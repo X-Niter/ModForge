@@ -12,8 +12,13 @@ import com.intellij.ui.components.JBScrollPane;
 import com.intellij.ui.components.JBTextField;
 import com.intellij.util.ui.JBUI;
 import com.intellij.util.ui.UIUtil;
+import com.intellij.openapi.fileChooser.FileChooserDescriptorFactory;
+import com.intellij.openapi.fileChooser.FileChooserDialog;
+import com.intellij.openapi.fileChooser.FileChooserFactory;
+import com.intellij.openapi.vfs.VirtualFile;
 import com.modforge.intellij.plugin.crossloader.ArchitecturyService;
 import com.modforge.intellij.plugin.crossloader.ArchitecturyService.ModLoader;
+import com.modforge.intellij.plugin.crossloader.generator.ArchitecturyTemplateGenerator;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 

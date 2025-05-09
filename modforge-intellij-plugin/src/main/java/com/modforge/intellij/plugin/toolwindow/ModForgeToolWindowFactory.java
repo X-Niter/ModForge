@@ -6,6 +6,7 @@ import com.intellij.openapi.wm.ToolWindow;
 import com.intellij.openapi.wm.ToolWindowFactory;
 import com.intellij.ui.content.Content;
 import com.intellij.ui.content.ContentFactory;
+import com.modforge.intellij.plugin.crossloader.ui.CrossLoaderPanel;
 import com.modforge.intellij.plugin.models.ModLoaderType;
 import com.modforge.intellij.plugin.services.ModForgeProjectService;
 import org.jetbrains.annotations.NotNull;
@@ -77,6 +78,15 @@ public class ModForgeToolWindowFactory implements ToolWindowFactory {
                 false
         );
         toolWindow.getContentManager().addContent(jarAnalyzerContent);
+        
+        // Add Cross-Loader tab
+        CrossLoaderPanel crossLoaderPanel = new CrossLoaderPanel(project);
+        Content crossLoaderContent = contentFactory.createContent(
+                crossLoaderPanel,
+                "Cross-Loader",
+                false
+        );
+        toolWindow.getContentManager().addContent(crossLoaderContent);
         
         // Add Metrics tab
         MetricsPanel metricsPanel = new MetricsPanel(project);

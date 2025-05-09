@@ -17,6 +17,7 @@
             <li><b>Pattern Learning:</b> The system learns from your code style and preferences over time</li>
             <li><b>JAR Analysis:</b> Extract useful patterns and examples from existing mods</li>
             <li><b>Documentation Explorer:</b> Access modding documentation directly within your IDE</li>
+            <li><b>Cross-Loader Development:</b> Create mods that work across Forge, Fabric, and Quilt with Architectury</li>
         </ul>
         
         <p>ModForge AI supports multiple mod loaders including Forge, Fabric, Quilt, and NeoForge.</p>
@@ -66,6 +67,12 @@
                     class="com.modforge.intellij.plugin.actions.AnalyzeJarAction"
                     text="Analyze JAR File" 
                     description="Analyze a mod JAR file for patterns">
+            </action>
+            
+            <action id="ModForgeAI.CreateCrossLoaderMod" 
+                    class="com.modforge.intellij.plugin.crossloader.actions.CreateCrossLoaderModAction"
+                    text="Create Cross-Loader Mod" 
+                    description="Create a new Minecraft mod that works across multiple mod loaders">
             </action>
             
             <action id="ModForgeAI.Settings" 
@@ -118,6 +125,7 @@
         <projectService serviceImplementation="com.modforge.intellij.plugin.services.ModForgeProjectService"/>
         <projectService serviceImplementation="com.modforge.intellij.plugin.services.ErrorResolutionService"/>
         <projectService serviceImplementation="com.modforge.intellij.plugin.services.RecommendationService"/>
+        <projectService serviceImplementation="com.modforge.intellij.plugin.crossloader.ArchitecturyService"/>
         
         <!-- Startup Activities -->
         <postStartupActivity implementation="com.modforge.intellij.plugin.services.RecommendationService$RecommendationStartupActivity"/>
