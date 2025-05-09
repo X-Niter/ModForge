@@ -500,7 +500,7 @@ const JarAnalyzerPage: React.FC = () => {
                     ) : (
                       <ScrollArea className="h-[400px] pr-4">
                         <div className="space-y-2">
-                          {jars?.map((jar: any) => (
+                          {jars.map((jar: JarFile) => (
                             <div 
                               key={jar.id}
                               onClick={() => setSelectedJarId(jar.id)}
@@ -547,7 +547,7 @@ const JarAnalyzerPage: React.FC = () => {
                     </CardTitle>
                     {selectedJarId && (
                       <CardDescription>
-                        {jars?.find((j: any) => j.id === selectedJarId)?.fileName || 'Selected JAR file'}
+                        {jars.find((j: JarFile) => j.id === selectedJarId)?.fileName || 'Selected JAR file'}
                       </CardDescription>
                     )}
                   </CardHeader>
@@ -581,21 +581,21 @@ const JarAnalyzerPage: React.FC = () => {
                           The JAR file may still be processing. Check back later.
                         </p>
                         
-                        {jars?.find((j: any) => j.id === selectedJarId)?.status === 'pending' && (
+                        {jars.find((j: JarFile) => j.id === selectedJarId)?.status === 'pending' && (
                           <div className="mt-4">
                             <Progress value={10} className="h-2" />
                             <p className="text-sm mt-1 text-muted-foreground">Waiting to be processed...</p>
                           </div>
                         )}
                         
-                        {jars?.find((j: any) => j.id === selectedJarId)?.status === 'processing' && (
+                        {jars.find((j: JarFile) => j.id === selectedJarId)?.status === 'processing' && (
                           <div className="mt-4">
                             <Progress value={50} className="h-2" />
                             <p className="text-sm mt-1 text-muted-foreground">Processing JAR file...</p>
                           </div>
                         )}
                         
-                        {jars?.find((j: any) => j.id === selectedJarId)?.status === 'error' && (
+                        {jars.find((j: JarFile) => j.id === selectedJarId)?.status === 'error' && (
                           <Alert variant="destructive" className="mt-4">
                             <AlertCircle className="h-4 w-4" />
                             <AlertTitle>Processing Error</AlertTitle>
@@ -608,7 +608,7 @@ const JarAnalyzerPage: React.FC = () => {
                     ) : (
                       <ScrollArea className="h-[400px] pr-4">
                         <div className="space-y-3">
-                          {classes?.map((cls: any) => (
+                          {classes.map((cls: ExtractedClass) => (
                             <div 
                               key={cls.id}
                               onClick={() => setSelectedClassId(cls.id)}
@@ -729,7 +729,7 @@ const JarAnalyzerPage: React.FC = () => {
                       </div>
                     ) : modrinthResults ? (
                       <div className="space-y-4 mt-4">
-                        {modrinthResults.map((mod: any) => (
+                        {modrinthResults.map((mod: ModrinthMod) => (
                           <Card key={mod.id}>
                             <CardContent className="p-4">
                               <div className="flex justify-between items-start">
