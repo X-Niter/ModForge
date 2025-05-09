@@ -24,9 +24,8 @@
         <applicationService serviceImplementation="com.modforge.intellij.plugin.ai.AIServiceManager"/>
         <applicationService serviceImplementation="com.modforge.intellij.plugin.ai.PatternRecognitionService"/>
 
-        <projectService serviceImplementation="com.modforge.intellij.plugin.services.AutonomousCodeGenerationService"/>
         <projectService serviceImplementation="com.modforge.intellij.plugin.services.ContinuousDevelopmentService"/>
-        <projectService serviceImplementation="com.modforge.intellij.plugin.listeners.ModForgeCompilationListener"/>
+        <projectService serviceImplementation="com.modforge.intellij.plugin.services.ModForgeProjectService"/>
 
         <!-- Tool Window -->
         <toolWindow id="ModForge" 
