@@ -18,6 +18,7 @@ import LicensePage from "@/pages/license";
 import MetricsPage from "@/pages/metrics";
 import ErrorResolutionPage from "@/pages/error-resolution";
 import WebExplorerPage from "@/pages/web-explorer";
+import JarAnalyzerPage from "@/pages/jar-analyzer";
 
 function Router() {
   return (
@@ -34,6 +35,7 @@ function Router() {
       <Route path="/metrics" component={MetricsPage}/>
       <Route path="/error-resolution" component={ErrorResolutionPage}/>
       <Route path="/web-explorer" component={WebExplorerPage}/>
+      <Route path="/jar-analyzer" component={JarAnalyzerPage}/>
       <Route component={NotFound} />
     </Switch>
   );

@@ -316,14 +316,15 @@ async function processClassFile(
   
   // Extract methods (basic information)
   const methods: {name: string, returnType: string, parameters: string[], isPublic: boolean}[] = [];
-  const methodMatches = content.matchAll(/(?:public|private|protected)?\s+(?:static\s+)?(?:final\s+)?([a-zA-Z0-9_<>]+)\s+([a-zA-Z0-9_]+)\s*\(([^)]*)\)/g);
+  const methodRegex = /(?:public|private|protected)?\s+(?:static\s+)?(?:final\s+)?([a-zA-Z0-9_<>]+)\s+([a-zA-Z0-9_]+)\s*\(([^)]*)\)/g;
+  let methodMatch;
   
-  for (const match of methodMatches) {
-    const returnType = match[1];
-    const methodName = match[2];
-    const params = match[3].trim();
-    const parameters = params.split(',').map(p => p.trim()).filter(p => p);
-    const isPublic = match[0].includes('public');
+  while ((methodMatch = methodRegex.exec(content)) !== null) {
+    const returnType = methodMatch[1];
+    const methodName = methodMatch[2];
+    const params = methodMatch[3].trim();
+    const parameters = params.split(',').map((p: string) => p.trim()).filter((p: string) => p);
+    const isPublic = methodMatch[0].includes('public');
     
     methods.push({
       name: methodName,
@@ -335,12 +336,13 @@ async function processClassFile(
   
   // Extract fields (basic information)
   const fields: {name: string, type: string, isPublic: boolean}[] = [];
-  const fieldMatches = content.matchAll(/(?:public|private|protected)?\s+(?:static\s+)?(?:final\s+)?([a-zA-Z0-9_<>]+)\s+([a-zA-Z0-9_]+)\s*(?:=|;)/g);
+  const fieldRegex = /(?:public|private|protected)?\s+(?:static\s+)?(?:final\s+)?([a-zA-Z0-9_<>]+)\s+([a-zA-Z0-9_]+)\s*(?:=|;)/g;
+  let fieldMatch;
   
-  for (const match of fieldMatches) {
-    const fieldType = match[1];
-    const fieldName = match[2];
-    const isPublic = match[0].includes('public');
+  while ((fieldMatch = fieldRegex.exec(content)) !== null) {
+    const fieldType = fieldMatch[1];
+    const fieldName = fieldMatch[2];
+    const isPublic = fieldMatch[0].includes('public');
     
     fields.push({
       name: fieldName,
