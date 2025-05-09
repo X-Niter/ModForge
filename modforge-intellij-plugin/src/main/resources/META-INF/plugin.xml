@@ -49,26 +49,45 @@
     </extensions>
 
     <actions>
-        <!-- Code Generation Actions -->
+        <!-- Main Menu Actions -->
         <group id="ModForge.ActionGroup" text="ModForge" description="ModForge actions" popup="true">
             <add-to-group group-id="ToolsMenu" anchor="last" />
-            <action id="ModForge.GenerateCode" 
-                    class="com.modforge.intellij.plugin.actions.GenerateCodeAction" 
-                    text="Generate Code" 
-                    description="Generate code using AI" />
-            <action id="ModForge.FixErrors" 
-                    class="com.modforge.intellij.plugin.actions.FixErrorsAction" 
-                    text="Fix Errors" 
-                    description="Fix errors in code using AI" />
-            <action id="ModForge.GenerateDocumentation" 
-                    class="com.modforge.intellij.plugin.actions.GenerateDocumentationAction" 
-                    text="Generate Documentation" 
-                    description="Generate documentation for code using AI" />
-            <action id="ModForge.ExplainCode" 
-                    class="com.modforge.intellij.plugin.actions.ExplainCodeAction" 
-                    text="Explain Code" 
-                    description="Explain code using AI" />
+            
+            <!-- Code Generation Actions -->
+            <group id="ModForge.CodeGenGroup" text="Code Generation" description="Code generation actions" popup="true">
+                <action id="ModForge.GenerateCode" 
+                        class="com.modforge.intellij.plugin.actions.GenerateCodeAction" 
+                        text="Generate Code" 
+                        description="Generate code using AI" />
+                <action id="ModForge.FixErrors" 
+                        class="com.modforge.intellij.plugin.actions.FixErrorsAction" 
+                        text="Fix Errors" 
+                        description="Fix errors in code using AI" />
+                <action id="ModForge.GenerateDocumentation" 
+                        class="com.modforge.intellij.plugin.actions.GenerateDocumentationAction" 
+                        text="Generate Documentation" 
+                        description="Generate documentation for code using AI" />
+                <action id="ModForge.ExplainCode" 
+                        class="com.modforge.intellij.plugin.actions.ExplainCodeAction" 
+                        text="Explain Code" 
+                        description="Explain code using AI" />
+            </group>
+            
+            <!-- Toggle Actions -->
+            <group id="ModForge.ToggleGroup" text="Toggles" description="Toggle features" popup="true">
+                <action id="ModForge.ToggleContinuousDevelopment" 
+                        class="com.modforge.intellij.plugin.actions.ToggleContinuousDevelopmentAction" 
+                        text="Enable Continuous Development" 
+                        description="Toggle continuous development mode" />
+                <action id="ModForge.TogglePatternRecognition" 
+                        class="com.modforge.intellij.plugin.actions.TogglePatternRecognitionAction" 
+                        text="Enable Pattern Recognition" 
+                        description="Toggle pattern recognition to reduce API usage" />
+            </group>
+            
             <separator />
+            
+            <!-- Utility Actions -->
             <action id="ModForge.ShowToolWindow" 
                     class="com.modforge.intellij.plugin.actions.ShowToolWindowAction" 
                     text="Show ModForge Tool Window" 
@@ -84,20 +103,30 @@
             <add-to-group group-id="EditorPopupMenu" anchor="last" />
             <action id="ModForge.GenerateCode.EditorPopup" 
                     class="com.modforge.intellij.plugin.actions.GenerateCodeAction" 
-                    text="Generate Code" 
+                    text="Generate Code with AI" 
                     description="Generate code using AI" />
             <action id="ModForge.FixErrors.EditorPopup" 
                     class="com.modforge.intellij.plugin.actions.FixErrorsAction" 
-                    text="Fix Errors" 
+                    text="Fix Errors with AI" 
                     description="Fix errors in code using AI" />
             <action id="ModForge.GenerateDocumentation.EditorPopup" 
                     class="com.modforge.intellij.plugin.actions.GenerateDocumentationAction" 
-                    text="Generate Documentation" 
+                    text="Generate Documentation with AI" 
                     description="Generate documentation for code using AI" />
             <action id="ModForge.ExplainCode.EditorPopup" 
                     class="com.modforge.intellij.plugin.actions.ExplainCodeAction" 
-                    text="Explain Code" 
+                    text="Explain Code with AI" 
                     description="Explain code using AI" />
+        </group>
+        
+        <!-- Main Toolbar Actions -->
+        <group id="ModForge.ToolbarActions">
+            <add-to-group group-id="MainToolBar" anchor="last" />
+            <action id="ModForge.ToggleContinuousDevelopment.Toolbar" 
+                    class="com.modforge.intellij.plugin.actions.ToggleContinuousDevelopmentAction" 
+                    text="Toggle Continuous Development" 
+                    description="Toggle continuous development mode"
+                    icon="AllIcons.Actions.Resume" />
         </group>
     </actions>
 </idea-plugin>

@@ -1,8 +1,7 @@
 package com.modforge.intellij.plugin.services;
 
 import com.intellij.openapi.application.ApplicationManager;
-import com.intellij.openapi.command.CommandProcessor;
-import com.intellij.openapi.command.WriteCommandAction;
+import com.intellij.openapi.application.ReadAction;
 import com.intellij.openapi.components.Service;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.editor.Document;
@@ -15,7 +14,6 @@ import com.intellij.psi.PsiManager;
 import com.modforge.intellij.plugin.ai.AIServiceManager;
 import com.modforge.intellij.plugin.ai.PatternRecognitionService;
 import com.modforge.intellij.plugin.ai.PatternRecognitionService.Pattern;
-import org.jetbrains.annotations.Nullable;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -30,7 +28,6 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 /**
  * Service that provides autonomous code generation capabilities.
@@ -324,412 +321,151 @@ public final class AutonomousCodeGenerationService {
         // Create options if null
         Map<String, Object> requestOptions = options != null ? new HashMap<>(options) : new HashMap<>();
         
-        // Create prompt for code explanation
-        String prompt = "Explain the following code in detail:\n\n" + code;
+        // Create prompt for explanation
+        String prompt = "Explain the following code:\n\n" + code;
         
-        // Create system prompt for code explanation
-        String systemPrompt = "You are an expert Minecraft mod developer and educator. " +
-                "Provide a detailed explanation of the provided code. " +
-                "Break down the explanation into sections: " +
-                "1. Overview - What the code does at a high level " +
-                "2. Key Components - The main classes, methods, and data structures " +
-                "3. Flow - How the code executes step by step " +
-                "4. Best Practices - Good patterns used in the code " +
-                "5. Potential Improvements - Any suggestions for making the code better";
+        // Create system prompt for explanation
+        String systemPrompt = "You are an expert Minecraft mod developer and technical writer. " +
+                "Explain the following code in detail, including its purpose, functionality, and any notable patterns or techniques. " +
+                "Be thorough but concise, and focus on helping the user understand the code completely. " +
+                "Use examples where appropriate to illustrate key concepts.";
         
         requestOptions.put("systemPrompt", systemPrompt);
         requestOptions.put("temperature", 0.3);
         requestOptions.put("maxTokens", 2048);
         
-        // Explain code using AI service
+        // Generate explanation using AI service
         return aiServiceManager.generateChatCompletion(prompt, requestOptions);
     }
     
     /**
-     * Analyzes a file for issues.
-     * @param file The file to analyze
-     * @return A future that completes with a list of issues
+     * Generates a chat response.
+     * @param prompt The prompt
+     * @param options Additional options
+     * @return A future that completes with the response
      */
-    public CompletableFuture<List<CodeIssue>> analyzeFile(@NotNull VirtualFile file) {
-        LOG.info("Analyzing file: " + file.getName());
+    public CompletableFuture<String> generateChatResponse(@NotNull String prompt, @Nullable Map<String, Object> options) {
+        LOG.info("Generating chat response for prompt: " + prompt);
         
-        return CompletableFuture.supplyAsync(() -> {
-            try {
-                // Get document
-                Document document = FileDocumentManager.getInstance().getDocument(file);
-                
-                if (document == null) {
-                    LOG.warn("Could not get document for file: " + file.getName());
-                    return new ArrayList<>();
-                }
-                
-                // Get file content
-                String content = document.getText();
-                
-                // Get PSI file
-                PsiFile psiFile = PsiManager.getInstance(project).findFile(file);
-                
-                if (psiFile == null) {
-                    LOG.warn("Could not get PSI file for file: " + file.getName());
-                    return new ArrayList<>();
-                }
-                
-                // Get language
-                String language = psiFile.getLanguage().getDisplayName().toLowerCase();
-                
-                // Create options
-                Map<String, Object> options = new HashMap<>();
-                options.put("language", language);
-                options.put("fileName", file.getName());
-                options.put("filePath", file.getPath());
-                
-                // Create prompt for code analysis
-                String prompt = "Analyze the following code for potential issues and improvements:\n\n" + content;
-                
-                // Create system prompt for code analysis
-                String systemPrompt = "You are an expert code analyzer and Minecraft mod developer. " +
-                        "Identify potential issues, bugs, and areas for improvement in the provided code. " +
-                        "Focus on issues that would cause compilation errors, runtime errors, or poor performance. " +
-                        "Format your response as a JSON array of issues. Each issue should have the following fields: " +
-                        "message (string), line (number), column (number), file (string), code (string snippet). " +
-                        "Only include the JSON array in your response, no other text.";
-                
-                options.put("systemPrompt", systemPrompt);
-                options.put("temperature", 0.1);
-                options.put("maxTokens", 2048);
-                
-                // Analyze code using AI service
-                String response = aiServiceManager.generateChatCompletion(prompt, options)
-                        .get(DEFAULT_TIMEOUT_SECONDS, TimeUnit.SECONDS);
-                
-                // Parse response
-                return parseIssues(response, file.getPath());
-            } catch (IOException | InterruptedException | ExecutionException | TimeoutException e) {
-                LOG.error("Error analyzing file: " + file.getName(), e);
-                return new ArrayList<>();
-            }
-        });
+        // Create options if null
+        Map<String, Object> requestOptions = options != null ? new HashMap<>(options) : new HashMap<>();
+        
+        // Create system prompt for chat
+        String systemPrompt = "You are an expert Minecraft mod developer assistant named ModForge. " +
+                "Provide helpful, concise, and accurate responses to questions about Minecraft modding. " +
+                "Prioritize code examples and practical solutions. " +
+                "Consider multiple mod loaders (Forge, Fabric, Quilt) and Minecraft versions in your answers. " +
+                "If you're uncertain, be honest about your limitations.";
+        
+        requestOptions.put("systemPrompt", systemPrompt);
+        requestOptions.put("temperature", 0.7);
+        requestOptions.put("maxTokens", 2048);
+        
+        // Generate chat response using AI service
+        return aiServiceManager.generateChatCompletion(prompt, requestOptions);
     }
     
     /**
-     * Fixes issues in a file.
-     * @param file The file
-     * @param issues The issues to fix
-     * @return A future that completes with the number of issues fixed
+     * Fixes a list of code issues in a batch.
+     * @param issues The code issues to fix
+     * @param options Additional options
+     * @return A future that completes with a map of file paths to fixed code
      */
-    public CompletableFuture<Integer> fixIssues(@NotNull VirtualFile file, @NotNull List<CodeIssue> issues) {
-        LOG.info("Fixing " + issues.size() + " issues in file: " + file.getName());
+    public CompletableFuture<Map<String, String>> fixCodeIssues(@NotNull List<CodeIssue> issues, @Nullable Map<String, Object> options) {
+        LOG.info("Fixing " + issues.size() + " code issues");
         
-        return CompletableFuture.supplyAsync(() -> {
-            try {
-                // Get document
-                Document document = FileDocumentManager.getInstance().getDocument(file);
-                
-                if (document == null) {
-                    LOG.warn("Could not get document for file: " + file.getName());
-                    return 0;
-                }
-                
-                // Get file content
-                String content = document.getText();
-                
-                // Count fixed issues
-                int fixedCount = 0;
-                
-                // Fix each issue
-                for (CodeIssue issue : issues) {
-                    try {
-                        // Get code snippet
-                        String codeSnippet = issue.getCode();
-                        
-                        if (codeSnippet == null || codeSnippet.isEmpty()) {
-                            LOG.warn("No code snippet for issue: " + issue.getMessage());
-                            continue;
-                        }
-                        
-                        // Fix code snippet
-                        Map<String, Object> options = new HashMap<>();
-                        options.put("fileName", file.getName());
-                        options.put("filePath", file.getPath());
-                        options.put("line", issue.getLine());
-                        options.put("column", issue.getColumn());
-                        
-                        String fixedSnippet = fixCode(codeSnippet, issue.getMessage(), options)
-                                .get(DEFAULT_TIMEOUT_SECONDS, TimeUnit.SECONDS);
-                        
-                        if (fixedSnippet.equals(codeSnippet)) {
-                            LOG.warn("Could not fix issue: " + issue.getMessage());
-                            continue;
-                        }
-                        
-                        // Replace code snippet in document
-                        int startOffset = content.indexOf(codeSnippet);
-                        
-                        if (startOffset == -1) {
-                            LOG.warn("Could not find code snippet in file: " + file.getName());
-                            continue;
-                        }
-                        
-                        int endOffset = startOffset + codeSnippet.length();
-                        
-                        // Update document
-                        ApplicationManager.getApplication().invokeAndWait(() -> {
-                            WriteCommandAction.runWriteCommandAction(project, () -> {
-                                CommandProcessor.getInstance().executeCommand(project, () -> {
-                                    document.replaceString(startOffset, endOffset, fixedSnippet);
-                                    
-                                    // Save document
-                                    FileDocumentManager.getInstance().saveDocument(document);
-                                }, "Fix Issue", null);
-                            });
-                        });
-                        
-                        // Update content
-                        content = document.getText();
-                        
-                        // Increment fixed count
-                        fixedCount++;
-                    } catch (Exception e) {
-                        LOG.error("Error fixing issue: " + issue.getMessage(), e);
-                    }
-                }
-                
-                return fixedCount;
-            } catch (Exception e) {
-                LOG.error("Error fixing issues in file: " + file.getName(), e);
-                return 0;
+        // Create options if null
+        Map<String, Object> requestOptions = options != null ? new HashMap<>(options) : new HashMap<>();
+        
+        // Group issues by file
+        Map<String, List<CodeIssue>> issuesByFile = new HashMap<>();
+        
+        for (CodeIssue issue : issues) {
+            if (!issuesByFile.containsKey(issue.getFile())) {
+                issuesByFile.put(issue.getFile(), new ArrayList<>());
             }
-        });
-    }
-    
-    /**
-     * Fixes errors in a file.
-     * @param file The file
-     * @param errorMessages The error messages
-     * @return A future that completes with a boolean indicating success
-     */
-    public CompletableFuture<Boolean> fixErrorsInFile(@NotNull VirtualFile file, @NotNull List<String> errorMessages) {
-        LOG.info("Fixing errors in file: " + file.getName());
-        
-        return CompletableFuture.supplyAsync(() -> {
-            try {
-                // Get document
-                Document document = FileDocumentManager.getInstance().getDocument(file);
-                
-                if (document == null) {
-                    LOG.warn("Could not get document for file: " + file.getName());
-                    return false;
-                }
-                
-                // Get file content
-                String content = document.getText();
-                
-                // Create options
-                Map<String, Object> options = new HashMap<>();
-                options.put("fileName", file.getName());
-                options.put("filePath", file.getPath());
-                
-                // Join error messages
-                String errorMessage = String.join("\n", errorMessages);
-                
-                // Fix code
-                String fixedCode = fixCode(content, errorMessage, options)
-                        .get(DEFAULT_TIMEOUT_SECONDS, TimeUnit.SECONDS);
-                
-                if (fixedCode.equals(content)) {
-                    LOG.warn("Could not fix errors in file: " + file.getName());
-                    return false;
-                }
-                
-                // Update document
-                ApplicationManager.getApplication().invokeAndWait(() -> {
-                    WriteCommandAction.runWriteCommandAction(project, () -> {
-                        CommandProcessor.getInstance().executeCommand(project, () -> {
-                            document.setText(fixedCode);
-                            
-                            // Save document
-                            FileDocumentManager.getInstance().saveDocument(document);
-                        }, "Fix Errors", null);
-                    });
-                });
-                
-                return true;
-            } catch (Exception e) {
-                LOG.error("Error fixing errors in file: " + file.getName(), e);
-                return false;
-            }
-        });
-    }
-    
-    /**
-     * Analyzes and enhances a file.
-     * @param file The file to analyze and enhance
-     * @return A future that completes with a boolean indicating if enhancements were made
-     */
-    public CompletableFuture<Boolean> analyzeAndEnhanceFile(@NotNull VirtualFile file) {
-        LOG.info("Analyzing and enhancing file: " + file.getName());
-        
-        return CompletableFuture.supplyAsync(() -> {
-            try {
-                // Get document
-                Document document = FileDocumentManager.getInstance().getDocument(file);
-                
-                if (document == null) {
-                    LOG.warn("Could not get document for file: " + file.getName());
-                    return false;
-                }
-                
-                // Get file content
-                String content = document.getText();
-                
-                // Get PSI file
-                PsiFile psiFile = PsiManager.getInstance(project).findFile(file);
-                
-                if (psiFile == null) {
-                    LOG.warn("Could not get PSI file for file: " + file.getName());
-                    return false;
-                }
-                
-                // Get language
-                String language = psiFile.getLanguage().getDisplayName().toLowerCase();
-                
-                // Create options
-                Map<String, Object> options = new HashMap<>();
-                options.put("language", language);
-                options.put("fileName", file.getName());
-                options.put("filePath", file.getPath());
-                
-                // Create prompt for code enhancement
-                String prompt = "Enhance the following code to improve readability, performance, " +
-                        "and maintainability. Focus on adding proper documentation, optimizing algorithms, " +
-                        "and following Minecraft modding best practices:\n\n" + content;
-                
-                // Create system prompt for code enhancement
-                String systemPrompt = "You are an expert Minecraft mod developer and code optimizer. " +
-                        "Improve the provided code by adding comprehensive documentation, optimizing algorithms, " +
-                        "and applying best practices for Minecraft modding. " +
-                        "Make sure the enhanced code maintains the original functionality. " +
-                        "Only output the enhanced code, no explanations or markdown formatting.";
-                
-                options.put("systemPrompt", systemPrompt);
-                options.put("temperature", 0.1);
-                options.put("maxTokens", 2048);
-                
-                // Enhance code using AI service
-                String enhancedCode = aiServiceManager.generateChatCompletion(prompt, options)
-                        .get(DEFAULT_TIMEOUT_SECONDS, TimeUnit.SECONDS);
-                
-                if (enhancedCode.equals(content)) {
-                    LOG.info("No enhancements made to file: " + file.getName());
-                    return false;
-                }
-                
-                // Update document
-                ApplicationManager.getApplication().invokeAndWait(() -> {
-                    WriteCommandAction.runWriteCommandAction(project, () -> {
-                        CommandProcessor.getInstance().executeCommand(project, () -> {
-                            document.setText(enhancedCode);
-                            
-                            // Save document
-                            FileDocumentManager.getInstance().saveDocument(document);
-                        }, "Enhance Code", null);
-                    });
-                });
-                
-                return true;
-            } catch (Exception e) {
-                LOG.error("Error enhancing file: " + file.getName(), e);
-                return false;
-            }
-        });
-    }
-    
-    /**
-     * Parses issues from an API response.
-     * @param response The API response
-     * @param filePath The file path
-     * @return A list of issues
-     */
-    private List<CodeIssue> parseIssues(@NotNull String response, @NotNull String filePath) {
-        List<CodeIssue> issues = new ArrayList<>();
-        
-        try {
-            // Parse JSON response
-            // This is a simple extraction, in a real system we would use a JSON library
-            String jsonArray = response.trim();
             
-            if (jsonArray.startsWith("[") && jsonArray.endsWith("]")) {
-                // Extract issues
-                String[] issueStrings = jsonArray.substring(1, jsonArray.length() - 1).split("\\},\\s*\\{");
-                
-                for (String issueString : issueStrings) {
-                    // Add braces if removed by split
-                    if (!issueString.startsWith("{")) {
-                        issueString = "{" + issueString;
-                    }
-                    if (!issueString.endsWith("}")) {
-                        issueString = issueString + "}";
-                    }
+            issuesByFile.get(issue.getFile()).add(issue);
+        }
+        
+        // Fix each file
+        Map<String, CompletableFuture<String>> futures = new HashMap<>();
+        
+        for (Map.Entry<String, List<CodeIssue>> entry : issuesByFile.entrySet()) {
+            String filePath = entry.getKey();
+            List<CodeIssue> fileIssues = entry.getValue();
+            
+            // Get file content
+            String fileContent = getFileContent(filePath);
+            
+            if (fileContent == null) {
+                LOG.error("Could not get content for file: " + filePath);
+                continue;
+            }
+            
+            // Create error message
+            StringBuilder errorMessage = new StringBuilder();
+            
+            for (CodeIssue issue : fileIssues) {
+                errorMessage.append(issue.getMessage()).append(" (Line ").append(issue.getLine()).append(")\n");
+            }
+            
+            // Create options for file
+            Map<String, Object> fileOptions = new HashMap<>(requestOptions);
+            fileOptions.put("filePath", filePath);
+            
+            // Fix code
+            CompletableFuture<String> future = fixCode(fileContent, errorMessage.toString(), fileOptions);
+            
+            futures.put(filePath, future);
+        }
+        
+        // Combine futures
+        return CompletableFuture.allOf(futures.values().toArray(new CompletableFuture[0]))
+                .thenApply(v -> {
+                    Map<String, String> result = new HashMap<>();
                     
-                    // Extract fields
-                    String message = extractJsonField(issueString, "message");
-                    int line = extractJsonIntField(issueString, "line");
-                    int column = extractJsonIntField(issueString, "column");
-                    String file = extractJsonField(issueString, "file");
-                    String code = extractJsonField(issueString, "code");
-                    
-                    if (message != null && !message.isEmpty() && code != null && !code.isEmpty()) {
-                        // Use filePath if file is empty
-                        if (file == null || file.isEmpty()) {
-                            file = filePath;
+                    for (Map.Entry<String, CompletableFuture<String>> entry : futures.entrySet()) {
+                        try {
+                            result.put(entry.getKey(), entry.getValue().get());
+                        } catch (InterruptedException | ExecutionException e) {
+                            LOG.error("Error getting fixed code for file: " + entry.getKey(), e);
                         }
-                        
-                        issues.add(new CodeIssue(message, line, column, file, code));
                     }
-                }
+                    
+                    return result;
+                });
+    }
+    
+    /**
+     * Gets the content of a file.
+     * @param filePath The file path
+     * @return The file content or null if an error occurs
+     */
+    @Nullable
+    private String getFileContent(@NotNull String filePath) {
+        try {
+            // Find the file
+            VirtualFile file = project.getBaseDir().findFileByRelativePath(filePath);
+            
+            if (file == null) {
+                LOG.error("File not found: " + filePath);
+                return null;
             }
+            
+            // Get document
+            Document document = FileDocumentManager.getInstance().getDocument(file);
+            
+            if (document == null) {
+                LOG.error("Could not get document for file: " + filePath);
+                return null;
+            }
+            
+            // Get content
+            return document.getText();
         } catch (Exception e) {
-            LOG.error("Error parsing issues from response: " + response, e);
+            LOG.error("Error getting file content: " + filePath, e);
+            return null;
         }
-        
-        return issues;
-    }
-    
-    /**
-     * Extracts a string field from a JSON object string.
-     * @param json The JSON object string
-     * @param field The field name
-     * @return The field value
-     */
-    private String extractJsonField(@NotNull String json, @NotNull String field) {
-        Pattern pattern = Pattern.compile("\"" + field + "\"\\s*:\\s*\"([^\"]*)\"");
-        Matcher matcher = pattern.matcher(json);
-        
-        if (matcher.find()) {
-            return matcher.group(1);
-        }
-        
-        return null;
-    }
-    
-    /**
-     * Extracts an integer field from a JSON object string.
-     * @param json The JSON object string
-     * @param field The field name
-     * @return The field value
-     */
-    private int extractJsonIntField(@NotNull String json, @NotNull String field) {
-        Pattern pattern = Pattern.compile("\"" + field + "\"\\s*:\\s*(\\d+)");
-        Matcher matcher = pattern.matcher(json);
-        
-        if (matcher.find()) {
-            try {
-                return Integer.parseInt(matcher.group(1));
-            } catch (NumberFormatException e) {
-                LOG.error("Error parsing integer field: " + field, e);
-            }
-        }
-        
-        return 0;
     }
 }
