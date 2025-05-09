@@ -7,13 +7,18 @@ async function throwIfResNotOk(res: Response) {
   }
 }
 
+interface ExtendedRequestInit extends RequestInit {
+  data?: any;
+}
+
 export async function apiRequest<T = any>(
   url: string,
-  options?: RequestInit
+  options?: ExtendedRequestInit
 ): Promise<T> {
   const res = await fetch(url, {
     ...options,
-    headers: options?.body 
+    body: options?.data ? JSON.stringify(options.data) : options?.body,
+    headers: (options?.data || options?.body)
       ? { ...options?.headers, "Content-Type": "application/json" } 
       : options?.headers,
     credentials: "include",

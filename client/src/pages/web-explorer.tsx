@@ -45,13 +45,24 @@ interface WebScrapingStats {
   failedSources: number;
 }
 
-// Form schema for adding a new source
+// Define the form schema for validation
 const addSourceSchema = z.object({
   url: z.string().url({ message: "Please enter a valid URL" }),
   description: z.string().optional(),
   contentType: z.string({ required_error: "Please select a content type" }),
-  tags: z.string().optional().transform(val => val ? val.split(',').map(tag => tag.trim()) : [])
+  tags: z.string().optional()
 });
+
+// Define the form type for React Hook Form
+type SourceFormValues = z.infer<typeof addSourceSchema>;
+
+// Type for the transformed data sent to the API
+type SourceApiValues = {
+  url: string;
+  description?: string;
+  contentType: string;
+  tags: string[];
+};
 
 // WebExplorer component
 export default function WebExplorerPage() {
@@ -60,20 +71,20 @@ export default function WebExplorerPage() {
   const queryClient = useQueryClient();
 
   // Query to get all sources
-  const { data: sources, isLoading: sourcesLoading } = useQuery({
+  const { data: sources = [], isLoading: sourcesLoading } = useQuery<WebSource[]>({
     queryKey: ['/api/web-explorer/sources'],
     retry: 1
   });
 
-  // Query to get statistics
-  const { data: stats, isLoading: statsLoading } = useQuery({
+  // Query to get statistics with default empty object
+  const { data: stats = {} as WebScrapingStats, isLoading: statsLoading } = useQuery<WebScrapingStats>({
     queryKey: ['/api/web-explorer/stats'],
     retry: 1
   });
 
   // Mutation for adding a new source
   const addSourceMutation = useMutation({
-    mutationFn: (newSource: z.infer<typeof addSourceSchema>) => {
+    mutationFn: (newSource: SourceApiValues) => {
       return apiRequest('/api/web-explorer/sources', {
         method: 'POST',
         data: newSource
@@ -147,7 +158,7 @@ export default function WebExplorerPage() {
   });
 
   // Form setup for adding a new source
-  const form = useForm<z.infer<typeof addSourceSchema>>({
+  const form = useForm<SourceFormValues>({
     resolver: zodResolver(addSourceSchema),
     defaultValues: {
       url: "",
@@ -157,8 +168,20 @@ export default function WebExplorerPage() {
     }
   });
 
-  const onSubmit = (values: z.infer<typeof addSourceSchema>) => {
-    addSourceMutation.mutate(values);
+  const onSubmit = (values: SourceFormValues) => {
+    // Transform the form values to the API format
+    const apiValues: SourceApiValues = {
+      url: values.url,
+      contentType: values.contentType,
+      tags: values.tags ? values.tags.split(',').map(tag => tag.trim()) : [],
+    };
+    
+    // Add description only if it's provided
+    if (values.description) {
+      apiValues.description = values.description;
+    }
+    
+    addSourceMutation.mutate(apiValues);
   };
 
   // Function to get status badge color
