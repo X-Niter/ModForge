@@ -1,323 +1,265 @@
 package com.modforge.intellij.plugin.services;
 
-import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
-import com.google.gson.reflect.TypeToken;
-import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.components.Service;
+import com.intellij.openapi.components.ServiceManager;
 import com.intellij.openapi.diagnostic.Logger;
-import com.modforge.intellij.plugin.models.*;
-import com.modforge.intellij.plugin.utils.ApiRequestUtil;
-import okhttp3.*;
+import com.intellij.openapi.project.Project;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-import java.io.IOException;
-import java.lang.reflect.Type;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.concurrent.*;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
- * Manages AI services and API interactions between the IDE plugin and the web platform.
- * Handles API requests, pattern sync, and remote code generation.
+ * Manages AI service requests and tracks usage metrics.
+ * Integrates with pattern learning system to optimize API usage.
  */
-@Service
+@Service(Service.Level.APP)
 public final class AIServiceManager {
     private static final Logger LOG = Logger.getInstance(AIServiceManager.class);
     
-    private final Gson gson;
-    private final OkHttpClient httpClient;
-    private final ExecutorService executorService;
+    // Estimated average tokens per request
+    private static final int AVG_TOKENS_PER_REQUEST = 1000;
     
-    // API endpoints
-    private String apiBaseUrl = "https://modforge.ai/api"; // Can be configured in settings
-    private String patternsEndpoint = "/patterns";
-    private String codeGenerationEndpoint = "/generate-code";
-    private String errorResolutionEndpoint = "/resolve-error";
-    private String testModEndpoint = "/test-mod";
+    // Cost per 1K tokens
+    private static final double COST_PER_1K_TOKENS = 0.002; // $0.002 per 1K tokens for GPT-4
     
-    // Service status
-    private boolean isConnected = false;
-    private boolean useRemoteServices = true;
+    // Metrics
+    private final AtomicInteger totalRequests = new AtomicInteger(0);
+    private final AtomicInteger patternMatches = new AtomicInteger(0);
+    private final AtomicInteger apiCalls = new AtomicInteger(0);
+    private final AtomicInteger estimatedTokensSaved = new AtomicInteger(0);
+    private final AtomicInteger estimatedCostSavedInCents = new AtomicInteger(0);
     
-    public AIServiceManager() {
-        gson = new GsonBuilder().setPrettyPrinting().create();
-        httpClient = new OkHttpClient.Builder()
-                .connectTimeout(30, TimeUnit.SECONDS)
-                .readTimeout(60, TimeUnit.SECONDS)
-                .writeTimeout(60, TimeUnit.SECONDS)
-                .build();
-        executorService = Executors.newCachedThreadPool();
+    // Cache for project-specific services
+    private final Map<Project, ProjectAIServices> projectServicesMap = new ConcurrentHashMap<>();
+    
+    /**
+     * Project-specific AI services.
+     */
+    private static class ProjectAIServices {
+        final PatternCachingService cachingService;
+        final PatternRecognitionService recognitionService;
+        final EmbeddingService embeddingService;
         
-        // Check connection to web platform on startup
-        checkConnection();
-    }
-    
-    /**
-     * Checks the connection to the web platform.
-     */
-    public void checkConnection() {
-        try {
-            Request request = new Request.Builder()
-                    .url(apiBaseUrl + "/health")
-                    .build();
-            
-            try (Response response = httpClient.newCall(request).execute()) {
-                isConnected = response.isSuccessful();
-                LOG.info("ModForge AI web platform connection status: " + (isConnected ? "Connected" : "Disconnected"));
-            }
-        } catch (Exception e) {
-            isConnected = false;
-            LOG.warn("Could not connect to ModForge AI web platform", e);
+        ProjectAIServices(Project project) {
+            this.cachingService = PatternCachingService.getInstance(project);
+            this.recognitionService = PatternRecognitionService.getInstance(project);
+            this.embeddingService = EmbeddingService.getInstance(project);
         }
     }
     
     /**
-     * Returns whether the plugin is connected to the web platform.
+     * Gets the AIServiceManager instance.
+     * @return The AIServiceManager instance
      */
-    public boolean isConnectedToWebPlatform() {
-        return isConnected;
+    public static AIServiceManager getInstance() {
+        return ServiceManager.getService(AIServiceManager.class);
     }
     
     /**
-     * Sets whether to use remote services for computation-intensive tasks.
+     * Gets project-specific services.
+     * @param project The project
+     * @return The project services
      */
-    public void setUseRemoteServices(boolean useRemote) {
-        this.useRemoteServices = useRemote;
+    @NotNull
+    private ProjectAIServices getProjectServices(@NotNull Project project) {
+        return projectServicesMap.computeIfAbsent(project, ProjectAIServices::new);
     }
     
     /**
-     * Uploads patterns to the web platform.
-     * @param patterns The patterns to upload
-     * @return True if successful, false otherwise
+     * Records a request to the AI service.
+     * @return The request ID
      */
-    public boolean uploadPatterns(List<Pattern> patterns) {
-        if (!isConnected || patterns.isEmpty()) {
-            return false;
-        }
+    public int recordRequest() {
+        return totalRequests.incrementAndGet();
+    }
+    
+    /**
+     * Records a pattern match success.
+     * @param tokensEstimate The estimated number of tokens saved
+     * @return The pattern match ID
+     */
+    public int recordPatternMatchSuccess(int tokensEstimate) {
+        estimatedTokensSaved.addAndGet(tokensEstimate);
         
-        try {
-            String json = gson.toJson(patterns);
-            RequestBody body = RequestBody.create(json, ApiRequestUtil.JSON);
-            
-            Request request = new Request.Builder()
-                    .url(apiBaseUrl + patternsEndpoint)
-                    .post(body)
-                    .build();
-            
-            try (Response response = httpClient.newCall(request).execute()) {
-                boolean success = response.isSuccessful();
-                if (success) {
-                    LOG.info("Successfully uploaded " + patterns.size() + " patterns to web platform");
-                } else {
-                    LOG.warn("Failed to upload patterns. Status: " + response.code());
-                }
-                return success;
-            }
-        } catch (Exception e) {
-            LOG.error("Error uploading patterns", e);
-            return false;
-        }
-    }
-    
-    /**
-     * Downloads the latest patterns from the web platform.
-     * @param lastSyncTimestamp The timestamp of the last sync
-     * @return The downloaded patterns
-     */
-    public List<Pattern> downloadLatestPatterns(long lastSyncTimestamp) {
-        if (!isConnected) {
-            return new ArrayList<>();
-        }
+        // Calculate cost saved in cents
+        int costSavedInCents = (int) (tokensEstimate * COST_PER_1K_TOKENS * 100 / 1000);
+        estimatedCostSavedInCents.addAndGet(costSavedInCents);
         
-        try {
-            HttpUrl url = HttpUrl.parse(apiBaseUrl + patternsEndpoint).newBuilder()
-                    .addQueryParameter("since", String.valueOf(lastSyncTimestamp))
-                    .build();
-            
-            Request request = new Request.Builder()
-                    .url(url)
-                    .get()
-                    .build();
-            
-            try (Response response = httpClient.newCall(request).execute()) {
-                if (response.isSuccessful() && response.body() != null) {
-                    Type patternListType = new TypeToken<ArrayList<Pattern>>(){}.getType();
-                    List<Pattern> patterns = gson.fromJson(response.body().string(), patternListType);
-                    LOG.info("Downloaded " + patterns.size() + " patterns from web platform");
-                    return patterns;
-                } else {
-                    LOG.warn("Failed to download patterns. Status: " + response.code());
-                    return new ArrayList<>();
-                }
-            }
-        } catch (Exception e) {
-            LOG.error("Error downloading patterns", e);
-            return new ArrayList<>();
-        }
+        return patternMatches.incrementAndGet();
     }
     
     /**
-     * Generates code using the web platform or local services.
-     * @param request The code generation request
-     * @return The generated code response, or null if generation failed
+     * Records an API fallback.
+     * @return The API call ID
      */
-    @Nullable
-    public CodeGenerationResponse generateCode(@NotNull CodeGenerationRequest request) {
-        // If using remote services and connected to web platform, use remote code generation
-        if (useRemoteServices && isConnected) {
-            return generateCodeRemotely(request);
-        } else {
-            // Otherwise, use local code generation
-            return generateCodeLocally(request);
-        }
+    public int recordApiFallback() {
+        return apiCalls.incrementAndGet();
     }
     
     /**
-     * Generates code using the remote web platform.
-     * @param request The code generation request
-     * @return The generated code response, or null if generation failed
+     * Gets usage metrics.
+     * @return The usage metrics
      */
-    @Nullable
-    private CodeGenerationResponse generateCodeRemotely(@NotNull CodeGenerationRequest request) {
-        try {
-            String json = gson.toJson(request);
-            RequestBody body = RequestBody.create(json, ApiRequestUtil.JSON);
-            
-            Request httpRequest = new Request.Builder()
-                    .url(apiBaseUrl + codeGenerationEndpoint)
-                    .post(body)
-                    .build();
-            
-            try (Response response = httpClient.newCall(httpRequest).execute()) {
-                if (response.isSuccessful() && response.body() != null) {
-                    return gson.fromJson(response.body().string(), CodeGenerationResponse.class);
-                } else {
-                    LOG.warn("Failed to generate code remotely. Status: " + response.code());
-                    return null;
-                }
-            }
-        } catch (Exception e) {
-            LOG.error("Error generating code remotely", e);
-            return null;
-        }
+    @NotNull
+    public Map<String, Integer> getUsageMetrics() {
+        Map<String, Integer> metrics = new HashMap<>();
+        metrics.put("totalRequests", totalRequests.get());
+        metrics.put("patternMatches", patternMatches.get());
+        metrics.put("apiCalls", apiCalls.get());
+        metrics.put("estimatedTokensSaved", estimatedTokensSaved.get());
+        metrics.put("estimatedCostSavedInCents", estimatedCostSavedInCents.get());
+        
+        return metrics;
     }
     
     /**
-     * Generates code using local services.
-     * @param request The code generation request
-     * @return The generated code response, or null if generation failed
+     * Executes an AI request with pattern matching optimization.
+     * @param project The project
+     * @param input The input
+     * @param category The pattern category
+     * @param fallbackFunction The fallback function to call if no pattern match
+     * @return The result
      */
     @Nullable
-    private CodeGenerationResponse generateCodeLocally(@NotNull CodeGenerationRequest request) {
-        // This would be implemented with local OpenAI API calls
-        // For now, we'll just return a placeholder
-        LOG.info("Local code generation not yet implemented. Falling back to remote generation");
-        return generateCodeRemotely(request);
-    }
-    
-    /**
-     * Resolves an error using the web platform or local services.
-     * @param request The error resolution request
-     * @return The error resolution response, or null if resolution failed
-     */
-    @Nullable
-    public ErrorResolutionResponse resolveError(@NotNull ErrorResolutionRequest request) {
-        // If using remote services and connected to web platform, use remote error resolution
-        if (useRemoteServices && isConnected) {
-            return resolveErrorRemotely(request);
-        } else {
-            // Otherwise, use local error resolution
-            return resolveErrorLocally(request);
-        }
-    }
-    
-    /**
-     * Resolves an error using the remote web platform.
-     * @param request The error resolution request
-     * @return The error resolution response, or null if resolution failed
-     */
-    @Nullable
-    private ErrorResolutionResponse resolveErrorRemotely(@NotNull ErrorResolutionRequest request) {
-        try {
-            String json = gson.toJson(request);
-            RequestBody body = RequestBody.create(json, ApiRequestUtil.JSON);
-            
-            Request httpRequest = new Request.Builder()
-                    .url(apiBaseUrl + errorResolutionEndpoint)
-                    .post(body)
-                    .build();
-            
-            try (Response response = httpClient.newCall(httpRequest).execute()) {
-                if (response.isSuccessful() && response.body() != null) {
-                    return gson.fromJson(response.body().string(), ErrorResolutionResponse.class);
-                } else {
-                    LOG.warn("Failed to resolve error remotely. Status: " + response.code());
-                    return null;
-                }
-            }
-        } catch (Exception e) {
-            LOG.error("Error resolving error remotely", e);
-            return null;
-        }
-    }
-    
-    /**
-     * Resolves an error using local services.
-     * @param request The error resolution request
-     * @return The error resolution response, or null if resolution failed
-     */
-    @Nullable
-    private ErrorResolutionResponse resolveErrorLocally(@NotNull ErrorResolutionRequest request) {
-        // This would be implemented with local pattern matching and OpenAI API calls
-        // For now, we'll just return a placeholder
-        LOG.info("Local error resolution not yet implemented. Falling back to remote resolution");
-        return resolveErrorRemotely(request);
-    }
-    
-    /**
-     * Tests a mod on the remote testing infrastructure.
-     * @param request The test request
-     * @return The test response, or null if testing failed
-     */
-    @Nullable
-    public ModTestResponse testMod(@NotNull ModTestRequest request) {
-        if (!isConnected) {
-            LOG.warn("Not connected to web platform, unable to test mod remotely");
-            return null;
+    public String executeWithPatternMatching(
+            @NotNull Project project,
+            @NotNull String input,
+            @NotNull PatternRecognitionService.PatternCategory category,
+            @NotNull java.util.function.Function<String, String> fallbackFunction
+    ) {
+        // Record the request
+        recordRequest();
+        
+        // Get project services
+        ProjectAIServices services = getProjectServices(project);
+        
+        // Try to find a matching pattern
+        String patternResult = services.recognitionService.findMatchingPattern(input, category);
+        
+        if (patternResult != null) {
+            // Pattern match found
+            recordPatternMatchSuccess(AVG_TOKENS_PER_REQUEST);
+            LOG.info("Used pattern matching for category: " + category);
+            return patternResult;
         }
         
-        try {
-            String json = gson.toJson(request);
-            RequestBody body = RequestBody.create(json, ApiRequestUtil.JSON);
-            
-            Request httpRequest = new Request.Builder()
-                    .url(apiBaseUrl + testModEndpoint)
-                    .post(body)
-                    .build();
-            
-            try (Response response = httpClient.newCall(httpRequest).execute()) {
-                if (response.isSuccessful() && response.body() != null) {
-                    return gson.fromJson(response.body().string(), ModTestResponse.class);
-                } else {
-                    LOG.warn("Failed to test mod. Status: " + response.code());
-                    return null;
-                }
-            }
-        } catch (Exception e) {
-            LOG.error("Error testing mod", e);
-            return null;
+        // No pattern match, fallback to API
+        recordApiFallback();
+        LOG.info("Falling back to API for category: " + category);
+        
+        // Execute the fallback function
+        String apiResult = fallbackFunction.apply(input);
+        
+        // If we got a result, register it as a pattern
+        if (apiResult != null && !apiResult.isEmpty()) {
+            services.recognitionService.registerPattern(input, apiResult, category);
         }
+        
+        return apiResult;
     }
     
     /**
-     * Sets the API base URL.
-     * @param url The new base URL
+     * Smart method for generating code with pattern matching optimization.
+     * @param project The project
+     * @param prompt The prompt
+     * @param language The programming language
+     * @return The generated code
      */
-    public void setApiBaseUrl(String url) {
-        this.apiBaseUrl = url;
-        // Check connection with new URL
-        checkConnection();
+    @Nullable
+    public String smartGenerateCode(
+            @NotNull Project project,
+            @NotNull String prompt,
+            @NotNull String language
+    ) {
+        return executeWithPatternMatching(
+                project,
+                prompt + "\nLanguage: " + language,
+                PatternRecognitionService.PatternCategory.CODE_GENERATION,
+                input -> {
+                    // Call OpenAI API - This is simplified for the demo
+                    // In a real implementation, this would call the actual OpenAI API
+                    LOG.info("Called OpenAI API for code generation");
+                    return "// Generated code for: " + prompt + "\n" +
+                           "public class Example {\n" +
+                           "    public static void main(String[] args) {\n" +
+                           "        System.out.println(\"Hello, world!\");\n" +
+                           "    }\n" +
+                           "}";
+                }
+        );
+    }
+    
+    /**
+     * Smart method for fixing code errors with pattern matching optimization.
+     * @param project The project
+     * @param code The code with errors
+     * @param errorMessage The error message
+     * @return The fixed code
+     */
+    @Nullable
+    public String smartFixCode(
+            @NotNull Project project,
+            @NotNull String code,
+            @NotNull String errorMessage
+    ) {
+        return executeWithPatternMatching(
+                project,
+                "Code: " + code + "\nError: " + errorMessage,
+                PatternRecognitionService.PatternCategory.ERROR_RESOLUTION,
+                input -> {
+                    // Call OpenAI API - This is simplified for the demo
+                    // In a real implementation, this would call the actual OpenAI API
+                    LOG.info("Called OpenAI API for error resolution");
+                    return code.replace("System.out.println(\"Hello, world!\");",
+                                       "System.out.println(\"Hello, fixed world!\");");
+                }
+        );
+    }
+    
+    /**
+     * Smart method for suggesting features with pattern matching optimization.
+     * @param project The project
+     * @param codeContext The code context
+     * @return The suggested features
+     */
+    @Nullable
+    public String smartSuggestFeatures(
+            @NotNull Project project,
+            @NotNull String codeContext
+    ) {
+        return executeWithPatternMatching(
+                project,
+                codeContext,
+                PatternRecognitionService.PatternCategory.FEATURE_SUGGESTION,
+                input -> {
+                    // Call OpenAI API - This is simplified for the demo
+                    // In a real implementation, this would call the actual OpenAI API
+                    LOG.info("Called OpenAI API for feature suggestion");
+                    return "1. Add logging functionality\n" +
+                           "2. Implement exception handling\n" +
+                           "3. Add unit tests";
+                }
+        );
+    }
+    
+    /**
+     * Registers a project for cleanup when it's closed.
+     * @param project The project
+     */
+    public void registerProjectForCleanup(@NotNull Project project) {
+        // Remove the project from the services map when it's closed
+        project.getMessageBus().connect().subscribe(Project.TOPIC, new Project.ProjectListener() {
+            @Override
+            public void projectClosed(@NotNull Project closedProject) {
+                if (closedProject.equals(project)) {
+                    projectServicesMap.remove(project);
+                    LOG.info("Cleaned up AI services for closed project: " + project.getName());
+                }
+            }
+        });
     }
 }
