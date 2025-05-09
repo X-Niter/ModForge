@@ -8,6 +8,144 @@ import axios from 'axios';
 import { spawn } from 'child_process';
 import { promisify } from 'util';
 import * as cheerio from 'cheerio';
+import AdmZip from 'adm-zip';
+
+/**
+ * Information about a JAR mod file
+ */
+interface ModInfo {
+  modLoader: string;
+  mcVersion?: string;
+  modVersion?: string;
+}
+
+/**
+ * Detect the mod loader type and Minecraft version from a JAR file
+ * @param jarFilePath Path to the JAR file
+ * @returns Information about the mod loader and Minecraft version
+ */
+async function detectModInfo(jarFilePath: string): Promise<ModInfo> {
+  try {
+    const zip = new AdmZip(jarFilePath);
+    const zipEntries = zip.getEntries();
+    
+    // Default to 'unknown' if we can't determine the mod loader
+    let modInfo: ModInfo = {
+      modLoader: 'unknown'
+    };
+    
+    // Check for Forge
+    const forgeToml = zipEntries.find(entry => 
+      entry.entryName === 'META-INF/mods.toml' || 
+      entry.entryName === 'mcmod.info'
+    );
+    
+    if (forgeToml) {
+      modInfo.modLoader = 'forge';
+      const content = zip.readAsText(forgeToml);
+      
+      // Extract Minecraft version from mods.toml
+      if (forgeToml.entryName === 'META-INF/mods.toml') {
+        const mcVersionMatch = content.match(/minecraft\s*=\s*\[\s*([^\]]+)\s*\]/);
+        if (mcVersionMatch) {
+          const versionText = mcVersionMatch[1];
+          // Extract version from a string like: "1.16.5"
+          const versionExtracted = versionText.match(/"([^"]+)"/);
+          if (versionExtracted) {
+            modInfo.mcVersion = versionExtracted[1];
+          }
+        }
+        
+        // Check if it's specifically NeoForge
+        if (content.includes('neoforge') || content.includes('neoforged')) {
+          modInfo.modLoader = 'neoforge';
+        }
+      } 
+      // Extract from older mcmod.info format
+      else if (forgeToml.entryName === 'mcmod.info') {
+        const mcVersionMatch = content.match(/"mcversion"?\s*:\s*"([^"]+)"/);
+        if (mcVersionMatch) {
+          modInfo.mcVersion = mcVersionMatch[1];
+        }
+      }
+      
+      return modInfo;
+    }
+    
+    // Check for Fabric
+    const fabricModJson = zipEntries.find(entry => 
+      entry.entryName === 'fabric.mod.json'
+    );
+    
+    if (fabricModJson) {
+      modInfo.modLoader = 'fabric';
+      const content = zip.readAsText(fabricModJson);
+      
+      try {
+        const jsonContent = JSON.parse(content);
+        if (jsonContent.depends && jsonContent.depends.minecraft) {
+          modInfo.mcVersion = jsonContent.depends.minecraft;
+        } else if (jsonContent.depends && jsonContent.depends.fabricloader) {
+          // Sometimes the minecraft version is in the fabric loader dependency
+          const versionMatch = jsonContent.depends.fabricloader.match(/\d+\.\d+(\.\d+)?/);
+          if (versionMatch) {
+            modInfo.mcVersion = versionMatch[0];
+          }
+        }
+      } catch (e) {
+        console.error('Error parsing fabric.mod.json:', e);
+      }
+      
+      return modInfo;
+    }
+    
+    // Check for Quilt
+    const quiltModJson = zipEntries.find(entry => 
+      entry.entryName === 'quilt.mod.json'
+    );
+    
+    if (quiltModJson) {
+      modInfo.modLoader = 'quilt';
+      const content = zip.readAsText(quiltModJson);
+      
+      try {
+        const jsonContent = JSON.parse(content);
+        if (jsonContent.depends && jsonContent.depends.minecraft) {
+          modInfo.mcVersion = jsonContent.depends.minecraft;
+        }
+      } catch (e) {
+        console.error('Error parsing quilt.mod.json:', e);
+      }
+      
+      return modInfo;
+    }
+
+    // Check for Bukkit/Spigot plugins
+    const pluginYml = zipEntries.find(entry => 
+      entry.entryName === 'plugin.yml'
+    );
+    
+    if (pluginYml) {
+      modInfo.modLoader = 'bukkit';
+      const content = zip.readAsText(pluginYml);
+      
+      // Extract API version from plugin.yml
+      const apiVersionMatch = content.match(/api-version\s*:\s*["']?([^"'\s]+)["']?/);
+      if (apiVersionMatch) {
+        modInfo.mcVersion = apiVersionMatch[1];
+      }
+      
+      return modInfo;
+    }
+    
+    return modInfo;
+  } catch (error) {
+    console.error('Error detecting mod info:', error);
+    return {
+      modLoader: 'unknown'
+    };
+  }
+}
 
 // Define schema for jar files and extracted classes
 export const jarFiles = pgTable('jar_files', {
