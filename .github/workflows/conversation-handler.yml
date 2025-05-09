@@ -513,11 +513,11 @@ Focus on code organization, design patterns, and maintainability. Provide the co
                   subprocess.run(['git', 'add', file_path], check=True)
                   subprocess.run(['git', 'commit', '-m', f"{cmd_type.capitalize()}: {os.path.basename(file_path)} [ModForge AI]"], check=True)
                   subprocess.run(['git', 'push', 'origin', branch_name], check=True)
-        
-        # Create a pull request
-        pr_data = {
-            'title': f"{cmd_type.capitalize()}: {os.path.basename(file_path)}",
-            'body': f"""This PR was created by ModForge AI in response to a /{cmd_type} command.
+                  
+                  # Create a pull request
+                  pr_data = {
+                      'title': f"{cmd_type.capitalize()}: {os.path.basename(file_path)}",
+                      'body': f"""This PR was created by ModForge AI in response to a /{cmd_type} command.
 
 ## Changes Made
 - {cmd_type.capitalize()}d `{os.path.basename(file_path)}`
@@ -529,16 +529,16 @@ Please review these changes and provide feedback.
 
 _This PR was automatically created by the ModForge Autonomous System_
 """,
-            'head': branch_name,
-            'base': 'main',
-            'maintainer_can_modify': True
-        }
-        
-        response = requests.post(f"{api_url}/pulls", headers=headers, json=pr_data)
-        
-        if response.status_code == 201:
-            pr_url = response.json().get('html_url')
-            return f"""I've {cmd_type}d `{os.path.basename(file_path)}` and created a pull request:
+                      'head': branch_name,
+                      'base': 'main',
+                      'maintainer_can_modify': True
+                  }
+                  
+                  response = requests.post(f"{api_url}/pulls", headers=headers, json=pr_data)
+                  
+                  if response.status_code == 201:
+                      pr_url = response.json().get('html_url')
+                      return f"""I've {cmd_type}d `{os.path.basename(file_path)}` and created a pull request:
 
 [View Pull Request]({pr_url})
 
@@ -546,50 +546,50 @@ The changes include:
 - {get_modification_summary(cmd_type, file_path, content, modified_code)}
 
 Please review the PR and merge it if the changes look good."""
-        else:
-            return f"I've {cmd_type}d `{os.path.basename(file_path)}`, but couldn't create a PR. Error: {response.status_code} {response.text}"
-    
-    except Exception as e:
-        return f"Error {cmd_type}ing {file_path}: {str(e)}"
+                  else:
+                      return f"I've {cmd_type}d `{os.path.basename(file_path)}`, but couldn't create a PR. Error: {response.status_code} {response.text}"
+              
+              except Exception as e:
+                  return f"Error {cmd_type}ing {file_path}: {str(e)}"
 
-def get_modification_summary(cmd_type, file_path, old_content, new_content):
-    """Generate a summary of the changes made"""
-    if cmd_type == 'document':
-        # Count added documentation lines
-        old_lines = old_content.count('\n')
-        new_lines = new_content.count('\n')
-        old_javadoc_lines = old_content.count('/**')
-        new_javadoc_lines = new_content.count('/**')
-        
-        return f"Added documentation to {new_javadoc_lines - old_javadoc_lines} classes/methods, increasing the file from {old_lines} to {new_lines} lines"
-    
-    elif cmd_type == 'fix':
-        # Look for removed potential bug patterns
-        null_checks_added = new_content.count('if (') - old_content.count('if (')
-        exception_handling_added = new_content.count('catch') - old_content.count('catch')
-        
-        return f"Fixed potential issues including {null_checks_added} new null checks and {exception_handling_added} improved exception handlers"
-    
-    elif cmd_type == 'improve' or cmd_type == 'refactor':
-        # Count structural changes
-        old_methods = len(re.findall(r'(?:public|private|protected)\s+\w+\s+\w+\s*\(', old_content))
-        new_methods = len(re.findall(r'(?:public|private|protected)\s+\w+\s+\w+\s*\(', new_content))
-        
-        changes = []
-        if new_methods > old_methods:
-            changes.append(f"Refactored code into {new_methods - old_methods} additional methods")
-        elif new_methods < old_methods:
-            changes.append(f"Consolidated {old_methods - new_methods} methods")
-        
-        if new_content.count('{') < old_content.count('{'):
-            changes.append("Reduced code complexity")
-        
-        if not changes:
-            changes.append("Improved code structure and readability")
-        
-        return "; ".join(changes)
-    
-    return "Made changes as requested"
+          def get_modification_summary(cmd_type, file_path, old_content, new_content):
+              """Generate a summary of the changes made"""
+              if cmd_type == 'document':
+                  # Count added documentation lines
+                  old_lines = old_content.count('\n')
+                  new_lines = new_content.count('\n')
+                  old_javadoc_lines = old_content.count('/**')
+                  new_javadoc_lines = new_content.count('/**')
+                  
+                  return f"Added documentation to {new_javadoc_lines - old_javadoc_lines} classes/methods, increasing the file from {old_lines} to {new_lines} lines"
+              
+              elif cmd_type == 'fix':
+                  # Look for removed potential bug patterns
+                  null_checks_added = new_content.count('if (') - old_content.count('if (')
+                  exception_handling_added = new_content.count('catch') - old_content.count('catch')
+                  
+                  return f"Fixed potential issues including {null_checks_added} new null checks and {exception_handling_added} improved exception handlers"
+              
+              elif cmd_type == 'improve' or cmd_type == 'refactor':
+                  # Count structural changes
+                  old_methods = len(re.findall(r'(?:public|private|protected)\s+\w+\s+\w+\s*\(', old_content))
+                  new_methods = len(re.findall(r'(?:public|private|protected)\s+\w+\s+\w+\s*\(', new_content))
+                  
+                  changes = []
+                  if new_methods > old_methods:
+                      changes.append(f"Refactored code into {new_methods - old_methods} additional methods")
+                  elif new_methods < old_methods:
+                      changes.append(f"Consolidated {old_methods - new_methods} methods")
+                  
+                  if new_content.count('{') < old_content.count('{'):
+                      changes.append("Reduced code complexity")
+                  
+                  if not changes:
+                      changes.append("Improved code structure and readability")
+                  
+                  return "; ".join(changes)
+              
+              return "Made changes as requested"
 
 def execute_feature_addition(cmd_args, branch_name):
     """Add a new feature to a component"""
