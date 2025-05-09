@@ -162,6 +162,20 @@ export const errorPatterns = pgTable("error_patterns", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
+export const ideaPatterns = pgTable("idea_patterns", {
+  id: serial("id").primaryKey(),
+  theme: text("theme"), // Can be null if general
+  complexity: text("complexity").notNull(), // Simple, medium, complex
+  modLoader: text("mod_loader"), // Can be null if any
+  minecraftVersion: text("minecraft_version"), // Can be null if any
+  prompt: text("prompt").notNull(), // The original prompt
+  response: jsonb("response").notNull(), // The generated ideas
+  useCount: integer("use_count").default(0).notNull(),
+  successRate: integer("success_rate").default(100).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
 export const insertCodePatternSchema = createInsertSchema(codePatterns).omit({
   id: true,
   createdAt: true,
@@ -174,8 +188,17 @@ export const insertErrorPatternSchema = createInsertSchema(errorPatterns).omit({
   updatedAt: true,
 });
 
+export const insertIdeaPatternSchema = createInsertSchema(ideaPatterns).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
 export type InsertCodePattern = z.infer<typeof insertCodePatternSchema>;
 export type CodePattern = typeof codePatterns.$inferSelect;
 
 export type InsertErrorPattern = z.infer<typeof insertErrorPatternSchema>;
 export type ErrorPattern = typeof errorPatterns.$inferSelect;
+
+export type InsertIdeaPattern = z.infer<typeof insertIdeaPatternSchema>;
+export type IdeaPattern = typeof ideaPatterns.$inferSelect;

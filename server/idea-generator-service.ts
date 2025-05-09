@@ -1,5 +1,6 @@
 import OpenAI from "openai";
 import { z } from "zod";
+import { storeIdeaGenerationPattern, tryGenerateIdeasFromPatterns, recordIdeaPatternResult } from "./idea-pattern-learning";
 
 // Initialize OpenAI
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
@@ -96,6 +97,27 @@ Format your response as a JSON object with the following structure:
   "inspirations": ["string"]
 }`;
 
+    // First check if we have a similar pattern already saved
+    const patternResult = await tryGenerateIdeasFromPatterns(
+      systemPrompt, 
+      request.theme || null,
+      request.complexity,
+      request.preferredModLoader !== "Any" ? request.preferredModLoader : null,
+      request.gameVersion || null
+    );
+    
+    // If we found a good pattern match, use it
+    if (patternResult.ideas && patternResult.patternId) {
+      console.log(`${getTimestamp()} Using existing pattern #${patternResult.patternId} with confidence ${patternResult.confidence.toFixed(2)}`);
+      
+      // Record the pattern usage
+      recordIdeaPatternResult(patternResult.patternId, true);
+      
+      return patternResult.ideas;
+    }
+    
+    console.log(`${getTimestamp()} No suitable pattern found, generating with OpenAI`);
+
     // Call OpenAI API
     const completion = await openai.chat.completions.create({
       model: "gpt-4o", // the newest OpenAI model is "gpt-4o" which was released May 13, 2024. do not change this unless explicitly requested by the user
@@ -117,6 +139,17 @@ Format your response as a JSON object with the following structure:
     
     try {
       const parsedResponse = JSON.parse(responseContent) as IdeaGenerationResponse;
+      
+      // Store this successful generation in our pattern learning database
+      await storeIdeaGenerationPattern(
+        systemPrompt,
+        request.theme || null,
+        request.complexity,
+        request.preferredModLoader !== "Any" ? request.preferredModLoader : null,
+        request.gameVersion || null,
+        parsedResponse
+      );
+      
       return parsedResponse;
     } catch (parseError) {
       console.error("Failed to parse OpenAI response as JSON:", parseError);
