@@ -3,246 +3,260 @@ package com.modforge.intellij.plugin.actions;
 import com.intellij.openapi.actionSystem.AnAction;
 import com.intellij.openapi.actionSystem.AnActionEvent;
 import com.intellij.openapi.actionSystem.CommonDataKeys;
+import com.intellij.openapi.application.ApplicationManager;
+import com.intellij.openapi.command.CommandProcessor;
+import com.intellij.openapi.command.WriteCommandAction;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.editor.Editor;
-import com.intellij.openapi.progress.ProgressIndicator;
-import com.intellij.openapi.progress.ProgressManager;
-import com.intellij.openapi.progress.Task;
+import com.intellij.openapi.editor.SelectionModel;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.DialogWrapper;
 import com.intellij.openapi.ui.Messages;
 import com.intellij.openapi.vfs.VirtualFile;
-import com.intellij.psi.PsiDocumentManager;
 import com.intellij.psi.PsiFile;
-import com.intellij.psi.PsiJavaFile;
 import com.intellij.ui.components.JBLabel;
-import com.intellij.ui.components.JBPanel;
 import com.intellij.ui.components.JBScrollPane;
 import com.intellij.ui.components.JBTextArea;
 import com.intellij.util.ui.JBUI;
-import com.modforge.intellij.plugin.ai.AIServiceManager;
 import com.modforge.intellij.plugin.services.AutonomousCodeGenerationService;
 import com.modforge.intellij.plugin.settings.ModForgeSettings;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import javax.swing.*;
+import javax.swing.border.Border;
 import java.awt.*;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * Action for generating code using AI.
  */
 public class GenerateCodeAction extends AnAction {
     private static final Logger LOG = Logger.getInstance(GenerateCodeAction.class);
-    
+
+    @Override
+    public void update(@NotNull AnActionEvent e) {
+        // Enable action only if a project is open and AI assist is enabled
+        Project project = e.getProject();
+        boolean enabled = project != null && ModForgeSettings.getInstance().isEnableAIAssist();
+        e.getPresentation().setEnabledAndVisible(enabled);
+    }
+
     @Override
     public void actionPerformed(@NotNull AnActionEvent e) {
         Project project = e.getProject();
         if (project == null) {
             return;
         }
-        
-        // Get editor and file
+
         Editor editor = e.getData(CommonDataKeys.EDITOR);
         PsiFile psiFile = e.getData(CommonDataKeys.PSI_FILE);
-        
-        if (editor == null || psiFile == null) {
-            Messages.showErrorDialog(project, "No editor is active", "Generate Code Error");
+        VirtualFile virtualFile = e.getData(CommonDataKeys.VIRTUAL_FILE);
+
+        if (editor == null) {
+            Messages.showInfoMessage(project, "Please open a file in the editor to generate code.", "No Editor");
             return;
         }
-        
-        // Check if file is Java file
-        if (!(psiFile instanceof PsiJavaFile)) {
-            Messages.showErrorDialog(project, "This action is only available for Java files", "Generate Code Error");
+
+        // Get selected text if any
+        SelectionModel selectionModel = editor.getSelectionModel();
+        String selectedText = selectionModel.getSelectedText();
+
+        // Create and show dialog
+        GenerateCodeDialog dialog = new GenerateCodeDialog(project, editor, virtualFile, selectedText);
+        dialog.show();
+
+        // If canceled, return
+        if (!dialog.isOK()) {
             return;
         }
-        
-        // Check if API key is set
-        String apiKey = ModForgeSettings.getInstance().getOpenAiApiKey();
-        if (apiKey == null || apiKey.trim().isEmpty()) {
-            Messages.showErrorDialog(project, "OpenAI API key is not set. Please configure it in the settings.", 
-                    "Generate Code Error");
-            return;
-        }
-        
-        // Show prompt dialog
-        PromptDialog dialog = new PromptDialog(project);
-        if (!dialog.showAndGet()) {
-            return; // User cancelled
-        }
-        
+
+        // Get prompt
         String prompt = dialog.getPrompt();
         if (prompt.isEmpty()) {
-            return; // Empty prompt
+            Messages.showWarningDialog(project, "Please enter a prompt for code generation.", "Empty Prompt");
+            return;
         }
+
+        // Get language
+        String language = dialog.getLanguage();
+
+        // Create options
+        Map<String, Object> options = new HashMap<>();
         
+        if (virtualFile != null) {
+            options.put("fileName", virtualFile.getName());
+            options.put("fileExtension", virtualFile.getExtension());
+        }
+
         // Generate code
-        generateCode(project, editor, psiFile, prompt);
-    }
-    
-    @Override
-    public void update(@NotNull AnActionEvent e) {
-        Project project = e.getProject();
-        Editor editor = e.getData(CommonDataKeys.EDITOR);
-        PsiFile psiFile = e.getData(CommonDataKeys.PSI_FILE);
+        AutonomousCodeGenerationService codeGenService = AutonomousCodeGenerationService.getInstance(project);
         
-        // Enable action only if we have a project, editor, and file
-        e.getPresentation().setEnabled(project != null && editor != null && psiFile != null);
-    }
-    
-    /**
-     * Generates code based on a prompt.
-     * @param project The project
-     * @param editor The editor
-     * @param psiFile The PSI file
-     * @param prompt The prompt
-     */
-    private void generateCode(@NotNull Project project, @NotNull Editor editor, @NotNull PsiFile psiFile, 
-                             @NotNull String prompt) {
-        // Get AI service manager
-        AIServiceManager aiServiceManager = AIServiceManager.getInstance(project);
+        Messages.showInfoMessage(project, "Generating code. This may take a few moments...", "Generating Code");
         
-        ProgressManager.getInstance().run(new Task.Backgroundable(project, "Generating Code", false) {
-            @Override
-            public void run(@NotNull ProgressIndicator indicator) {
-                indicator.setIndeterminate(true);
-                indicator.setText("Generating code based on your prompt...");
-                
-                try {
-                    // Determine programming language
-                    String language = "java";
-                    
-                    // Build context
-                    Map<String, Object> options = new HashMap<>();
-                    options.put("filename", psiFile.getName());
-                    
-                    // Add file content as context if needed
-                    // options.put("fileContent", psiFile.getText());
-                    
-                    // Generate code
-                    String generatedCode = aiServiceManager.generateCode(prompt, language, options)
-                            .get(30, TimeUnit.SECONDS);
-                    
-                    if (generatedCode == null || generatedCode.trim().isEmpty()) {
-                        throw new Exception("Generated code is empty");
-                    }
-                    
-                    // Insert code at cursor position
-                    insertCodeAtCursor(project, editor, generatedCode);
-                } catch (Exception ex) {
-                    LOG.error("Error generating code", ex);
-                    
-                    // Show error
-                    SwingUtilities.invokeLater(() -> {
-                        Messages.showErrorDialog(project, "Error generating code: " + ex.getMessage(), 
-                                "Generate Code Error");
+        AtomicReference<String> generatedCode = new AtomicReference<>("");
+        
+        try {
+            codeGenService.generateCode(prompt, language, options)
+                    .thenAccept(code -> {
+                        generatedCode.set(code);
+                        
+                        // Insert code into editor
+                        ApplicationManager.getApplication().invokeLater(() -> {
+                            insertCodeIntoEditor(project, editor, code);
+                        });
+                    })
+                    .exceptionally(ex -> {
+                        LOG.error("Error generating code", ex);
+                        ApplicationManager.getApplication().invokeLater(() -> {
+                            Messages.showErrorDialog(project, "Error generating code: " + ex.getMessage(), "Error");
+                        });
+                        return null;
                     });
-                }
-            }
-        });
+        } catch (Exception ex) {
+            LOG.error("Error generating code", ex);
+            Messages.showErrorDialog(project, "Error generating code: " + ex.getMessage(), "Error");
+        }
     }
-    
+
     /**
-     * Inserts code at the cursor position.
+     * Inserts code into the editor.
      * @param project The project
      * @param editor The editor
      * @param code The code to insert
      */
-    private void insertCodeAtCursor(@NotNull Project project, @NotNull Editor editor, @NotNull String code) {
+    private void insertCodeIntoEditor(@NotNull Project project, @NotNull Editor editor, @NotNull String code) {
         Document document = editor.getDocument();
-        int offset = editor.getCaretModel().getOffset();
+        SelectionModel selectionModel = editor.getSelectionModel();
+        
+        // Get insert position
+        final int start;
+        final int end;
+        
+        if (selectionModel.hasSelection()) {
+            start = selectionModel.getSelectionStart();
+            end = selectionModel.getSelectionEnd();
+        } else {
+            start = end = editor.getCaretModel().getOffset();
+        }
         
         // Insert code
-        Runnable runnable = () -> document.insertString(offset, code);
-        
-        SwingUtilities.invokeLater(() -> {
-            com.intellij.openapi.command.CommandProcessor.getInstance().executeCommand(
-                    project,
-                    () -> com.intellij.openapi.application.ApplicationManager.getApplication().runWriteAction(runnable),
-                    "Generate Code",
-                    null
-            );
-            
-            // Commit document
-            PsiDocumentManager.getInstance(project).commitDocument(document);
-            
-            // Analyze for potential issues
-            VirtualFile file = PsiDocumentManager.getInstance(project).getPsiFile(document).getVirtualFile();
-            AutonomousCodeGenerationService codeGenService = project.getService(AutonomousCodeGenerationService.class);
-            
-            codeGenService.analyzeFile(file)
-                    .thenAccept(issues -> {
-                        if (!issues.isEmpty()) {
-                            // Log issues
-                            LOG.info("Found " + issues.size() + " issues in generated code");
-                            
-                            // (Optionally) Fix issues automatically
-                            /*
-                            codeGenService.fixIssues(file, issues)
-                                    .thenAccept(fixedCount -> {
-                                        if (fixedCount > 0) {
-                                            LOG.info("Fixed " + fixedCount + " issues in generated code");
-                                        }
-                                    });
-                            */
-                        }
-                    });
+        WriteCommandAction.runWriteCommandAction(project, () -> {
+            CommandProcessor.getInstance().executeCommand(project, () -> {
+                if (start != end) {
+                    document.replaceString(start, end, code);
+                } else {
+                    document.insertString(start, code);
+                }
+            }, "Insert Generated Code", null);
         });
     }
-    
+
     /**
-     * Dialog for entering a prompt.
+     * Dialog for generating code.
      */
-    private static class PromptDialog extends DialogWrapper {
+    private static class GenerateCodeDialog extends DialogWrapper {
         private final JBTextArea promptArea;
-        
+        private final JComboBox<String> languageComboBox;
+        private final Project project;
+        private final Editor editor;
+        private final VirtualFile file;
+
         /**
-         * Creates a new PromptDialog.
+         * Creates a new GenerateCodeDialog.
          * @param project The project
+         * @param editor The editor
+         * @param file The file
+         * @param selectedText The selected text
          */
-        public PromptDialog(@Nullable Project project) {
-            super(project);
-            setTitle("Generate Code");
-            
+        public GenerateCodeDialog(@NotNull Project project, @NotNull Editor editor, @Nullable VirtualFile file, 
+                                @Nullable String selectedText) {
+            super(project, true);
+            this.project = project;
+            this.editor = editor;
+            this.file = file;
+
+            // Create UI components
             promptArea = new JBTextArea(10, 50);
             promptArea.setLineWrap(true);
             promptArea.setWrapStyleWord(true);
             
+            if (selectedText != null && !selectedText.isEmpty()) {
+                promptArea.setText("Please explain this code and suggest improvements:\n\n" + selectedText);
+            } else {
+                promptArea.setText("Generate a Minecraft mod class that:");
+            }
+
+            // Create language combo box
+            languageComboBox = new JComboBox<>(new String[]{"java", "kotlin", "javascript", "typescript", "python"});
+            
+            // Set default language based on file extension
+            if (file != null) {
+                String extension = file.getExtension();
+                if (extension != null) {
+                    switch (extension.toLowerCase()) {
+                        case "java":
+                            languageComboBox.setSelectedItem("java");
+                            break;
+                        case "kt":
+                            languageComboBox.setSelectedItem("kotlin");
+                            break;
+                        case "js":
+                            languageComboBox.setSelectedItem("javascript");
+                            break;
+                        case "ts":
+                            languageComboBox.setSelectedItem("typescript");
+                            break;
+                        case "py":
+                            languageComboBox.setSelectedItem("python");
+                            break;
+                    }
+                }
+            }
+
+            setTitle("Generate Code");
             init();
         }
-        
+
+        @Nullable
         @Override
-        protected @Nullable JComponent createCenterPanel() {
-            JBPanel<JBPanel<?>> panel = new JBPanel<>(new BorderLayout());
-            panel.setBorder(JBUI.Borders.empty(10));
+        protected JComponent createCenterPanel() {
+            JPanel panel = new JPanel(new BorderLayout());
             
-            panel.add(new JBLabel("Enter your code generation prompt:"), BorderLayout.NORTH);
-            panel.add(new JBScrollPane(promptArea), BorderLayout.CENTER);
+            JPanel promptPanel = new JPanel(new BorderLayout());
+            promptPanel.add(new JBLabel("Enter your prompt:"), BorderLayout.NORTH);
+            promptPanel.add(new JBScrollPane(promptArea), BorderLayout.CENTER);
             
-            // Add help text
-            JBLabel helpLabel = new JBLabel("<html><body>" +
-                    "Examples:<br>" +
-                    "- \"Create a Java class for a Minecraft block that emits light when right-clicked\"<br>" +
-                    "- \"Generate a method to calculate the distance between two 3D vectors\"<br>" +
-                    "- \"Create a data model class for a player's inventory with getters and setters\"" +
-                    "</body></html>");
-            helpLabel.setBorder(JBUI.Borders.emptyTop(10));
+            JPanel languagePanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
+            languagePanel.add(new JBLabel("Language:"));
+            languagePanel.add(languageComboBox);
             
-            panel.add(helpLabel, BorderLayout.SOUTH);
+            panel.add(promptPanel, BorderLayout.CENTER);
+            panel.add(languagePanel, BorderLayout.SOUTH);
+            
+            Border border = JBUI.Borders.empty(10);
+            panel.setBorder(border);
             
             return panel;
         }
-        
+
         /**
          * Gets the prompt.
          * @return The prompt
          */
         public String getPrompt() {
             return promptArea.getText().trim();
+        }
+
+        /**
+         * Gets the language.
+         * @return The language
+         */
+        public String getLanguage() {
+            return (String) languageComboBox.getSelectedItem();
         }
     }
 }
