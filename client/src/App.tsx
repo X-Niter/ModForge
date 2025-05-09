@@ -4,7 +4,7 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ModProvider } from "@/context/mod-context";
-// import { ThemeProvider } from "@/context/theme-context";
+import { Layout } from "@/components/ui/layout";
 import Home from "@/pages/home";
 import NotFound from "@/pages/not-found";
 import GitHubIntegration from "@/pages/github-integration";
@@ -22,22 +22,24 @@ import JarAnalyzerPage from "@/pages/jar-analyzer";
 
 function Router() {
   return (
-    <Switch>
-      <Route path="/" component={Home}/>
-      <Route path="/github-integration" component={GitHubIntegration}/>
-      <Route path="/settings" component={Settings}/>
-      <Route path="/continuous-development" component={ContinuousDevelopment}/>
-      <Route path="/idea-generator" component={IdeaGenerator}/>
-      <Route path="/code-generator" component={CodeGeneratorPage}/>
-      <Route path="/documentation" component={Documentation}/>
-      <Route path="/terms" component={TermsOfService}/>
-      <Route path="/license" component={LicensePage}/>
-      <Route path="/metrics" component={MetricsPage}/>
-      <Route path="/error-resolution" component={ErrorResolutionPage}/>
-      <Route path="/web-explorer" component={WebExplorerPage}/>
-      <Route path="/jar-analyzer" component={JarAnalyzerPage}/>
-      <Route component={NotFound} />
-    </Switch>
+    <Layout>
+      <Switch>
+        <Route path="/" component={Home}/>
+        <Route path="/github-integration" component={GitHubIntegration}/>
+        <Route path="/settings" component={Settings}/>
+        <Route path="/continuous-development" component={ContinuousDevelopment}/>
+        <Route path="/idea-generator" component={IdeaGenerator}/>
+        <Route path="/code-generator" component={CodeGeneratorPage}/>
+        <Route path="/documentation" component={Documentation}/>
+        <Route path="/terms" component={TermsOfService}/>
+        <Route path="/license" component={LicensePage}/>
+        <Route path="/metrics" component={MetricsPage}/>
+        <Route path="/error-resolution" component={ErrorResolutionPage}/>
+        <Route path="/web-explorer" component={WebExplorerPage}/>
+        <Route path="/jar-analyzer" component={JarAnalyzerPage}/>
+        <Route component={NotFound} />
+      </Switch>
+    </Layout>
   );
 }
 
