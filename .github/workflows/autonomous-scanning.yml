@@ -97,109 +97,109 @@ jobs:
         run: |
           # Create a Python script for AI analysis
           cat > analyze_code.py << 'EOF'
-import os
-import re
-import sys
-import json
-import subprocess
-from pathlib import Path
-import openai
-import random
+          import os
+          import re
+          import sys
+          import json
+          import subprocess
+          from pathlib import Path
+          import openai
+          import random
 
-# Initialize OpenAI API with newer client library
-openai_api_key = os.environ.get('OPENAI_API_KEY')
-if not openai_api_key:
-    print("Error: OPENAI_API_KEY not found")
-    sys.exit(1)
-client = openai.OpenAI(api_key=openai_api_key)
+          # Initialize OpenAI API with newer client library
+          openai_api_key = os.environ.get('OPENAI_API_KEY')
+          if not openai_api_key:
+              print("Error: OPENAI_API_KEY not found")
+              sys.exit(1)
+          client = openai.OpenAI(api_key=openai_api_key)
 
-# Status from previous steps
-COMPILATION_SUCCESS = os.environ.get('COMPILATION_SUCCESS', 'true') == 'true'
-QUALITY_ISSUES = os.environ.get('QUALITY_ISSUES', 'false') == 'true'
+          # Status from previous steps
+          COMPILATION_SUCCESS = os.environ.get('COMPILATION_SUCCESS', 'true') == 'true'
+          QUALITY_ISSUES = os.environ.get('QUALITY_ISSUES', 'false') == 'true'
+          
+          def load_errors():
+              """Load errors from log files"""
+              errors = []
+              
+              # Check compilation errors
+              if not COMPILATION_SUCCESS and os.path.exists('compilation_errors.log'):
+                  with open('compilation_errors.log', 'r') as f:
+                      errors.append({
+                          'type': 'compilation',
+                          'details': f.read()
+                      })
+              
+              # Check code quality issues
+              if QUALITY_ISSUES and os.path.exists('quality_issues.log'):
+                  with open('quality_issues.log', 'r') as f:
+                      errors.append({
+                          'type': 'quality',
+                          'details': f.read()
+                      })
+                      
+              return errors
 
-def load_errors():
-    """Load errors from log files"""
-    errors = []
-    
-    # Check compilation errors
-    if not COMPILATION_SUCCESS and os.path.exists('compilation_errors.log'):
-        with open('compilation_errors.log', 'r') as f:
-            errors.append({
-                'type': 'compilation',
-                'details': f.read()
-            })
-    
-    # Check code quality issues
-    if QUALITY_ISSUES and os.path.exists('quality_issues.log'):
-        with open('quality_issues.log', 'r') as f:
-            errors.append({
-                'type': 'quality',
-                'details': f.read()
-            })
-            
-    return errors
+          def get_recent_changes():
+              """Get recent changes to understand context"""
+              try:
+                  result = subprocess.run(
+                      ['git', 'log', '-n', '5', '--pretty=format:%s'],
+                      capture_output=True, text=True, check=True
+                  )
+                  return result.stdout
+              except:
+                  return "Unable to fetch recent changes"
 
-def get_recent_changes():
-    """Get recent changes to understand context"""
-    try:
-        result = subprocess.run(
-            ['git', 'log', '-n', '5', '--pretty=format:%s'],
-            capture_output=True, text=True, check=True
-        )
-        return result.stdout
-    except:
-        return "Unable to fetch recent changes"
-
-def analyze_errors(errors):
-    """Analyze errors using OpenAI"""
-    if not errors:
-        return None
-        
-    error_details = "\n\n".join([f"Error Type: {e['type']}\nDetails:\n{e['details']}" for e in errors])
-    recent_changes = get_recent_changes()
-    
-    try:
-        response = client.chat.completions.create(
-            model="gpt-4",
-            messages=[
-                {"role": "system", "content": """You are an expert Java developer specialized in IntelliJ plugin and Minecraft mod development.
-Analyze build errors and provide a clear diagnostic with suggestions for fixes."""},
-                {"role": "user", "content": f"""Analyze these errors from an IntelliJ plugin project:
-
-# ERROR DETAILS
-{error_details}
-
-# RECENT COMMITS
-{recent_changes}
-
-Provide the following:
-1. A clear diagnosis of the root causes
-2. The specific files and code that likely need to be modified
-3. Concrete fix suggestions with code examples
-4. A summary title for the issue (50-70 chars)
-
-Format your response as a JSON object with these fields:
-- issue_title: string
-- diagnosis: string
-- affected_files: string[]
-- suggested_fixes: object[] (each with 'file', 'problem', and 'fix' fields)
-- summary: string
-"""}
-            ],
-            temperature=0.2,
-            response_format={"type": "json_object"}
-        )
-        
-        return json.loads(response.choices[0].message.content)
-    except Exception as e:
-        print(f"Error analyzing with OpenAI: {str(e)}")
-        return {
-            "issue_title": "Build error requires investigation",
-            "diagnosis": f"Failed to analyze errors: {str(e)}. See logs for details.",
-            "affected_files": [],
-            "suggested_fixes": [],
-            "summary": "System encountered errors that require manual review."
-        }
+          def analyze_errors(errors):
+              """Analyze errors using OpenAI"""
+              if not errors:
+                  return None
+                  
+              error_details = "\n\n".join([f"Error Type: {e['type']}\nDetails:\n{e['details']}" for e in errors])
+              recent_changes = get_recent_changes()
+              
+              try:
+                  response = client.chat.completions.create(
+                      model="gpt-4",
+                      messages=[
+                          {"role": "system", "content": """You are an expert Java developer specialized in IntelliJ plugin and Minecraft mod development.
+          Analyze build errors and provide a clear diagnostic with suggestions for fixes."""},
+                          {"role": "user", "content": f"""Analyze these errors from an IntelliJ plugin project:
+          
+          # ERROR DETAILS
+          {error_details}
+          
+          # RECENT COMMITS
+          {recent_changes}
+          
+          Provide the following:
+          1. A clear diagnosis of the root causes
+          2. The specific files and code that likely need to be modified
+          3. Concrete fix suggestions with code examples
+          4. A summary title for the issue (50-70 chars)
+          
+          Format your response as a JSON object with these fields:
+          - issue_title: string
+          - diagnosis: string
+          - affected_files: string[]
+          - suggested_fixes: object[] (each with 'file', 'problem', and 'fix' fields)
+          - summary: string
+          """}
+                      ],
+                      temperature=0.2,
+                      response_format={"type": "json_object"}
+                  )
+                  
+                  return json.loads(response.choices[0].message.content)
+              except Exception as e:
+                  print(f"Error analyzing with OpenAI: {str(e)}")
+                  return {
+                      "issue_title": "Build error requires investigation",
+                      "diagnosis": f"Failed to analyze errors: {str(e)}. See logs for details.",
+                      "affected_files": [],
+                      "suggested_fixes": [],
+                      "summary": "System encountered errors that require manual review."
+                  }
 
 def analyze_codebase_for_improvements():
     """Proactively analyze the codebase for improvements"""
