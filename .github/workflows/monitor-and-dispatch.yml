@@ -1,0 +1,96 @@
+name: Monitor and Dispatch (Controller)
+
+on:
+  schedule:
+    - cron: '* * * * *'  # Run every minute
+  workflow_dispatch:     # Allow manual triggering
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
+jobs:
+  check-and-run:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          
+      - name: Check for running workflows
+        id: check_workflows
+        run: |
+          echo "Checking if any other workflows are currently running..."
+          # Wait to avoid race conditions
+          sleep 10
+          
+          # Get status of current workflows
+          RUNNING_WORKFLOWS=$(gh api repos/${{ github.repository }}/actions/runs \
+            --jq '.workflow_runs[] | select(.status == "in_progress" and .name != "Monitor and Dispatch (Controller)") | .name' \
+            -H "Accept: application/vnd.github.v3+json")
+          
+          if [ -n "$RUNNING_WORKFLOWS" ]; then
+            echo "Found running workflows:"
+            echo "$RUNNING_WORKFLOWS"
+            echo "::set-output name=should_proceed::false"
+          else
+            echo "No workflows currently running. We can proceed."
+            echo "::set-output name=should_proceed::true"
+          fi
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Determine workflow to run
+        id: pick_workflow
+        if: steps.check_workflows.outputs.should_proceed == 'true'
+        run: |
+          # Default assignment
+          WORKFLOW_TO_RUN="autonomous-scanning"
+          REASON="Running regular scan"
+          
+          # Check for issues and PRs that need attention
+          OPEN_ISSUES=$(gh api repos/${{ github.repository }}/issues \
+                        --jq '.[] | select(.pull_request == null) | select(.labels[].name == "needs-attention" or .labels[].name == "waiting-for-response") | .number' \
+                        -H "Accept: application/vnd.github.v3+json")
+          
+          OPEN_PRS=$(gh api repos/${{ github.repository }}/pulls \
+                    --jq '.[] | select(.labels[].name == "needs-review" or .labels[].name == "needs-update") | .number' \
+                    -H "Accept: application/vnd.github.v3+json")
+          
+          # Check recent activity
+          RECENT_COMMENTS=$(gh api repos/${{ github.repository }}/issues/comments \
+                          --jq '.[] | select(.created_at >= (now - 3600 | strftime("%Y-%m-%dT%H:%M:%SZ"))) | .issue_url' \
+                          -H "Accept: application/vnd.github.v3+json")
+          
+          # Prioritize work
+          if [ -n "$OPEN_PRS" ]; then
+            WORKFLOW_TO_RUN="pull-request-review"
+            REASON="Processing pull requests that need attention"
+          elif [ -n "$RECENT_COMMENTS" ]; then
+            WORKFLOW_TO_RUN="conversation-handler"
+            REASON="Handling recent conversations"
+          elif [ -n "$OPEN_ISSUES" ]; then
+            WORKFLOW_TO_RUN="conversation-handler" 
+            REASON="Processing issues that need attention"
+          fi
+          
+          # Set outputs for the next step
+          echo "::set-output name=workflow::$WORKFLOW_TO_RUN"
+          echo "::set-output name=reason::$REASON"
+          echo "Selected workflow to run: $WORKFLOW_TO_RUN"
+          echo "Reason: $REASON"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Dispatch selected workflow
+        if: steps.check_workflows.outputs.should_proceed == 'true'
+        run: |
+          WORKFLOW="${{ steps.pick_workflow.outputs.workflow }}"
+          REASON="${{ steps.pick_workflow.outputs.reason }}"
+          
+          echo "Dispatching workflow: $WORKFLOW"
+          echo "Reason: $REASON"
+          
+          gh workflow run $WORKFLOW.yml -f reason="$REASON"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
