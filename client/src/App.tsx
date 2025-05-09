@@ -15,6 +15,7 @@ import CodeGeneratorPage from "@/pages/code-generator";
 import Documentation from "@/pages/documentation";
 import TermsOfService from "@/pages/terms";
 import LicensePage from "@/pages/license";
+import MetricsPage from "@/pages/metrics";
 
 function Router() {
   return (
@@ -28,6 +29,7 @@ function Router() {
       <Route path="/documentation" component={Documentation}/>
       <Route path="/terms" component={TermsOfService}/>
       <Route path="/license" component={LicensePage}/>
+      <Route path="/metrics" component={MetricsPage}/>
       <Route component={NotFound} />
     </Switch>
   );
