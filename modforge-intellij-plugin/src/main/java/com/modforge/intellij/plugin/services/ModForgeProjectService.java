@@ -1,153 +1,71 @@
 package com.modforge.intellij.plugin.services;
 
 import com.intellij.openapi.components.Service;
+import com.intellij.openapi.components.ServiceManager;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.project.Project;
-import com.modforge.intellij.plugin.models.ModLoaderType;
-import com.modforge.intellij.plugin.utils.ModDetectionUtil;
-import com.modforge.intellij.plugin.utils.PatternStorageUtil;
+import com.modforge.intellij.plugin.listeners.ModForgeCompilationListener;
+import com.modforge.intellij.plugin.listeners.ModForgeFileListener;
+import org.jetbrains.annotations.NotNull;
 
 /**
- * Project-level service for ModForge AI.
- * Manages project-specific functionality and state.
+ * Service that manages ModForge plugin services and listeners for a project.
+ * This service is created when a project is opened and disposed when a project is closed.
  */
-@Service
+@Service(Service.Level.PROJECT)
 public final class ModForgeProjectService {
     private static final Logger LOG = Logger.getInstance(ModForgeProjectService.class);
-    
     private final Project project;
-    private ModLoaderType detectedModLoader;
-    private boolean isModProject = false;
-    private String minecraftVersion;
+    private ModForgeCompilationListener compilationListener;
+    private ModForgeFileListener fileListener;
     
-    // Local pattern storage for this project
-    private PatternStorageUtil patternStorage;
-    
-    // Sync status
-    private boolean syncEnabled = true;
-    private long lastSyncTimestamp = 0;
-    
+    /**
+     * Creates a new ModForgeProjectService.
+     * @param project The project
+     */
     public ModForgeProjectService(Project project) {
         this.project = project;
-        this.patternStorage = new PatternStorageUtil(project);
+        LOG.info("ModForge project service created for project: " + project.getName());
+        
+        // Initialize listeners
+        initListeners();
     }
     
     /**
-     * Called when the project is opened.
-     * Detects project type and initializes services.
+     * Gets the ModForge project service for a project.
+     * @param project The project
+     * @return The ModForge project service
      */
-    public void projectOpened() {
-        LOG.info("Initializing ModForge AI for project: " + project.getName());
-        
-        // Detect if this is a Minecraft mod project and which mod loader it uses
-        detectProjectType();
-        
-        // Initialize pattern storage and load local patterns
-        patternStorage.initialize();
-        
-        // Check for sync with web platform if enabled
-        if (syncEnabled) {
-            syncWithWebPlatform();
-        }
+    public static ModForgeProjectService getInstance(@NotNull Project project) {
+        return project.getService(ModForgeProjectService.class);
     }
     
     /**
-     * Called when the project is closed.
-     * Performs cleanup and ensures data is saved.
+     * Initializes listeners.
      */
-    public void projectClosed() {
-        LOG.info("Shutting down ModForge AI for project: " + project.getName());
+    private void initListeners() {
+        // Create compilation listener
+        compilationListener = new ModForgeCompilationListener(project);
         
-        // Save any unsaved patterns
-        patternStorage.savePatterns();
-        
-        // Final sync with web platform if enabled
-        if (syncEnabled) {
-            syncWithWebPlatform();
-        }
+        // Create file listener
+        fileListener = new ModForgeFileListener(project);
     }
     
     /**
-     * Detects if this is a Minecraft mod project and which mod loader it uses.
+     * Disposes the service.
      */
-    private void detectProjectType() {
-        ModDetectionUtil.ProjectInfo info = ModDetectionUtil.detectModProject(project);
-        this.isModProject = info.isModProject();
-        this.detectedModLoader = info.getModLoaderType();
-        this.minecraftVersion = info.getMinecraftVersion();
+    public void dispose() {
+        LOG.info("ModForge project service disposed for project: " + project.getName());
         
-        LOG.info("Project detection results: " +
-                "Is mod project: " + isModProject + ", " +
-                "Mod loader: " + detectedModLoader + ", " +
-                "Minecraft version: " + minecraftVersion);
-    }
-    
-    /**
-     * Synchronizes local patterns with the web platform.
-     */
-    public void syncWithWebPlatform() {
-        if (!syncEnabled) {
-            LOG.info("Sync is disabled for project: " + project.getName());
-            return;
+        // Dispose listeners
+        if (compilationListener != null) {
+            compilationListener.dispose();
+            compilationListener = null;
         }
         
-        try {
-            LOG.info("Syncing patterns with web platform for project: " + project.getName());
-            
-            // Get API service from application-level service
-            AIServiceManager aiServiceManager = project.getService(AIServiceManager.class);
-            
-            // Upload local patterns that are new or modified
-            aiServiceManager.uploadPatterns(patternStorage.getModifiedPatterns());
-            
-            // Download new patterns from the platform
-            patternStorage.mergePatterns(aiServiceManager.downloadLatestPatterns(lastSyncTimestamp));
-            
-            // Update sync timestamp
-            lastSyncTimestamp = System.currentTimeMillis();
-            
-            LOG.info("Sync completed successfully");
-        } catch (Exception e) {
-            LOG.error("Error syncing with web platform", e);
+        if (fileListener != null) {
+            fileListener.dispose();
+            fileListener = null;
         }
-    }
-    
-    /**
-     * Toggles sync with web platform.
-     */
-    public void setSyncEnabled(boolean enabled) {
-        this.syncEnabled = enabled;
-        if (enabled && lastSyncTimestamp == 0) {
-            // Initial sync if it was previously disabled
-            syncWithWebPlatform();
-        }
-    }
-    
-    /**
-     * Returns whether this is a Minecraft mod project.
-     */
-    public boolean isModProject() {
-        return isModProject;
-    }
-    
-    /**
-     * Returns the detected mod loader type.
-     */
-    public ModLoaderType getModLoaderType() {
-        return detectedModLoader;
-    }
-    
-    /**
-     * Returns the detected Minecraft version.
-     */
-    public String getMinecraftVersion() {
-        return minecraftVersion;
-    }
-    
-    /**
-     * Returns the pattern storage utility.
-     */
-    public PatternStorageUtil getPatternStorage() {
-        return patternStorage;
     }
 }

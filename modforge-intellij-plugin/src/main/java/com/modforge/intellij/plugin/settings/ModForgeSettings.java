@@ -2,141 +2,66 @@ package com.modforge.intellij.plugin.settings;
 
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.components.PersistentStateComponent;
+import com.intellij.openapi.components.ServiceManager;
 import com.intellij.openapi.components.State;
 import com.intellij.openapi.components.Storage;
-import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.util.xmlb.XmlSerializerUtil;
-import com.intellij.util.xmlb.annotations.Transient;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * Settings for ModForge.
- * This class stores settings for ModForge, such as API keys and user preferences.
+ * Persistent settings for ModForge plugin.
  */
 @State(
         name = "ModForgeSettings",
-        storages = @Storage("modforge.xml")
+        storages = {@Storage("ModForgeSettings.xml")}
 )
 public class ModForgeSettings implements PersistentStateComponent<ModForgeSettings> {
-    private static final Logger LOG = Logger.getInstance(ModForgeSettings.class);
+    // General settings
+    private boolean enableAIAssist = true;
+    private boolean enableContinuousDevelopment = true;
+    private boolean autoFixCompilationErrors = true;
+    private int maxAutoFixAttempts = 3;
+    private int maxEnhancementsPerFile = 5;
     
     // API settings
-    private String openAiApiKey = "";
-    private String openAiModel = "gpt-4";
-    
-    // User settings
-    private String username = "";
-    private String serverUrl = "https://api.modforge.dev";
-    
-    // Feature toggles
-    private boolean enableAIAssist = true;
+    private String openAIApiKey = "";
     private boolean usePatternRecognition = true;
-    private boolean enableContinuousDevelopment = true;
-    private boolean enableCollaborativeEditing = true;
-    
-    // Advanced settings
-    private int maxCompletionTokens = 2000;
     private double similarityThreshold = 0.7;
-    private int autoSaveIntervalSeconds = 5;
+    
+    // Web sync settings
+    private String serverUrl = "https://modforge.io/api";
+    private String apiToken = "";
+    private boolean enableSync = false;
+    private int syncInterval = 300; // 5 minutes
     
     /**
-     * Gets the ModForgeSettings instance.
-     * @return The ModForgeSettings instance
+     * Gets the ModForge settings instance.
+     * @return The ModForge settings
      */
     public static ModForgeSettings getInstance() {
         return ApplicationManager.getApplication().getService(ModForgeSettings.class);
     }
-    
+
     @Nullable
     @Override
     public ModForgeSettings getState() {
         return this;
     }
-    
+
     @Override
     public void loadState(@NotNull ModForgeSettings state) {
         XmlSerializerUtil.copyBean(state, this);
     }
-    
-    // OpenAI API settings
-    
+
     /**
-     * Gets the OpenAI API key.
-     * @return The OpenAI API key
-     */
-    public String getOpenAiApiKey() {
-        return openAiApiKey;
-    }
-    
-    /**
-     * Sets the OpenAI API key.
-     * @param openAiApiKey The OpenAI API key
-     */
-    public void setOpenAiApiKey(String openAiApiKey) {
-        this.openAiApiKey = openAiApiKey;
-    }
-    
-    /**
-     * Gets the OpenAI model.
-     * @return The OpenAI model
-     */
-    public String getOpenAiModel() {
-        return openAiModel;
-    }
-    
-    /**
-     * Sets the OpenAI model.
-     * @param openAiModel The OpenAI model
-     */
-    public void setOpenAiModel(String openAiModel) {
-        this.openAiModel = openAiModel;
-    }
-    
-    // User settings
-    
-    /**
-     * Gets the username.
-     * @return The username
-     */
-    public String getUsername() {
-        return username;
-    }
-    
-    /**
-     * Sets the username.
-     * @param username The username
-     */
-    public void setUsername(String username) {
-        this.username = username;
-    }
-    
-    /**
-     * Gets the server URL.
-     * @return The server URL
-     */
-    public String getServerUrl() {
-        return serverUrl;
-    }
-    
-    /**
-     * Sets the server URL.
-     * @param serverUrl The server URL
-     */
-    public void setServerUrl(String serverUrl) {
-        this.serverUrl = serverUrl;
-    }
-    
-    // Feature toggles
-    
-    /**
-     * Gets whether AI assist is enabled.
-     * @return Whether AI assist is enabled
+     * Checks if AI assist is enabled.
+     * @return True if AI assist is enabled
      */
     public boolean isEnableAIAssist() {
         return enableAIAssist;
     }
-    
+
     /**
      * Sets whether AI assist is enabled.
      * @param enableAIAssist Whether AI assist is enabled
@@ -144,31 +69,15 @@ public class ModForgeSettings implements PersistentStateComponent<ModForgeSettin
     public void setEnableAIAssist(boolean enableAIAssist) {
         this.enableAIAssist = enableAIAssist;
     }
-    
+
     /**
-     * Gets whether pattern recognition is used.
-     * @return Whether pattern recognition is used
-     */
-    public boolean isUsePatternRecognition() {
-        return usePatternRecognition;
-    }
-    
-    /**
-     * Sets whether pattern recognition is used.
-     * @param usePatternRecognition Whether pattern recognition is used
-     */
-    public void setUsePatternRecognition(boolean usePatternRecognition) {
-        this.usePatternRecognition = usePatternRecognition;
-    }
-    
-    /**
-     * Gets whether continuous development is enabled.
-     * @return Whether continuous development is enabled
+     * Checks if continuous development is enabled.
+     * @return True if continuous development is enabled
      */
     public boolean isEnableContinuousDevelopment() {
         return enableContinuousDevelopment;
     }
-    
+
     /**
      * Sets whether continuous development is enabled.
      * @param enableContinuousDevelopment Whether continuous development is enabled
@@ -176,70 +85,164 @@ public class ModForgeSettings implements PersistentStateComponent<ModForgeSettin
     public void setEnableContinuousDevelopment(boolean enableContinuousDevelopment) {
         this.enableContinuousDevelopment = enableContinuousDevelopment;
     }
-    
+
     /**
-     * Gets whether collaborative editing is enabled.
-     * @return Whether collaborative editing is enabled
+     * Checks if automatic compilation error fixing is enabled.
+     * @return True if automatic compilation error fixing is enabled
      */
-    public boolean isEnableCollaborativeEditing() {
-        return enableCollaborativeEditing;
+    public boolean isAutoFixCompilationErrors() {
+        return autoFixCompilationErrors;
     }
-    
+
     /**
-     * Sets whether collaborative editing is enabled.
-     * @param enableCollaborativeEditing Whether collaborative editing is enabled
+     * Sets whether automatic compilation error fixing is enabled.
+     * @param autoFixCompilationErrors Whether automatic compilation error fixing is enabled
      */
-    public void setEnableCollaborativeEditing(boolean enableCollaborativeEditing) {
-        this.enableCollaborativeEditing = enableCollaborativeEditing;
+    public void setAutoFixCompilationErrors(boolean autoFixCompilationErrors) {
+        this.autoFixCompilationErrors = autoFixCompilationErrors;
     }
-    
-    // Advanced settings
-    
+
     /**
-     * Gets the maximum completion tokens.
-     * @return The maximum completion tokens
+     * Gets the maximum number of automatic fix attempts.
+     * @return The maximum number of automatic fix attempts
      */
-    public int getMaxCompletionTokens() {
-        return maxCompletionTokens;
+    public int getMaxAutoFixAttempts() {
+        return maxAutoFixAttempts;
     }
-    
+
     /**
-     * Sets the maximum completion tokens.
-     * @param maxCompletionTokens The maximum completion tokens
+     * Sets the maximum number of automatic fix attempts.
+     * @param maxAutoFixAttempts The maximum number of automatic fix attempts
      */
-    public void setMaxCompletionTokens(int maxCompletionTokens) {
-        this.maxCompletionTokens = maxCompletionTokens;
+    public void setMaxAutoFixAttempts(int maxAutoFixAttempts) {
+        this.maxAutoFixAttempts = maxAutoFixAttempts;
     }
-    
+
     /**
-     * Gets the similarity threshold.
+     * Gets the maximum number of enhancements per file.
+     * @return The maximum number of enhancements per file
+     */
+    public int getMaxEnhancementsPerFile() {
+        return maxEnhancementsPerFile;
+    }
+
+    /**
+     * Sets the maximum number of enhancements per file.
+     * @param maxEnhancementsPerFile The maximum number of enhancements per file
+     */
+    public void setMaxEnhancementsPerFile(int maxEnhancementsPerFile) {
+        this.maxEnhancementsPerFile = maxEnhancementsPerFile;
+    }
+
+    /**
+     * Gets the OpenAI API key.
+     * @return The OpenAI API key
+     */
+    public String getOpenAIApiKey() {
+        return openAIApiKey;
+    }
+
+    /**
+     * Sets the OpenAI API key.
+     * @param openAIApiKey The OpenAI API key
+     */
+    public void setOpenAIApiKey(String openAIApiKey) {
+        this.openAIApiKey = openAIApiKey;
+    }
+
+    /**
+     * Checks if pattern recognition is enabled.
+     * @return True if pattern recognition is enabled
+     */
+    public boolean isUsePatternRecognition() {
+        return usePatternRecognition;
+    }
+
+    /**
+     * Sets whether pattern recognition is enabled.
+     * @param usePatternRecognition Whether pattern recognition is enabled
+     */
+    public void setUsePatternRecognition(boolean usePatternRecognition) {
+        this.usePatternRecognition = usePatternRecognition;
+    }
+
+    /**
+     * Gets the similarity threshold for pattern matching.
      * @return The similarity threshold
      */
     public double getSimilarityThreshold() {
         return similarityThreshold;
     }
-    
+
     /**
-     * Sets the similarity threshold.
+     * Sets the similarity threshold for pattern matching.
      * @param similarityThreshold The similarity threshold
      */
     public void setSimilarityThreshold(double similarityThreshold) {
         this.similarityThreshold = similarityThreshold;
     }
-    
+
     /**
-     * Gets the auto-save interval in seconds.
-     * @return The auto-save interval in seconds
+     * Gets the server URL.
+     * @return The server URL
      */
-    public int getAutoSaveIntervalSeconds() {
-        return autoSaveIntervalSeconds;
+    public String getServerUrl() {
+        return serverUrl;
     }
-    
+
     /**
-     * Sets the auto-save interval in seconds.
-     * @param autoSaveIntervalSeconds The auto-save interval in seconds
+     * Sets the server URL.
+     * @param serverUrl The server URL
      */
-    public void setAutoSaveIntervalSeconds(int autoSaveIntervalSeconds) {
-        this.autoSaveIntervalSeconds = autoSaveIntervalSeconds;
+    public void setServerUrl(String serverUrl) {
+        this.serverUrl = serverUrl;
+    }
+
+    /**
+     * Gets the API token.
+     * @return The API token
+     */
+    public String getApiToken() {
+        return apiToken;
+    }
+
+    /**
+     * Sets the API token.
+     * @param apiToken The API token
+     */
+    public void setApiToken(String apiToken) {
+        this.apiToken = apiToken;
+    }
+
+    /**
+     * Checks if synchronization is enabled.
+     * @return True if synchronization is enabled
+     */
+    public boolean isEnableSync() {
+        return enableSync;
+    }
+
+    /**
+     * Sets whether synchronization is enabled.
+     * @param enableSync Whether synchronization is enabled
+     */
+    public void setEnableSync(boolean enableSync) {
+        this.enableSync = enableSync;
+    }
+
+    /**
+     * Gets the synchronization interval in seconds.
+     * @return The synchronization interval
+     */
+    public int getSyncInterval() {
+        return syncInterval;
+    }
+
+    /**
+     * Sets the synchronization interval in seconds.
+     * @param syncInterval The synchronization interval
+     */
+    public void setSyncInterval(int syncInterval) {
+        this.syncInterval = syncInterval;
     }
 }

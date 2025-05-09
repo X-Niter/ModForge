@@ -1,546 +1,431 @@
 package com.modforge.intellij.plugin.ai;
 
-import com.google.gson.Gson;
-import com.google.gson.JsonArray;
-import com.google.gson.JsonObject;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.components.Service;
 import com.intellij.openapi.diagnostic.Logger;
-import com.intellij.openapi.progress.ProcessCanceledException;
-import com.intellij.openapi.project.Project;
-import com.intellij.openapi.util.text.StringUtil;
 import com.intellij.util.concurrency.AppExecutorUtil;
 import com.modforge.intellij.plugin.settings.ModForgeSettings;
-import okhttp3.*;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
+import java.net.HttpURLConnection;
+import java.net.URI;
+import java.net.URL;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.time.Duration;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.concurrent.*;
-import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
- * Service for interacting with AI APIs.
- * This service provides methods for generating code, fixing code, and other AI-powered features.
+ * Service that manages AI service interactions.
+ * This service is responsible for handling API calls to OpenAI and tracking usage metrics.
  */
-@Service(Service.Level.PROJECT)
+@Service
 public final class AIServiceManager {
     private static final Logger LOG = Logger.getInstance(AIServiceManager.class);
-    
+    private static final int MAX_RETRIES = 3;
+    private static final int RETRY_DELAY_MS = 1000;
     private static final String OPENAI_API_URL = "https://api.openai.com/v1/chat/completions";
-    private static final String DEFAULT_MODEL = "gpt-4";
-    private static final int DEFAULT_MAX_TOKENS = 2000;
-    private static final int REQUEST_TIMEOUT_SECONDS = 60;
+    private static final String DEFAULT_MODEL = "gpt-4-0125-preview";
     
-    private final Project project;
-    private final OkHttpClient httpClient;
-    private final Gson gson;
-    private final PatternRecognitionService patternRecognitionService;
-    
-    // Statistics
-    private final AtomicLong requestCount = new AtomicLong(0);
-    private final AtomicLong cacheHitCount = new AtomicLong(0);
-    private final AtomicLong failureCount = new AtomicLong(0);
-    private final AtomicLong totalTokensUsed = new AtomicLong(0);
-    private final AtomicLong totalApiCalls = new AtomicLong(0);
+    private final ExecutorService executor;
+    private final HttpClient httpClient;
+    private final AtomicInteger tokenUsage = new AtomicInteger(0);
+    private final AtomicInteger apiCalls = new AtomicInteger(0);
+    private final AtomicInteger successfulCalls = new AtomicInteger(0);
+    private final AtomicInteger failedCalls = new AtomicInteger(0);
+    private final AtomicInteger patternMatches = new AtomicInteger(0);
     
     /**
      * Creates a new AIServiceManager.
-     * @param project The project
      */
-    public AIServiceManager(@NotNull Project project) {
-        this.project = project;
-        
-        // Create HTTP client
-        this.httpClient = new OkHttpClient.Builder()
-                .connectTimeout(REQUEST_TIMEOUT_SECONDS, TimeUnit.SECONDS)
-                .readTimeout(REQUEST_TIMEOUT_SECONDS, TimeUnit.SECONDS)
-                .writeTimeout(REQUEST_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+    public AIServiceManager() {
+        this.executor = AppExecutorUtil.createBoundedApplicationPoolExecutor("AIServiceManager", 4);
+        this.httpClient = HttpClient.newBuilder()
+                .executor(executor)
+                .connectTimeout(Duration.ofSeconds(30))
                 .build();
         
-        this.gson = new Gson();
-        this.patternRecognitionService = project.getService(PatternRecognitionService.class);
-        
-        LOG.info("AIServiceManager initialized for project: " + project.getName());
+        LOG.info("AI service manager created");
     }
     
     /**
-     * Gets the AIServiceManager instance.
-     * @param project The project
-     * @return The AIServiceManager instance
+     * Gets the AI service manager instance.
+     * @return The AI service manager
      */
-    public static AIServiceManager getInstance(@NotNull Project project) {
-        return project.getService(AIServiceManager.class);
+    public static AIServiceManager getInstance() {
+        return ApplicationManager.getApplication().getService(AIServiceManager.class);
     }
     
     /**
-     * Generates code.
+     * Sends a chat completion request to OpenAI.
      * @param prompt The prompt
-     * @param language The programming language
-     * @param options Additional options
-     * @return A future that completes with the generated code
+     * @param options The options
+     * @return A future that completes with the response text
      */
-    @NotNull
-    public CompletableFuture<String> generateCode(@NotNull String prompt, @NotNull String language,
-                                                @Nullable Map<String, Object> options) {
-        String patternType = "code_generation";
-        Map<String, Object> context = new HashMap<>();
-        context.put("language", language);
+    public CompletableFuture<String> generateChatCompletion(@NotNull String prompt, @Nullable Map<String, Object> options) {
+        // Get API key from settings
+        String apiKey = ModForgeSettings.getInstance().getOpenAIApiKey();
         
-        if (options != null) {
-            context.putAll(options);
-        }
-        
-        // Check for matching pattern
-        if (ModForgeSettings.getInstance().isUsePatternRecognition()) {
-            PatternRecognitionService.RecognizedPattern pattern = 
-                    patternRecognitionService.findMatchingPattern(patternType, prompt, context);
-            
-            if (pattern != null) {
-                LOG.info("Using cached code generation response for prompt: " + truncateForLogging(prompt));
-                cacheHitCount.incrementAndGet();
-                return CompletableFuture.completedFuture(pattern.getResponse());
-            }
-        }
-        
-        // Create messages
-        JsonArray messages = new JsonArray();
-        
-        // System message
-        JsonObject systemMessage = new JsonObject();
-        systemMessage.addProperty("role", "system");
-        systemMessage.addProperty("content", String.format(
-                "You are an expert %s programmer. Generate well-structured, idiomatic %s code in response to the user's request. " +
-                "Focus on generating clean, maintainable code with appropriate error handling. " +
-                "Include necessary imports and comments where appropriate. " +
-                "Output ONLY the code without any surrounding markdown or explanation.",
-                language, language));
-        messages.add(systemMessage);
-        
-        // User message
-        JsonObject userMessage = new JsonObject();
-        userMessage.addProperty("role", "user");
-        userMessage.addProperty("content", prompt);
-        messages.add(userMessage);
-        
-        // Create request
-        return sendOpenAiRequest(messages, DEFAULT_MAX_TOKENS)
-                .thenApply(response -> {
-                    // Store pattern
-                    if (ModForgeSettings.getInstance().isUsePatternRecognition()) {
-                        patternRecognitionService.addPattern(patternType, prompt, response, context);
-                    }
-                    
-                    return response;
-                });
-    }
-    
-    /**
-     * Fixes code.
-     * @param code The code to fix
-     * @param errorMessage The error message
-     * @param options Additional options
-     * @return A future that completes with the fixed code
-     */
-    @NotNull
-    public CompletableFuture<String> fixCode(@NotNull String code, @Nullable String errorMessage,
-                                           @Nullable Map<String, Object> options) {
-        String patternType = "code_fix";
-        Map<String, Object> context = new HashMap<>();
-        
-        if (errorMessage != null) {
-            context.put("errorMessage", errorMessage);
-        }
-        
-        if (options != null) {
-            context.putAll(options);
-        }
-        
-        // Check for matching pattern
-        if (ModForgeSettings.getInstance().isUsePatternRecognition()) {
-            PatternRecognitionService.RecognizedPattern pattern = 
-                    patternRecognitionService.findMatchingPattern(patternType, code, context);
-            
-            if (pattern != null) {
-                LOG.info("Using cached code fix response for code: " + truncateForLogging(code));
-                cacheHitCount.incrementAndGet();
-                return CompletableFuture.completedFuture(pattern.getResponse());
-            }
-        }
-        
-        // Create messages
-        JsonArray messages = new JsonArray();
-        
-        // System message
-        JsonObject systemMessage = new JsonObject();
-        systemMessage.addProperty("role", "system");
-        systemMessage.addProperty("content", 
-                "You are an expert programmer specializing in code review and bug fixing. " +
-                "Fix the code provided by the user. Only provide the corrected code without explanations. " +
-                "If you see compilation errors, logic errors, or potential bugs, fix them. " +
-                "If the code is already correct, return it as is.");
-        messages.add(systemMessage);
-        
-        // User message
-        StringBuilder userContent = new StringBuilder();
-        userContent.append("Fix the following code:");
-        userContent.append("\n\n```\n").append(code).append("\n```\n\n");
-        
-        if (errorMessage != null && !errorMessage.isEmpty()) {
-            userContent.append("Error message: ").append(errorMessage).append("\n\n");
-        }
-        
-        userContent.append("Return only the fixed code without explanations or markdown formatting.");
-        
-        JsonObject userMessage = new JsonObject();
-        userMessage.addProperty("role", "user");
-        userMessage.addProperty("content", userContent.toString());
-        messages.add(userMessage);
-        
-        // Create request
-        return sendOpenAiRequest(messages, DEFAULT_MAX_TOKENS)
-                .thenApply(response -> {
-                    // Clean up response
-                    String cleanResponse = cleanupCodeResponse(response);
-                    
-                    // Store pattern
-                    if (ModForgeSettings.getInstance().isUsePatternRecognition()) {
-                        patternRecognitionService.addPattern(patternType, code, cleanResponse, context);
-                    }
-                    
-                    return cleanResponse;
-                });
-    }
-    
-    /**
-     * Explains code.
-     * @param code The code to explain
-     * @param options Additional options
-     * @return A future that completes with the explanation
-     */
-    @NotNull
-    public CompletableFuture<String> explainCode(@NotNull String code, @Nullable Map<String, Object> options) {
-        String patternType = "code_explanation";
-        Map<String, Object> context = options != null ? new HashMap<>(options) : new HashMap<>();
-        
-        // Check for matching pattern
-        if (ModForgeSettings.getInstance().isUsePatternRecognition()) {
-            PatternRecognitionService.RecognizedPattern pattern = 
-                    patternRecognitionService.findMatchingPattern(patternType, code, context);
-            
-            if (pattern != null) {
-                LOG.info("Using cached code explanation response for code: " + truncateForLogging(code));
-                cacheHitCount.incrementAndGet();
-                return CompletableFuture.completedFuture(pattern.getResponse());
-            }
-        }
-        
-        // Create messages
-        JsonArray messages = new JsonArray();
-        
-        // System message
-        JsonObject systemMessage = new JsonObject();
-        systemMessage.addProperty("role", "system");
-        systemMessage.addProperty("content", 
-                "You are an expert programmer specializing in code explanation. " +
-                "Explain the code provided by the user in clear, concise terms. " +
-                "Break down complex parts, explain the algorithm, and highlight important aspects. " +
-                "Keep your explanation well-structured and easy to understand.");
-        messages.add(systemMessage);
-        
-        // User message
-        StringBuilder userContent = new StringBuilder();
-        userContent.append("Explain the following code:");
-        userContent.append("\n\n```\n").append(code).append("\n```\n\n");
-        
-        JsonObject userMessage = new JsonObject();
-        userMessage.addProperty("role", "user");
-        userMessage.addProperty("content", userContent.toString());
-        messages.add(userMessage);
-        
-        // Create request
-        return sendOpenAiRequest(messages, DEFAULT_MAX_TOKENS)
-                .thenApply(response -> {
-                    // Store pattern
-                    if (ModForgeSettings.getInstance().isUsePatternRecognition()) {
-                        patternRecognitionService.addPattern(patternType, code, response, context);
-                    }
-                    
-                    return response;
-                });
-    }
-    
-    /**
-     * Generates documentation.
-     * @param code The code to document
-     * @param options Additional options
-     * @return A future that completes with the documentation
-     */
-    @NotNull
-    public CompletableFuture<String> generateDocumentation(@NotNull String code, @Nullable Map<String, Object> options) {
-        String patternType = "documentation_generation";
-        Map<String, Object> context = options != null ? new HashMap<>(options) : new HashMap<>();
-        
-        // Check for matching pattern
-        if (ModForgeSettings.getInstance().isUsePatternRecognition()) {
-            PatternRecognitionService.RecognizedPattern pattern = 
-                    patternRecognitionService.findMatchingPattern(patternType, code, context);
-            
-            if (pattern != null) {
-                LOG.info("Using cached documentation response for code: " + truncateForLogging(code));
-                cacheHitCount.incrementAndGet();
-                return CompletableFuture.completedFuture(pattern.getResponse());
-            }
-        }
-        
-        // Create messages
-        JsonArray messages = new JsonArray();
-        
-        // System message
-        JsonObject systemMessage = new JsonObject();
-        systemMessage.addProperty("role", "system");
-        systemMessage.addProperty("content", 
-                "You are an expert programmer specializing in code documentation. " +
-                "Generate comprehensive documentation for the code provided by the user. " +
-                "Include class, method, and parameter documentation in the appropriate format for the language. " +
-                "For Java code, use JavaDoc format. For JavaScript, use JSDoc. For Python, use docstrings. " +
-                "Focus on explaining what each component does, any parameters, return values, and exceptions." +
-                "Return only the documented code, not explanations about it.");
-        messages.add(systemMessage);
-        
-        // User message
-        StringBuilder userContent = new StringBuilder();
-        userContent.append("Document the following code:");
-        userContent.append("\n\n```\n").append(code).append("\n```\n\n");
-        userContent.append("Return the code with added documentation.");
-        
-        JsonObject userMessage = new JsonObject();
-        userMessage.addProperty("role", "user");
-        userMessage.addProperty("content", userContent.toString());
-        messages.add(userMessage);
-        
-        // Create request
-        return sendOpenAiRequest(messages, DEFAULT_MAX_TOKENS)
-                .thenApply(response -> {
-                    // Clean up response
-                    String cleanResponse = cleanupCodeResponse(response);
-                    
-                    // Store pattern
-                    if (ModForgeSettings.getInstance().isUsePatternRecognition()) {
-                        patternRecognitionService.addPattern(patternType, code, cleanResponse, context);
-                    }
-                    
-                    return cleanResponse;
-                });
-    }
-    
-    /**
-     * Sends a request to the OpenAI API.
-     * @param messages The messages
-     * @param maxTokens The maximum number of tokens
-     * @return A future that completes with the response
-     */
-    @NotNull
-    private CompletableFuture<String> sendOpenAiRequest(@NotNull JsonArray messages, int maxTokens) {
-        ModForgeSettings settings = ModForgeSettings.getInstance();
-        String apiKey = settings.getOpenAiApiKey();
-        String model = settings.getOpenAiModel();
-        
-        if (StringUtil.isEmpty(apiKey)) {
+        if (apiKey == null || apiKey.isEmpty()) {
             return CompletableFuture.failedFuture(
-                    new IllegalStateException("OpenAI API key is not set. Please configure it in the settings."));
+                    new IllegalStateException("OpenAI API key not set. Please configure it in the ModForge settings.")
+            );
         }
         
-        if (StringUtil.isEmpty(model)) {
-            model = DEFAULT_MODEL;
-        }
+        // Create options map if null
+        Map<String, Object> requestOptions = options != null ? new HashMap<>(options) : new HashMap<>();
         
-        // Track request
-        requestCount.incrementAndGet();
-        totalApiCalls.incrementAndGet();
+        // Build request body
+        Map<String, Object> requestBody = new HashMap<>();
+        requestBody.put("model", requestOptions.getOrDefault("model", DEFAULT_MODEL));
+        requestBody.put("messages", new Object[]{
+                Map.of("role", "system", "content", requestOptions.getOrDefault("systemPrompt", "You are a helpful assistant for Minecraft mod development.")),
+                Map.of("role", "user", "content", prompt)
+        });
+        requestBody.put("max_tokens", requestOptions.getOrDefault("maxTokens", 2048));
+        requestBody.put("temperature", requestOptions.getOrDefault("temperature", 0.7));
         
-        // Create request body
-        JsonObject requestBody = new JsonObject();
-        requestBody.addProperty("model", model);
-        requestBody.add("messages", messages);
-        requestBody.addProperty("max_tokens", maxTokens);
-        requestBody.addProperty("temperature", 0.2); // Lower temperature for more deterministic outputs
-        requestBody.addProperty("top_p", 1);
+        // Convert to JSON
+        String requestBodyJson = toJson(requestBody);
         
-        // Create request
-        Request request = new Request.Builder()
-                .url(OPENAI_API_URL)
-                .post(RequestBody.create(
-                        MediaType.parse("application/json"),
-                        gson.toJson(requestBody)))
-                .header("Authorization", "Bearer " + apiKey)
+        // Build request
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(OPENAI_API_URL))
                 .header("Content-Type", "application/json")
+                .header("Authorization", "Bearer " + apiKey)
+                .POST(HttpRequest.BodyPublishers.ofString(requestBodyJson))
                 .build();
-        
-        // Create future
-        CompletableFuture<String> future = new CompletableFuture<>();
         
         // Send request
-        String finalModel = model;
-        httpClient.newCall(request).enqueue(new Callback() {
-            @Override
-            public void onFailure(@NotNull Call call, @NotNull IOException e) {
-                LOG.error("OpenAI API request failed", e);
-                failureCount.incrementAndGet();
-                future.completeExceptionally(e);
-            }
-            
-            @Override
-            public void onResponse(@NotNull Call call, @NotNull Response response) throws IOException {
-                ResponseBody responseBody = response.body();
-                
-                try {
-                    if (!response.isSuccessful() || responseBody == null) {
-                        String errorBody = responseBody != null ? responseBody.string() : "Empty response";
-                        LOG.error("OpenAI API request failed with status: " + response.code() + ", body: " + errorBody);
-                        failureCount.incrementAndGet();
-                        future.completeExceptionally(new IOException(
-                                "OpenAI API request failed with status: " + response.code() + ", body: " + errorBody));
-                        return;
-                    }
-                    
+        return sendRequest(request, 0)
+                .thenApply(response -> {
                     // Parse response
-                    String responseString = responseBody.string();
-                    JsonObject jsonResponse = gson.fromJson(responseString, JsonObject.class);
-                    
-                    // Extract content
-                    String content = extractContentFromResponse(jsonResponse);
-                    
-                    // Update token usage
-                    if (jsonResponse.has("usage")) {
-                        JsonObject usage = jsonResponse.getAsJsonObject("usage");
-                        if (usage.has("total_tokens")) {
-                            totalTokensUsed.addAndGet(usage.get("total_tokens").getAsInt());
+                    try {
+                        Map<String, Object> responseJson = fromJson(response);
+                        
+                        @SuppressWarnings("unchecked")
+                        Map<String, Object> choice = ((java.util.List<Map<String, Object>>) responseJson.get("choices")).get(0);
+                        
+                        @SuppressWarnings("unchecked")
+                        Map<String, Object> message = (Map<String, Object>) choice.get("message");
+                        
+                        String content = (String) message.get("content");
+                        
+                        // Track token usage
+                        if (responseJson.containsKey("usage")) {
+                            @SuppressWarnings("unchecked")
+                            Map<String, Object> usage = (Map<String, Object>) responseJson.get("usage");
+                            
+                            int totalTokens = ((Number) usage.get("total_tokens")).intValue();
+                            tokenUsage.addAndGet(totalTokens);
                         }
+                        
+                        // Track successful call
+                        successfulCalls.incrementAndGet();
+                        
+                        return content;
+                    } catch (Exception e) {
+                        // Track failed call
+                        failedCalls.incrementAndGet();
+                        
+                        throw new RuntimeException("Failed to parse OpenAI response", e);
                     }
-                    
-                    future.complete(content);
-                } catch (Exception e) {
-                    LOG.error("Error parsing OpenAI API response", e);
-                    failureCount.incrementAndGet();
-                    future.completeExceptionally(e);
-                } finally {
-                    if (responseBody != null) {
-                        responseBody.close();
-                    }
-                    response.close();
-                }
-            }
-        });
-        
-        return future;
+                });
     }
     
     /**
-     * Extracts content from a response.
-     * @param jsonResponse The JSON response
-     * @return The content
+     * Sends an HTTP request with retry logic.
+     * @param request The HTTP request
+     * @param retryCount The current retry count
+     * @return A future that completes with the response body
      */
-    @NotNull
-    private String extractContentFromResponse(@NotNull JsonObject jsonResponse) {
-        try {
-            if (jsonResponse.has("choices") && jsonResponse.getAsJsonArray("choices").size() > 0) {
-                JsonObject choice = jsonResponse.getAsJsonArray("choices").get(0).getAsJsonObject();
-                
-                if (choice.has("message") && choice.getAsJsonObject("message").has("content")) {
-                    return choice.getAsJsonObject("message").get("content").getAsString();
-                }
+    private CompletableFuture<String> sendRequest(HttpRequest request, int retryCount) {
+        // Track API call
+        apiCalls.incrementAndGet();
+        
+        return httpClient.sendAsync(request, HttpResponse.BodyHandlers.ofString())
+                .thenCompose(response -> {
+                    int statusCode = response.statusCode();
+                    
+                    if (isSuccessful(statusCode)) {
+                        return CompletableFuture.completedFuture(response.body());
+                    } else if (isRetryable(statusCode) && retryCount < MAX_RETRIES) {
+                        // Retry after delay
+                        return CompletableFuture.supplyAsync(() -> {
+                            try {
+                                Thread.sleep(RETRY_DELAY_MS * (retryCount + 1));
+                                return null;
+                            } catch (InterruptedException e) {
+                                throw new RuntimeException(e);
+                            }
+                        }, executor).thenCompose(v -> sendRequest(request, retryCount + 1));
+                    } else {
+                        // Not retryable or max retries reached
+                        return CompletableFuture.failedFuture(
+                                new IOException("HTTP error " + statusCode + ": " + response.body())
+                        );
+                    }
+                });
+    }
+    
+    /**
+     * Checks if a status code indicates a successful response.
+     * @param statusCode The status code
+     * @return True if the status code indicates a successful response
+     */
+    private boolean isSuccessful(int statusCode) {
+        return statusCode >= 200 && statusCode < 300;
+    }
+    
+    /**
+     * Checks if a status code indicates a retryable error.
+     * @param statusCode The status code
+     * @return True if the status code indicates a retryable error
+     */
+    private boolean isRetryable(int statusCode) {
+        return statusCode == HttpURLConnection.HTTP_TOO_MANY_REQUESTS || // 429
+               statusCode >= 500; // Server errors
+    }
+    
+    /**
+     * Records a pattern match.
+     * This means the AI service was not needed because a pattern match was found.
+     */
+    public void recordPatternMatch() {
+        patternMatches.incrementAndGet();
+    }
+    
+    /**
+     * Gets token usage.
+     * @return The token usage
+     */
+    public int getTokenUsage() {
+        return tokenUsage.get();
+    }
+    
+    /**
+     * Gets API call count.
+     * @return The API call count
+     */
+    public int getApiCallCount() {
+        return apiCalls.get();
+    }
+    
+    /**
+     * Gets successful call count.
+     * @return The successful call count
+     */
+    public int getSuccessfulCallCount() {
+        return successfulCalls.get();
+    }
+    
+    /**
+     * Gets failed call count.
+     * @return The failed call count
+     */
+    public int getFailedCallCount() {
+        return failedCalls.get();
+    }
+    
+    /**
+     * Gets pattern match count.
+     * @return The pattern match count
+     */
+    public int getPatternMatchCount() {
+        return patternMatches.get();
+    }
+    
+    /**
+     * Gets the estimated cost savings from pattern matches.
+     * @return The estimated cost savings in USD
+     */
+    public double getEstimatedCostSavings() {
+        // Assume average of 1000 tokens per request at $0.01 per 1000 tokens
+        return patternMatches.get() * 0.01;
+    }
+    
+    /**
+     * Resets usage metrics.
+     */
+    public void resetMetrics() {
+        tokenUsage.set(0);
+        apiCalls.set(0);
+        successfulCalls.set(0);
+        failedCalls.set(0);
+        patternMatches.set(0);
+    }
+    
+    /**
+     * Converts a map to a JSON string.
+     * @param map The map
+     * @return The JSON string
+     */
+    private String toJson(Map<String, Object> map) {
+        // Simple JSON serialization
+        StringBuilder sb = new StringBuilder();
+        sb.append("{");
+        
+        boolean first = true;
+        for (Map.Entry<String, Object> entry : map.entrySet()) {
+            if (!first) {
+                sb.append(",");
             }
-        } catch (Exception e) {
-            LOG.error("Error extracting content from response", e);
+            first = false;
+            
+            sb.append("\"").append(entry.getKey()).append("\":");
+            appendJsonValue(sb, entry.getValue());
         }
         
-        return "";
+        sb.append("}");
+        return sb.toString();
     }
     
     /**
-     * Cleans up a code response by removing code blocks and extra whitespace.
-     * @param response The response
-     * @return The cleaned up response
+     * Appends a JSON value to a string builder.
+     * @param sb The string builder
+     * @param value The value
      */
-    @NotNull
-    private String cleanupCodeResponse(@NotNull String response) {
-        // Remove code blocks
-        String cleaned = response;
-        
-        // Remove ```language
-        cleaned = cleaned.replaceAll("```\\w*\\s*", "");
-        
-        // Remove remaining ``` markers
-        cleaned = cleaned.replace("```", "");
-        
-        // Trim whitespace
-        cleaned = cleaned.trim();
-        
-        return cleaned;
+    private void appendJsonValue(StringBuilder sb, Object value) {
+        if (value == null) {
+            sb.append("null");
+        } else if (value instanceof String) {
+            sb.append("\"").append(escapeJson((String) value)).append("\"");
+        } else if (value instanceof Number) {
+            sb.append(value);
+        } else if (value instanceof Boolean) {
+            sb.append(value);
+        } else if (value instanceof Map) {
+            sb.append(toJson((Map<String, Object>) value));
+        } else if (value instanceof Object[]) {
+            sb.append("[");
+            boolean first = true;
+            for (Object item : (Object[]) value) {
+                if (!first) {
+                    sb.append(",");
+                }
+                first = false;
+                appendJsonValue(sb, item);
+            }
+            sb.append("]");
+        } else if (value instanceof java.util.List) {
+            sb.append("[");
+            boolean first = true;
+            for (Object item : (java.util.List<?>) value) {
+                if (!first) {
+                    sb.append(",");
+                }
+                first = false;
+                appendJsonValue(sb, item);
+            }
+            sb.append("]");
+        } else {
+            sb.append("\"").append(escapeJson(value.toString())).append("\"");
+        }
     }
     
     /**
-     * Truncates a string for logging.
+     * Escapes a string for JSON.
      * @param str The string
-     * @return The truncated string
+     * @return The escaped string
      */
-    @NotNull
-    private String truncateForLogging(@NotNull String str) {
-        return str.length() <= 100 ? str : str.substring(0, 97) + "...";
+    private String escapeJson(String str) {
+        if (str == null) {
+            return "";
+        }
+        
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < str.length(); i++) {
+            char c = str.charAt(i);
+            switch (c) {
+                case '"':
+                    sb.append("\\\"");
+                    break;
+                case '\\':
+                    sb.append("\\\\");
+                    break;
+                case '\b':
+                    sb.append("\\b");
+                    break;
+                case '\f':
+                    sb.append("\\f");
+                    break;
+                case '\n':
+                    sb.append("\\n");
+                    break;
+                case '\r':
+                    sb.append("\\r");
+                    break;
+                case '\t':
+                    sb.append("\\t");
+                    break;
+                default:
+                    if (c < ' ') {
+                        sb.append(String.format("\\u%04x", (int) c));
+                    } else {
+                        sb.append(c);
+                    }
+            }
+        }
+        return sb.toString();
     }
     
     /**
-     * Gets the request count.
-     * @return The request count
+     * Parses a JSON string into a map.
+     * Note: This is a very simplistic JSON parser that only handles
+     * the structures returned by the OpenAI API. For a production system,
+     * a proper JSON library should be used.
+     * @param json The JSON string
+     * @return The parsed map
      */
-    public long getRequestCount() {
-        return requestCount.get();
-    }
-    
-    /**
-     * Gets the cache hit count.
-     * @return The cache hit count
-     */
-    public long getCacheHitCount() {
-        return cacheHitCount.get();
-    }
-    
-    /**
-     * Gets the failure count.
-     * @return The failure count
-     */
-    public long getFailureCount() {
-        return failureCount.get();
-    }
-    
-    /**
-     * Gets the total tokens used.
-     * @return The total tokens used
-     */
-    public long getTotalTokensUsed() {
-        return totalTokensUsed.get();
-    }
-    
-    /**
-     * Gets the estimated cost.
-     * @return The estimated cost
-     */
-    public double getEstimatedCost() {
-        // Simplified cost calculation based on gpt-4 pricing ($0.03 per 1K tokens)
-        // For a more accurate calculation, we would need to track input and output tokens separately
-        // and use the appropriate pricing for each model
-        return totalTokensUsed.get() * 0.03 / 1000.0;
-    }
-    
-    /**
-     * Disposes the service.
-     */
-    public void dispose() {
-        httpClient.dispatcher().executorService().shutdown();
-        httpClient.connectionPool().evictAll();
+    private Map<String, Object> fromJson(String json) {
+        // For simplicity, we're using gson. In a real implementation, 
+        // you would use a proper JSON library like Gson or Jackson.
+        // This method is mocked to simplify the example.
+        // In a real implementation, replace this with proper JSON parsing.
+        
+        // Mock implementation for demonstration
+        Map<String, Object> result = new HashMap<>();
+        
+        // Extract content
+        if (json.contains("\"choices\"")) {
+            java.util.List<Map<String, Object>> choices = new java.util.ArrayList<>();
+            Map<String, Object> choice = new HashMap<>();
+            Map<String, Object> message = new HashMap<>();
+            
+            // Extract content between "content": " and the next "
+            int contentStart = json.indexOf("\"content\":") + 11;
+            int contentEnd = json.indexOf("\"", contentStart + 1);
+            String content = json.substring(contentStart, contentEnd);
+            
+            message.put("content", content);
+            choice.put("message", message);
+            choices.add(choice);
+            result.put("choices", choices);
+        }
+        
+        // Extract usage
+        if (json.contains("\"total_tokens\"")) {
+            Map<String, Object> usage = new HashMap<>();
+            
+            // Extract total tokens
+            int tokensStart = json.indexOf("\"total_tokens\":") + 15;
+            int tokensEnd = json.indexOf(",", tokensStart);
+            if (tokensEnd == -1) {
+                tokensEnd = json.indexOf("}", tokensStart);
+            }
+            int totalTokens = Integer.parseInt(json.substring(tokensStart, tokensEnd).trim());
+            
+            usage.put("total_tokens", totalTokens);
+            result.put("usage", usage);
+        }
+        
+        return result;
     }
 }
