@@ -2,6 +2,7 @@ package com.modforge.intellij.plugin.listeners;
 
 import com.intellij.openapi.compiler.CompilationStatusListener;
 import com.intellij.openapi.compiler.CompileContext;
+import com.intellij.openapi.compiler.CompilerManager;
 import com.intellij.openapi.compiler.CompilerMessage;
 import com.intellij.openapi.compiler.CompilerMessageCategory;
 import com.intellij.openapi.components.Service;
@@ -26,6 +27,7 @@ public final class ModForgeCompilationListener implements CompilationStatusListe
     
     private final Project project;
     private final List<CompilationIssue> activeIssues = new CopyOnWriteArrayList<>();
+    private boolean isRegistered = false;
     
     /**
      * Creates a new ModForgeCompilationListener.
@@ -33,6 +35,28 @@ public final class ModForgeCompilationListener implements CompilationStatusListe
      */
     public ModForgeCompilationListener(@NotNull Project project) {
         this.project = project;
+    }
+    
+    /**
+     * Registers this listener with the compiler manager.
+     */
+    public void register() {
+        if (!isRegistered) {
+            CompilerManager.getInstance(project).addCompilationStatusListener(this);
+            isRegistered = true;
+            LOG.info("Compilation listener registered for project: " + project.getName());
+        }
+    }
+    
+    /**
+     * Unregisters this listener from the compiler manager.
+     */
+    public void unregister() {
+        if (isRegistered) {
+            CompilerManager.getInstance(project).removeCompilationStatusListener(this);
+            isRegistered = false;
+            LOG.info("Compilation listener unregistered for project: " + project.getName());
+        }
     }
     
     @Override

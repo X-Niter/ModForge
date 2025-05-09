@@ -26,6 +26,8 @@
 
         <projectService serviceImplementation="com.modforge.intellij.plugin.services.ContinuousDevelopmentService"/>
         <projectService serviceImplementation="com.modforge.intellij.plugin.services.ModForgeProjectService"/>
+        <projectService serviceImplementation="com.modforge.intellij.plugin.listeners.ModForgeCompilationListener"/>
+        <projectService serviceImplementation="com.modforge.intellij.plugin.listeners.ModForgeFileListener"/>
 
         <!-- Tool Window -->
         <toolWindow id="ModForge" 
@@ -48,6 +50,9 @@
         <!-- Register compilation listener -->
         <listener class="com.modforge.intellij.plugin.listeners.ModForgeCompilationListener"
                   topic="com.intellij.openapi.compiler.CompilationStatusListener"/>
+        <!-- Register file listener -->
+        <listener class="com.modforge.intellij.plugin.listeners.ModForgeFileListener"
+                  topic="com.intellij.openapi.vfs.VirtualFileListener"/>
     </projectListeners>
 
     <actions>
