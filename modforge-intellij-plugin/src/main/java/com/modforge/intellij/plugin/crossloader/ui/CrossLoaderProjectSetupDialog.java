@@ -3,6 +3,7 @@ package com.modforge.intellij.plugin.crossloader.ui;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.DialogWrapper;
+import com.intellij.openapi.ui.Messages;
 import com.intellij.openapi.ui.ValidationInfo;
 import com.intellij.ui.components.JBLabel;
 import com.intellij.ui.components.JBList;
@@ -767,5 +768,78 @@ public class CrossLoaderProjectSetupDialog extends DialogWrapper {
         public void setBuildSystem(@NotNull String buildSystem) {
             this.buildSystem = buildSystem;
         }
+    }
+    
+    /**
+     * Called when the user clicks the "Create Project" button.
+     * Creates a new cross-loader mod project.
+     */
+    @Override
+    protected void doOKAction() {
+        if (useArchitectury) {
+            createArchitecturyProject();
+        } else {
+            createDirectConversionProject();
+        }
+        
+        super.doOKAction();
+    }
+    
+    /**
+     * Creates an Architectury project.
+     */
+    private void createArchitecturyProject() {
+        // Get project data
+        String modId = modIdField.getText().trim();
+        String modName = modNameField.getText().trim();
+        String modDescription = modDescriptionField.getText().trim();
+        String author = modAuthorField.getText().trim();
+        String packageName = packageNameField.getText().trim();
+        
+        // Show directory chooser
+        FileChooserDialog fileChooser = FileChooserFactory.getInstance().createFileChooser(
+                FileChooserDescriptorFactory.createSingleFolderDescriptor(),
+                project,
+                null
+        );
+        
+        VirtualFile[] files = fileChooser.choose(project);
+        if (files.length == 0) {
+            return;
+        }
+        
+        VirtualFile baseDir = files[0];
+        
+        // Generate Architectury project
+        ArchitecturyTemplateGenerator generator = new ArchitecturyTemplateGenerator(project);
+        boolean success = generator.generateArchitecturyMod(
+                modId, modName, modDescription, packageName, author, baseDir
+        );
+        
+        if (success) {
+            LOG.info("Successfully generated Architectury mod project: " + modId);
+            Messages.showInfoMessage(
+                    "Successfully created cross-loader mod project at:\n" + baseDir.getPath(),
+                    "Project Created"
+            );
+        } else {
+            LOG.error("Failed to generate Architectury mod project: " + modId);
+            Messages.showErrorDialog(
+                    "Failed to create cross-loader mod project. See the IDE log for details.",
+                    "Project Creation Failed"
+            );
+        }
+    }
+    
+    /**
+     * Creates a direct conversion project.
+     */
+    private void createDirectConversionProject() {
+        // TODO: Implement direct conversion project creation
+        Messages.showInfoMessage(
+                "Direct conversion project creation is not yet implemented.\n" +
+                "Please use Architectury for now.",
+                "Not Implemented"
+        );
     }
 }
