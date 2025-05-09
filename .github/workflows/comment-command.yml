@@ -6,6 +6,11 @@ on:
   pull_request_review_comment:
     types: [created]
 
+# Prevent overlapping command processing on the same issue/PR
+concurrency:
+  group: comment-command-${{ github.event.issue.number || github.event.pull_request.number }}
+  cancel-in-progress: false
+
 jobs:
   process-comment-command:
     runs-on: ubuntu-latest

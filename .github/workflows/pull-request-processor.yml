@@ -4,6 +4,11 @@ on:
   pull_request:
     types: [opened, synchronize, reopened, edited, labeled]
 
+# Prevent multiple processors running on the same PR
+concurrency:
+  group: pr-processor-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+
 jobs:
   process-pr:
     runs-on: ubuntu-latest

@@ -5,6 +5,11 @@ on:
     - cron: '0 0 * * 0'  # Run once a week on Sunday at midnight
   workflow_dispatch:  # Allow manual trigger
 
+# Prevent multiple dependency update jobs from running simultaneously
+concurrency:
+  group: dependency-update
+  cancel-in-progress: false
+
 jobs:
   update-dependencies:
     runs-on: ubuntu-latest
