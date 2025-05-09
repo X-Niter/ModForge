@@ -1,9 +1,9 @@
 plugins {
     id 'java'
-    id 'org.jetbrains.intellij' version '1.16.0'
+    id 'org.jetbrains.intellij' version '1.15.0'
 }
 
-group 'com.modforge'
+group 'com.modforge.intellij'
 version '1.0.0'
 
 repositories {
@@ -11,77 +11,34 @@ repositories {
 }
 
 dependencies {
-    implementation 'org.java-websocket:Java-WebSocket:1.5.4'
+    implementation 'org.jetbrains:annotations:24.0.0'
+    implementation 'com.squareup.okhttp3:okhttp:4.10.0'
     implementation 'com.google.code.gson:gson:2.10.1'
-    
-    // Add any other dependencies you need for AI, pattern recognition, etc.
-    implementation 'org.apache.commons:commons-lang3:3.12.0'
-    implementation 'org.apache.commons:commons-collections4:4.4'
-    implementation 'org.apache.commons:commons-math3:3.6.1'
 }
 
-// Configure Gradle IntelliJ Plugin
 intellij {
-    version = '2023.1'
-    plugins = ['java']
+    version = '2023.2'
+    type = 'IC' // IntelliJ IDEA Community Edition
+    plugins = ['com.intellij.java']
+    updateSinceUntilBuild = false
 }
 
-// Set to Java 17 compatibility
-sourceCompatibility = JavaVersion.VERSION_17
-targetCompatibility = JavaVersion.VERSION_17
-
-tasks.withType(JavaCompile).configureEach {
-    options.encoding = 'UTF-8'
+tasks {
+    patchPluginXml {
+        sinceBuild = '231'
+        untilBuild = '*'
+    }
 }
 
-patchPluginXml {
-    changeNotes = """
-      <h3>1.0.0</h3>
-      <ul>
-        <li>Initial release of ModForge IntelliJ plugin</li>
-        <li>AI-powered code generation for Minecraft mods</li>
-        <li>Cross-loader support for Forge, Fabric, and Quilt</li>
-        <li>Real-time collaboration features</li>
-        <li>Pattern recognition for reduced API costs</li>
-        <li>Metrics dashboard for productivity tracking</li>
-      </ul>
-    """
-    sinceBuild = '231'
-    untilBuild = '242.*'
-}
-
-runIde {
-    // Configure the IDE run configuration
-    jvmArgs '-Xmx2G'
-    ideDir = System.getenv('INTELLIJ_HOME') ?: ''
+java {
+    sourceCompatibility = JavaVersion.VERSION_17
+    targetCompatibility = JavaVersion.VERSION_17
 }
 
 buildSearchableOptions {
     enabled = false
 }
 
-// Create a task to create directories
-task createDirectories {
-    doLast {
-        mkdir 'src/main/resources/icons'
-        mkdir 'src/main/resources/META-INF/lib'
-        mkdir 'src/main/resources/fileTemplates'
-        mkdir 'src/main/resources/liveTemplates'
-    }
-}
-
-prepareSandbox {
-    dependsOn createDirectories
-}
-
-signPlugin {
-    // Optional: Sign the plugin if you have a certificate
-    certificateChain = System.getenv('CERTIFICATE_CHAIN') ?: ''
-    privateKey = System.getenv('PRIVATE_KEY') ?: ''
-    password = System.getenv('PRIVATE_KEY_PASSWORD') ?: ''
-}
-
-publishPlugin {
-    // Optional: Publish to JetBrains Marketplace if you have a token
-    token = System.getenv('PUBLISH_TOKEN') ?: ''
+test {
+    useJUnitPlatform()
 }
