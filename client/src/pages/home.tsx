@@ -8,6 +8,7 @@ import { StatusCard } from "@/components/status-card";
 import { BuildHistory } from "@/components/build-history";
 import { ActionsCard } from "@/components/actions-card";
 import { ConsoleOutput } from "@/components/console-output";
+import { ContinuousDevelopmentControls } from "@/components/continuous-development-controls";
 import { modLoaders, compileFrequencies, autoFixLevels } from "@shared/schema";
 import { ModFormData } from "@/types";
 
@@ -176,6 +177,7 @@ export default function Home() {
                 
                 <div className="lg:col-span-2">
                   <StatusCard />
+                  <ContinuousDevelopmentControls />
                   <BuildHistory />
                   <ActionsCard formData={formData} />
                 </div>

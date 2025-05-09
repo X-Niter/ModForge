@@ -5,6 +5,7 @@ import { compileMod } from "./compiler";
 import { generateModCode, fixCompilationErrors, addModFeatures } from "./ai-service";
 import { pushModToGitHub } from "./github";
 import { checkDatabaseHealth } from "./db-health";
+import { continuousService } from "./continuous-service";
 import { z } from "zod";
 import { insertModSchema } from "@shared/schema";
 import { BuildStatus } from "@/types";
@@ -373,6 +374,107 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error adding features:", error);
       res.status(500).json({ message: "Failed to add features" });
+    }
+  });
+
+  // Continuous Development Endpoints
+
+  // Start continuous development
+  app.post("/api/mods/:id/continuous-development/start", async (req, res) => {
+    try {
+      const modId = parseInt(req.params.id, 10);
+      if (isNaN(modId)) {
+        return res.status(400).json({ message: "Invalid mod ID" });
+      }
+
+      const mod = await storage.getMod(modId);
+      if (!mod) {
+        return res.status(404).json({ message: "Mod not found" });
+      }
+
+      // Get frequency from the mod's compileFrequency setting
+      let frequency = 5 * 60 * 1000; // Default: 5 minutes
+      
+      switch (mod.compileFrequency) {
+        case "Every 5 Minutes":
+          frequency = 5 * 60 * 1000;
+          break;
+        case "Every 15 Minutes":
+          frequency = 15 * 60 * 1000;
+          break;
+        case "Manual Only":
+          return res.status(400).json({ 
+            message: "Cannot start continuous development for mods with 'Manual Only' compile frequency" 
+          });
+        case "After Every Change":
+          frequency = 2 * 60 * 1000; // Check every 2 minutes for changes
+          break;
+      }
+
+      // Start continuous development
+      continuousService.startContinuousDevelopment(modId, frequency);
+
+      res.json({ 
+        message: "Continuous development started",
+        modId,
+        frequency,
+        compileFrequency: mod.compileFrequency
+      });
+    } catch (error) {
+      console.error("Error starting continuous development:", error);
+      res.status(500).json({ message: "Failed to start continuous development" });
+    }
+  });
+
+  // Stop continuous development
+  app.post("/api/mods/:id/continuous-development/stop", async (req, res) => {
+    try {
+      const modId = parseInt(req.params.id, 10);
+      if (isNaN(modId)) {
+        return res.status(400).json({ message: "Invalid mod ID" });
+      }
+
+      const mod = await storage.getMod(modId);
+      if (!mod) {
+        return res.status(404).json({ message: "Mod not found" });
+      }
+
+      // Stop continuous development
+      continuousService.stopContinuousDevelopment(modId);
+
+      res.json({ 
+        message: "Continuous development stopped",
+        modId
+      });
+    } catch (error) {
+      console.error("Error stopping continuous development:", error);
+      res.status(500).json({ message: "Failed to stop continuous development" });
+    }
+  });
+
+  // Get continuous development status
+  app.get("/api/mods/:id/continuous-development/status", async (req, res) => {
+    try {
+      const modId = parseInt(req.params.id, 10);
+      if (isNaN(modId)) {
+        return res.status(400).json({ message: "Invalid mod ID" });
+      }
+
+      const mod = await storage.getMod(modId);
+      if (!mod) {
+        return res.status(404).json({ message: "Mod not found" });
+      }
+
+      // Get continuous development status
+      const status = continuousService.getStatistics(modId);
+
+      res.json({ 
+        modId,
+        status
+      });
+    } catch (error) {
+      console.error("Error getting continuous development status:", error);
+      res.status(500).json({ message: "Failed to get continuous development status" });
     }
   });
 
