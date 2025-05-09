@@ -7,12 +7,14 @@ import { ModProvider } from "@/context/mod-context";
 import Home from "@/pages/home";
 import NotFound from "@/pages/not-found";
 import GitHubIntegration from "@/pages/github-integration";
+import Settings from "@/pages/settings";
 
 function Router() {
   return (
     <Switch>
       <Route path="/" component={Home}/>
       <Route path="/github-integration" component={GitHubIntegration}/>
+      <Route path="/settings" component={Settings}/>
       <Route component={NotFound} />
     </Switch>
   );
