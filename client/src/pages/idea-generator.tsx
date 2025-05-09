@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useLocation } from "wouter";
 import { IdeaGeneratorForm } from "@/components/idea-generator-form";
 import { IdeaCard } from "@/components/idea-card";
-import { insertModSchema } from "@shared/schema";
+import { insertModSchema, type Mod } from "@shared/schema";
 import { apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
