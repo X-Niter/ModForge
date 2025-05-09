@@ -2,7 +2,9 @@ package com.modforge.intellij.plugin.actions;
 
 import com.intellij.openapi.actionSystem.AnAction;
 import com.intellij.openapi.actionSystem.AnActionEvent;
+import com.intellij.openapi.actionSystem.Presentation;
 import com.intellij.openapi.project.Project;
+import com.intellij.openapi.ui.Messages;
 import com.modforge.intellij.plugin.services.ContinuousDevelopmentService;
 import com.modforge.intellij.plugin.settings.ModForgeSettings;
 import org.jetbrains.annotations.NotNull;
@@ -13,26 +15,51 @@ import org.jetbrains.annotations.NotNull;
 public class ToggleContinuousDevelopmentAction extends AnAction {
     @Override
     public void actionPerformed(@NotNull AnActionEvent e) {
-        Project project = e.getProject();
+        final Project project = e.getProject();
         
         if (project == null) {
             return;
         }
         
+        // Get settings
         ModForgeSettings settings = ModForgeSettings.getInstance();
+        boolean enabled = settings.isContinuousDevelopmentEnabled();
+        
+        // Toggle setting
+        settings.setContinuousDevelopmentEnabled(!enabled);
+        
+        // Get service
         ContinuousDevelopmentService service = ContinuousDevelopmentService.getInstance(project);
         
-        boolean newState = !settings.isContinuousDevelopmentEnabled();
-        settings.setContinuousDevelopmentEnabled(newState);
-        
-        if (newState) {
-            service.start();
-        } else {
-            service.stop();
+        if (service == null) {
+            Messages.showErrorDialog(
+                    project,
+                    "Continuous development service not available.",
+                    "Toggle Continuous Development"
+            );
+            return;
         }
         
-        e.getPresentation().setText(getActionText(newState));
-        e.getPresentation().setDescription(getActionDescription(newState));
+        // Start or stop service
+        if (!enabled) {
+            service.start();
+            Messages.showInfoDialog(
+                    project,
+                    "Continuous development has been enabled.\n\n" +
+                            "The system will now automatically monitor for errors and fix them.",
+                    "Continuous Development Enabled"
+            );
+        } else {
+            service.stop();
+            Messages.showInfoDialog(
+                    project,
+                    "Continuous development has been disabled.",
+                    "Continuous Development Disabled"
+            );
+        }
+        
+        // Update presentation
+        update(e);
     }
     
     @Override
@@ -44,30 +71,23 @@ public class ToggleContinuousDevelopmentAction extends AnAction {
             return;
         }
         
-        boolean enabled = ModForgeSettings.getInstance().isContinuousDevelopmentEnabled();
+        // Get service
+        ContinuousDevelopmentService service = ContinuousDevelopmentService.getInstance(project);
         
-        e.getPresentation().setText(getActionText(enabled));
-        e.getPresentation().setDescription(getActionDescription(enabled));
-        e.getPresentation().setEnabledAndVisible(true);
-    }
-    
-    /**
-     * Gets the action text based on the current state.
-     * @param enabled Whether continuous development is enabled
-     * @return The action text
-     */
-    private String getActionText(boolean enabled) {
-        return enabled ? "Disable Continuous Development" : "Enable Continuous Development";
-    }
-    
-    /**
-     * Gets the action description based on the current state.
-     * @param enabled Whether continuous development is enabled
-     * @return The action description
-     */
-    private String getActionDescription(boolean enabled) {
-        return enabled
-                ? "Disable automatic error fixing and feature addition"
-                : "Enable automatic error fixing and feature addition";
+        if (service == null) {
+            e.getPresentation().setEnabledAndVisible(false);
+            return;
+        }
+        
+        // Update text based on current state
+        Presentation presentation = e.getPresentation();
+        boolean running = service.isRunning();
+        
+        presentation.setText(running ? "Disable Continuous Development" : "Enable Continuous Development");
+        presentation.setDescription(running ?
+                "Disable automatic error fixing" :
+                "Enable automatic error fixing");
+        
+        presentation.setEnabledAndVisible(true);
     }
 }

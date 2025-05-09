@@ -5,14 +5,13 @@ import com.intellij.openapi.actionSystem.AnActionEvent;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.wm.ToolWindow;
 import com.intellij.openapi.wm.ToolWindowManager;
+import com.modforge.intellij.plugin.ui.toolwindow.ModForgeToolWindowFactory;
 import org.jetbrains.annotations.NotNull;
 
 /**
  * Action to show the ModForge tool window.
  */
 public class ShowToolWindowAction extends AnAction {
-    private static final String TOOL_WINDOW_ID = "ModForge";
-    
     @Override
     public void actionPerformed(@NotNull AnActionEvent e) {
         Project project = e.getProject();
@@ -21,8 +20,8 @@ public class ShowToolWindowAction extends AnAction {
             return;
         }
         
-        ToolWindowManager toolWindowManager = ToolWindowManager.getInstance(project);
-        ToolWindow toolWindow = toolWindowManager.getToolWindow(TOOL_WINDOW_ID);
+        ToolWindow toolWindow = ToolWindowManager.getInstance(project)
+                .getToolWindow(ModForgeToolWindowFactory.TOOL_WINDOW_ID);
         
         if (toolWindow != null) {
             toolWindow.show();

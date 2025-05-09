@@ -4,194 +4,142 @@ import com.intellij.openapi.actionSystem.AnAction;
 import com.intellij.openapi.actionSystem.AnActionEvent;
 import com.intellij.openapi.actionSystem.CommonDataKeys;
 import com.intellij.openapi.command.WriteCommandAction;
-import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.editor.Editor;
-import com.intellij.openapi.editor.SelectionModel;
+import com.intellij.openapi.editor.ScrollType;
 import com.intellij.openapi.project.Project;
-import com.intellij.openapi.ui.DialogWrapper;
 import com.intellij.openapi.ui.Messages;
-import com.intellij.openapi.util.NlsContexts;
-import com.intellij.openapi.wm.ToolWindow;
-import com.intellij.openapi.wm.ToolWindowManager;
-import com.intellij.ui.components.JBScrollPane;
-import com.intellij.ui.components.JBTextArea;
-import com.intellij.util.ui.JBUI;
+import com.intellij.psi.PsiFile;
 import com.modforge.intellij.plugin.services.AutonomousCodeGenerationService;
 import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
-
-import javax.swing.*;
-import java.awt.*;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 
 /**
  * Action to generate code using AI.
  */
 public class GenerateCodeAction extends AnAction {
-    private static final String TOOL_WINDOW_ID = "ModForge";
-    
     @Override
     public void actionPerformed(@NotNull AnActionEvent e) {
-        Project project = e.getProject();
+        final Project project = e.getRequiredData(CommonDataKeys.PROJECT);
+        final Editor editor = e.getRequiredData(CommonDataKeys.EDITOR);
+        final PsiFile psiFile = e.getRequiredData(CommonDataKeys.PSI_FILE);
         
-        if (project == null) {
-            return;
-        }
+        // Get programming language from file
+        String fileExtension = psiFile.getFileType().getDefaultExtension();
+        String language = getLanguageFromExtension(fileExtension);
         
-        Editor editor = e.getData(CommonDataKeys.EDITOR);
-        
-        // If no editor is open or focused, show the tool window
-        if (editor == null) {
-            ToolWindowManager toolWindowManager = ToolWindowManager.getInstance(project);
-            ToolWindow toolWindow = toolWindowManager.getToolWindow(TOOL_WINDOW_ID);
-            
-            if (toolWindow != null) {
-                toolWindow.show();
-            }
-            return;
-        }
-        
-        // Get the selected text
-        SelectionModel selectionModel = editor.getSelectionModel();
-        String selectedText = selectionModel.getSelectedText();
-        
-        // Show dialog to get the prompt
-        GenerateCodeDialog dialog = new GenerateCodeDialog(project, selectedText);
-        if (!dialog.showAndGet()) {
-            return;
-        }
-        
-        // Get the prompt from the dialog
-        String prompt = dialog.getPrompt();
-        String language = dialog.getLanguage();
+        // Ask for prompt
+        String prompt = Messages.showInputDialog(
+                project,
+                "Enter what you want to generate:",
+                "Generate Code",
+                Messages.getQuestionIcon()
+        );
         
         if (prompt == null || prompt.trim().isEmpty()) {
-            Messages.showErrorDialog(project, "Please enter a prompt.", "Empty Prompt");
             return;
         }
         
-        // Generate code
-        AutonomousCodeGenerationService service = AutonomousCodeGenerationService.getInstance(project);
-        Map<String, Object> options = new HashMap<>();
-        
-        CompletableFuture<String> future = service.generateCode(prompt, language, options);
+        // Get code generation service
+        AutonomousCodeGenerationService codeGenService = AutonomousCodeGenerationService.getInstance(project);
         
         try {
-            // Wait for the result with a timeout
-            String result = future.get(60, TimeUnit.SECONDS);
-            
-            if (result != null && !result.isEmpty()) {
-                // Replace the selection or insert at caret
-                Document document = editor.getDocument();
-                
-                WriteCommandAction.runWriteCommandAction(project, () -> {
-                    if (selectionModel.hasSelection()) {
-                        document.replaceString(
-                                selectionModel.getSelectionStart(),
-                                selectionModel.getSelectionEnd(),
-                                result
+            // Generate code
+            codeGenService.generateCode(prompt, language, null)
+                    .thenAccept(generatedCode -> {
+                        if (generatedCode == null || generatedCode.isEmpty()) {
+                            Messages.showErrorDialog(
+                                    project,
+                                    "Failed to generate code.",
+                                    "Generate Code"
+                            );
+                            return;
+                        }
+                        
+                        // Insert code at cursor position
+                        WriteCommandAction.runWriteCommandAction(project, () -> {
+                            int offset = editor.getCaretModel().getOffset();
+                            editor.getDocument().insertString(offset, generatedCode);
+                            editor.getCaretModel().moveToOffset(offset + generatedCode.length());
+                            editor.getScrollingModel().scrollToCaret(ScrollType.MAKE_VISIBLE);
+                        });
+                    })
+                    .exceptionally(ex -> {
+                        Messages.showErrorDialog(
+                                project,
+                                "Error generating code: " + ex.getMessage(),
+                                "Generate Code"
                         );
-                    } else {
-                        int offset = editor.getCaretModel().getOffset();
-                        document.insertString(offset, result);
-                    }
-                });
-            } else {
-                Messages.showErrorDialog(project, "Failed to generate code.", "Generation Failed");
-            }
-        } catch (InterruptedException | ExecutionException | TimeoutException ex) {
-            Messages.showErrorDialog(project, "Error generating code: " + ex.getMessage(), "Generation Error");
+                        return null;
+                    });
+        } catch (Exception ex) {
+            Messages.showErrorDialog(
+                    project,
+                    "Error generating code: " + ex.getMessage(),
+                    "Generate Code"
+            );
         }
     }
     
     @Override
     public void update(@NotNull AnActionEvent e) {
-        e.getPresentation().setEnabledAndVisible(e.getProject() != null);
+        // Enable only if we have a project, editor, and file
+        Project project = e.getProject();
+        Editor editor = e.getData(CommonDataKeys.EDITOR);
+        PsiFile psiFile = e.getData(CommonDataKeys.PSI_FILE);
+        
+        e.getPresentation().setEnabledAndVisible(
+                project != null && editor != null && psiFile != null
+        );
     }
     
     /**
-     * Dialog to get the code generation prompt.
+     * Determines the programming language from a file extension.
+     * @param extension The file extension
+     * @return The programming language
      */
-    private static class GenerateCodeDialog extends DialogWrapper {
-        private JBTextArea promptTextArea;
-        private JComboBox<String> languageComboBox;
-        private final String initialPrompt;
-        
-        /**
-         * Creates a new GenerateCodeDialog.
-         * @param project The project
-         * @param initialPrompt The initial prompt
-         */
-        protected GenerateCodeDialog(@Nullable Project project, @Nullable String initialPrompt) {
-            super(project);
-            this.initialPrompt = initialPrompt;
-            setTitle("Generate Code");
-            init();
+    private String getLanguageFromExtension(String extension) {
+        if (extension == null) {
+            return "text";
         }
         
-        @Override
-        protected @Nullable JComponent createCenterPanel() {
-            JPanel panel = new JPanel(new BorderLayout());
-            panel.setPreferredSize(new Dimension(400, 200));
-            
-            // Create prompt input
-            JPanel promptPanel = new JPanel(new BorderLayout());
-            promptPanel.setBorder(JBUI.Borders.empty(0, 0, 5, 0));
-            
-            promptPanel.add(new JLabel("Enter a prompt to generate code:"), BorderLayout.NORTH);
-            
-            promptTextArea = new JBTextArea();
-            promptTextArea.setLineWrap(true);
-            promptTextArea.setWrapStyleWord(true);
-            
-            if (initialPrompt != null && !initialPrompt.isEmpty()) {
-                promptTextArea.setText("Generate code for: " + initialPrompt);
-            }
-            
-            promptPanel.add(new JBScrollPane(promptTextArea), BorderLayout.CENTER);
-            
-            panel.add(promptPanel, BorderLayout.CENTER);
-            
-            // Create language selection
-            JPanel languagePanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
-            
-            languagePanel.add(new JLabel("Language:"));
-            
-            languageComboBox = new JComboBox<>(new String[] {
-                    "Java",
-                    "Kotlin",
-                    "Groovy",
-                    "XML",
-                    "JSON",
-                    "YAML"
-            });
-            
-            languagePanel.add(languageComboBox);
-            
-            panel.add(languagePanel, BorderLayout.SOUTH);
-            
-            return panel;
-        }
-        
-        /**
-         * Gets the prompt from the dialog.
-         * @return The prompt
-         */
-        public String getPrompt() {
-            return promptTextArea.getText();
-        }
-        
-        /**
-         * Gets the language from the dialog.
-         * @return The language
-         */
-        public String getLanguage() {
-            return (String) languageComboBox.getSelectedItem();
+        switch (extension.toLowerCase()) {
+            case "java":
+                return "java";
+            case "kt":
+                return "kotlin";
+            case "js":
+            case "jsx":
+            case "ts":
+            case "tsx":
+                return "javascript";
+            case "py":
+                return "python";
+            case "rb":
+                return "ruby";
+            case "go":
+                return "go";
+            case "c":
+            case "cpp":
+            case "h":
+            case "hpp":
+                return "cpp";
+            case "cs":
+                return "csharp";
+            case "php":
+                return "php";
+            case "rs":
+                return "rust";
+            case "swift":
+                return "swift";
+            case "m":
+                return "objective-c";
+            case "scala":
+                return "scala";
+            case "groovy":
+                return "groovy";
+            case "rb":
+                return "ruby";
+            default:
+                return "text";
         }
     }
 }

@@ -1,133 +1,136 @@
 package com.modforge.intellij.plugin.actions;
 
-import com.intellij.codeInsight.daemon.impl.HighlightInfo;
-import com.intellij.codeInsight.daemon.impl.HighlightInfoType;
-import com.intellij.codeInsight.daemon.impl.SeveritiesProvider;
-import com.intellij.lang.annotation.HighlightSeverity;
 import com.intellij.openapi.actionSystem.AnAction;
 import com.intellij.openapi.actionSystem.AnActionEvent;
 import com.intellij.openapi.actionSystem.CommonDataKeys;
 import com.intellij.openapi.command.WriteCommandAction;
 import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.editor.Editor;
+import com.intellij.openapi.progress.ProgressIndicator;
+import com.intellij.openapi.progress.ProgressManager;
+import com.intellij.openapi.progress.Task;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.Messages;
-import com.intellij.openapi.wm.ToolWindow;
-import com.intellij.openapi.wm.ToolWindowManager;
+import com.intellij.psi.PsiDocumentManager;
+import com.intellij.psi.PsiFile;
+import com.modforge.intellij.plugin.listeners.ModForgeCompilationListener;
 import com.modforge.intellij.plugin.services.AutonomousCodeGenerationService;
 import org.jetbrains.annotations.NotNull;
 
-import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
+import java.util.stream.Collectors;
 
 /**
- * Action to fix errors in code using AI.
+ * Action to fix errors using AI.
  */
 public class FixErrorsAction extends AnAction {
-    private static final String TOOL_WINDOW_ID = "ModForge";
-    
     @Override
     public void actionPerformed(@NotNull AnActionEvent e) {
-        Project project = e.getProject();
+        final Project project = e.getRequiredData(CommonDataKeys.PROJECT);
+        final Editor editor = e.getRequiredData(CommonDataKeys.EDITOR);
+        final PsiFile psiFile = e.getRequiredData(CommonDataKeys.PSI_FILE);
         
-        if (project == null) {
-            return;
-        }
-        
-        Editor editor = e.getData(CommonDataKeys.EDITOR);
-        
-        // If no editor is open or focused, show the tool window
-        if (editor == null) {
-            ToolWindowManager toolWindowManager = ToolWindowManager.getInstance(project);
-            ToolWindow toolWindow = toolWindowManager.getToolWindow(TOOL_WINDOW_ID);
-            
-            if (toolWindow != null) {
-                toolWindow.show();
-            }
-            return;
-        }
-        
-        // Get the current document text
+        // Get document
         Document document = editor.getDocument();
-        String text = document.getText();
         
-        if (text.isEmpty()) {
-            Messages.showErrorDialog(project, "No code to fix.", "Empty Document");
+        // Get compilation listener
+        ModForgeCompilationListener compilationListener = ModForgeCompilationListener.getInstance(project);
+        
+        if (compilationListener == null) {
+            Messages.showErrorDialog(
+                    project,
+                    "Compilation listener not available.",
+                    "Fix Errors"
+            );
             return;
         }
         
-        // Collect error messages
-        List<String> errorMessages = collectErrorMessages(editor);
+        // Get issues for the current file
+        String filePath = psiFile.getVirtualFile().getPath();
+        String basePath = project.getBasePath();
         
-        if (errorMessages.isEmpty()) {
-            Messages.showInfoMessage(project, "No errors found in the current document.", "No Errors");
-            return;
-        }
-        
-        // Construct error message
-        StringBuilder errorMessage = new StringBuilder();
-        for (String error : errorMessages) {
-            errorMessage.append(error).append("\n");
-        }
-        
-        // Fix code
-        AutonomousCodeGenerationService service = AutonomousCodeGenerationService.getInstance(project);
-        Map<String, Object> options = new HashMap<>();
-        
-        CompletableFuture<String> future = service.fixCode(text, errorMessage.toString(), options);
-        
-        try {
-            // Wait for the result with a timeout
-            String result = future.get(60, TimeUnit.SECONDS);
+        if (basePath != null && filePath.startsWith(basePath)) {
+            filePath = filePath.substring(basePath.length());
             
-            if (result != null && !result.isEmpty() && !result.equals(text)) {
-                // Replace the document text
-                WriteCommandAction.runWriteCommandAction(project, () -> {
-                    document.replaceString(0, document.getTextLength(), result);
-                });
-                
-                Messages.showInfoMessage(project, "Fixed " + errorMessages.size() + " errors in the document.", "Errors Fixed");
-            } else {
-                Messages.showErrorDialog(project, "Failed to fix errors or no changes were needed.", "Fix Failed");
+            // Remove leading slash
+            if (filePath.startsWith("/")) {
+                filePath = filePath.substring(1);
             }
-        } catch (InterruptedException | ExecutionException | TimeoutException ex) {
-            Messages.showErrorDialog(project, "Error fixing code: " + ex.getMessage(), "Fix Error");
         }
+        
+        List<ModForgeCompilationListener.CompilationIssue> issues = compilationListener.getActiveIssuesForFile(filePath);
+        
+        if (issues.isEmpty()) {
+            Messages.showInfoDialog(
+                    project,
+                    "No compilation errors found in this file.",
+                    "Fix Errors"
+            );
+            return;
+        }
+        
+        // Build error message
+        String errorMessage = issues.stream()
+                .map(issue -> issue.getMessage() + " (Line " + issue.getLine() + ")")
+                .collect(Collectors.joining("\n"));
+        
+        // Get code
+        String code = document.getText();
+        
+        // Get code generation service
+        AutonomousCodeGenerationService codeGenService = AutonomousCodeGenerationService.getInstance(project);
+        
+        // Run in background
+        ProgressManager.getInstance().run(new Task.Backgroundable(project, "Fixing Errors", false) {
+            @Override
+            public void run(@NotNull ProgressIndicator indicator) {
+                indicator.setIndeterminate(false);
+                indicator.setText("Analyzing errors...");
+                indicator.setFraction(0.2);
+                
+                try {
+                    // Fix code
+                    String fixedCode = codeGenService.fixCode(code, errorMessage, null).get();
+                    
+                    if (fixedCode == null || fixedCode.isEmpty() || fixedCode.equals(code)) {
+                        Messages.showErrorDialog(
+                                project,
+                                "Failed to fix errors.",
+                                "Fix Errors"
+                        );
+                        return;
+                    }
+                    
+                    indicator.setText("Applying fixes...");
+                    indicator.setFraction(0.8);
+                    
+                    // Update document
+                    WriteCommandAction.runWriteCommandAction(project, () -> {
+                        document.setText(fixedCode);
+                        PsiDocumentManager.getInstance(project).commitDocument(document);
+                    });
+                    
+                    indicator.setFraction(1.0);
+                } catch (Exception ex) {
+                    Messages.showErrorDialog(
+                            project,
+                            "Error fixing code: " + ex.getMessage(),
+                            "Fix Errors"
+                    );
+                }
+            }
+        });
     }
     
     @Override
     public void update(@NotNull AnActionEvent e) {
+        // Enable only if we have a project, editor, and file
         Project project = e.getProject();
         Editor editor = e.getData(CommonDataKeys.EDITOR);
+        PsiFile psiFile = e.getData(CommonDataKeys.PSI_FILE);
         
-        e.getPresentation().setEnabledAndVisible(project != null && editor != null);
-    }
-    
-    /**
-     * Collects error messages from the current editor.
-     * @param editor The editor
-     * @return The error messages
-     */
-    private List<String> collectErrorMessages(@NotNull Editor editor) {
-        List<String> errorMessages = new ArrayList<>();
-        Document document = editor.getDocument();
-        
-        // For a real implementation, we would use the DaemonCodeAnalyzer to get real-time errors
-        // This is a simplified approach that looks for ERROR highlights in the editor
-        
-        // Get the error highlights
-        // Note: In a real implementation, this should be done properly through the inspection system
-        // This is a placeholder for the actual implementation
-        
-        // For now, we'll return a dummy error message
-        errorMessages.add("Cannot resolve symbol 'Unknown'");
-        
-        return errorMessages;
+        e.getPresentation().setEnabledAndVisible(
+                project != null && editor != null && psiFile != null
+        );
     }
 }

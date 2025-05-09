@@ -3,14 +3,16 @@ package com.modforge.intellij.plugin.actions;
 import com.intellij.openapi.actionSystem.AnAction;
 import com.intellij.openapi.actionSystem.AnActionEvent;
 import com.intellij.openapi.actionSystem.CommonDataKeys;
-import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.editor.SelectionModel;
+import com.intellij.openapi.progress.ProgressIndicator;
+import com.intellij.openapi.progress.ProgressManager;
+import com.intellij.openapi.progress.Task;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.DialogWrapper;
 import com.intellij.openapi.ui.Messages;
-import com.intellij.openapi.wm.ToolWindow;
-import com.intellij.openapi.wm.ToolWindowManager;
+import com.intellij.psi.PsiFile;
+import com.intellij.ui.components.JBLabel;
 import com.intellij.ui.components.JBScrollPane;
 import com.intellij.ui.components.JBTextArea;
 import com.intellij.util.ui.JBUI;
@@ -20,145 +22,130 @@ import org.jetbrains.annotations.Nullable;
 
 import javax.swing.*;
 import java.awt.*;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 
 /**
  * Action to explain code using AI.
  */
 public class ExplainCodeAction extends AnAction {
-    private static final String TOOL_WINDOW_ID = "ModForge";
-    
     @Override
     public void actionPerformed(@NotNull AnActionEvent e) {
-        Project project = e.getProject();
+        final Project project = e.getRequiredData(CommonDataKeys.PROJECT);
+        final Editor editor = e.getRequiredData(CommonDataKeys.EDITOR);
         
-        if (project == null) {
-            return;
-        }
-        
-        Editor editor = e.getData(CommonDataKeys.EDITOR);
-        
-        // If no editor is open or focused, show the tool window
-        if (editor == null) {
-            ToolWindowManager toolWindowManager = ToolWindowManager.getInstance(project);
-            ToolWindow toolWindow = toolWindowManager.getToolWindow(TOOL_WINDOW_ID);
-            
-            if (toolWindow != null) {
-                toolWindow.show();
-            }
-            return;
-        }
-        
-        // Get the selected text or the entire document
+        // Get selected text
         SelectionModel selectionModel = editor.getSelectionModel();
-        String text;
+        String selectedText = selectionModel.getSelectedText();
         
-        if (selectionModel.hasSelection()) {
-            text = selectionModel.getSelectedText();
-        } else {
-            Document document = editor.getDocument();
-            text = document.getText();
-        }
-        
-        if (text == null || text.isEmpty()) {
-            Messages.showErrorDialog(project, "No code to explain.", "Empty Document");
+        if (selectedText == null || selectedText.isEmpty()) {
+            Messages.showWarningDialog(
+                    project,
+                    "Please select some code to explain.",
+                    "Explain Code"
+            );
             return;
         }
         
-        // Explain code
-        AutonomousCodeGenerationService service = AutonomousCodeGenerationService.getInstance(project);
-        CompletableFuture<String> future = service.explainCode(text, null);
+        // Get code generation service
+        AutonomousCodeGenerationService codeGenService = AutonomousCodeGenerationService.getInstance(project);
         
-        try {
-            // Wait for the result with a timeout
-            String result = future.get(60, TimeUnit.SECONDS);
+        // Run in background
+        ProgressManager.getInstance().run(new Task.Backgroundable(project, "Explaining Code", false) {
+            private String explanation;
             
-            if (result != null && !result.isEmpty()) {
-                // Show the explanation
-                ExplanationDialog dialog = new ExplanationDialog(project, text, result);
-                dialog.show();
-            } else {
-                Messages.showErrorDialog(project, "Failed to explain the code.", "Explanation Failed");
+            @Override
+            public void run(@NotNull ProgressIndicator indicator) {
+                indicator.setIndeterminate(false);
+                indicator.setText("Analyzing code...");
+                indicator.setFraction(0.2);
+                
+                try {
+                    // Explain code
+                    explanation = codeGenService.explainCode(selectedText, null).get();
+                    
+                    if (explanation == null || explanation.isEmpty()) {
+                        Messages.showErrorDialog(
+                                project,
+                                "Failed to explain code.",
+                                "Explain Code"
+                        );
+                        return;
+                    }
+                    
+                    indicator.setFraction(1.0);
+                } catch (Exception ex) {
+                    Messages.showErrorDialog(
+                            project,
+                            "Error explaining code: " + ex.getMessage(),
+                            "Explain Code"
+                    );
+                }
             }
-        } catch (InterruptedException | ExecutionException | TimeoutException ex) {
-            Messages.showErrorDialog(project, "Error explaining code: " + ex.getMessage(), "Explanation Error");
-        }
+            
+            @Override
+            public void onSuccess() {
+                if (explanation != null && !explanation.isEmpty()) {
+                    ExplanationDialog dialog = new ExplanationDialog(project, explanation);
+                    dialog.show();
+                }
+            }
+        });
     }
     
     @Override
     public void update(@NotNull AnActionEvent e) {
+        // Enable only if we have a project, editor, and text selection
         Project project = e.getProject();
         Editor editor = e.getData(CommonDataKeys.EDITOR);
         
-        e.getPresentation().setEnabledAndVisible(project != null && editor != null);
+        if (project == null || editor == null) {
+            e.getPresentation().setEnabledAndVisible(false);
+            return;
+        }
+        
+        // Check if text is selected
+        SelectionModel selectionModel = editor.getSelectionModel();
+        boolean hasSelection = selectionModel.hasSelection();
+        
+        e.getPresentation().setEnabledAndVisible(hasSelection);
     }
     
     /**
-     * Dialog to display the code explanation.
+     * Dialog to display code explanation.
      */
     private static class ExplanationDialog extends DialogWrapper {
-        private final String code;
         private final String explanation;
         
-        /**
-         * Creates a new ExplanationDialog.
-         * @param project The project
-         * @param code The code to explain
-         * @param explanation The explanation
-         */
-        protected ExplanationDialog(@Nullable Project project, @NotNull String code, @NotNull String explanation) {
+        public ExplanationDialog(Project project, String explanation) {
             super(project);
-            this.code = code;
             this.explanation = explanation;
-            setTitle("Code Explanation");
-            setSize(800, 600);
             init();
+            setTitle("Code Explanation");
+            setSize(600, 400);
         }
         
         @Override
         protected @Nullable JComponent createCenterPanel() {
             JPanel panel = new JPanel(new BorderLayout());
-            panel.setPreferredSize(new Dimension(800, 600));
+            panel.setPreferredSize(new Dimension(600, 400));
             
-            JTabbedPane tabbedPane = new JTabbedPane();
+            JBLabel titleLabel = new JBLabel("Code Explanation");
+            titleLabel.setFont(titleLabel.getFont().deriveFont(Font.BOLD, 16));
+            titleLabel.setBorder(JBUI.Borders.empty(0, 0, 10, 0));
             
-            // Code tab
-            JPanel codePanel = new JPanel(new BorderLayout());
-            codePanel.setBorder(JBUI.Borders.empty(5));
+            JBTextArea textArea = new JBTextArea(explanation);
+            textArea.setEditable(false);
+            textArea.setLineWrap(true);
+            textArea.setWrapStyleWord(true);
+            textArea.setBorder(JBUI.Borders.empty(5));
             
-            JBTextArea codeTextArea = new JBTextArea();
-            codeTextArea.setText(code);
-            codeTextArea.setEditable(false);
+            JBScrollPane scrollPane = new JBScrollPane(textArea);
+            scrollPane.setBorder(JBUI.Borders.empty());
             
-            codePanel.add(new JBScrollPane(codeTextArea), BorderLayout.CENTER);
-            
-            tabbedPane.addTab("Code", codePanel);
-            
-            // Explanation tab
-            JPanel explanationPanel = new JPanel(new BorderLayout());
-            explanationPanel.setBorder(JBUI.Borders.empty(5));
-            
-            JBTextArea explanationTextArea = new JBTextArea();
-            explanationTextArea.setText(explanation);
-            explanationTextArea.setEditable(false);
-            explanationTextArea.setLineWrap(true);
-            explanationTextArea.setWrapStyleWord(true);
-            
-            explanationPanel.add(new JBScrollPane(explanationTextArea), BorderLayout.CENTER);
-            
-            tabbedPane.addTab("Explanation", explanationPanel);
-            
-            panel.add(tabbedPane, BorderLayout.CENTER);
+            panel.add(titleLabel, BorderLayout.NORTH);
+            panel.add(scrollPane, BorderLayout.CENTER);
+            panel.setBorder(JBUI.Borders.empty(10));
             
             return panel;
-        }
-        
-        @Override
-        protected Action @NotNull [] createActions() {
-            return new Action[] { getOKAction() };
         }
     }
 }

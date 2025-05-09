@@ -8,7 +8,7 @@ import com.modforge.intellij.plugin.settings.ModForgeSettingsConfigurable;
 import org.jetbrains.annotations.NotNull;
 
 /**
- * Action to open the ModForge settings dialog.
+ * Action to open ModForge settings.
  */
 public class OpenSettingsAction extends AnAction {
     @Override
@@ -19,7 +19,10 @@ public class OpenSettingsAction extends AnAction {
             return;
         }
         
-        ShowSettingsUtil.getInstance().showSettingsDialog(project, ModForgeSettingsConfigurable.class);
+        ShowSettingsUtil.getInstance().showSettingsDialog(
+                project,
+                ModForgeSettingsConfigurable.class
+        );
     }
     
     @Override
