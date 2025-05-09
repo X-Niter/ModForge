@@ -1,4 +1,4 @@
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { compileMod } from "./compiler";
@@ -7,6 +7,7 @@ import { pushModToGitHub } from "./github";
 import { z } from "zod";
 import { insertModSchema } from "@shared/schema";
 import { BuildStatus } from "@/types";
+import axios from "axios";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Create HTTP server
@@ -204,8 +205,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Verify GitHub token
+  app.post("/api/github/verify-token", async (req, res) => {
+    try {
+      const { token } = req.body;
+      if (!token) {
+        return res.status(400).json({ message: "GitHub token is required" });
+      }
+      
+      try {
+        // Test the token by making a request to the GitHub API
+        const response = await axios.get('https://api.github.com/user', {
+          headers: {
+            'Authorization': `token ${token}`,
+            'Accept': 'application/vnd.github.v3+json'
+          }
+        });
+        
+        // If we get here, the token is valid
+        res.json({ 
+          valid: true, 
+          username: response.data.login 
+        });
+      } catch (githubError) {
+        // Token is invalid or doesn't have the right permissions
+        res.status(200).json({ 
+          valid: false,
+          message: "Invalid GitHub token or insufficient permissions"
+        });
+      }
+    } catch (error) {
+      console.error("Error verifying GitHub token:", error);
+      res.status(500).json({ message: "Failed to verify GitHub token" });
+    }
+  });
+  
   // Push to GitHub
-  app.post("/api/mods/:id/github", async (req, res) => {
+  app.post("/api/mods/:id/push-to-github", async (req, res) => {
     try {
       const modId = parseInt(req.params.id, 10);
       if (isNaN(modId)) {
@@ -216,17 +252,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!mod) {
         return res.status(404).json({ message: "Mod not found" });
       }
-
-      // Push to GitHub
-      const result = await pushModToGitHub(modId, req.body.githubToken);
-      if (!result.success) {
-        return res.status(400).json({ message: result.error });
+      
+      const { token } = req.body;
+      if (!token) {
+        return res.status(400).json({ message: "GitHub token is required" });
       }
 
-      res.json({ repoUrl: result.repoUrl });
+      // Push to GitHub
+      const result = await pushModToGitHub(modId, token);
+      
+      if (!result.success) {
+        return res.status(400).json({ 
+          success: false,
+          error: result.error || "Failed to push to GitHub"
+        });
+      }
+
+      res.json({ 
+        success: true,
+        repoUrl: result.repoUrl,
+        owner: result.owner
+      });
     } catch (error) {
       console.error("Error pushing to GitHub:", error);
-      res.status(500).json({ message: "Failed to push to GitHub" });
+      res.status(500).json({ 
+        success: false,
+        message: "Failed to push to GitHub",
+        error: error instanceof Error ? error.message : String(error)
+      });
     }
   });
 

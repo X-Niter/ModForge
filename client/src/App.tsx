@@ -6,11 +6,13 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { ModProvider } from "@/context/mod-context";
 import Home from "@/pages/home";
 import NotFound from "@/pages/not-found";
+import GitHubIntegration from "@/pages/github-integration";
 
 function Router() {
   return (
     <Switch>
       <Route path="/" component={Home}/>
+      <Route path="/github-integration" component={GitHubIntegration}/>
       <Route component={NotFound} />
     </Switch>
   );

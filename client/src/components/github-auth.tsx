@@ -5,10 +5,23 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { useModContext } from "@/context/mod-context";
-import { apiRequest } from "@/lib/queryClient";
+import axios from 'axios';
 
 interface GitHubAuthProps {
   onSuccess?: (token: string) => void;
+}
+
+interface GitHubVerifyResponse {
+  valid: boolean;
+  username?: string;
+  message?: string;
+}
+
+interface GitHubPushResponse {
+  success: boolean;
+  repoUrl?: string;
+  error?: string;
+  owner?: string;
 }
 
 export function GitHubAuth({ onSuccess }: GitHubAuthProps) {
@@ -32,16 +45,13 @@ export function GitHubAuth({ onSuccess }: GitHubAuthProps) {
     
     try {
       // Verify token by testing it
-      const response = await apiRequest<{ valid: boolean; username?: string }>({
-        url: '/api/github/verify-token',
-        method: 'POST',
-        data: { token }
-      });
+      const response = await axios.post<GitHubVerifyResponse>('/api/github/verify-token', { token });
+      const data = response.data;
       
-      if (response.valid) {
+      if (data.valid) {
         toast({
           title: "Authentication Successful",
-          description: `Connected to GitHub as ${response.username}`,
+          description: `Connected to GitHub as ${data.username}`,
           variant: "default"
         });
         
@@ -52,7 +62,7 @@ export function GitHubAuth({ onSuccess }: GitHubAuthProps) {
       } else {
         toast({
           title: "Authentication Failed",
-          description: "Invalid GitHub token. Please check and try again.",
+          description: data.message || "Invalid GitHub token. Please check and try again.",
           variant: "destructive"
         });
       }
@@ -90,25 +100,20 @@ export function GitHubAuth({ onSuccess }: GitHubAuthProps) {
     setIsVerifying(true);
     
     try {
-      const response = await apiRequest<{ 
-        success: boolean; 
-        repoUrl?: string;
-        error?: string;
-        owner?: string;
-      }>({
-        url: `/api/mods/${currentMod.id}/push-to-github`,
-        method: 'POST',
-        data: { token }
-      });
+      const response = await axios.post<GitHubPushResponse>(
+        `/api/mods/${currentMod.id}/push-to-github`, 
+        { token }
+      );
+      const data = response.data;
       
-      if (response.success && response.repoUrl) {
+      if (data.success && data.repoUrl) {
         toast({
           title: "Mod Pushed to GitHub",
           description: (
             <div>
               <p>Your mod has been successfully pushed to GitHub!</p>
               <a 
-                href={response.repoUrl} 
+                href={data.repoUrl} 
                 target="_blank" 
                 rel="noopener noreferrer"
                 className="text-primary underline"
@@ -122,7 +127,7 @@ export function GitHubAuth({ onSuccess }: GitHubAuthProps) {
       } else {
         toast({
           title: "GitHub Push Failed",
-          description: response.error || "Failed to push mod to GitHub.",
+          description: data.error || "Failed to push mod to GitHub.",
           variant: "destructive"
         });
       }
