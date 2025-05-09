@@ -39,8 +39,17 @@ interface CategoryData {
 
 export default function MetricsPage() {
   // Fetch usage metrics
-  const { data: metricsData, isLoading: metricsLoading } = useQuery({
-    queryKey: ['/api/metrics/usage']
+  const { data: metricsData, isLoading: metricsLoading } = useQuery<MetricsData>({
+    queryKey: ['/api/metrics/usage'],
+    initialData: {
+      totalRequests: 0,
+      patternMatches: 0,
+      apiCalls: 0,
+      estimatedTokensSaved: 0,
+      estimatedCostSaved: 0,
+      patternMatchRate: "0.00%",
+      apiCallRate: "0.00%"
+    }
   });
 
   // Fetch category data
