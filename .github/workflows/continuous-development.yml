@@ -1,0 +1,108 @@
+name: Continuous Development
+
+on:
+  # Run on push events to main branch
+  push:
+    branches: [ main ]
+  
+  # Run on pull request events
+  pull_request:
+    branches: [ main ]
+  
+  # Run on manual trigger via GitHub UI
+  workflow_dispatch:
+    inputs:
+      task:
+        description: 'Development task to perform'
+        required: false
+        default: 'fix-errors'
+        type: choice
+        options:
+          - fix-errors
+          - improve-code
+          - generate-docs
+          - add-feature
+
+  # Run on schedule (every 6 hours)
+  schedule:
+    - cron: '0 */6 * * *'
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Set up JDK 17
+      uses: actions/setup-java@v3
+      with:
+        java-version: '17'
+        distribution: 'temurin'
+        
+    - name: Build with Gradle
+      run: ./gradlew build
+      
+    - name: Run tests
+      run: ./gradlew test
+      
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: plugin-distributions
+        path: build/distributions/*.zip
+        
+  continuous-development:
+    runs-on: ubuntu-latest
+    needs: build-and-test
+    if: ${{ success() && (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') }}
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Set up JDK 17
+      uses: actions/setup-java@v3
+      with:
+        java-version: '17'
+        distribution: 'temurin'
+        
+    - name: Download latest build artifacts
+      uses: actions/download-artifact@v3
+      with:
+        name: plugin-distributions
+        path: artifacts
+        
+    - name: Set up Python for automation
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.10'
+        
+    - name: Configure GitHub credentials
+      run: |
+        git config --global user.name "ModForge Automation"
+        git config --global user.email "automation@modforge.dev"
+        
+    - name: Install AI development dependencies
+      run: |
+        pip install openai
+        pip install requests
+        pip install pyyaml
+        
+    - name: Run Automated Development Process
+      env:
+        OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        TASK_TYPE: ${{ github.event.inputs.task || 'fix-errors' }}
+      run: |
+        python .github/scripts/run_auto_development.py --task "$TASK_TYPE"
+        
+    - name: Commit changes if any
+      run: |
+        git add .
+        if git diff --staged --quiet; then
+          echo "No changes to commit"
+        else
+          TIMESTAMP=$(date +"%Y-%m-%d %H:%M:%S")
+          git commit -m "Automated Development: ${{ github.event.inputs.task || 'fix-errors' }} [$TIMESTAMP]"
+          git push
+        fi

@@ -1,0 +1,300 @@
+name: Pull Request Review
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    branches: [ main ]
+
+jobs:
+  ai-review:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+      
+    steps:
+    - uses: actions/checkout@v3
+      with:
+        fetch-depth: 0
+        
+    - name: Set up JDK 17
+      uses: actions/setup-java@v3
+      with:
+        java-version: '17'
+        distribution: 'temurin'
+        
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.10'
+        
+    - name: Install Python dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install openai
+        
+    - name: Get changed files
+      id: changed-files
+      uses: tj-actions/changed-files@v35
+      
+    - name: Review Java code changes
+      if: steps.changed-files.outputs.any_changed == 'true'
+      env:
+        OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        PR_NUMBER: ${{ github.event.number }}
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        echo "Analyzing code changes in PR #$PR_NUMBER..."
+        
+        # Filter for Java files only
+        JAVA_FILES=""
+        for file in ${{ steps.changed-files.outputs.all_changed_files }}; do
+          if [[ $file == *.java ]]; then
+            JAVA_FILES="$JAVA_FILES $file"
+          fi
+        done
+        
+        if [ -z "$JAVA_FILES" ]; then
+          echo "No Java files were modified in this PR."
+          exit 0
+        fi
+        
+        # Create a Python script to analyze code and post comments
+        cat > review_pr.py << 'EOF'
+import os
+import sys
+import json
+import subprocess
+import re
+import openai
+import requests
+from github import Github
+
+# Initialize OpenAI API
+openai.api_key = os.environ.get('OPENAI_API_KEY')
+if not openai.api_key:
+    print("Error: OPENAI_API_KEY not found in environment variables")
+    sys.exit(1)
+
+# GitHub setup
+github_token = os.environ.get('GITHUB_TOKEN')
+if not github_token:
+    print("Error: GITHUB_TOKEN not found in environment variables")
+    sys.exit(1)
+
+repo_full_name = os.environ.get('GITHUB_REPOSITORY')
+pr_number = int(os.environ.get('PR_NUMBER'))
+
+# GitHub API base URL
+api_url = f"https://api.github.com/repos/{repo_full_name}"
+
+# Headers for GitHub API requests
+headers = {
+    'Authorization': f'token {github_token}',
+    'Accept': 'application/vnd.github.v3+json'
+}
+
+def get_file_content(file_path):
+    """Get the content of a file"""
+    try:
+        with open(file_path, 'r', encoding='utf-8') as f:
+            return f.read()
+    except Exception as e:
+        print(f"Error reading file {file_path}: {str(e)}")
+        return None
+
+def get_file_diff(file_path):
+    """Get the diff of a file"""
+    try:
+        # Get the diff for this specific file
+        result = subprocess.run(
+            ['git', 'diff', 'origin/main', '--', file_path],
+            capture_output=True,
+            text=True,
+            check=True
+        )
+        return result.stdout
+    except subprocess.CalledProcessError as e:
+        print(f"Error getting diff for {file_path}: {str(e)}")
+        return None
+
+def analyze_code(file_path, file_content, file_diff):
+    """Analyze code using OpenAI to provide improvement suggestions"""
+    try:
+        # Prepare the prompt for OpenAI
+        prompt = f"""
+You are an expert Java developer specializing in IntelliJ plugin development for Minecraft mods.
+Review the following code changes and provide constructive feedback:
+
+File: {file_path}
+
+Diff:
+```diff
+{file_diff}
+```
+
+Full file content:
+```java
+{file_content}
+```
+
+Provide a detailed code review focusing on:
+1. Code quality issues
+2. Potential bugs
+3. Performance concerns
+4. Best practices for IntelliJ plugin development
+5. Specific improvements that could be made
+
+For each issue, provide:
+- A clear description of the issue
+- Why it's a problem
+- How to fix it with a specific code example
+
+Format your response as structured feedback with sections for different types of issues.
+If the code looks good, say so and explain why it's well-written.
+"""
+
+        # Call OpenAI API
+        response = openai.ChatCompletion.create(
+            model="gpt-4",
+            messages=[
+                {"role": "system", "content": "You are an expert code reviewer for Java development."},
+                {"role": "user", "content": prompt}
+            ],
+            max_tokens=1000
+        )
+        
+        review_content = response.choices[0].message['content'].strip()
+        return review_content
+        
+    except Exception as e:
+        print(f"Error analyzing code: {str(e)}")
+        return f"Error analyzing code: {str(e)}"
+
+def post_review_comment(file_path, review_content):
+    """Post a review comment on the PR"""
+    try:
+        # Create a review comment
+        url = f"{api_url}/pulls/{pr_number}/reviews"
+        
+        # Prepare the comment data
+        data = {
+            "body": f"## ModForge AI Review for `{file_path}`\n\n{review_content}\n\n_This review was automatically generated by ModForge AI._",
+            "event": "COMMENT"
+        }
+        
+        # Post the comment
+        response = requests.post(url, headers=headers, json=data)
+        
+        if response.status_code == 200 or response.status_code == 201:
+            print(f"Successfully posted review for {file_path}")
+        else:
+            print(f"Error posting review: {response.status_code}")
+            print(response.text)
+            
+    except Exception as e:
+        print(f"Error posting review comment: {str(e)}")
+
+def main():
+    # Get the list of Java files to review
+    files = sys.argv[1:]
+    
+    if not files:
+        print("No files to review")
+        return
+        
+    all_reviews = []
+    
+    for file_path in files:
+        print(f"Reviewing {file_path}...")
+        
+        # Get file content
+        file_content = get_file_content(file_path)
+        if not file_content:
+            continue
+            
+        # Get file diff
+        file_diff = get_file_diff(file_path)
+        if not file_diff:
+            continue
+            
+        # Analyze code
+        review = analyze_code(file_path, file_content, file_diff)
+        
+        # Store review
+        all_reviews.append({
+            "file": file_path,
+            "review": review
+        })
+    
+    # Post a summary comment
+    summary = "# ModForge AI Review Summary\n\n"
+    
+    if all_reviews:
+        for review_item in all_reviews:
+            file_path = review_item["file"]
+            review = review_item["review"]
+            
+            # Post individual file reviews
+            post_review_comment(file_path, review)
+            
+            # Add to summary
+            summary += f"## {file_path}\n\n"
+            
+            # Extract first paragraph or sentence for summary
+            first_para = re.search(r'^(.+?)\n\n', review)
+            if first_para:
+                summary += first_para.group(1) + "\n\n"
+            else:
+                first_sentence = re.search(r'^(.+?\.)\s', review)
+                if first_sentence:
+                    summary += first_sentence.group(1) + "\n\n"
+                else:
+                    summary += review[:150] + "...\n\n"
+            
+            summary += f"[View detailed review](#file-{file_path.replace('/', '-')})\n\n"
+            
+        # Post final summary comment
+        url = f"{api_url}/issues/{pr_number}/comments"
+        data = {
+            "body": summary + "\n\n_This review summary was automatically generated by ModForge AI._"
+        }
+        
+        response = requests.post(url, headers=headers, json=data)
+        
+        if response.status_code == 201:
+            print("Successfully posted review summary")
+        else:
+            print(f"Error posting review summary: {response.status_code}")
+            print(response.text)
+    else:
+        print("No reviews generated")
+
+if __name__ == "__main__":
+    main()
+EOF
+
+        # Run the code review script
+        python review_pr.py $JAVA_FILES
+        
+    - name: Check Compilation
+      if: steps.changed-files.outputs.any_changed == 'true'
+      run: |
+        # Build the project to check for compilation errors
+        ./gradlew build -x test
+        
+    - name: Report Build Status
+      if: always()
+      uses: actions/github-script@v6
+      with:
+        github-token: ${{ secrets.GITHUB_TOKEN }}
+        script: |
+          const buildSuccess = ${{ job.status == 'success' }};
+          const buildStatus = buildSuccess ? 'passed' : 'failed';
+          
+          github.rest.issues.createComment({
+            issue_number: context.issue.number,
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            body: `## Build Status: ${buildStatus.toUpperCase()}\n\n${buildSuccess ? '✅ The code compiles successfully.' : '❌ The build failed. Please check the workflow logs for details.'}\n\n_This build check was automatically run by ModForge CI._`
+          });
