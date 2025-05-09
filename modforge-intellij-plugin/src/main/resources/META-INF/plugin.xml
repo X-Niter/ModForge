@@ -69,11 +69,12 @@
                     description="Analyze a mod JAR file for patterns">
             </action>
             
-            <action id="ModForgeAI.CreateCrossLoaderMod" 
-                    class="com.modforge.intellij.plugin.crossloader.actions.CreateCrossLoaderModAction"
-                    text="Create Cross-Loader Mod" 
-                    description="Create a new Minecraft mod that works across multiple mod loaders">
-            </action>
+            <group id="ModForgeAI.CrossLoader" 
+                   class="com.modforge.intellij.plugin.crossloader.actions.CrossLoaderActionGroup"
+                   text="Cross-Loader Development" 
+                   description="Cross-loader mod development tools"
+                   popup="true">
+            </group>
             
             <action id="ModForgeAI.Settings" 
                     class="com.modforge.intellij.plugin.actions.SettingsAction"
@@ -125,7 +126,11 @@
         <projectService serviceImplementation="com.modforge.intellij.plugin.services.ModForgeProjectService"/>
         <projectService serviceImplementation="com.modforge.intellij.plugin.services.ErrorResolutionService"/>
         <projectService serviceImplementation="com.modforge.intellij.plugin.services.RecommendationService"/>
+        <projectService serviceImplementation="com.modforge.intellij.plugin.services.PatternCachingService"/>
+        <projectService serviceImplementation="com.modforge.intellij.plugin.services.EmbeddingService"/>
+        <projectService serviceImplementation="com.modforge.intellij.plugin.services.PatternRecognitionService"/>
         <projectService serviceImplementation="com.modforge.intellij.plugin.crossloader.ArchitecturyService"/>
+        <projectService serviceImplementation="com.modforge.intellij.plugin.crossloader.CrossLoaderAPI"/>
         
         <!-- Startup Activities -->
         <postStartupActivity implementation="com.modforge.intellij.plugin.services.RecommendationService$RecommendationStartupActivity"/>
@@ -152,6 +157,10 @@
         <!-- Intention Actions -->
         <intentionAction>
             <className>com.modforge.intellij.plugin.intentions.GenerateEventHandlerIntention</className>
+            <category>ModForge AI</category>
+        </intentionAction>
+        <intentionAction>
+            <className>com.modforge.intellij.plugin.crossloader.intentions.ConvertToPlatformSpecificIntention</className>
             <category>ModForge AI</category>
         </intentionAction>
     </extensions>
