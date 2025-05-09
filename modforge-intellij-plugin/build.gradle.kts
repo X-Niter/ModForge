@@ -19,7 +19,11 @@ intellij {
     version.set("2023.2")
     type.set("IC") // Target IDE Platform: IntelliJ IDEA Community Edition
 
-    plugins.set(listOf("com.intellij.java"))
+    plugins.set(listOf(
+        "com.intellij.java",
+        "org.jetbrains.plugins.gradle",
+        "org.intellij.intelliLang"
+    ))
 }
 
 dependencies {
@@ -28,6 +32,9 @@ dependencies {
     implementation("org.apache.commons:commons-lang3:3.13.0")
     implementation("org.apache.commons:commons-text:1.10.0")
     implementation("org.apache.commons:commons-collections4:4.4")
+    implementation("commons-io:commons-io:2.13.0")
+    testImplementation("org.junit.jupiter:junit-jupiter-api:5.10.0")
+    testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine:5.10.0")
 }
 
 tasks {
@@ -35,9 +42,15 @@ tasks {
     withType<JavaCompile> {
         sourceCompatibility = "17"
         targetCompatibility = "17"
+        options.encoding = "UTF-8"
     }
+    
     withType<KotlinCompile> {
         kotlinOptions.jvmTarget = "17"
+    }
+
+    test {
+        useJUnitPlatform()
     }
 
     patchPluginXml {
@@ -69,5 +82,19 @@ tasks {
     runIde {
         // Configure JVM arguments for the IDE instance
         jvmArgs("-Xmx2g")
+    }
+    
+    signPlugin {
+        certificateChain.set(System.getenv("CERTIFICATE_CHAIN"))
+        privateKey.set(System.getenv("PRIVATE_KEY"))
+        password.set(System.getenv("PRIVATE_KEY_PASSWORD"))
+    }
+    
+    prepareSandbox {
+        // Extract any additional files to the sandbox directory
+        from("src/main/resources") {
+            into("${intellij.pluginName.get()}/resources")
+            include("**/*")
+        }
     }
 }
