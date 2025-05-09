@@ -46,3 +46,13 @@ export interface ErrorData {
   code?: string;
   suggestion?: string;
 }
+
+export interface ModrinthMod {
+  id: string;
+  name: string;
+  description: string;
+  url: string;
+  author: string;
+  downloads: number;
+  modLoader: string;
+}

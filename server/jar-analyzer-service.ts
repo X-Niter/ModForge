@@ -223,24 +223,34 @@ export async function getExtractedClassesByJarId(
  * Process an uploaded JAR file
  * @param filePath Path to the uploaded JAR file
  * @param fileName Original file name
- * @param modLoader Mod loader type (forge, fabric, etc.)
- * @param version Version of the mod loader
- * @param mcVersion Minecraft version
+ * @param modLoader Optional mod loader type (forge, fabric, etc.), will be auto-detected if not provided
+ * @param version Optional version of the mod loader
+ * @param mcVersion Optional Minecraft version, will be auto-detected if not provided
  */
 export async function processUploadedJarFile(
   filePath: string,
   fileName: string,
-  modLoader: string,
+  modLoader?: string,
   version?: string,
   mcVersion?: string
 ): Promise<typeof jarFiles.$inferSelect> {
   try {
+    // Auto-detect mod loader and Minecraft version if not provided
+    if (!modLoader || !mcVersion) {
+      const detectedInfo = await detectModInfo(filePath);
+      modLoader = modLoader || detectedInfo.modLoader;
+      mcVersion = mcVersion || detectedInfo.mcVersion;
+      version = version || detectedInfo.modVersion;
+      
+      console.log(`Auto-detected mod info: loader=${modLoader}, mcVersion=${mcVersion || 'unknown'}`);
+    }
+
     // Insert the JAR file record
     const [jarFile] = await db.insert(jarFiles).values({
       fileName,
       filePath,
       source: 'upload',
-      modLoader,
+      modLoader: modLoader || 'unknown',
       version,
       mcVersion,
       status: 'pending'
@@ -569,13 +579,18 @@ export async function searchModrinthJars(query: string): Promise<any[]> {
 
 /**
  * Download a JAR file from a URL
+ * @param url URL to download the JAR file from
+ * @param modName Name of the mod
+ * @param modLoader Optional mod loader type, will be auto-detected if not provided
+ * @param version Optional version of the mod
+ * @param mcVersion Optional Minecraft version, will be auto-detected if not provided
  */
 export async function downloadJarFile(
   url: string,
   modName: string,
-  modLoader: string,
-  version: string,
-  mcVersion: string
+  modLoader?: string,
+  version?: string,
+  mcVersion?: string
 ): Promise<typeof jarFiles.$inferSelect | undefined> {
   try {
     const tempDir = path.join(os.tmpdir(), 'jar-downloads');
@@ -583,7 +598,11 @@ export async function downloadJarFile(
       fs.mkdirSync(tempDir, { recursive: true });
     }
     
-    const fileName = `${modName}-${version}-${mcVersion}.jar`;
+    // Create a more generic filename if version and mcVersion are unknown
+    const fileName = version && mcVersion 
+      ? `${modName}-${version}-${mcVersion}.jar`
+      : `${modName}-${Date.now()}.jar`;
+    
     const filePath = path.join(tempDir, fileName);
     
     // Download the file
@@ -601,7 +620,7 @@ export async function downloadJarFile(
       writer.on('error', reject);
     });
     
-    // Process the downloaded JAR file
+    // Process the downloaded JAR file - mod info will be auto-detected
     const jarFile = await processUploadedJarFile(
       filePath,
       fileName,
