@@ -45,244 +45,244 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           cat > check_activity.py << 'EOF'
-import os
-import json
-import requests
-import datetime
-import pytz
-from datetime import timedelta
+          import os
+          import json
+          import requests
+          import datetime
+          import pytz
+          from datetime import timedelta
 
-# GitHub API setup
-github_token = os.environ.get('GITHUB_TOKEN')
-repo = os.environ.get('GITHUB_REPOSITORY')
-api_url = f"https://api.github.com/repos/{repo}"
-headers = {
-    'Authorization': f'token {github_token}',
-    'Accept': 'application/vnd.github.v3+json'
-}
+          # GitHub API setup
+          github_token = os.environ.get('GITHUB_TOKEN')
+          repo = os.environ.get('GITHUB_REPOSITORY')
+          api_url = f"https://api.github.com/repos/{repo}"
+          headers = {
+              'Authorization': f'token {github_token}',
+              'Accept': 'application/vnd.github.v3+json'
+          }
 
-# Get current time in UTC
-utc_now = datetime.datetime.now(pytz.UTC)
+          # Get current time in UTC
+          utc_now = datetime.datetime.now(pytz.UTC)
+          
+          def get_recent_issues(hours=24):
+              """Get issues updated in the last hours"""
+              since_time = (utc_now - timedelta(hours=hours)).isoformat()
+              url = f"{api_url}/issues?state=open&sort=updated&direction=desc&since={since_time}"
+              
+              response = requests.get(url, headers=headers)
+              if response.status_code != 200:
+                  print(f"Error fetching issues: {response.status_code}")
+                  return []
+              
+              # Filter out PRs (GitHub API returns PRs as issues too)
+              issues = [issue for issue in response.json() if 'pull_request' not in issue]
+              return issues
 
-def get_recent_issues(hours=24):
-    """Get issues updated in the last hours"""
-    since_time = (utc_now - timedelta(hours=hours)).isoformat()
-    url = f"{api_url}/issues?state=open&sort=updated&direction=desc&since={since_time}"
-    
-    response = requests.get(url, headers=headers)
-    if response.status_code != 200:
-        print(f"Error fetching issues: {response.status_code}")
-        return []
-    
-    # Filter out PRs (GitHub API returns PRs as issues too)
-    issues = [issue for issue in response.json() if 'pull_request' not in issue]
-    return issues
+          def get_recent_prs(hours=24):
+              """Get PRs updated in the last hours"""
+              url = f"{api_url}/pulls?state=open&sort=updated&direction=desc"
+              
+              response = requests.get(url, headers=headers)
+              if response.status_code != 200:
+                  print(f"Error fetching PRs: {response.status_code}")
+                  return []
+              
+              # Filter by time
+              since_time = utc_now - timedelta(hours=hours)
+              prs = []
+              for pr in response.json():
+                  updated_at = datetime.datetime.fromisoformat(pr['updated_at'].replace('Z', '+00:00'))
+                  if updated_at >= since_time:
+                      prs.append(pr)
+              
+              return prs
 
-def get_recent_prs(hours=24):
-    """Get PRs updated in the last hours"""
-    url = f"{api_url}/pulls?state=open&sort=updated&direction=desc"
-    
-    response = requests.get(url, headers=headers)
-    if response.status_code != 200:
-        print(f"Error fetching PRs: {response.status_code}")
-        return []
-    
-    # Filter by time
-    since_time = utc_now - timedelta(hours=hours)
-    prs = []
-    for pr in response.json():
-        updated_at = datetime.datetime.fromisoformat(pr['updated_at'].replace('Z', '+00:00'))
-        if updated_at >= since_time:
-            prs.append(pr)
-    
-    return prs
+          def get_recent_commits(hours=24):
+              """Get commits from the last hours"""
+              since_time = (utc_now - timedelta(hours=hours)).isoformat()
+              url = f"{api_url}/commits?since={since_time}"
+              
+              response = requests.get(url, headers=headers)
+              if response.status_code != 200:
+                  print(f"Error fetching commits: {response.status_code}")
+                  return []
+              
+              return response.json()
 
-def get_recent_commits(hours=24):
-    """Get commits from the last hours"""
-    since_time = (utc_now - timedelta(hours=hours)).isoformat()
-    url = f"{api_url}/commits?since={since_time}"
-    
-    response = requests.get(url, headers=headers)
-    if response.status_code != 200:
-        print(f"Error fetching commits: {response.status_code}")
-        return []
-    
-    return response.json()
+          def check_active_workflows():
+              """Check for already running workflows and recently completed ones"""
+              # Check for in-progress workflows
+              in_progress_url = f"{api_url}/actions/runs?status=in_progress"
+              response = requests.get(in_progress_url, headers=headers)
+              if response.status_code != 200:
+                  print(f"Error fetching in-progress workflows: {response.status_code}")
+                  return []
+              
+              # Exclude this controller workflow
+              controller_id = os.environ.get('GITHUB_RUN_ID')
+              active_workflows = [wf for wf in response.json().get('workflow_runs', []) 
+                                 if str(wf.get('id')) != controller_id]
+              
+              # If any workflows are active, return them
+              if active_workflows:
+                  return active_workflows
+              
+              # Check for recently completed workflows (in the last minute)
+              # This implements the "1-minute breather" after completion
+              one_minute_ago = utc_now - timedelta(minutes=1)
+              completed_url = f"{api_url}/actions/runs?status=completed"
+              response = requests.get(completed_url, headers=headers)
+              
+              if response.status_code != 200:
+                  print(f"Error fetching completed workflows: {response.status_code}")
+                  return []
+                  
+              # Check for workflows that completed in the last minute
+              recent_workflows = []
+              for wf in response.json().get('workflow_runs', []):
+                  if str(wf.get('id')) == controller_id:
+                      continue
+                      
+                  # Check if it's an autonomous workflow and completed within the last minute
+                  if wf.get('name', '').startswith(('ModForge Autonomous', 'Autonomous Scanning', 'Conversation Handler')):
+                      completed_at = datetime.datetime.fromisoformat(wf.get('updated_at').replace('Z', '+00:00'))
+                      if completed_at > one_minute_ago:
+                          recent_workflows.append(wf)
+                          print(f"Found recently completed workflow: {wf.get('name')} at {wf.get('updated_at')}")
+              
+              # Return any workflows that completed within the breather period
+              return recent_workflows
 
-def check_active_workflows():
-    """Check for already running workflows and recently completed ones"""
-    # Check for in-progress workflows
-    in_progress_url = f"{api_url}/actions/runs?status=in_progress"
-    response = requests.get(in_progress_url, headers=headers)
-    if response.status_code != 200:
-        print(f"Error fetching in-progress workflows: {response.status_code}")
-        return []
-    
-    # Exclude this controller workflow
-    controller_id = os.environ.get('GITHUB_RUN_ID')
-    active_workflows = [wf for wf in response.json().get('workflow_runs', []) 
-                       if str(wf.get('id')) != controller_id]
-    
-    # If any workflows are active, return them
-    if active_workflows:
-        return active_workflows
-    
-    # Check for recently completed workflows (in the last minute)
-    # This implements the "1-minute breather" after completion
-    one_minute_ago = utc_now - timedelta(minutes=1)
-    completed_url = f"{api_url}/actions/runs?status=completed"
-    response = requests.get(completed_url, headers=headers)
-    
-    if response.status_code != 200:
-        print(f"Error fetching completed workflows: {response.status_code}")
-        return []
-        
-    # Check for workflows that completed in the last minute
-    recent_workflows = []
-    for wf in response.json().get('workflow_runs', []):
-        if str(wf.get('id')) == controller_id:
-            continue
-            
-        # Check if it's an autonomous workflow and completed within the last minute
-        if wf.get('name', '').startswith(('ModForge Autonomous', 'Autonomous Scanning', 'Conversation Handler')):
-            completed_at = datetime.datetime.fromisoformat(wf.get('updated_at').replace('Z', '+00:00'))
-            if completed_at > one_minute_ago:
-                recent_workflows.append(wf)
-                print(f"Found recently completed workflow: {wf.get('name')} at {wf.get('updated_at')}")
-    
-    # Return any workflows that completed within the breather period
-    return recent_workflows
+          def save_action_needed(action_type, data):
+              """Save info about needed actions to output files"""
+              with open(f"{action_type}_needed.txt", 'w') as f:
+                  f.write("true")
+              
+              with open(f"{action_type}_data.json", 'w') as f:
+                  json.dump(data, f)
 
-def save_action_needed(action_type, data):
-    """Save info about needed actions to output files"""
-    with open(f"{action_type}_needed.txt", 'w') as f:
-        f.write("true")
-    
-    with open(f"{action_type}_data.json", 'w') as f:
-        json.dump(data, f)
+          def main():
+              # Check for active autonomous workflows
+              active_workflows = check_active_workflows()
+              
+              # If other autonomous workflows are running, don't dispatch new ones
+              if any(wf.get('name', '').startswith(('ModForge Autonomous', 'Autonomous Scanning', 'Conversation Handler')) 
+                     for wf in active_workflows):
+                  print("Other autonomous workflows are already running. Skipping dispatch.")
+                  print(f"Active workflows: {[wf.get('name') for wf in active_workflows]}")
+                  return
+              
+              # Check for recent activity (last 24 hours)
+              recent_issues = get_recent_issues(24)
+              recent_prs = get_recent_prs(24)
+              recent_commits = get_recent_commits(24)
+              
+              # Check for very recent activity (last 1 hour)
+              very_recent_issues = get_recent_issues(1)
+              very_recent_prs = get_recent_prs(1)
+              
+              # Check for stale issues/PRs needing response (2-5 days old with no recent comments)
+              all_open_issues = get_recent_issues(120)  # Get issues updated in last 5 days
+              all_open_prs = get_recent_prs(120)        # Get PRs updated in last 5 days
+              
+              stale_issues = []
+              stale_prs = []
+              
+              for issue in all_open_issues:
+                  issue_number = issue.get('number')
+                  # Check if last comment is not from ModForge
+                  response = requests.get(f"{api_url}/issues/{issue_number}/comments?sort=created&direction=desc&per_page=1", headers=headers)
+                  if response.status_code == 200 and response.json():
+                      last_comment = response.json()[0]
+                      # If last comment is not from the bot and is 2-5 days old
+                      if 'ModForge' not in last_comment.get('user', {}).get('login', '') and 'github-actions' not in last_comment.get('user', {}).get('login', ''):
+                          commented_at = datetime.datetime.fromisoformat(last_comment.get('created_at').replace('Z', '+00:00'))
+                          days_since = (utc_now - commented_at).days
+                          if 2 <= days_since <= 5:
+                              stale_issues.append(issue)
+              
+              for pr in all_open_prs:
+                  pr_number = pr.get('number')
+                  # Check if last comment is not from ModForge
+                  response = requests.get(f"{api_url}/issues/{pr_number}/comments?sort=created&direction=desc&per_page=1", headers=headers)
+                  if response.status_code == 200 and response.json():
+                      last_comment = response.json()[0]
+                      # If last comment is not from the bot and is 2-5 days old
+                      if 'ModForge' not in last_comment.get('user', {}).get('login', '') and 'github-actions' not in last_comment.get('user', {}).get('login', ''):
+                          commented_at = datetime.datetime.fromisoformat(last_comment.get('created_at').replace('Z', '+00:00'))
+                          days_since = (utc_now - commented_at).days
+                          if 2 <= days_since <= 5:
+                              stale_prs.append(pr)
+              
+              print(f"Found {len(recent_issues)} recent issues, {len(recent_prs)} recent PRs, {len(recent_commits)} recent commits")
+              print(f"Found {len(very_recent_issues)} very recent issues, {len(very_recent_prs)} very recent PRs")
+              print(f"Found {len(stale_issues)} stale issues, {len(stale_prs)} stale PRs")
+              
+              # Prioritize actions:
+              
+              # 1. If there are very recent issues or PRs (within 1 hour), handle those immediately
+              if very_recent_issues or very_recent_prs:
+                  print("Recent activity detected - triggering conversation handler")
+                  if very_recent_issues:
+                      save_action_needed("conversation", {
+                          "type": "issue", 
+                          "id": very_recent_issues[0].get('number'),
+                          "updated_at": very_recent_issues[0].get('updated_at')
+                      })
+                  else:
+                      save_action_needed("conversation", {
+                          "type": "pr", 
+                          "id": very_recent_prs[0].get('number'),
+                          "updated_at": very_recent_prs[0].get('updated_at')
+                      })
+                  return
+              
+              # 2. If there are stale issues/PRs, respond to those
+              if stale_issues or stale_prs:
+                  print("Stale conversation detected - triggering follow-up")
+                  if stale_issues:
+                      save_action_needed("stale_followup", {
+                          "type": "issue", 
+                          "id": stale_issues[0].get('number'),
+                          "updated_at": stale_issues[0].get('updated_at')
+                      })
+                  else:
+                      save_action_needed("stale_followup", {
+                          "type": "pr", 
+                          "id": stale_prs[0].get('number'),
+                          "updated_at": stale_prs[0].get('updated_at')
+                      })
+                  return
+              
+              # 3. Run the autonomous scanning flow if no urgent conversations
+              # But only if there have been commits in the last 24 hours or if it's been >12h since last scan
+              
+              # Check when the last scan happened
+              last_scan_time = None
+              try:
+                  response = requests.get(f"{api_url}/actions/workflows/autonomous-scanning.yml/runs?status=completed&per_page=1", headers=headers)
+                  if response.status_code == 200 and response.json().get('workflow_runs'):
+                      last_run = response.json().get('workflow_runs')[0]
+                      last_scan_time = datetime.datetime.fromisoformat(last_run.get('updated_at').replace('Z', '+00:00'))
+              except Exception as e:
+                  print(f"Error checking last scan time: {e}")
+              
+              hours_since_scan = float('inf')  # Default to infinity if we can't determine
+              if last_scan_time:
+                  hours_since_scan = (utc_now - last_scan_time).total_seconds() / 3600
+              
+              if recent_commits or hours_since_scan > 12:
+                  print(f"Code changes detected or it's been {hours_since_scan:.1f}h since last scan - triggering scanning")
+                  save_action_needed("scanning", {
+                      "reason": "recent_commits" if recent_commits else "timed_scan",
+                      "hours_since_scan": hours_since_scan
+                  })
+                  return
+              
+              print("No immediate actions needed")
 
-def main():
-    # Check for active autonomous workflows
-    active_workflows = check_active_workflows()
-    
-    # If other autonomous workflows are running, don't dispatch new ones
-    if any(wf.get('name', '').startswith(('ModForge Autonomous', 'Autonomous Scanning', 'Conversation Handler')) 
-           for wf in active_workflows):
-        print("Other autonomous workflows are already running. Skipping dispatch.")
-        print(f"Active workflows: {[wf.get('name') for wf in active_workflows]}")
-        return
-    
-    # Check for recent activity (last 24 hours)
-    recent_issues = get_recent_issues(24)
-    recent_prs = get_recent_prs(24)
-    recent_commits = get_recent_commits(24)
-    
-    # Check for very recent activity (last 1 hour)
-    very_recent_issues = get_recent_issues(1)
-    very_recent_prs = get_recent_prs(1)
-    
-    # Check for stale issues/PRs needing response (2-5 days old with no recent comments)
-    all_open_issues = get_recent_issues(120)  # Get issues updated in last 5 days
-    all_open_prs = get_recent_prs(120)        # Get PRs updated in last 5 days
-    
-    stale_issues = []
-    stale_prs = []
-    
-    for issue in all_open_issues:
-        issue_number = issue.get('number')
-        # Check if last comment is not from ModForge
-        response = requests.get(f"{api_url}/issues/{issue_number}/comments?sort=created&direction=desc&per_page=1", headers=headers)
-        if response.status_code == 200 and response.json():
-            last_comment = response.json()[0]
-            # If last comment is not from the bot and is 2-5 days old
-            if 'ModForge' not in last_comment.get('user', {}).get('login', '') and 'github-actions' not in last_comment.get('user', {}).get('login', ''):
-                commented_at = datetime.datetime.fromisoformat(last_comment.get('created_at').replace('Z', '+00:00'))
-                days_since = (utc_now - commented_at).days
-                if 2 <= days_since <= 5:
-                    stale_issues.append(issue)
-    
-    for pr in all_open_prs:
-        pr_number = pr.get('number')
-        # Check if last comment is not from ModForge
-        response = requests.get(f"{api_url}/issues/{pr_number}/comments?sort=created&direction=desc&per_page=1", headers=headers)
-        if response.status_code == 200 and response.json():
-            last_comment = response.json()[0]
-            # If last comment is not from the bot and is 2-5 days old
-            if 'ModForge' not in last_comment.get('user', {}).get('login', '') and 'github-actions' not in last_comment.get('user', {}).get('login', ''):
-                commented_at = datetime.datetime.fromisoformat(last_comment.get('created_at').replace('Z', '+00:00'))
-                days_since = (utc_now - commented_at).days
-                if 2 <= days_since <= 5:
-                    stale_prs.append(pr)
-    
-    print(f"Found {len(recent_issues)} recent issues, {len(recent_prs)} recent PRs, {len(recent_commits)} recent commits")
-    print(f"Found {len(very_recent_issues)} very recent issues, {len(very_recent_prs)} very recent PRs")
-    print(f"Found {len(stale_issues)} stale issues, {len(stale_prs)} stale PRs")
-    
-    # Prioritize actions:
-    
-    # 1. If there are very recent issues or PRs (within 1 hour), handle those immediately
-    if very_recent_issues or very_recent_prs:
-        print("Recent activity detected - triggering conversation handler")
-        if very_recent_issues:
-            save_action_needed("conversation", {
-                "type": "issue", 
-                "id": very_recent_issues[0].get('number'),
-                "updated_at": very_recent_issues[0].get('updated_at')
-            })
-        else:
-            save_action_needed("conversation", {
-                "type": "pr", 
-                "id": very_recent_prs[0].get('number'),
-                "updated_at": very_recent_prs[0].get('updated_at')
-            })
-        return
-    
-    # 2. If there are stale issues/PRs, respond to those
-    if stale_issues or stale_prs:
-        print("Stale conversation detected - triggering follow-up")
-        if stale_issues:
-            save_action_needed("stale_followup", {
-                "type": "issue", 
-                "id": stale_issues[0].get('number'),
-                "updated_at": stale_issues[0].get('updated_at')
-            })
-        else:
-            save_action_needed("stale_followup", {
-                "type": "pr", 
-                "id": stale_prs[0].get('number'),
-                "updated_at": stale_prs[0].get('updated_at')
-            })
-        return
-    
-    # 3. Run the autonomous scanning flow if no urgent conversations
-    # But only if there have been commits in the last 24 hours or if it's been >12h since last scan
-    
-    # Check when the last scan happened
-    last_scan_time = None
-    try:
-        response = requests.get(f"{api_url}/actions/workflows/autonomous-scanning.yml/runs?status=completed&per_page=1", headers=headers)
-        if response.status_code == 200 and response.json().get('workflow_runs'):
-            last_run = response.json().get('workflow_runs')[0]
-            last_scan_time = datetime.datetime.fromisoformat(last_run.get('updated_at').replace('Z', '+00:00'))
-    except Exception as e:
-        print(f"Error checking last scan time: {e}")
-    
-    hours_since_scan = float('inf')  # Default to infinity if we can't determine
-    if last_scan_time:
-        hours_since_scan = (utc_now - last_scan_time).total_seconds() / 3600
-    
-    if recent_commits or hours_since_scan > 12:
-        print(f"Code changes detected or it's been {hours_since_scan:.1f}h since last scan - triggering scanning")
-        save_action_needed("scanning", {
-            "reason": "recent_commits" if recent_commits else "timed_scan",
-            "hours_since_scan": hours_since_scan
-        })
-        return
-    
-    print("No immediate actions needed")
-
-if __name__ == "__main__":
-    main()
+          if __name__ == "__main__":
+              main()
 EOF
 
           python check_activity.py
