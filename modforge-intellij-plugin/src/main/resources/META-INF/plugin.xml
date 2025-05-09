@@ -114,7 +114,13 @@
         <!-- Services -->
         <applicationService serviceImplementation="com.modforge.intellij.plugin.services.ModForgeSettingsService"/>
         <applicationService serviceImplementation="com.modforge.intellij.plugin.services.AIServiceManager"/>
+        <applicationService serviceImplementation="com.modforge.intellij.plugin.services.UserSubscriptionService"/>
         <projectService serviceImplementation="com.modforge.intellij.plugin.services.ModForgeProjectService"/>
+        <projectService serviceImplementation="com.modforge.intellij.plugin.services.ErrorResolutionService"/>
+        <projectService serviceImplementation="com.modforge.intellij.plugin.services.RecommendationService"/>
+        
+        <!-- Startup Activities -->
+        <postStartupActivity implementation="com.modforge.intellij.plugin.services.RecommendationService$RecommendationStartupActivity"/>
         
         <!-- Settings -->
         <applicationConfigurable 

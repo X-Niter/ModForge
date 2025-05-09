@@ -1,70 +1,74 @@
 package com.modforge.intellij.plugin.services;
 
 import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
+import com.intellij.ide.BrowserUtil;
 import com.intellij.openapi.application.ApplicationManager;
+import com.intellij.openapi.components.PersistentStateComponent;
 import com.intellij.openapi.components.Service;
+import com.intellij.openapi.components.State;
+import com.intellij.openapi.components.Storage;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.util.concurrency.AppExecutorUtil;
-import com.modforge.intellij.plugin.models.SubscriptionPlan;
+import com.intellij.util.xmlb.XmlSerializerUtil;
+import com.intellij.util.xmlb.annotations.Transient;
 import com.modforge.intellij.plugin.models.UserProfile;
 import com.modforge.intellij.plugin.utils.ApiRequestUtil;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.ScheduledExecutorService;
+import java.awt.*;
+import java.net.URI;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Random;
+import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
- * Service for managing user subscription and premium features.
- * Handles authentication, subscription status, and feature access.
+ * Service for managing user subscriptions and premium features.
+ * Handles authentication, subscription validation, and marketing analytics.
  */
 @Service
-public final class UserSubscriptionService {
+@State(
+        name = "ModForgeUserSubscription",
+        storages = {@Storage("modforge-subscription.xml")}
+)
+public final class UserSubscriptionService implements PersistentStateComponent<UserSubscriptionService.State> {
     private static final Logger LOG = Logger.getInstance(UserSubscriptionService.class);
     
-    // API endpoints
-    private static final String AUTH_ENDPOINT = "/auth";
-    private static final String SUBSCRIPTION_ENDPOINT = "/subscription";
-    private static final String USER_PROFILE_ENDPOINT = "/user/profile";
-    private static final String ENGAGEMENT_ENDPOINT = "/engagement";
+    // Constants
+    private static final String BASE_URL = "https://modforge.ai";
+    private static final String SUBSCRIPTION_URL = BASE_URL + "/pricing";
+    private static final String API_URL = BASE_URL + "/api";
+    private static final int SUBSCRIPTION_CHECK_INTERVAL_HOURS = 24;
+    private static final int MARKETING_COOLDOWN_DAYS = 7;
+    private static final double DEFAULT_CONVERSION_RATE = 0.05; // 5% of impressions convert
     
-    private final ExecutorService executorService;
-    private final ScheduledExecutorService scheduledExecutorService;
-    private final Gson gson;
+    // State
+    private final State myState = new State();
     
-    // User state
-    private boolean authenticated = false;
-    private UserProfile userProfile = null;
-    private SubscriptionPlan currentPlan = SubscriptionPlan.FREE;
-    private String authToken = null;
+    // Runtime data
+    @Transient private UserProfile userProfile;
+    @Transient private final AtomicInteger impressionCount = new AtomicInteger(0);
+    @Transient private final AtomicInteger interactionCount = new AtomicInteger(0);
+    @Transient private final Map<MarketingStrategy, Long> lastImpressionTime = new HashMap<>();
+    @Transient private final Map<MarketingStrategy, Integer> strategyImpressions = new HashMap<>();
+    @Transient private final Map<MarketingStrategy, Integer> strategyInteractions = new HashMap<>();
+    @Transient private final Random random = new Random();
+    @Transient private ScheduledFuture<?> checkTask;
     
-    // Usage tracking
-    private int apiCallsThisMonth = 0;
-    private int freeApiCallsLimit = 100;
-    private int premiumPromoImpressions = 0;
-    private int premiumPromoInteractions = 0;
-    
-    // Smart marketing state
-    private MarketingStrategy currentStrategy = MarketingStrategy.NONE;
-    private double conversionRate = 0.0;
-    private long lastPromotionTimestamp = 0;
-    private int minimumPromotionIntervalMinutes = 60; // Default: at most once per hour
-    
+    /**
+     * Initializes the service.
+     */
     public UserSubscriptionService() {
-        this.executorService = AppExecutorUtil.getAppExecutorService();
-        this.scheduledExecutorService = AppExecutorUtil.getAppScheduledExecutorService();
-        this.gson = new GsonBuilder().setPrettyPrinting().create();
+        // Schedule subscription checks
+        scheduleSubscriptionCheck();
         
-        // Schedule periodic checks of subscription status
-        scheduledExecutorService.scheduleAtFixedRate(
-                this::refreshSubscriptionStatus,
-                1, 
-                60, 
-                TimeUnit.MINUTES
-        );
+        // Initialize user profile if we have an auth token
+        if (hasAuthToken()) {
+            fetchUserProfile();
+        }
     }
     
     /**
@@ -76,164 +80,67 @@ public final class UserSubscriptionService {
     }
     
     /**
-     * Attempts to authenticate the user with the given credentials.
-     * @param username The username
-     * @param password The password
-     * @return CompletableFuture that resolves to true if authentication was successful, false otherwise
+     * Gets the persistent state.
+     * @return The state
      */
-    public CompletableFuture<Boolean> authenticate(String username, String password) {
-        return CompletableFuture.supplyAsync(() -> {
-            try {
-                LOG.info("Authenticating user: " + username);
-                
-                String apiUrl = ModForgeSettingsService.getInstance().getApiUrl();
-                String json = gson.toJson(new AuthRequest(username, password));
-                
-                String response = ApiRequestUtil.post(apiUrl + AUTH_ENDPOINT, json);
-                if (response != null) {
-                    AuthResponse authResponse = gson.fromJson(response, AuthResponse.class);
-                    if (authResponse != null && authResponse.getToken() != null) {
-                        this.authToken = authResponse.getToken();
-                        this.authenticated = true;
-                        
-                        // Fetch user profile and subscription status
-                        fetchUserProfile();
-                        fetchSubscriptionStatus();
-                        
-                        return true;
-                    }
-                }
-                
-                this.authenticated = false;
-                this.authToken = null;
-                return false;
-            } catch (Exception e) {
-                LOG.error("Error authenticating user", e);
-                this.authenticated = false;
-                this.authToken = null;
-                return false;
-            }
-        }, executorService);
+    @Override
+    public State getState() {
+        return myState;
     }
     
     /**
-     * Refreshes the user's subscription status.
+     * Loads the persistent state.
+     * @param state The state
      */
-    public void refreshSubscriptionStatus() {
-        if (!authenticated || authToken == null) {
-            return;
-        }
+    @Override
+    public void loadState(@NotNull State state) {
+        XmlSerializerUtil.copyBean(state, myState);
+    }
+    
+    /**
+     * Checks if the user has an auth token.
+     * @return Whether the user has an auth token
+     */
+    public boolean hasAuthToken() {
+        return myState.authToken != null && !myState.authToken.isEmpty();
+    }
+    
+    /**
+     * Sets the auth token.
+     * @param token The auth token
+     */
+    public void setAuthToken(String token) {
+        myState.authToken = token;
         
-        try {
+        // Fetch user profile after token change
+        if (hasAuthToken()) {
             fetchUserProfile();
-            fetchSubscriptionStatus();
-        } catch (Exception e) {
-            LOG.error("Error refreshing subscription status", e);
+        } else {
+            userProfile = null;
+            myState.isPremium = false;
         }
     }
     
     /**
-     * Fetches the user's profile information.
+     * Gets the auth token.
+     * @return The auth token
      */
-    private void fetchUserProfile() {
-        if (!authenticated || authToken == null) {
-            return;
-        }
-        
-        try {
-            LOG.info("Fetching user profile");
-            
-            String apiUrl = ModForgeSettingsService.getInstance().getApiUrl();
-            String url = apiUrl + USER_PROFILE_ENDPOINT;
-            
-            // Add authorization header
-            okhttp3.Request request = new okhttp3.Request.Builder()
-                    .url(url)
-                    .addHeader("Authorization", "Bearer " + authToken)
-                    .build();
-            
-            okhttp3.OkHttpClient client = new okhttp3.OkHttpClient();
-            try (okhttp3.Response response = client.newCall(request).execute()) {
-                if (response.isSuccessful() && response.body() != null) {
-                    String responseBody = response.body().string();
-                    userProfile = gson.fromJson(responseBody, UserProfile.class);
-                    LOG.info("Fetched user profile for: " + userProfile.getUsername());
-                }
-            }
-        } catch (Exception e) {
-            LOG.error("Error fetching user profile", e);
-        }
+    @Nullable
+    public String getAuthToken() {
+        return myState.authToken;
     }
     
     /**
-     * Fetches the user's subscription status.
+     * Checks if the user has a premium subscription.
+     * @return Whether the user has a premium subscription
      */
-    private void fetchSubscriptionStatus() {
-        if (!authenticated || authToken == null) {
-            return;
-        }
-        
-        try {
-            LOG.info("Fetching subscription status");
-            
-            String apiUrl = ModForgeSettingsService.getInstance().getApiUrl();
-            String url = apiUrl + SUBSCRIPTION_ENDPOINT;
-            
-            // Add authorization header
-            okhttp3.Request request = new okhttp3.Request.Builder()
-                    .url(url)
-                    .addHeader("Authorization", "Bearer " + authToken)
-                    .build();
-            
-            okhttp3.OkHttpClient client = new okhttp3.OkHttpClient();
-            try (okhttp3.Response response = client.newCall(request).execute()) {
-                if (response.isSuccessful() && response.body() != null) {
-                    String responseBody = response.body().string();
-                    SubscriptionResponse subscriptionResponse = gson.fromJson(responseBody, SubscriptionResponse.class);
-                    
-                    if (subscriptionResponse != null) {
-                        this.currentPlan = subscriptionResponse.getPlan();
-                        this.apiCallsThisMonth = subscriptionResponse.getApiCallsThisMonth();
-                        this.freeApiCallsLimit = subscriptionResponse.getFreeApiCallsLimit();
-                        
-                        LOG.info("Fetched subscription status: " + currentPlan);
-                    }
-                }
-            }
-        } catch (Exception e) {
-            LOG.error("Error fetching subscription status", e);
-        }
-    }
-    
-    /**
-     * Logs the user out.
-     */
-    public void logout() {
-        this.authenticated = false;
-        this.authToken = null;
-        this.userProfile = null;
-        this.currentPlan = SubscriptionPlan.FREE;
-    }
-    
-    /**
-     * Gets whether the user is authenticated.
-     * @return Whether the user is authenticated
-     */
-    public boolean isAuthenticated() {
-        return authenticated;
-    }
-    
-    /**
-     * Gets the current subscription plan.
-     * @return The current subscription plan
-     */
-    public SubscriptionPlan getCurrentPlan() {
-        return currentPlan;
+    public boolean isPremium() {
+        return myState.isPremium;
     }
     
     /**
      * Gets the user profile.
-     * @return The user profile, or null if not authenticated
+     * @return The user profile
      */
     @Nullable
     public UserProfile getUserProfile() {
@@ -241,64 +148,114 @@ public final class UserSubscriptionService {
     }
     
     /**
-     * Gets whether the user has a premium subscription.
-     * @return Whether the user has a premium subscription
+     * Fetches the user profile from the API.
      */
-    public boolean isPremium() {
-        return currentPlan == SubscriptionPlan.PREMIUM || 
-               currentPlan == SubscriptionPlan.ENTERPRISE;
-    }
-    
-    /**
-     * Gets whether the user has an enterprise subscription.
-     * @return Whether the user has an enterprise subscription
-     */
-    public boolean isEnterprise() {
-        return currentPlan == SubscriptionPlan.ENTERPRISE;
-    }
-    
-    /**
-     * Gets whether the user has API calls remaining.
-     * @return Whether the user has API calls remaining
-     */
-    public boolean hasApiCallsRemaining() {
-        return isPremium() || apiCallsThisMonth < freeApiCallsLimit;
-    }
-    
-    /**
-     * Records an API call.
-     */
-    public void recordApiCall() {
-        apiCallsThisMonth++;
-        
-        // If this puts the user over the free limit, consider showing a premium promotion
-        if (!isPremium() && apiCallsThisMonth >= freeApiCallsLimit) {
-            considerShowingPremiumPromotion(MarketingStrategy.USAGE_LIMIT);
+    public void fetchUserProfile() {
+        if (!hasAuthToken()) {
+            LOG.warn("Cannot fetch user profile without auth token");
+            return;
         }
+        
+        // Fetch in background
+        AppExecutorUtil.getAppExecutorService().submit(() -> {
+            try {
+                String response = ApiRequestUtil.get(
+                        API_URL + "/users/profile",
+                        myState.authToken
+                );
+                
+                if (response != null) {
+                    Gson gson = new Gson();
+                    userProfile = gson.fromJson(response, UserProfile.class);
+                    
+                    // Update premium status
+                    myState.isPremium = userProfile.isPremium();
+                    
+                    LOG.info("Fetched user profile: " + userProfile.getUsername() + 
+                            " (Premium: " + myState.isPremium + ")");
+                }
+            } catch (Exception e) {
+                LOG.error("Error fetching user profile", e);
+            }
+        });
     }
     
     /**
-     * Records when a user encounters a premium-only feature.
-     * @param featureName The name of the feature
+     * Validates the subscription with the API.
      */
-    public void recordPremiumFeatureEncounter(String featureName) {
-        if (!isPremium()) {
-            considerShowingPremiumPromotion(MarketingStrategy.FEATURE_BLOCKED);
-            
-            // Record the encounter for analytics
-            executorService.submit(() -> {
-                try {
-                    String apiUrl = ModForgeSettingsService.getInstance().getApiUrl();
-                    String json = gson.toJson(new EngagementEvent(
-                            "premium_feature_encounter", 
-                            featureName
-                    ));
+    public void validateSubscription() {
+        if (!hasAuthToken()) {
+            LOG.warn("Cannot validate subscription without auth token");
+            return;
+        }
+        
+        // Validate in background
+        AppExecutorUtil.getAppExecutorService().submit(() -> {
+            try {
+                String response = ApiRequestUtil.get(
+                        API_URL + "/subscriptions/validate",
+                        myState.authToken
+                );
+                
+                if (response != null) {
+                    Gson gson = new Gson();
+                    Map<String, Object> result = gson.fromJson(response, Map.class);
                     
-                    ApiRequestUtil.post(apiUrl + ENGAGEMENT_ENDPOINT, json);
-                } catch (Exception e) {
-                    LOG.error("Error recording premium feature encounter", e);
+                    boolean wasValid = myState.isPremium;
+                    myState.isPremium = (boolean) result.getOrDefault("isValid", false);
+                    
+                    // If subscription status changed, log it
+                    if (wasValid != myState.isPremium) {
+                        LOG.info("Subscription status changed: " + (myState.isPremium ? "Active" : "Inactive"));
+                        
+                        // If subscription became inactive, show a notification
+                        if (!myState.isPremium) {
+                            // In a real implementation, we would show a notification to the user
+                        }
+                    }
                 }
-            });
+            } catch (Exception e) {
+                LOG.error("Error validating subscription", e);
+            }
+        });
+    }
+    
+    /**
+     * Schedules regular subscription checks.
+     */
+    private void scheduleSubscriptionCheck() {
+        // Cancel existing task if any
+        if (checkTask != null && !checkTask.isDone()) {
+            checkTask.cancel(false);
+        }
+        
+        // Schedule new task
+        checkTask = AppExecutorUtil.getAppScheduledExecutorService().scheduleAtFixedRate(
+                this::validateSubscription,
+                1,
+                SUBSCRIPTION_CHECK_INTERVAL_HOURS,
+                TimeUnit.HOURS
+        );
+    }
+    
+    /**
+     * Opens the subscription page in the browser.
+     */
+    public void openSubscriptionPage() {
+        try {
+            String url = SUBSCRIPTION_URL;
+            
+            // Add auth token if available
+            if (hasAuthToken()) {
+                url += "?token=" + myState.authToken;
+            }
+            
+            // Open in browser
+            BrowserUtil.browse(url);
+            
+            LOG.info("Opened subscription page: " + url);
+        } catch (Exception e) {
+            LOG.error("Error opening subscription page", e);
         }
     }
     
@@ -307,290 +264,89 @@ public final class UserSubscriptionService {
      * @param strategy The marketing strategy used
      */
     public void recordPremiumPromoImpression(MarketingStrategy strategy) {
-        premiumPromoImpressions++;
+        impressionCount.incrementAndGet();
+        strategyImpressions.merge(strategy, 1, Integer::sum);
+        lastImpressionTime.put(strategy, System.currentTimeMillis());
         
-        // Record the impression for analytics
-        executorService.submit(() -> {
-            try {
-                String apiUrl = ModForgeSettingsService.getInstance().getApiUrl();
-                String json = gson.toJson(new EngagementEvent(
-                        "premium_promo_impression", 
-                        strategy.name()
-                ));
-                
-                ApiRequestUtil.post(apiUrl + ENGAGEMENT_ENDPOINT, json);
-            } catch (Exception e) {
-                LOG.error("Error recording premium promo impression", e);
-            }
-        });
+        LOG.debug("Recorded premium promotion impression: " + strategy);
     }
     
     /**
      * Records a premium promotion interaction.
      * @param strategy The marketing strategy used
-     * @param action The action taken (e.g., "clicked", "dismissed")
+     * @param action The action taken
      */
     public void recordPremiumPromoInteraction(MarketingStrategy strategy, String action) {
-        premiumPromoInteractions++;
+        interactionCount.incrementAndGet();
+        strategyInteractions.merge(strategy, 1, Integer::sum);
         
-        // Update conversion rate
-        if (premiumPromoImpressions > 0) {
-            conversionRate = (double) premiumPromoInteractions / premiumPromoImpressions;
-        }
-        
-        // Record the interaction for analytics
-        executorService.submit(() -> {
-            try {
-                String apiUrl = ModForgeSettingsService.getInstance().getApiUrl();
-                String json = gson.toJson(new EngagementEvent(
-                        "premium_promo_interaction", 
-                        strategy.name() + ":" + action
-                ));
-                
-                ApiRequestUtil.post(apiUrl + ENGAGEMENT_ENDPOINT, json);
-            } catch (Exception e) {
-                LOG.error("Error recording premium promo interaction", e);
-            }
-        });
+        LOG.debug("Recorded premium promotion interaction: " + strategy + " - " + action);
     }
     
     /**
-     * Considers showing a premium promotion based on the given trigger.
-     * Uses smart marketing logic to decide whether to show a promotion.
-     * @param trigger The trigger for showing a promotion
-     * @return Whether a promotion should be shown
+     * Considers whether to show a premium promotion.
+     * @param strategy The marketing strategy to consider
+     * @return Whether to show the promotion
      */
-    public boolean considerShowingPremiumPromotion(MarketingStrategy trigger) {
+    public boolean considerShowingPremiumPromotion(MarketingStrategy strategy) {
+        // Don't show promotions to premium users
         if (isPremium()) {
-            return false; // Already premium
+            return false;
         }
         
-        // Check if we've shown a promotion recently
-        long now = System.currentTimeMillis();
-        if (now - lastPromotionTimestamp < minimumPromotionIntervalMinutes * 60 * 1000) {
-            return false; // Too soon
-        }
-        
-        // Decide whether to show promotion based on the trigger and user behavior
-        boolean shouldShow = false;
-        
-        switch (trigger) {
-            case USAGE_LIMIT:
-                // Almost always show when hitting usage limit
-                shouldShow = true;
-                break;
-                
-            case FEATURE_BLOCKED:
-                // Show with moderate frequency for blocked features
-                shouldShow = Math.random() < 0.7;
-                break;
-                
-            case TIME_BASED:
-                // Show occasionally based on time
-                shouldShow = Math.random() < 0.3;
-                break;
-                
-            case SUCCESS_MOMENT:
-                // Show during moments of success, with moderate frequency
-                shouldShow = Math.random() < 0.5;
-                break;
-        }
-        
-        if (shouldShow) {
-            // Update state
-            currentStrategy = trigger;
-            lastPromotionTimestamp = now;
-        }
-        
-        return shouldShow;
-    }
-    
-    /**
-     * Gets the current marketing strategy.
-     * @return The current marketing strategy
-     */
-    public MarketingStrategy getCurrentMarketingStrategy() {
-        return currentStrategy;
-    }
-    
-    /**
-     * Gets the premium promotional message based on the current strategy.
-     * @return The promotional message
-     */
-    public String getPremiumPromotionalMessage() {
-        switch (currentStrategy) {
-            case USAGE_LIMIT:
-                return "You've reached the free API usage limit for this month. " +
-                        "Upgrade to Premium for unlimited API calls and exclusive features!";
-                
-            case FEATURE_BLOCKED:
-                return "This feature is available exclusively to Premium subscribers. " +
-                        "Unlock the full power of ModForge AI by upgrading today!";
-                
-            case TIME_BASED:
-                return "Supercharge your Minecraft mod development with ModForge AI Premium. " +
-                        "Unlock advanced features and save valuable development time!";
-                
-            case SUCCESS_MOMENT:
-                return "Great job! Upgrade to Premium to get even more powerful AI-driven " +
-                        "mod creation tools and unlimited generations!";
-                
-            default:
-                return "Upgrade to ModForge AI Premium for the ultimate mod development experience!";
-        }
-    }
-    
-    /**
-     * Gets the benefits of the premium plan.
-     * @return The benefits of the premium plan
-     */
-    public String[] getPremiumBenefits() {
-        return new String[]{
-                "✓ Unlimited API calls",
-                "✓ Advanced pattern learning",
-                "✓ Priority processing",
-                "✓ Exclusive premium features",
-                "✓ Remote build and test",
-                "✓ Enhanced error resolution"
-        };
-    }
-    
-    /**
-     * Opens the subscription page in the browser.
-     */
-    public void openSubscriptionPage() {
-        String subscriptionUrl = ModForgeSettingsService.getInstance().getApiUrl()
-                .replace("/api", "/subscription");
-        
-        // Add user token if available
-        if (authToken != null) {
-            subscriptionUrl += "?token=" + authToken;
-        }
-        
-        // Open the URL in the browser
-        try {
-            java.awt.Desktop.getDesktop().browse(java.net.URI.create(subscriptionUrl));
+        // Check if this strategy is in cooldown
+        Long lastImpression = lastImpressionTime.get(strategy);
+        if (lastImpression != null) {
+            long daysSinceLastImpression = TimeUnit.MILLISECONDS.toDays(
+                    System.currentTimeMillis() - lastImpression
+            );
             
-            // Record the interaction
-            recordPremiumPromoInteraction(currentStrategy, "clicked_subscribe");
-        } catch (Exception e) {
-            LOG.error("Error opening subscription page", e);
+            if (daysSinceLastImpression < MARKETING_COOLDOWN_DAYS) {
+                return false;
+            }
         }
+        
+        // Get the conversion rate for this strategy
+        double conversionRate = getStrategyConversionRate(strategy);
+        
+        // Higher conversion rate = more likely to show
+        return random.nextDouble() < conversionRate;
     }
     
     /**
-     * Authentication request.
+     * Gets the conversion rate for a marketing strategy.
+     * @param strategy The marketing strategy
+     * @return The conversion rate
      */
-    private static class AuthRequest {
-        private final String username;
-        private final String password;
+    private double getStrategyConversionRate(MarketingStrategy strategy) {
+        Integer impressions = strategyImpressions.get(strategy);
+        Integer interactions = strategyInteractions.get(strategy);
         
-        public AuthRequest(String username, String password) {
-            this.username = username;
-            this.password = password;
+        if (impressions == null || impressions == 0 || interactions == null) {
+            return DEFAULT_CONVERSION_RATE;
         }
         
-        public String getUsername() {
-            return username;
-        }
-        
-        public String getPassword() {
-            return password;
-        }
+        return Math.min(0.9, Math.max(0.01, (double) interactions / impressions));
     }
     
     /**
-     * Authentication response.
-     */
-    private static class AuthResponse {
-        private String token;
-        private String message;
-        
-        public String getToken() {
-            return token;
-        }
-        
-        public void setToken(String token) {
-            this.token = token;
-        }
-        
-        public String getMessage() {
-            return message;
-        }
-        
-        public void setMessage(String message) {
-            this.message = message;
-        }
-    }
-    
-    /**
-     * Subscription response.
-     */
-    private static class SubscriptionResponse {
-        private SubscriptionPlan plan;
-        private int apiCallsThisMonth;
-        private int freeApiCallsLimit;
-        
-        public SubscriptionPlan getPlan() {
-            return plan;
-        }
-        
-        public void setPlan(SubscriptionPlan plan) {
-            this.plan = plan;
-        }
-        
-        public int getApiCallsThisMonth() {
-            return apiCallsThisMonth;
-        }
-        
-        public void setApiCallsThisMonth(int apiCallsThisMonth) {
-            this.apiCallsThisMonth = apiCallsThisMonth;
-        }
-        
-        public int getFreeApiCallsLimit() {
-            return freeApiCallsLimit;
-        }
-        
-        public void setFreeApiCallsLimit(int freeApiCallsLimit) {
-            this.freeApiCallsLimit = freeApiCallsLimit;
-        }
-    }
-    
-    /**
-     * Engagement event.
-     */
-    private static class EngagementEvent {
-        private final String type;
-        private final String data;
-        private final long timestamp;
-        
-        public EngagementEvent(String type, String data) {
-            this.type = type;
-            this.data = data;
-            this.timestamp = System.currentTimeMillis();
-        }
-        
-        public String getType() {
-            return type;
-        }
-        
-        public String getData() {
-            return data;
-        }
-        
-        public long getTimestamp() {
-            return timestamp;
-        }
-    }
-    
-    /**
-     * Marketing strategies.
+     * Marketing strategies for premium promotions.
      */
     public enum MarketingStrategy {
-        NONE,           // No marketing strategy
-        USAGE_LIMIT,    // User has reached usage limit
-        FEATURE_BLOCKED,// User tried to access premium feature
-        TIME_BASED,     // Periodic promotion
-        SUCCESS_MOMENT  // Show during moment of success
+        STARTUP_NOTIFICATION,
+        FEATURE_BLOCKED,
+        ERROR_RESOLUTION,
+        CODE_GENERATION,
+        JAR_ANALYSIS,
+        SETTINGS_PAGE
+    }
+    
+    /**
+     * Persistent state for this service.
+     */
+    public static class State {
+        public String authToken;
+        public boolean isPremium = false;
+        public long lastSubscriptionCheck = 0;
     }
 }

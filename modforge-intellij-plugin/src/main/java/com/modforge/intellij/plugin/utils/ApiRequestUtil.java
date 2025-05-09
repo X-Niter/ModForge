@@ -4,13 +4,16 @@ import com.intellij.openapi.diagnostic.Logger;
 import okhttp3.MediaType;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
+import okhttp3.RequestBody;
 import okhttp3.Response;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 import java.io.IOException;
 import java.util.concurrent.TimeUnit;
 
 /**
- * Utility class for making API requests.
+ * Utility for making API requests.
  */
 public class ApiRequestUtil {
     private static final Logger LOG = Logger.getInstance(ApiRequestUtil.class);
@@ -23,24 +26,67 @@ public class ApiRequestUtil {
             .writeTimeout(60, TimeUnit.SECONDS)
             .build();
     
+    private ApiRequestUtil() {
+        // Utility class, no instantiation
+    }
+    
     /**
      * Makes a GET request to the specified URL.
-     * @param url The URL to make the request to
+     * @param url The URL
      * @return The response body, or null if the request failed
      */
-    public static String get(String url) {
+    @Nullable
+    public static String get(@NotNull String url) {
         try {
             Request request = new Request.Builder()
                     .url(url)
                     .build();
             
             try (Response response = CLIENT.newCall(request).execute()) {
-                if (response.isSuccessful() && response.body() != null) {
-                    return response.body().string();
-                } else {
-                    LOG.warn("Failed to make GET request to " + url + ". Status: " + response.code());
+                if (!response.isSuccessful()) {
+                    LOG.warn("GET request to " + url + " failed with status code " + response.code());
                     return null;
                 }
+                
+                if (response.body() == null) {
+                    LOG.warn("GET request to " + url + " returned null body");
+                    return null;
+                }
+                
+                return response.body().string();
+            }
+        } catch (IOException e) {
+            LOG.error("Error making GET request to " + url, e);
+            return null;
+        }
+    }
+    
+    /**
+     * Makes a GET request to the specified URL with the specified token.
+     * @param url The URL
+     * @param token The authentication token
+     * @return The response body, or null if the request failed
+     */
+    @Nullable
+    public static String get(@NotNull String url, @NotNull String token) {
+        try {
+            Request request = new Request.Builder()
+                    .url(url)
+                    .header("Authorization", "Bearer " + token)
+                    .build();
+            
+            try (Response response = CLIENT.newCall(request).execute()) {
+                if (!response.isSuccessful()) {
+                    LOG.warn("GET request to " + url + " failed with status code " + response.code());
+                    return null;
+                }
+                
+                if (response.body() == null) {
+                    LOG.warn("GET request to " + url + " returned null body");
+                    return null;
+                }
+                
+                return response.body().string();
             }
         } catch (IOException e) {
             LOG.error("Error making GET request to " + url, e);
@@ -50,13 +96,14 @@ public class ApiRequestUtil {
     
     /**
      * Makes a POST request to the specified URL with the specified JSON body.
-     * @param url The URL to make the request to
+     * @param url The URL
      * @param json The JSON body
      * @return The response body, or null if the request failed
      */
-    public static String post(String url, String json) {
+    @Nullable
+    public static String post(@NotNull String url, @NotNull String json) {
         try {
-            okhttp3.RequestBody body = okhttp3.RequestBody.create(json, JSON);
+            RequestBody body = RequestBody.create(json, JSON);
             
             Request request = new Request.Builder()
                     .url(url)
@@ -64,12 +111,54 @@ public class ApiRequestUtil {
                     .build();
             
             try (Response response = CLIENT.newCall(request).execute()) {
-                if (response.isSuccessful() && response.body() != null) {
-                    return response.body().string();
-                } else {
-                    LOG.warn("Failed to make POST request to " + url + ". Status: " + response.code());
+                if (!response.isSuccessful()) {
+                    LOG.warn("POST request to " + url + " failed with status code " + response.code());
                     return null;
                 }
+                
+                if (response.body() == null) {
+                    LOG.warn("POST request to " + url + " returned null body");
+                    return null;
+                }
+                
+                return response.body().string();
+            }
+        } catch (IOException e) {
+            LOG.error("Error making POST request to " + url, e);
+            return null;
+        }
+    }
+    
+    /**
+     * Makes a POST request to the specified URL with the specified JSON body and token.
+     * @param url The URL
+     * @param json The JSON body
+     * @param token The authentication token
+     * @return The response body, or null if the request failed
+     */
+    @Nullable
+    public static String post(@NotNull String url, @NotNull String json, @NotNull String token) {
+        try {
+            RequestBody body = RequestBody.create(json, JSON);
+            
+            Request request = new Request.Builder()
+                    .url(url)
+                    .header("Authorization", "Bearer " + token)
+                    .post(body)
+                    .build();
+            
+            try (Response response = CLIENT.newCall(request).execute()) {
+                if (!response.isSuccessful()) {
+                    LOG.warn("POST request to " + url + " failed with status code " + response.code());
+                    return null;
+                }
+                
+                if (response.body() == null) {
+                    LOG.warn("POST request to " + url + " returned null body");
+                    return null;
+                }
+                
+                return response.body().string();
             }
         } catch (IOException e) {
             LOG.error("Error making POST request to " + url, e);
@@ -79,13 +168,14 @@ public class ApiRequestUtil {
     
     /**
      * Makes a PUT request to the specified URL with the specified JSON body.
-     * @param url The URL to make the request to
+     * @param url The URL
      * @param json The JSON body
      * @return The response body, or null if the request failed
      */
-    public static String put(String url, String json) {
+    @Nullable
+    public static String put(@NotNull String url, @NotNull String json) {
         try {
-            okhttp3.RequestBody body = okhttp3.RequestBody.create(json, JSON);
+            RequestBody body = RequestBody.create(json, JSON);
             
             Request request = new Request.Builder()
                     .url(url)
@@ -93,12 +183,17 @@ public class ApiRequestUtil {
                     .build();
             
             try (Response response = CLIENT.newCall(request).execute()) {
-                if (response.isSuccessful() && response.body() != null) {
-                    return response.body().string();
-                } else {
-                    LOG.warn("Failed to make PUT request to " + url + ". Status: " + response.code());
+                if (!response.isSuccessful()) {
+                    LOG.warn("PUT request to " + url + " failed with status code " + response.code());
                     return null;
                 }
+                
+                if (response.body() == null) {
+                    LOG.warn("PUT request to " + url + " returned null body");
+                    return null;
+                }
+                
+                return response.body().string();
             }
         } catch (IOException e) {
             LOG.error("Error making PUT request to " + url, e);
@@ -108,10 +203,10 @@ public class ApiRequestUtil {
     
     /**
      * Makes a DELETE request to the specified URL.
-     * @param url The URL to make the request to
-     * @return True if the request was successful, false otherwise
+     * @param url The URL
+     * @return Whether the request was successful
      */
-    public static boolean delete(String url) {
+    public static boolean delete(@NotNull String url) {
         try {
             Request request = new Request.Builder()
                     .url(url)
