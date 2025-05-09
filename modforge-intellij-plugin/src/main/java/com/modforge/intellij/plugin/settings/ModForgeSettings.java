@@ -2,7 +2,6 @@ package com.modforge.intellij.plugin.settings;
 
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.components.PersistentStateComponent;
-import com.intellij.openapi.components.ServiceManager;
 import com.intellij.openapi.components.State;
 import com.intellij.openapi.components.Storage;
 import com.intellij.util.xmlb.XmlSerializerUtil;
@@ -14,26 +13,18 @@ import org.jetbrains.annotations.Nullable;
  */
 @State(
         name = "ModForgeSettings",
-        storages = {@Storage("ModForgeSettings.xml")}
+        storages = {@Storage("modforge-settings.xml")}
 )
 public class ModForgeSettings implements PersistentStateComponent<ModForgeSettings> {
-    // API settings
     private String openAiApiKey = "";
-    private int maxTokensPerRequest = 1000;
-    private boolean usePatternLearning = true;
-    
-    // Collaboration settings
-    private String collaborationServerUrl = "wss://modforge.io/ws/collaboration";
-    private String username = "";
-    
-    // Code generation settings
-    private boolean generateJavadoc = true;
-    private boolean addCopyrightHeader = true;
-    private String copyrightText = "Copyright (c) ${YEAR} ModForge Team";
-    
-    // UI settings
-    private boolean showMetricsInStatusBar = true;
-    private boolean enableNotifications = true;
+    private String username = "anonymous";
+    private String collaborationServerUrl = "wss://modforge.io/collab";
+    private boolean enableContinuousRefactoring = false;
+    private boolean enableAIAssist = true;
+    private int maxTokensPerRequest = 1024;
+    private String openAiModel = "gpt-4";
+    private boolean usePatternRecognition = true;
+    private int collaborationRefreshRate = 500; // milliseconds
     
     /**
      * Gets the ModForgeSettings instance.
@@ -43,9 +34,8 @@ public class ModForgeSettings implements PersistentStateComponent<ModForgeSettin
         return ApplicationManager.getApplication().getService(ModForgeSettings.class);
     }
     
-    @Nullable
     @Override
-    public ModForgeSettings getState() {
+    public @Nullable ModForgeSettings getState() {
         return this;
     }
     
@@ -58,6 +48,7 @@ public class ModForgeSettings implements PersistentStateComponent<ModForgeSettin
      * Gets the OpenAI API key.
      * @return The OpenAI API key
      */
+    @NotNull
     public String getOpenAiApiKey() {
         return openAiApiKey;
     }
@@ -66,8 +57,74 @@ public class ModForgeSettings implements PersistentStateComponent<ModForgeSettin
      * Sets the OpenAI API key.
      * @param openAiApiKey The OpenAI API key
      */
-    public void setOpenAiApiKey(String openAiApiKey) {
+    public void setOpenAiApiKey(@NotNull String openAiApiKey) {
         this.openAiApiKey = openAiApiKey;
+    }
+    
+    /**
+     * Gets the username.
+     * @return The username
+     */
+    @NotNull
+    public String getUsername() {
+        return username;
+    }
+    
+    /**
+     * Sets the username.
+     * @param username The username
+     */
+    public void setUsername(@NotNull String username) {
+        this.username = username;
+    }
+    
+    /**
+     * Gets the collaboration server URL.
+     * @return The collaboration server URL
+     */
+    @NotNull
+    public String getCollaborationServerUrl() {
+        return collaborationServerUrl;
+    }
+    
+    /**
+     * Sets the collaboration server URL.
+     * @param collaborationServerUrl The collaboration server URL
+     */
+    public void setCollaborationServerUrl(@NotNull String collaborationServerUrl) {
+        this.collaborationServerUrl = collaborationServerUrl;
+    }
+    
+    /**
+     * Gets whether continuous refactoring is enabled.
+     * @return Whether continuous refactoring is enabled
+     */
+    public boolean isEnableContinuousRefactoring() {
+        return enableContinuousRefactoring;
+    }
+    
+    /**
+     * Sets whether continuous refactoring is enabled.
+     * @param enableContinuousRefactoring Whether continuous refactoring is enabled
+     */
+    public void setEnableContinuousRefactoring(boolean enableContinuousRefactoring) {
+        this.enableContinuousRefactoring = enableContinuousRefactoring;
+    }
+    
+    /**
+     * Gets whether AI assist is enabled.
+     * @return Whether AI assist is enabled
+     */
+    public boolean isEnableAIAssist() {
+        return enableAIAssist;
+    }
+    
+    /**
+     * Sets whether AI assist is enabled.
+     * @param enableAIAssist Whether AI assist is enabled
+     */
+    public void setEnableAIAssist(boolean enableAIAssist) {
+        this.enableAIAssist = enableAIAssist;
     }
     
     /**
@@ -87,130 +144,51 @@ public class ModForgeSettings implements PersistentStateComponent<ModForgeSettin
     }
     
     /**
-     * Gets whether to use pattern learning.
-     * @return Whether to use pattern learning
+     * Gets the OpenAI model.
+     * @return The OpenAI model
      */
-    public boolean isUsePatternLearning() {
-        return usePatternLearning;
+    @NotNull
+    public String getOpenAiModel() {
+        return openAiModel;
     }
     
     /**
-     * Sets whether to use pattern learning.
-     * @param usePatternLearning Whether to use pattern learning
+     * Sets the OpenAI model.
+     * @param openAiModel The OpenAI model
      */
-    public void setUsePatternLearning(boolean usePatternLearning) {
-        this.usePatternLearning = usePatternLearning;
+    public void setOpenAiModel(@NotNull String openAiModel) {
+        this.openAiModel = openAiModel;
     }
     
     /**
-     * Gets the collaboration server URL.
-     * @return The collaboration server URL
+     * Gets whether pattern recognition is enabled.
+     * @return Whether pattern recognition is enabled
      */
-    public String getCollaborationServerUrl() {
-        return collaborationServerUrl;
+    public boolean isUsePatternRecognition() {
+        return usePatternRecognition;
     }
     
     /**
-     * Sets the collaboration server URL.
-     * @param collaborationServerUrl The collaboration server URL
+     * Sets whether pattern recognition is enabled.
+     * @param usePatternRecognition Whether pattern recognition is enabled
      */
-    public void setCollaborationServerUrl(String collaborationServerUrl) {
-        this.collaborationServerUrl = collaborationServerUrl;
+    public void setUsePatternRecognition(boolean usePatternRecognition) {
+        this.usePatternRecognition = usePatternRecognition;
     }
     
     /**
-     * Gets the username.
-     * @return The username
+     * Gets the collaboration refresh rate.
+     * @return The collaboration refresh rate
      */
-    public String getUsername() {
-        return username;
+    public int getCollaborationRefreshRate() {
+        return collaborationRefreshRate;
     }
     
     /**
-     * Sets the username.
-     * @param username The username
+     * Sets the collaboration refresh rate.
+     * @param collaborationRefreshRate The collaboration refresh rate
      */
-    public void setUsername(String username) {
-        this.username = username;
-    }
-    
-    /**
-     * Gets whether to generate Javadoc.
-     * @return Whether to generate Javadoc
-     */
-    public boolean isGenerateJavadoc() {
-        return generateJavadoc;
-    }
-    
-    /**
-     * Sets whether to generate Javadoc.
-     * @param generateJavadoc Whether to generate Javadoc
-     */
-    public void setGenerateJavadoc(boolean generateJavadoc) {
-        this.generateJavadoc = generateJavadoc;
-    }
-    
-    /**
-     * Gets whether to add a copyright header.
-     * @return Whether to add a copyright header
-     */
-    public boolean isAddCopyrightHeader() {
-        return addCopyrightHeader;
-    }
-    
-    /**
-     * Sets whether to add a copyright header.
-     * @param addCopyrightHeader Whether to add a copyright header
-     */
-    public void setAddCopyrightHeader(boolean addCopyrightHeader) {
-        this.addCopyrightHeader = addCopyrightHeader;
-    }
-    
-    /**
-     * Gets the copyright text.
-     * @return The copyright text
-     */
-    public String getCopyrightText() {
-        return copyrightText;
-    }
-    
-    /**
-     * Sets the copyright text.
-     * @param copyrightText The copyright text
-     */
-    public void setCopyrightText(String copyrightText) {
-        this.copyrightText = copyrightText;
-    }
-    
-    /**
-     * Gets whether to show metrics in the status bar.
-     * @return Whether to show metrics in the status bar
-     */
-    public boolean isShowMetricsInStatusBar() {
-        return showMetricsInStatusBar;
-    }
-    
-    /**
-     * Sets whether to show metrics in the status bar.
-     * @param showMetricsInStatusBar Whether to show metrics in the status bar
-     */
-    public void setShowMetricsInStatusBar(boolean showMetricsInStatusBar) {
-        this.showMetricsInStatusBar = showMetricsInStatusBar;
-    }
-    
-    /**
-     * Gets whether to enable notifications.
-     * @return Whether to enable notifications
-     */
-    public boolean isEnableNotifications() {
-        return enableNotifications;
-    }
-    
-    /**
-     * Sets whether to enable notifications.
-     * @param enableNotifications Whether to enable notifications
-     */
-    public void setEnableNotifications(boolean enableNotifications) {
-        this.enableNotifications = enableNotifications;
+    public void setCollaborationRefreshRate(int collaborationRefreshRate) {
+        this.collaborationRefreshRate = collaborationRefreshRate;
     }
 }

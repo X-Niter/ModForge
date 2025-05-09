@@ -1,5 +1,8 @@
 package com.modforge.intellij.plugin.ai;
 
+import com.intellij.notification.Notification;
+import com.intellij.notification.NotificationType;
+import com.intellij.notification.Notifications;
 import com.intellij.openapi.components.Service;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.project.Project;
@@ -8,36 +11,45 @@ import com.modforge.intellij.plugin.settings.ModForgeSettings;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.InputStreamReader;
+import java.io.OutputStreamWriter;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutorService;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 
 /**
- * Service for managing AI requests and pattern learning.
- * This service coordinates between direct API requests and pattern-matched responses,
- * optimizing for cost and performance.
+ * Service for managing AI operations.
+ * This service provides high-level methods for generating code, fixing code,
+ * and generating documentation using AI services.
  */
 @Service(Service.Level.PROJECT)
 public final class AIServiceManager {
     private static final Logger LOG = Logger.getInstance(AIServiceManager.class);
     
+    private static final String API_URL = "https://api.openai.com/v1/chat/completions";
+    private static final String MODEL = "gpt-4";
+    private static final int MAX_TOKENS = 1024;
+    private static final double TEMPERATURE = 0.7;
+    
     private final Project project;
-    private final ExecutorService executor = AppExecutorUtil.createBoundedApplicationPoolExecutor(
-            "ModForge.AIServiceManager", 4);
     
-    // Metrics for API usage
-    private final AtomicInteger totalApiRequests = new AtomicInteger(0);
-    private final AtomicInteger totalPatternMatches = new AtomicInteger(0);
-    private final AtomicInteger totalTokensGenerated = new AtomicInteger(0);
-    private final AtomicInteger totalTokensSaved = new AtomicInteger(0);
-    private final Map<String, AtomicInteger> requestsByType = new HashMap<>();
+    // Cache for recent responses
+    private final Map<String, CachedResponse> responseCache = new ConcurrentHashMap<>();
     
-    // Cache for recent requests
-    private final Map<String, String> responseCache = new HashMap<>();
+    // Statistics
+    private final AtomicLong requestCount = new AtomicLong(0);
+    private final AtomicLong cacheHitCount = new AtomicLong(0);
+    private final AtomicLong failureCount = new AtomicLong(0);
+    private final AtomicLong totalTokensUsed = new AtomicLong(0);
     
     /**
      * Creates a new AIServiceManager.
@@ -46,11 +58,9 @@ public final class AIServiceManager {
     public AIServiceManager(@NotNull Project project) {
         this.project = project;
         
-        // Initialize request type counters
-        requestsByType.put("Code Generation", new AtomicInteger(0));
-        requestsByType.put("Code Improvement", new AtomicInteger(0));
-        requestsByType.put("Error Resolution", new AtomicInteger(0));
-        requestsByType.put("Documentation", new AtomicInteger(0));
+        // Schedule cache cleanup
+        AppExecutorUtil.getAppScheduledExecutorService().scheduleWithFixedDelay(
+                this::cleanupCache, 30, 30, TimeUnit.MINUTES);
         
         LOG.info("AIServiceManager initialized");
     }
@@ -69,391 +79,421 @@ public final class AIServiceManager {
      * @param prompt The prompt
      * @param language The programming language
      * @param options Additional options
-     * @return The generated code
+     * @return A future that completes with the generated code
      */
     @NotNull
-    public CompletableFuture<String> generateCode(@NotNull String prompt, 
-                                                 @NotNull String language, 
-                                                 @Nullable Map<String, Object> options) {
-        // Increment metrics
-        totalApiRequests.incrementAndGet();
-        requestsByType.get("Code Generation").incrementAndGet();
-        
-        // Check pattern matching first
-        return CompletableFuture.supplyAsync(() -> {
-            // In a real implementation, this would check for pattern matches
-            return null; // No pattern match found
-        }, executor).thenCompose(matchResult -> {
-            if (matchResult != null) {
-                // Pattern match found
-                totalPatternMatches.incrementAndGet();
-                
-                // Estimate tokens saved (very rough estimate)
-                int estimatedTokensSaved = prompt.length() / 4 + 500;
-                totalTokensSaved.addAndGet(estimatedTokensSaved);
-                
-                return CompletableFuture.completedFuture(matchResult);
-            } else {
-                // No pattern match, use API
-                return callOpenAiApi(prompt, language, options);
-            }
-        });
-    }
-    
-    /**
-     * Improves code based on a prompt.
-     * @param code The code to improve
-     * @param prompt The improvement instructions
-     * @param options Additional options
-     * @return The improved code
-     */
-    @NotNull
-    public CompletableFuture<String> improveCode(@NotNull String code, 
-                                               @NotNull String prompt, 
+    public CompletableFuture<String> generateCode(@NotNull String prompt, @NotNull String language, 
                                                @Nullable Map<String, Object> options) {
-        // Increment metrics
-        totalApiRequests.incrementAndGet();
-        requestsByType.get("Code Improvement").incrementAndGet();
+        // Build messages
+        String systemPrompt = "You are an expert " + language + " developer. " +
+                "Generate clean, well-commented code based on the user's request. " +
+                "Provide only the code without explanations, unless specifically asked for explanations.";
         
-        // Check pattern matching first
-        return CompletableFuture.supplyAsync(() -> {
-            // In a real implementation, this would check for pattern matches
-            return null; // No pattern match found
-        }, executor).thenCompose(matchResult -> {
-            if (matchResult != null) {
-                // Pattern match found
-                totalPatternMatches.incrementAndGet();
-                
-                // Estimate tokens saved (very rough estimate)
-                int estimatedTokensSaved = code.length() / 4 + prompt.length() / 4 + 200;
-                totalTokensSaved.addAndGet(estimatedTokensSaved);
-                
-                return CompletableFuture.completedFuture(matchResult);
-            } else {
-                // No pattern match, use API
-                Map<String, Object> fullOptions = new HashMap<>();
-                if (options != null) {
-                    fullOptions.putAll(options);
-                }
-                fullOptions.put("code", code);
-                
-                return callOpenAiApi(prompt, "code_improvement", fullOptions);
+        if (options != null && !options.isEmpty()) {
+            systemPrompt += "\n\nAdditional context:\n";
+            
+            for (Map.Entry<String, Object> entry : options.entrySet()) {
+                systemPrompt += "- " + entry.getKey() + ": " + entry.getValue() + "\n";
             }
-        });
+        }
+        
+        return sendRequest(systemPrompt, prompt, "generate_code", options);
     }
     
     /**
-     * Fixes code based on error messages.
+     * Fixes code based on a prompt and code.
      * @param code The code to fix
      * @param errorMessage The error message
      * @param options Additional options
-     * @return The fixed code
+     * @return A future that completes with the fixed code
      */
     @NotNull
-    public CompletableFuture<String> fixCode(@NotNull String code, 
-                                           @NotNull String errorMessage, 
-                                           @Nullable Map<String, Object> options) {
-        // Increment metrics
-        totalApiRequests.incrementAndGet();
-        requestsByType.get("Error Resolution").incrementAndGet();
+    public CompletableFuture<String> fixCode(@NotNull String code, @Nullable String errorMessage, 
+                                          @Nullable Map<String, Object> options) {
+        // Build messages
+        String systemPrompt = "You are an expert programmer. Fix the code provided by the user.";
         
-        // Check pattern matching first
-        return CompletableFuture.supplyAsync(() -> {
-            // In a real implementation, this would check for pattern matches
-            return null; // No pattern match found
-        }, executor).thenCompose(matchResult -> {
-            if (matchResult != null) {
-                // Pattern match found
-                totalPatternMatches.incrementAndGet();
-                
-                // Estimate tokens saved (very rough estimate)
-                int estimatedTokensSaved = code.length() / 4 + errorMessage.length() / 4 + 300;
-                totalTokensSaved.addAndGet(estimatedTokensSaved);
-                
-                return CompletableFuture.completedFuture(matchResult);
-            } else {
-                // No pattern match, use API
-                Map<String, Object> fullOptions = new HashMap<>();
-                if (options != null) {
-                    fullOptions.putAll(options);
-                }
-                fullOptions.put("code", code);
-                fullOptions.put("error", errorMessage);
-                
-                return callOpenAiApi(errorMessage, "error_resolution", fullOptions);
-            }
-        });
+        if (errorMessage != null && !errorMessage.isEmpty()) {
+            systemPrompt += " The code is producing the following error:\n\n" + errorMessage;
+        }
+        
+        String userPrompt = "Please fix the following code:\n\n```\n" + code + "\n```";
+        
+        return sendRequest(systemPrompt, userPrompt, "fix_code", options);
     }
     
     /**
      * Generates documentation for code.
      * @param code The code to document
      * @param options Additional options
-     * @return The documentation
+     * @return A future that completes with the documentation
      */
     @NotNull
     public CompletableFuture<String> generateDocumentation(@NotNull String code, 
-                                                         @Nullable Map<String, Object> options) {
-        // Increment metrics
-        totalApiRequests.incrementAndGet();
-        requestsByType.get("Documentation").incrementAndGet();
+                                                        @Nullable Map<String, Object> options) {
+        // Build messages
+        String systemPrompt = "You are an expert technical writer. " +
+                "Generate comprehensive documentation for the code provided by the user.";
         
-        // Check pattern matching first
-        return CompletableFuture.supplyAsync(() -> {
-            // In a real implementation, this would check for pattern matches
-            return null; // No pattern match found
-        }, executor).thenCompose(matchResult -> {
-            if (matchResult != null) {
-                // Pattern match found
-                totalPatternMatches.incrementAndGet();
-                
-                // Estimate tokens saved (very rough estimate)
-                int estimatedTokensSaved = code.length() / 4 + 400;
-                totalTokensSaved.addAndGet(estimatedTokensSaved);
-                
-                return CompletableFuture.completedFuture(matchResult);
-            } else {
-                // No pattern match, use API
-                Map<String, Object> fullOptions = new HashMap<>();
-                if (options != null) {
-                    fullOptions.putAll(options);
-                }
-                
-                return callOpenAiApi("Generate documentation for the following code:\n\n" + code, 
-                        "documentation", fullOptions);
-            }
-        });
+        if (options != null && options.containsKey("prompt")) {
+            systemPrompt += " " + options.get("prompt");
+        }
+        
+        String userPrompt = "Please generate documentation for the following code:\n\n```\n" + code + "\n```";
+        
+        return sendRequest(systemPrompt, userPrompt, "generate_documentation", options);
     }
     
     /**
-     * Calls the OpenAI API.
-     * @param prompt The prompt
-     * @param type The request type
+     * Explains code.
+     * @param code The code to explain
      * @param options Additional options
-     * @return The response
+     * @return A future that completes with the explanation
      */
     @NotNull
-    private CompletableFuture<String> callOpenAiApi(@NotNull String prompt, 
-                                                  @NotNull String type, 
-                                                  @Nullable Map<String, Object> options) {
+    public CompletableFuture<String> explainCode(@NotNull String code, @Nullable Map<String, Object> options) {
+        // Build messages
+        String systemPrompt = "You are an expert programmer. " +
+                "Explain the code provided by the user in a clear and concise manner.";
+        
+        String userPrompt = "Please explain the following code:\n\n```\n" + code + "\n```";
+        
+        return sendRequest(systemPrompt, userPrompt, "explain_code", options);
+    }
+    
+    /**
+     * Sends a request to the OpenAI API.
+     * @param systemPrompt The system prompt
+     * @param userPrompt The user prompt
+     * @param requestType The request type for caching
+     * @param options Additional options
+     * @return A future that completes with the response
+     */
+    @NotNull
+    private CompletableFuture<String> sendRequest(@NotNull String systemPrompt, @NotNull String userPrompt, 
+                                               @NotNull String requestType, @Nullable Map<String, Object> options) {
         return CompletableFuture.supplyAsync(() -> {
-            try {
-                LOG.info("Calling OpenAI API for " + type);
+            // Check cache
+            String cacheKey = generateCacheKey(systemPrompt, userPrompt, requestType);
+            
+            CachedResponse cachedResponse = responseCache.get(cacheKey);
+            if (cachedResponse != null && !cachedResponse.isExpired()) {
+                // Cache hit
+                cacheHitCount.incrementAndGet();
+                LOG.info("Cache hit for request type: " + requestType);
                 
-                // Check for API key
+                return cachedResponse.getResponse();
+            }
+            
+            // Increment request count
+            requestCount.incrementAndGet();
+            
+            try {
+                // Get API key
                 String apiKey = ModForgeSettings.getInstance().getOpenAiApiKey();
                 if (apiKey == null || apiKey.trim().isEmpty()) {
-                    throw new IllegalStateException("OpenAI API key is not set. Please configure it in the settings.");
+                    throw new IllegalStateException("OpenAI API key is not set");
                 }
                 
-                // Check cache
-                String cacheKey = prompt + "|" + type + "|" + (options != null ? options.toString() : "");
-                if (responseCache.containsKey(cacheKey)) {
-                    LOG.info("Using cached response for " + type);
-                    return responseCache.get(cacheKey);
+                // Build request
+                URL url = new URL(API_URL);
+                HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+                connection.setRequestMethod("POST");
+                connection.setRequestProperty("Content-Type", "application/json");
+                connection.setRequestProperty("Authorization", "Bearer " + apiKey);
+                connection.setDoOutput(true);
+                
+                // Build messages
+                String requestBody = "{" +
+                        "\"model\": \"" + MODEL + "\"," +
+                        "\"messages\": [" +
+                        "{\"role\": \"system\", \"content\": \"" + escapeJson(systemPrompt) + "\"}," +
+                        "{\"role\": \"user\", \"content\": \"" + escapeJson(userPrompt) + "\"}" +
+                        "]," +
+                        "\"max_tokens\": " + MAX_TOKENS + "," +
+                        "\"temperature\": " + TEMPERATURE +
+                        "}";
+                
+                // Send request
+                try (OutputStreamWriter writer = new OutputStreamWriter(connection.getOutputStream())) {
+                    writer.write(requestBody);
+                    writer.flush();
                 }
                 
-                // In a real implementation, we would call the OpenAI API here
-                // For now, we'll simulate a response
-                
-                // Simulate network delay
-                try {
-                    Thread.sleep(1500);
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
+                // Read response
+                StringBuilder response = new StringBuilder();
+                try (BufferedReader reader = new BufferedReader(
+                        new InputStreamReader(connection.getInputStream(), StandardCharsets.UTF_8))) {
+                    String line;
+                    while ((line = reader.readLine()) != null) {
+                        response.append(line);
+                    }
                 }
                 
-                // Generate a mock response
-                String response = generateMockResponse(prompt, type, options);
+                // Parse response
+                String responseText = parseResponse(response.toString());
                 
-                // Update metrics - approximately 4 chars per token
-                int estimatedTokens = (prompt.length() + response.length()) / 4;
-                totalTokensGenerated.addAndGet(estimatedTokens);
+                // Increment token count (estimation)
+                int estimatedTokens = estimateTokenCount(systemPrompt) + estimateTokenCount(userPrompt) + 
+                        estimateTokenCount(responseText);
+                totalTokensUsed.addAndGet(estimatedTokens);
                 
-                // Cache the response
-                responseCache.put(cacheKey, response);
+                // Cache response
+                responseCache.put(cacheKey, new CachedResponse(responseText));
                 
-                return response;
+                return responseText;
             } catch (Exception e) {
-                LOG.error("Error calling OpenAI API", e);
-                throw new RuntimeException("Error calling OpenAI API: " + e.getMessage(), e);
+                // Increment failure count
+                failureCount.incrementAndGet();
+                
+                LOG.error("Error sending request", e);
+                
+                // Notify user
+                Notification notification = new Notification(
+                        "ModForge Notifications",
+                        "AI Service Error",
+                        "Error sending request to AI service: " + e.getMessage(),
+                        NotificationType.ERROR
+                );
+                
+                Notifications.Bus.notify(notification, project);
+                
+                throw new RuntimeException("Error sending request to AI service", e);
             }
-        }, executor);
+        }, AppExecutorUtil.getAppExecutorService());
     }
     
     /**
-     * Generates a mock response for testing.
-     * @param prompt The prompt
-     * @param type The request type
-     * @param options Additional options
-     * @return The mock response
+     * Parses the OpenAI API response.
+     * @param response The response to parse
+     * @return The parsed response
+     * @throws IOException If there is an error parsing the response
      */
     @NotNull
-    private String generateMockResponse(@NotNull String prompt, 
-                                      @NotNull String type, 
-                                      @Nullable Map<String, Object> options) {
-        // NOTE: In a real implementation, this would call the actual OpenAI API
+    private String parseResponse(@NotNull String response) throws IOException {
+        // Check for error response
+        if (response.contains("\"error\":")) {
+            String errorMessage = extractJsonField(response, "message");
+            if (errorMessage != null && !errorMessage.isEmpty()) {
+                throw new IOException("API error: " + errorMessage);
+            }
+            
+            throw new IOException("Unknown API error");
+        }
         
-        switch (type) {
-            case "java":
-            case "python":
-            case "javascript":
-            case "typescript":
-                return "/**\n" +
-                      " * Generated code based on prompt:\n" +
-                      " * " + prompt + "\n" +
-                      " */\n" +
-                      "public class GeneratedCode {\n" +
-                      "    public static void main(String[] args) {\n" +
-                      "        System.out.println(\"Hello, ModForge!\");\n" +
-                      "    }\n" +
-                      "}";
-                
-            case "code_improvement":
-                String code = options != null && options.containsKey("code") ? 
-                        (String) options.get("code") : "";
-                return "/**\n" +
-                      " * Improved code based on prompt:\n" +
-                      " * " + prompt + "\n" +
-                      " */\n" +
-                      "public class ImprovedCode {\n" +
-                      "    public static void main(String[] args) {\n" +
-                      "        // More efficient implementation\n" +
-                      "        System.out.println(\"Hello, Improved ModForge!\");\n" +
-                      "    }\n" +
-                      "}";
-                
-            case "error_resolution":
-                return "/**\n" +
-                      " * Fixed code based on error:\n" +
-                      " * " + prompt + "\n" +
-                      " */\n" +
-                      "public class FixedCode {\n" +
-                      "    public static void main(String[] args) {\n" +
-                      "        // Fix applied: added missing semicolon\n" +
-                      "        System.out.println(\"Hello, Fixed ModForge!\");\n" +
-                      "    }\n" +
-                      "}";
-                
-            case "documentation":
-                return "/**\n" +
-                      " * # Code Documentation\n" +
-                      " * \n" +
-                      " * This class implements a simple Hello World program.\n" +
-                      " * \n" +
-                      " * ## Main Method\n" +
-                      " * \n" +
-                      " * The `main` method is the entry point of the application.\n" +
-                      " * It prints a greeting message to the console.\n" +
-                      " * \n" +
-                      " * @param args Command line arguments (not used)\n" +
-                      " */";
-                
-            default:
-                return "/**\n" +
-                      " * Generated response based on prompt:\n" +
-                      " * " + prompt + "\n" +
-                      " */\n" +
-                      "// No specific handler for type: " + type;
+        // Extract choice content
+        String content = extractJsonField(
+                extractJsonField(extractJsonField(response, "choices"), "message"), "content");
+        
+        return content != null ? content : "";
+    }
+    
+    /**
+     * Extracts a field from a JSON string.
+     * @param json The JSON string
+     * @param field The field to extract
+     * @return The extracted field, or null if not found
+     */
+    @Nullable
+    private String extractJsonField(@Nullable String json, @NotNull String field) {
+        if (json == null || json.isEmpty()) {
+            return null;
+        }
+        
+        String fieldPattern = "\"" + field + "\"\\s*:\\s*";
+        
+        // Check if field exists
+        int fieldStart = json.indexOf(fieldPattern);
+        if (fieldStart < 0) {
+            return null;
+        }
+        
+        // Find start of value
+        int valueStart = json.indexOf(":", fieldStart) + 1;
+        while (valueStart < json.length() && Character.isWhitespace(json.charAt(valueStart))) {
+            valueStart++;
+        }
+        
+        // Check if value is object or array
+        char startChar = json.charAt(valueStart);
+        
+        if (startChar == '{') {
+            // Object
+            int braceCount = 1;
+            int i = valueStart + 1;
+            
+            while (i < json.length() && braceCount > 0) {
+                char c = json.charAt(i);
+                if (c == '{') {
+                    braceCount++;
+                } else if (c == '}') {
+                    braceCount--;
+                }
+                i++;
+            }
+            
+            return json.substring(valueStart, i);
+        } else if (startChar == '[') {
+            // Array
+            int bracketCount = 1;
+            int i = valueStart + 1;
+            
+            while (i < json.length() && bracketCount > 0) {
+                char c = json.charAt(i);
+                if (c == '[') {
+                    bracketCount++;
+                } else if (c == ']') {
+                    bracketCount--;
+                }
+                i++;
+            }
+            
+            return json.substring(valueStart, i);
+        } else if (startChar == '"') {
+            // String
+            int i = valueStart + 1;
+            
+            while (i < json.length()) {
+                char c = json.charAt(i);
+                if (c == '"' && json.charAt(i - 1) != '\\') {
+                    break;
+                }
+                i++;
+            }
+            
+            return json.substring(valueStart + 1, i).replaceAll("\\\\\"", "\"").replaceAll("\\\\n", "\n");
+        } else {
+            // Number, boolean, or null
+            int i = valueStart;
+            
+            while (i < json.length() && json.charAt(i) != ',' && json.charAt(i) != '}' && json.charAt(i) != ']') {
+                i++;
+            }
+            
+            return json.substring(valueStart, i).trim();
         }
     }
     
     /**
-     * Gets usage metrics.
-     * @return The usage metrics
+     * Escapes a string for use in JSON.
+     * @param string The string to escape
+     * @return The escaped string
      */
     @NotNull
-    public UsageMetrics getUsageMetrics() {
-        UsageMetrics metrics = new UsageMetrics();
-        
-        metrics.totalApiRequests = totalApiRequests.get();
-        metrics.totalPatternMatches = totalPatternMatches.get();
-        metrics.totalTokensGenerated = totalTokensGenerated.get();
-        metrics.totalTokensSaved = totalTokensSaved.get();
-        
-        // Copy request type counts
-        for (Map.Entry<String, AtomicInteger> entry : requestsByType.entrySet()) {
-            metrics.requestsByType.put(entry.getKey(), entry.getValue().get());
-        }
-        
-        // Calculate approximate cost savings (assume $0.002 per 1000 tokens)
-        metrics.estimatedCostSaved = totalTokensSaved.get() * 0.002 / 1000.0;
-        
-        return metrics;
+    private String escapeJson(@NotNull String string) {
+        return string.replace("\\", "\\\\")
+                .replace("\"", "\\\"")
+                .replace("\n", "\\n")
+                .replace("\r", "\\r")
+                .replace("\t", "\\t");
     }
     
     /**
-     * Clears metrics.
+     * Estimates the number of tokens in a string.
+     * @param string The string to estimate
+     * @return The estimated number of tokens
      */
-    public void clearMetrics() {
-        totalApiRequests.set(0);
-        totalPatternMatches.set(0);
-        totalTokensGenerated.set(0);
-        totalTokensSaved.set(0);
-        
-        for (AtomicInteger counter : requestsByType.values()) {
-            counter.set(0);
-        }
+    private int estimateTokenCount(@NotNull String string) {
+        // Rough estimation: 1 token ≈ 4 characters
+        return string.length() / 4;
     }
     
     /**
-     * Usage metrics.
+     * Generates a cache key.
+     * @param systemPrompt The system prompt
+     * @param userPrompt The user prompt
+     * @param requestType The request type
+     * @return The cache key
      */
-    public static class UsageMetrics {
-        private int totalApiRequests;
-        private int totalPatternMatches;
-        private int totalTokensGenerated;
-        private int totalTokensSaved;
-        private double estimatedCostSaved;
-        private final Map<String, Integer> requestsByType = new HashMap<>();
+    @NotNull
+    private String generateCacheKey(@NotNull String systemPrompt, @NotNull String userPrompt, 
+                                  @NotNull String requestType) {
+        return requestType + ":" + Objects.hash(systemPrompt, userPrompt);
+    }
+    
+    /**
+     * Cleans up the response cache.
+     */
+    private void cleanupCache() {
+        LOG.info("Cleaning up response cache");
+        
+        // Remove expired entries
+        responseCache.entrySet().removeIf(entry -> entry.getValue().isExpired());
+    }
+    
+    /**
+     * Gets the request count.
+     * @return The request count
+     */
+    public long getRequestCount() {
+        return requestCount.get();
+    }
+    
+    /**
+     * Gets the cache hit count.
+     * @return The cache hit count
+     */
+    public long getCacheHitCount() {
+        return cacheHitCount.get();
+    }
+    
+    /**
+     * Gets the failure count.
+     * @return The failure count
+     */
+    public long getFailureCount() {
+        return failureCount.get();
+    }
+    
+    /**
+     * Gets the total tokens used.
+     * @return The total tokens used
+     */
+    public long getTotalTokensUsed() {
+        return totalTokensUsed.get();
+    }
+    
+    /**
+     * Gets the estimated cost in USD.
+     * @return The estimated cost
+     */
+    public double getEstimatedCost() {
+        // GPT-4 pricing: $0.03 per 1K tokens
+        return totalTokensUsed.get() * 0.03 / 1000.0;
+    }
+    
+    /**
+     * Cached API response.
+     */
+    private static class CachedResponse {
+        private final String response;
+        private final long timestamp;
+        private static final long EXPIRATION_TIME = TimeUnit.HOURS.toMillis(1);
         
         /**
-         * Gets the total API requests.
-         * @return The total API requests
+         * Creates a new CachedResponse.
+         * @param response The response
          */
-        public int getTotalApiRequests() {
-            return totalApiRequests;
+        public CachedResponse(@NotNull String response) {
+            this.response = response;
+            this.timestamp = System.currentTimeMillis();
         }
         
         /**
-         * Gets the total pattern matches.
-         * @return The total pattern matches
-         */
-        public int getTotalPatternMatches() {
-            return totalPatternMatches;
-        }
-        
-        /**
-         * Gets the total tokens generated.
-         * @return The total tokens generated
-         */
-        public int getTotalTokensGenerated() {
-            return totalTokensGenerated;
-        }
-        
-        /**
-         * Gets the total tokens saved.
-         * @return The total tokens saved
-         */
-        public int getTotalTokensSaved() {
-            return totalTokensSaved;
-        }
-        
-        /**
-         * Gets the estimated cost saved.
-         * @return The estimated cost saved
-         */
-        public double getEstimatedCostSaved() {
-            return estimatedCostSaved;
-        }
-        
-        /**
-         * Gets the requests by type.
-         * @return The requests by type
+         * Gets the response.
+         * @return The response
          */
         @NotNull
-        public Map<String, Integer> getRequestsByType() {
-            return requestsByType;
+        public String getResponse() {
+            return response;
+        }
+        
+        /**
+         * Checks if the response is expired.
+         * @return Whether the response is expired
+         */
+        public boolean isExpired() {
+            return System.currentTimeMillis() - timestamp > EXPIRATION_TIME;
         }
     }
 }

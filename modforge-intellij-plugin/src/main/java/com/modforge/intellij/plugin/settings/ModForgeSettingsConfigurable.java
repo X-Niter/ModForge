@@ -3,265 +3,205 @@ package com.modforge.intellij.plugin.settings;
 import com.intellij.openapi.options.Configurable;
 import com.intellij.openapi.options.ConfigurationException;
 import com.intellij.openapi.ui.ComboBox;
+import com.intellij.openapi.util.NlsContexts;
+import com.intellij.ui.JBColor;
 import com.intellij.ui.components.JBCheckBox;
 import com.intellij.ui.components.JBLabel;
-import com.intellij.ui.components.JBPanel;
 import com.intellij.ui.components.JBPasswordField;
 import com.intellij.ui.components.JBTextField;
 import com.intellij.util.ui.FormBuilder;
 import com.intellij.util.ui.JBUI;
+import com.intellij.util.ui.UI;
 import org.jetbrains.annotations.Nls;
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import javax.swing.*;
+import javax.swing.event.DocumentEvent;
+import javax.swing.event.DocumentListener;
 import java.awt.*;
 
 /**
- * Configurable for ModForge settings in the IDE settings dialog.
+ * Configurable for ModForge settings.
  */
 public class ModForgeSettingsConfigurable implements Configurable {
-    private JBPasswordField apiKeyField;
-    private JSpinner maxTokensField;
-    private JBCheckBox usePatternLearningField;
-    private JBTextField serverUrlField;
+    private JPanel mainPanel;
+    private JBPasswordField openAiApiKeyField;
     private JBTextField usernameField;
-    private JBCheckBox generateJavadocField;
-    private JBCheckBox addCopyrightHeaderField;
-    private JBTextField copyrightTextField;
-    private JBCheckBox showMetricsInStatusBarField;
-    private JBCheckBox enableNotificationsField;
-    private ComboBox<String> themeSelector;
+    private JBTextField collaborationServerUrlField;
+    private JBCheckBox enableContinuousRefactoringCheckBox;
+    private JBCheckBox enableAIAssistCheckBox;
+    private JBTextField maxTokensPerRequestField;
+    private ComboBox<String> openAiModelComboBox;
+    private JBCheckBox usePatternRecognitionCheckBox;
+    private JBTextField collaborationRefreshRateField;
+    private JBLabel apiKeyWarningLabel;
     
-    private final ModForgeSettings settings = ModForgeSettings.getInstance();
-    
-    @Nls(capitalization = Nls.Capitalization.Title)
     @Override
-    public String getDisplayName() {
+    public @NotNull @Nls(capitalization = Nls.Capitalization.Title) String getDisplayName() {
         return "ModForge";
     }
     
-    @Nullable
     @Override
-    public JComponent createComponent() {
-        // Create tabbed pane for different setting categories
-        JTabbedPane tabbedPane = new JTabbedPane();
+    public @Nullable JComponent createComponent() {
+        mainPanel = new JPanel(new BorderLayout());
         
-        // Create panels for each tab
-        JPanel aiSettingsPanel = createAISettingsPanel();
-        JPanel collaborationSettingsPanel = createCollaborationSettingsPanel();
-        JPanel codeGenerationSettingsPanel = createCodeGenerationSettingsPanel();
-        JPanel uiSettingsPanel = createUISettingsPanel();
+        // Create fields
+        openAiApiKeyField = new JBPasswordField();
+        usernameField = new JBTextField();
+        collaborationServerUrlField = new JBTextField();
+        enableContinuousRefactoringCheckBox = new JBCheckBox("Enable continuous refactoring");
+        enableAIAssistCheckBox = new JBCheckBox("Enable AI assist");
+        maxTokensPerRequestField = new JBTextField();
+        openAiModelComboBox = new ComboBox<>(new String[]{"gpt-4", "gpt-4-turbo", "gpt-3.5-turbo"});
+        usePatternRecognitionCheckBox = new JBCheckBox("Use pattern recognition (reduces API usage)");
+        collaborationRefreshRateField = new JBTextField();
+        apiKeyWarningLabel = new JBLabel("Warning: API key not set");
+        apiKeyWarningLabel.setForeground(JBColor.RED);
+        apiKeyWarningLabel.setVisible(false);
         
-        // Add panels to tabbed pane
-        tabbedPane.addTab("AI Settings", aiSettingsPanel);
-        tabbedPane.addTab("Collaboration", collaborationSettingsPanel);
-        tabbedPane.addTab("Code Generation", codeGenerationSettingsPanel);
-        tabbedPane.addTab("UI", uiSettingsPanel);
+        // Add document listener to API key field to show/hide warning
+        openAiApiKeyField.getDocument().addDocumentListener(new DocumentListener() {
+            @Override
+            public void insertUpdate(DocumentEvent e) {
+                updateApiKeyWarning();
+            }
+            
+            @Override
+            public void removeUpdate(DocumentEvent e) {
+                updateApiKeyWarning();
+            }
+            
+            @Override
+            public void changedUpdate(DocumentEvent e) {
+                updateApiKeyWarning();
+            }
+            
+            private void updateApiKeyWarning() {
+                String apiKey = String.valueOf(openAiApiKeyField.getPassword());
+                apiKeyWarningLabel.setVisible(apiKey.isEmpty());
+            }
+        });
         
-        // Create main panel
-        JPanel mainPanel = new JBPanel<>(new BorderLayout());
-        mainPanel.add(tabbedPane, BorderLayout.CENTER);
+        // Build UI
+        JPanel settingsPanel = FormBuilder.createFormBuilder()
+                .addLabeledComponent(new JBLabel("OpenAI API Key:"), 
+                        UI.PanelFactory.panel(openAiApiKeyField).withComment(
+                                "Required for AI code generation and refactoring").createPanel())
+                .addComponentToRightColumn(apiKeyWarningLabel)
+                .addLabeledComponent(new JBLabel("OpenAI Model:"), openAiModelComboBox)
+                .addLabeledComponent(new JBLabel("Max Tokens per Request:"), maxTokensPerRequestField)
+                .addLabeledComponent(new JBLabel("Username:"), usernameField)
+                .addLabeledComponent(new JBLabel("Collaboration Server URL:"), collaborationServerUrlField)
+                .addLabeledComponent(new JBLabel("Collaboration Refresh Rate (ms):"), collaborationRefreshRateField)
+                .addComponentToRightColumn(enableContinuousRefactoringCheckBox)
+                .addComponentToRightColumn(enableAIAssistCheckBox)
+                .addComponentToRightColumn(usePatternRecognitionCheckBox)
+                .addComponentFillVertically(new JPanel(), 0)
+                .getPanel();
+        
+        // Create titled panel
+        JPanel titledPanel = UI.PanelFactory.panel(settingsPanel)
+                .withLabel("ModForge Settings")
+                .withComment("Configure settings for the ModForge plugin")
+                .createPanel();
+        
+        mainPanel.add(titledPanel, BorderLayout.CENTER);
         mainPanel.setBorder(JBUI.Borders.empty(10));
+        
+        // Load settings
+        reset();
         
         return mainPanel;
     }
     
-    /**
-     * Creates the AI settings panel.
-     * @return The AI settings panel
-     */
-    private JPanel createAISettingsPanel() {
-        // Create fields
-        apiKeyField = new JBPasswordField();
-        apiKeyField.setEmptyText("Enter your OpenAI API key");
-        
-        maxTokensField = new JSpinner(new SpinnerNumberModel(1000, 100, 10000, 100));
-        
-        usePatternLearningField = new JBCheckBox("Use pattern learning to reduce API costs");
-        
-        // Create info label
-        JBLabel infoLabel = new JBLabel("<html><body>" +
-                "ModForge uses OpenAI's API to generate and improve code.<br>" +
-                "You will need to provide your own API key to use these features.<br>" +
-                "Get an API key at <a href=\"https://platform.openai.com/\">platform.openai.com</a>" +
-                "</body></html>");
-        infoLabel.setBorder(JBUI.Borders.empty(0, 0, 10, 0));
-        
-        // Create panel
-        JPanel panel = FormBuilder.createFormBuilder()
-                .addComponent(infoLabel)
-                .addLabeledComponent("OpenAI API Key:", apiKeyField)
-                .addLabeledComponent("Max Tokens per Request:", maxTokensField)
-                .addComponent(usePatternLearningField)
-                .addComponentFillVertically(new JPanel(), 0)
-                .getPanel();
-        
-        panel.setBorder(JBUI.Borders.empty(10));
-        
-        return panel;
-    }
-    
-    /**
-     * Creates the collaboration settings panel.
-     * @return The collaboration settings panel
-     */
-    private JPanel createCollaborationSettingsPanel() {
-        // Create fields
-        serverUrlField = new JBTextField();
-        serverUrlField.setEmptyText("WebSocket server URL for collaboration");
-        
-        usernameField = new JBTextField();
-        usernameField.setEmptyText("Your username for collaboration");
-        
-        // Create info label
-        JBLabel infoLabel = new JBLabel("<html><body>" +
-                "Configure collaboration settings for real-time shared editing.<br>" +
-                "The default server URL points to the ModForge collaboration service.<br>" +
-                "You can also set up your own collaboration server and use it instead." +
-                "</body></html>");
-        infoLabel.setBorder(JBUI.Borders.empty(0, 0, 10, 0));
-        
-        // Create panel
-        JPanel panel = FormBuilder.createFormBuilder()
-                .addComponent(infoLabel)
-                .addLabeledComponent("Server URL:", serverUrlField)
-                .addLabeledComponent("Username:", usernameField)
-                .addComponentFillVertically(new JPanel(), 0)
-                .getPanel();
-        
-        panel.setBorder(JBUI.Borders.empty(10));
-        
-        return panel;
-    }
-    
-    /**
-     * Creates the code generation settings panel.
-     * @return The code generation settings panel
-     */
-    private JPanel createCodeGenerationSettingsPanel() {
-        // Create fields
-        generateJavadocField = new JBCheckBox("Generate Javadoc comments for generated code");
-        
-        addCopyrightHeaderField = new JBCheckBox("Add copyright header to generated files");
-        
-        copyrightTextField = new JBTextField();
-        copyrightTextField.setEmptyText("Copyright text (${YEAR} will be replaced with current year)");
-        
-        // Create info label
-        JBLabel infoLabel = new JBLabel("<html><body>" +
-                "Configure how ModForge generates code.<br>" +
-                "These settings will be applied to all generated files." +
-                "</body></html>");
-        infoLabel.setBorder(JBUI.Borders.empty(0, 0, 10, 0));
-        
-        // Create panel
-        JPanel panel = FormBuilder.createFormBuilder()
-                .addComponent(infoLabel)
-                .addComponent(generateJavadocField)
-                .addComponent(addCopyrightHeaderField)
-                .addLabeledComponent("Copyright Text:", copyrightTextField)
-                .addComponentFillVertically(new JPanel(), 0)
-                .getPanel();
-        
-        panel.setBorder(JBUI.Borders.empty(10));
-        
-        return panel;
-    }
-    
-    /**
-     * Creates the UI settings panel.
-     * @return The UI settings panel
-     */
-    private JPanel createUISettingsPanel() {
-        // Create fields
-        showMetricsInStatusBarField = new JBCheckBox("Show metrics in status bar");
-        
-        enableNotificationsField = new JBCheckBox("Enable notifications");
-        
-        // Create theme selector
-        themeSelector = new ComboBox<>(new String[] {
-                "Use IDE Theme", "Light Theme", "Dark Theme"
-        });
-        
-        // Create info label
-        JBLabel infoLabel = new JBLabel("<html><body>" +
-                "Configure the ModForge user interface.<br>" +
-                "These settings control how ModForge displays information and alerts." +
-                "</body></html>");
-        infoLabel.setBorder(JBUI.Borders.empty(0, 0, 10, 0));
-        
-        // Create panel
-        JPanel panel = FormBuilder.createFormBuilder()
-                .addComponent(infoLabel)
-                .addComponent(showMetricsInStatusBarField)
-                .addComponent(enableNotificationsField)
-                .addLabeledComponent("Theme:", themeSelector)
-                .addComponentFillVertically(new JPanel(), 0)
-                .getPanel();
-        
-        panel.setBorder(JBUI.Borders.empty(10));
-        
-        return panel;
-    }
-    
     @Override
     public boolean isModified() {
-        return !String.valueOf(apiKeyField.getPassword()).equals(settings.getOpenAiApiKey())
-                || (Integer) maxTokensField.getValue() != settings.getMaxTokensPerRequest()
-                || usePatternLearningField.isSelected() != settings.isUsePatternLearning()
-                || !serverUrlField.getText().equals(settings.getCollaborationServerUrl())
-                || !usernameField.getText().equals(settings.getUsername())
-                || generateJavadocField.isSelected() != settings.isGenerateJavadoc()
-                || addCopyrightHeaderField.isSelected() != settings.isAddCopyrightHeader()
-                || !copyrightTextField.getText().equals(settings.getCopyrightText())
-                || showMetricsInStatusBarField.isSelected() != settings.isShowMetricsInStatusBar()
-                || enableNotificationsField.isSelected() != settings.isEnableNotifications();
+        ModForgeSettings settings = ModForgeSettings.getInstance();
+        
+        String apiKey = String.valueOf(openAiApiKeyField.getPassword());
+        String username = usernameField.getText();
+        String serverUrl = collaborationServerUrlField.getText();
+        boolean continuousRefactoring = enableContinuousRefactoringCheckBox.isSelected();
+        boolean aiAssist = enableAIAssistCheckBox.isSelected();
+        int maxTokens = getIntFromField(maxTokensPerRequestField, settings.getMaxTokensPerRequest());
+        String model = (String) openAiModelComboBox.getSelectedItem();
+        boolean patternRecognition = usePatternRecognitionCheckBox.isSelected();
+        int refreshRate = getIntFromField(collaborationRefreshRateField, settings.getCollaborationRefreshRate());
+        
+        return !apiKey.equals(settings.getOpenAiApiKey()) ||
+                !username.equals(settings.getUsername()) ||
+                !serverUrl.equals(settings.getCollaborationServerUrl()) ||
+                continuousRefactoring != settings.isEnableContinuousRefactoring() ||
+                aiAssist != settings.isEnableAIAssist() ||
+                maxTokens != settings.getMaxTokensPerRequest() ||
+                (model != null && !model.equals(settings.getOpenAiModel())) ||
+                patternRecognition != settings.isUsePatternRecognition() ||
+                refreshRate != settings.getCollaborationRefreshRate();
     }
     
     @Override
     public void apply() throws ConfigurationException {
-        // API settings
-        settings.setOpenAiApiKey(String.valueOf(apiKeyField.getPassword()));
-        settings.setMaxTokensPerRequest((Integer) maxTokensField.getValue());
-        settings.setUsePatternLearning(usePatternLearningField.isSelected());
+        ModForgeSettings settings = ModForgeSettings.getInstance();
         
-        // Collaboration settings
-        settings.setCollaborationServerUrl(serverUrlField.getText());
+        // Validate input
+        int maxTokens = getIntFromField(maxTokensPerRequestField, settings.getMaxTokensPerRequest());
+        if (maxTokens <= 0) {
+            throw new ConfigurationException("Max tokens per request must be positive");
+        }
+        
+        int refreshRate = getIntFromField(collaborationRefreshRateField, settings.getCollaborationRefreshRate());
+        if (refreshRate <= 0) {
+            throw new ConfigurationException("Collaboration refresh rate must be positive");
+        }
+        
+        // Save settings
+        settings.setOpenAiApiKey(String.valueOf(openAiApiKeyField.getPassword()));
         settings.setUsername(usernameField.getText());
+        settings.setCollaborationServerUrl(collaborationServerUrlField.getText());
+        settings.setEnableContinuousRefactoring(enableContinuousRefactoringCheckBox.isSelected());
+        settings.setEnableAIAssist(enableAIAssistCheckBox.isSelected());
+        settings.setMaxTokensPerRequest(maxTokens);
         
-        // Code generation settings
-        settings.setGenerateJavadoc(generateJavadocField.isSelected());
-        settings.setAddCopyrightHeader(addCopyrightHeaderField.isSelected());
-        settings.setCopyrightText(copyrightTextField.getText());
+        String model = (String) openAiModelComboBox.getSelectedItem();
+        if (model != null) {
+            settings.setOpenAiModel(model);
+        }
         
-        // UI settings
-        settings.setShowMetricsInStatusBar(showMetricsInStatusBarField.isSelected());
-        settings.setEnableNotifications(enableNotificationsField.isSelected());
+        settings.setUsePatternRecognition(usePatternRecognitionCheckBox.isSelected());
+        settings.setCollaborationRefreshRate(refreshRate);
     }
     
     @Override
     public void reset() {
-        // API settings
-        apiKeyField.setText(settings.getOpenAiApiKey());
-        maxTokensField.setValue(settings.getMaxTokensPerRequest());
-        usePatternLearningField.setSelected(settings.isUsePatternLearning());
+        ModForgeSettings settings = ModForgeSettings.getInstance();
         
-        // Collaboration settings
-        serverUrlField.setText(settings.getCollaborationServerUrl());
+        openAiApiKeyField.setText(settings.getOpenAiApiKey());
         usernameField.setText(settings.getUsername());
+        collaborationServerUrlField.setText(settings.getCollaborationServerUrl());
+        enableContinuousRefactoringCheckBox.setSelected(settings.isEnableContinuousRefactoring());
+        enableAIAssistCheckBox.setSelected(settings.isEnableAIAssist());
+        maxTokensPerRequestField.setText(String.valueOf(settings.getMaxTokensPerRequest()));
+        openAiModelComboBox.setSelectedItem(settings.getOpenAiModel());
+        usePatternRecognitionCheckBox.setSelected(settings.isUsePatternRecognition());
+        collaborationRefreshRateField.setText(String.valueOf(settings.getCollaborationRefreshRate()));
         
-        // Code generation settings
-        generateJavadocField.setSelected(settings.isGenerateJavadoc());
-        addCopyrightHeaderField.setSelected(settings.isAddCopyrightHeader());
-        copyrightTextField.setText(settings.getCopyrightText());
-        
-        // UI settings
-        showMetricsInStatusBarField.setSelected(settings.isShowMetricsInStatusBar());
-        enableNotificationsField.setSelected(settings.isEnableNotifications());
+        // Check if API key is set
+        String apiKey = settings.getOpenAiApiKey();
+        apiKeyWarningLabel.setVisible(apiKey.isEmpty());
     }
     
-    @Override
-    public void disposeUIResources() {
-        // No resources to dispose
+    /**
+     * Gets an integer from a text field.
+     * @param field The text field
+     * @param defaultValue The default value
+     * @return The integer value
+     */
+    private int getIntFromField(JBTextField field, int defaultValue) {
+        try {
+            return Integer.parseInt(field.getText());
+        } catch (NumberFormatException e) {
+            return defaultValue;
+        }
     }
 }
