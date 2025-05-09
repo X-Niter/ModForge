@@ -13,8 +13,45 @@ export interface CompletionResponse {
   text: string;
 }
 
+// Custom type for Minecraft mod generation response
+export interface ModGenerationResponse {
+  files: Array<{ path: string; content: string }>;
+  explanation: string;
+  logs: string;
+}
+
 /**
- * Client-side function to request code generation through our backend API
+ * Client-side function to request Minecraft mod code generation through our backend API
+ * This forwards the request to the server which uses the OpenAI API
+ */
+export async function generateModCode(
+  modName: string,
+  modDescription: string,
+  modLoader: string,
+  mcVersion: string,
+  idea: string
+): Promise<ModGenerationResponse> {
+  try {
+    const response = await apiRequest<ModGenerationResponse>("/api/ai/generate-mod-code", {
+      method: "POST",
+      body: JSON.stringify({
+        modName,
+        modDescription,
+        modLoader,
+        mcVersion,
+        idea
+      })
+    });
+    
+    return response;
+  } catch (error) {
+    console.error("Failed to generate mod code:", error);
+    throw new Error("Mod code generation failed. Please try again.");
+  }
+}
+
+/**
+ * Client-side function to request general code generation through our backend API
  * This forwards the request to the server which uses the OpenAI API
  */
 export async function generateCode(
