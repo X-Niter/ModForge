@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useModContext } from "@/context/mod-context";
 import { Badge } from "@/components/ui/badge";
 import { ArrowRight } from "lucide-react";
-import { Mod } from "@/types";
+import { Mod } from "@shared/schema";
 
 export function ModSelector() {
   const { currentMod, setCurrentMod } = useModContext();

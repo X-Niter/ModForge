@@ -477,6 +477,156 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ message: "Failed to get continuous development status" });
     }
   });
+  
+  // Get features and their progress for a mod
+  app.get("/api/mods/:id/features/progress", async (req, res) => {
+    try {
+      const modId = parseInt(req.params.id, 10);
+      if (isNaN(modId)) {
+        return res.status(400).json({ message: "Invalid mod ID" });
+      }
+
+      const mod = await storage.getMod(modId);
+      if (!mod) {
+        return res.status(404).json({ message: "Mod not found" });
+      }
+
+      // In a real implementation, this would fetch from a database
+      // For now, we'll simulate this with a static data object
+      res.json({
+        modId,
+        features: [
+          {
+            id: "feature-1",
+            name: "Basic mod structure and configuration",
+            status: "completed",
+            progress: 100,
+            notes: "Initial setup complete with all required files"
+          },
+          {
+            id: "feature-2",
+            name: "Custom weapons implementation",
+            status: "in_progress",
+            progress: 65,
+            estimatedCompletion: "~20 minutes",
+            notes: "Currently implementing attack animations"
+          },
+          {
+            id: "feature-3",
+            name: "Stamina system",
+            status: "planned",
+            progress: 0,
+            estimatedCompletion: "~45 minutes",
+            notes: "Will start after weapons implementation"
+          },
+          {
+            id: "feature-4",
+            name: "Particle effects for combat actions",
+            status: "planned",
+            progress: 0,
+            estimatedCompletion: "~30 minutes"
+          }
+        ],
+        currentFeature: "feature-2",
+        aiSuggestions: [
+          "Consider adding special weapon effects for critical hits",
+          "Combat balancing: adjust damage values based on weapon weight",
+          "Add sound effects for each weapon type"
+        ]
+      });
+    } catch (error) {
+      console.error("Error getting feature progress:", error);
+      res.status(500).json({ message: "Failed to get feature progress" });
+    }
+  });
+  
+  // Get analytics data for a mod
+  app.get("/api/mods/:id/analytics/:timeRange?", async (req, res) => {
+    try {
+      const modId = parseInt(req.params.id, 10);
+      if (isNaN(modId)) {
+        return res.status(400).json({ message: "Invalid mod ID" });
+      }
+
+      const timeRange = req.params.timeRange || "week";
+      
+      const mod = await storage.getMod(modId);
+      if (!mod) {
+        return res.status(404).json({ message: "Mod not found" });
+      }
+
+      // In a real implementation, this would calculate analytics from real data
+      // For now, we'll simulate this with a static data object
+      res.json({
+        modId: mod.id,
+        buildStats: {
+          totalBuilds: 37,
+          successfulBuilds: 29,
+          failedBuilds: 8,
+          buildsByDay: [
+            { date: "Mon", count: 5, successful: 3, failed: 2 },
+            { date: "Tue", count: 7, successful: 5, failed: 2 },
+            { date: "Wed", count: 6, successful: 5, failed: 1 },
+            { date: "Thu", count: 8, successful: 7, failed: 1 },
+            { date: "Fri", count: 6, successful: 5, failed: 1 },
+            { date: "Sat", count: 3, successful: 2, failed: 1 },
+            { date: "Sun", count: 2, successful: 2, failed: 0 }
+          ]
+        },
+        errorStats: {
+          totalErrors: 24,
+          errorsFixed: 22,
+          errorCategories: [
+            { name: "Syntax", count: 9 },
+            { name: "Type", count: 7 },
+            { name: "Logical", count: 4 },
+            { name: "Dependency", count: 3 },
+            { name: "Other", count: 1 }
+          ],
+          errorsByDay: [
+            { date: "Mon", count: 5, fixed: 4 },
+            { date: "Tue", count: 6, fixed: 5 },
+            { date: "Wed", count: 4, fixed: 4 },
+            { date: "Thu", count: 3, fixed: 3 },
+            { date: "Fri", count: 4, fixed: 4 },
+            { date: "Sat", count: 2, fixed: 2 },
+            { date: "Sun", count: 0, fixed: 0 }
+          ]
+        },
+        featureStats: {
+          totalFeatures: 12,
+          completedFeatures: 8,
+          featureCategories: [
+            { name: "Weapons", count: 5 },
+            { name: "Combat System", count: 3 },
+            { name: "UI", count: 2 },
+            { name: "Effects", count: 2 }
+          ],
+          featureProgress: [
+            { date: "Week 1", completed: 2, total: 12 },
+            { date: "Week 2", completed: 5, total: 12 },
+            { date: "Week 3", completed: 8, total: 12 }
+          ]
+        },
+        performanceStats: {
+          averageBuildTime: 42,
+          averageFixTime: 18,
+          buildTimes: [
+            { buildNumber: 1, time: 65 },
+            { buildNumber: 2, time: 58 },
+            { buildNumber: 3, time: 51 },
+            { buildNumber: 4, time: 48 },
+            { buildNumber: 5, time: 45 },
+            { buildNumber: 6, time: 43 },
+            { buildNumber: 7, time: 40 }
+          ]
+        }
+      });
+    } catch (error) {
+      console.error("Error getting analytics data:", error);
+      res.status(500).json({ message: "Failed to get analytics data" });
+    }
+  });
 
   return httpServer;
 }
