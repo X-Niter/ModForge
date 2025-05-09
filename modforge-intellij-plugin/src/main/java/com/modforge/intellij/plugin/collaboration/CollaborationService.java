@@ -57,6 +57,47 @@ public final class CollaborationService {
      */
     public CollaborationService(@NotNull Project project) {
         this.project = project;
+        
+        // Initialize WebSocket handler
+        CollaborationWebSocketHandler handler = new CollaborationWebSocketHandler(this);
+        webSocketClient.addListener(handler);
+    }
+    
+    /**
+     * Adds a participant to the session.
+     * @param participant The participant to add
+     */
+    public void addParticipant(@NotNull Participant participant) {
+        // Check if participant already exists
+        if (participants.contains(participant)) {
+            return;
+        }
+        
+        // Add participant
+        participants.add(participant);
+        
+        // Notify listeners
+        notifyParticipantJoined(participant);
+    }
+    
+    /**
+     * Removes a participant from the session.
+     * @param userId The user ID of the participant to remove
+     */
+    public void removeParticipant(@NotNull String userId) {
+        // Find participant
+        Participant participant = participants.stream()
+                .filter(p -> p.userId.equals(userId))
+                .findFirst()
+                .orElse(null);
+        
+        if (participant != null) {
+            // Remove participant
+            participants.remove(participant);
+            
+            // Notify listeners
+            notifyParticipantLeft(participant);
+        }
     }
     
     /**
@@ -81,11 +122,33 @@ public final class CollaborationService {
                 this.userId = UUID.randomUUID().toString();
                 this.sessionId = UUID.randomUUID().toString();
                 this.isHost = true;
+                
+                // Connect to WebSocket server
+                boolean connected = webSocketClient.connect(
+                        WEBSOCKET_SERVER_URL,
+                        sessionId,
+                        userId,
+                        username
+                );
+                
+                if (!connected) {
+                    throw new IllegalStateException("Failed to connect to WebSocket server");
+                }
+                
                 this.isConnected = true;
                 
                 // Add self as a participant
                 Participant self = new Participant(userId, username, true);
                 participants.add(self);
+                
+                // Send join message
+                Map<String, Object> joinData = new HashMap<>();
+                joinData.put("sessionId", sessionId);
+                joinData.put("userId", userId);
+                joinData.put("username", username);
+                joinData.put("isHost", true);
+                
+                webSocketClient.sendMessage(WebSocketMessage.TYPE_JOIN, joinData);
                 
                 // Notify listeners
                 notifySessionStarted(sessionId);
@@ -113,13 +176,33 @@ public final class CollaborationService {
                 this.username = username;
                 this.userId = UUID.randomUUID().toString();
                 this.isHost = false;
+                
+                // Connect to WebSocket server
+                boolean connected = webSocketClient.connect(
+                        WEBSOCKET_SERVER_URL,
+                        sessionId,
+                        userId,
+                        username
+                );
+                
+                if (!connected) {
+                    throw new IllegalStateException("Failed to connect to WebSocket server");
+                }
+                
                 this.isConnected = true;
                 
                 // Add self as a participant
                 Participant self = new Participant(userId, username, false);
                 participants.add(self);
                 
-                // TODO: Connect to session host and get participant list
+                // Send join message to notify other participants
+                Map<String, Object> joinData = new HashMap<>();
+                joinData.put("sessionId", sessionId);
+                joinData.put("userId", userId);
+                joinData.put("username", username);
+                joinData.put("isHost", false);
+                
+                webSocketClient.sendMessage(WebSocketMessage.TYPE_JOIN, joinData);
                 
                 // Notify listeners
                 notifySessionJoined(sessionId);
@@ -145,26 +228,25 @@ public final class CollaborationService {
                     return false;
                 }
                 
-                // If we're the host, terminate the session
-                if (isHost) {
-                    // Notify all participants that the session is ending
-                    for (Participant participant : participants) {
-                        if (!participant.userId.equals(userId)) {
-                            // TODO: Notify participant that the session is ending
-                        }
-                    }
-                } else {
-                    // Notify the host that we're leaving
-                    // TODO: Notify host that we're leaving
-                }
+                String sessionIdToLeave = sessionId;
+                
+                // Send leave message to notify other participants
+                Map<String, Object> leaveData = new HashMap<>();
+                leaveData.put("sessionId", sessionId);
+                leaveData.put("userId", userId);
+                
+                webSocketClient.sendMessage(WebSocketMessage.TYPE_LEAVE, leaveData);
+                
+                // Disconnect from WebSocket server
+                webSocketClient.disconnect();
                 
                 // Clear session data
                 clearSessionData();
                 
                 // Notify listeners
-                notifySessionLeft(sessionId);
+                notifySessionLeft(sessionIdToLeave);
                 
-                LOG.info("Left collaboration session: " + sessionId);
+                LOG.info("Left collaboration session: " + sessionIdToLeave);
                 return true;
             } catch (Exception e) {
                 LOG.error("Error leaving collaboration session", e);
@@ -292,14 +374,30 @@ public final class CollaborationService {
      * @param data The message data
      */
     public void broadcastMessage(@NotNull String type, @NotNull Map<String, Object> data) {
-        // TODO: Send message to all participants
-        LOG.info("Broadcasting message: " + type);
+        if (!isConnected) {
+            LOG.warn("Cannot broadcast message: Not connected to a session");
+            return;
+        }
         
-        // For now, just log the message
-        for (Participant participant : participants) {
-            if (!participant.userId.equals(userId)) {
-                LOG.info("  To: " + participant.username);
+        // Add session and user information to the message
+        Map<String, Object> messageData = new HashMap<>(data);
+        messageData.put("sessionId", sessionId);
+        messageData.put("userId", userId);
+        
+        // Send the message through WebSocket
+        boolean sent = webSocketClient.sendMessage(type, messageData);
+        
+        if (sent) {
+            LOG.info("Broadcasted message: " + type);
+            
+            // Log the recipients
+            for (Participant participant : participants) {
+                if (!participant.userId.equals(userId)) {
+                    LOG.info("  To: " + participant.username);
+                }
             }
+        } else {
+            LOG.error("Failed to broadcast message: " + type);
         }
     }
     
@@ -310,14 +408,31 @@ public final class CollaborationService {
      * @param data The message data
      */
     public void sendDirectMessage(@NotNull String recipientUserId, @NotNull String type, @NotNull Map<String, Object> data) {
+        if (!isConnected) {
+            LOG.warn("Cannot send direct message: Not connected to a session");
+            return;
+        }
+        
         // Find the recipient
         Optional<Participant> recipient = participants.stream()
                 .filter(p -> p.userId.equals(recipientUserId))
                 .findFirst();
         
         if (recipient.isPresent()) {
-            // TODO: Send message to the recipient
-            LOG.info("Sending direct message to " + recipient.get().username + ": " + type);
+            // Add session, user, and recipient information to the message
+            Map<String, Object> messageData = new HashMap<>(data);
+            messageData.put("sessionId", sessionId);
+            messageData.put("userId", userId);
+            messageData.put("recipientId", recipientUserId);
+            
+            // Send the message through WebSocket
+            boolean sent = webSocketClient.sendMessage(type, messageData);
+            
+            if (sent) {
+                LOG.info("Sent direct message to " + recipient.get().username + ": " + type);
+            } else {
+                LOG.error("Failed to send direct message to " + recipient.get().username + ": " + type);
+            }
         } else {
             LOG.warn("Recipient not found: " + recipientUserId);
         }

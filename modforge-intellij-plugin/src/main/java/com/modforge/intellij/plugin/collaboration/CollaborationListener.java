@@ -37,9 +37,9 @@ public interface CollaborationListener {
     void onParticipantLeft(@NotNull Participant participant);
     
     /**
-     * Called when an operation is received from a participant.
+     * Called when an operation is received from another participant.
      * @param operation The operation
-     * @param participant The participant
+     * @param participant The participant who sent the operation
      */
     void onOperationReceived(@NotNull EditorOperation operation, @NotNull Participant participant);
 }

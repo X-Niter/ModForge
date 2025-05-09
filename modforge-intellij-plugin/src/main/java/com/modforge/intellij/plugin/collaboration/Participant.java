@@ -46,6 +46,6 @@ public class Participant {
     
     @Override
     public String toString() {
-        return username + (isHost ? " (host)" : "");
+        return username + (isHost ? " (Host)" : "");
     }
 }

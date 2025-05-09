@@ -2,195 +2,88 @@ package com.modforge.intellij.plugin.collaboration;
 
 import org.jetbrains.annotations.NotNull;
 
-import java.util.UUID;
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * Represents an operation on a collaborative editor.
+ * Operations are used to synchronize editor content between multiple participants.
  */
 public class EditorOperation {
     // Operation types
     public static final String TYPE_INSERT = "insert";
     public static final String TYPE_DELETE = "delete";
     public static final String TYPE_REPLACE = "replace";
-    public static final String TYPE_CURSOR_MOVE = "cursor_move";
-    public static final String TYPE_SELECTION_CHANGE = "selection_change";
     
-    // Operation ID for ordering and conflict resolution
-    @NotNull
-    private final String id;
-    
-    // The user who generated the operation
-    @NotNull
-    private final String userId;
-    
-    // The file path this operation applies to
-    @NotNull
-    private final String filePath;
-    
-    // Operation type (insert, delete, replace, etc.)
+    /** The operation type. */
     @NotNull
     private final String type;
     
-    // Operation position (offset in the document)
+    /** The operation offset. */
     private final int offset;
     
-    // The text to insert, delete, or replace
+    /** The operation length (for delete and replace operations). */
+    private final int length;
+    
+    /** The operation text (for insert and replace operations). */
     @NotNull
     private final String text;
     
-    // For replacements, the length of text to replace
-    private final int length;
-    
-    // Timestamp when the operation was created
+    /** The timestamp when the operation was created. */
     private final long timestamp;
     
     /**
      * Creates a new EditorOperation.
-     * @param userId The user ID
-     * @param filePath The file path
      * @param type The operation type
-     * @param offset The offset
-     * @param text The text
-     * @param length The length
+     * @param offset The operation offset
+     * @param length The operation length
+     * @param text The operation text
      */
-    public EditorOperation(
-            @NotNull String userId,
-            @NotNull String filePath,
-            @NotNull String type,
-            int offset,
-            @NotNull String text,
-            int length
-    ) {
-        this.id = UUID.randomUUID().toString();
-        this.userId = userId;
-        this.filePath = filePath;
+    private EditorOperation(@NotNull String type, int offset, int length, @NotNull String text) {
         this.type = type;
         this.offset = offset;
-        this.text = text;
         this.length = length;
+        this.text = text;
         this.timestamp = System.currentTimeMillis();
     }
     
     /**
-     * Creates a cursor move operation.
-     * @param userId The user ID
-     * @param filePath The file path
-     * @param offset The offset
-     * @return The operation
-     */
-    @NotNull
-    public static EditorOperation createCursorMove(
-            @NotNull String userId,
-            @NotNull String filePath,
-            int offset
-    ) {
-        return new EditorOperation(userId, filePath, TYPE_CURSOR_MOVE, offset, "", 0);
-    }
-    
-    /**
-     * Creates a selection change operation.
-     * @param userId The user ID
-     * @param filePath The file path
-     * @param offset The offset
-     * @param length The length
-     * @return The operation
-     */
-    @NotNull
-    public static EditorOperation createSelectionChange(
-            @NotNull String userId,
-            @NotNull String filePath,
-            int offset,
-            int length
-    ) {
-        return new EditorOperation(userId, filePath, TYPE_SELECTION_CHANGE, offset, "", length);
-    }
-    
-    /**
      * Creates an insert operation.
-     * @param userId The user ID
-     * @param filePath The file path
-     * @param offset The offset
+     * @param offset The offset at which to insert the text
      * @param text The text to insert
-     * @return The operation
+     * @return The insert operation
      */
     @NotNull
-    public static EditorOperation createInsert(
-            @NotNull String userId,
-            @NotNull String filePath,
-            int offset,
-            @NotNull String text
-    ) {
-        return new EditorOperation(userId, filePath, TYPE_INSERT, offset, text, 0);
+    public static EditorOperation createInsertOperation(int offset, @NotNull String text) {
+        return new EditorOperation(TYPE_INSERT, offset, 0, text);
     }
     
     /**
      * Creates a delete operation.
-     * @param userId The user ID
-     * @param filePath The file path
-     * @param offset The offset
-     * @param length The length of text to delete
-     * @return The operation
+     * @param offset The offset at which to delete text
+     * @param length The length of the text to delete
+     * @return The delete operation
      */
     @NotNull
-    public static EditorOperation createDelete(
-            @NotNull String userId,
-            @NotNull String filePath,
-            int offset,
-            int length
-    ) {
-        return new EditorOperation(userId, filePath, TYPE_DELETE, offset, "", length);
+    public static EditorOperation createDeleteOperation(int offset, int length) {
+        return new EditorOperation(TYPE_DELETE, offset, length, "");
     }
     
     /**
      * Creates a replace operation.
-     * @param userId The user ID
-     * @param filePath The file path
-     * @param offset The offset
-     * @param text The text to insert
-     * @param length The length of text to replace
-     * @return The operation
+     * @param offset The offset at which to replace text
+     * @param length The length of the text to replace
+     * @param text The replacement text
+     * @return The replace operation
      */
     @NotNull
-    public static EditorOperation createReplace(
-            @NotNull String userId,
-            @NotNull String filePath,
-            int offset,
-            @NotNull String text,
-            int length
-    ) {
-        return new EditorOperation(userId, filePath, TYPE_REPLACE, offset, text, length);
-    }
-    
-    /**
-     * Gets the operation ID.
-     * @return The ID
-     */
-    @NotNull
-    public String getId() {
-        return id;
-    }
-    
-    /**
-     * Gets the user ID.
-     * @return The user ID
-     */
-    @NotNull
-    public String getUserId() {
-        return userId;
-    }
-    
-    /**
-     * Gets the file path.
-     * @return The file path
-     */
-    @NotNull
-    public String getFilePath() {
-        return filePath;
+    public static EditorOperation createReplaceOperation(int offset, int length, @NotNull String text) {
+        return new EditorOperation(TYPE_REPLACE, offset, length, text);
     }
     
     /**
      * Gets the operation type.
-     * @return The type
+     * @return The operation type
      */
     @NotNull
     public String getType() {
@@ -198,16 +91,24 @@ public class EditorOperation {
     }
     
     /**
-     * Gets the offset.
-     * @return The offset
+     * Gets the operation offset.
+     * @return The operation offset
      */
     public int getOffset() {
         return offset;
     }
     
     /**
-     * Gets the text.
-     * @return The text
+     * Gets the operation length.
+     * @return The operation length
+     */
+    public int getLength() {
+        return length;
+    }
+    
+    /**
+     * Gets the operation text.
+     * @return The operation text
      */
     @NotNull
     public String getText() {
@@ -215,26 +116,45 @@ public class EditorOperation {
     }
     
     /**
-     * Gets the length.
-     * @return The length
-     */
-    public int getLength() {
-        return length;
-    }
-    
-    /**
-     * Gets the timestamp.
-     * @return The timestamp
+     * Gets the operation timestamp.
+     * @return The operation timestamp
      */
     public long getTimestamp() {
         return timestamp;
     }
     
+    /**
+     * Converts the operation to a map.
+     * @return The operation as a map
+     */
+    @NotNull
+    public Map<String, Object> toMap() {
+        Map<String, Object> map = new HashMap<>();
+        
+        map.put("type", type);
+        map.put("offset", offset);
+        
+        if (type.equals(TYPE_DELETE) || type.equals(TYPE_REPLACE)) {
+            map.put("length", length);
+        }
+        
+        if (type.equals(TYPE_INSERT) || type.equals(TYPE_REPLACE)) {
+            map.put("text", text);
+        }
+        
+        map.put("timestamp", timestamp);
+        
+        return map;
+    }
+    
     @Override
     public String toString() {
-        return String.format(
-                "EditorOperation{type=%s, offset=%d, text='%s', length=%d}",
-                type, offset, text, length
-        );
+        return "EditorOperation{" +
+                "type='" + type + '\'' +
+                ", offset=" + offset +
+                ", length=" + length +
+                ", text='" + (text.length() > 20 ? text.substring(0, 20) + "..." : text) + '\'' +
+                ", timestamp=" + timestamp +
+                '}';
     }
 }
