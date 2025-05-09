@@ -1,6 +1,17 @@
 import OpenAI from "openai";
 import { ErrorData } from "@/types";
 
+// Types for API responses
+export interface CodeGenerationResponse {
+  code: string;
+  explanation: string;
+  suggestedFileName?: string;
+}
+
+export interface CompletionResponse {
+  text: string;
+}
+
 // Initialize OpenAI client
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY || "dummy_key_for_development" });
 
@@ -297,5 +308,313 @@ export async function addModFeatures(
       explanation: `Error adding features: ${error instanceof Error ? error.message : String(error)}`,
       logs,
     };
+  }
+}
+
+/**
+ * Generate code from a prompt using OpenAI
+ */
+export async function generateCode(
+  prompt: string,
+  options: {
+    language?: string;
+    context?: string;
+    complexity?: "simple" | "medium" | "complex";
+  } = {}
+): Promise<CodeGenerationResponse> {
+  try {
+    console.log(`[${getTimestamp()}] Generating code for prompt: ${prompt.substring(0, 100)}...`);
+    
+    const language = options.language || "java";
+    const complexity = options.complexity || "medium";
+    
+    // The newest OpenAI model is "gpt-4o" which was released May 13, 2024. do not change this unless explicitly requested by the user
+    const promptText = `
+      Generate ${language} code based on the following prompt:
+      
+      ${prompt}
+      
+      ${options.context ? `Context: ${options.context}` : ""}
+      
+      Complexity level: ${complexity}
+      
+      Instructions:
+      - Generate well-structured, clean code that follows best practices for ${language}
+      - Include appropriate comments and documentation
+      - The complexity level is set to "${complexity}"
+      
+      Respond with a JSON object in the following format:
+      {
+        "code": "The generated code here",
+        "explanation": "A brief explanation of how the code works and any important implementation details",
+        "suggestedFileName": "A suggested file name for this code"
+      }
+    `;
+    
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o",
+      messages: [{ role: "user", content: promptText }],
+      response_format: { type: "json_object" },
+      temperature: 0.7,
+    });
+    
+    const result = JSON.parse(response.choices[0].message.content || "{}");
+    
+    return {
+      code: result.code || "",
+      explanation: result.explanation || "Code generated successfully",
+      suggestedFileName: result.suggestedFileName,
+    };
+  } catch (error) {
+    console.error("Error generating code:", error);
+    throw new Error(`Code generation failed: ${error instanceof Error ? error.message : String(error)}`);
+  }
+}
+
+/**
+ * Fix code with errors using OpenAI
+ */
+export async function fixCode(
+  code: string,
+  errors: string[],
+  language: string = "java"
+): Promise<CodeGenerationResponse> {
+  try {
+    console.log(`[${getTimestamp()}] Fixing code with ${errors.length} errors`);
+    
+    // The newest OpenAI model is "gpt-4o" which was released May 13, 2024. do not change this unless explicitly requested by the user
+    const promptText = `
+      Fix the following ${language} code that contains errors:
+      
+      \`\`\`${language}
+      ${code}
+      \`\`\`
+      
+      Errors:
+      ${errors.map(err => `- ${err}`).join('\n')}
+      
+      Instructions:
+      - Fix all the errors mentioned
+      - Make minimal changes to the code to fix the issues
+      - Keep the same structure and logic where possible
+      - Include inline comments explaining the fixes
+      
+      Respond with a JSON object in the following format:
+      {
+        "code": "The fixed code here",
+        "explanation": "An explanation of what was wrong and how it was fixed"
+      }
+    `;
+    
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o",
+      messages: [{ role: "user", content: promptText }],
+      response_format: { type: "json_object" },
+      temperature: 0.5,
+    });
+    
+    const result = JSON.parse(response.choices[0].message.content || "{}");
+    
+    return {
+      code: result.code || code,
+      explanation: result.explanation || "Code fixed successfully",
+    };
+  } catch (error) {
+    console.error("Error fixing code:", error);
+    throw new Error(`Code fixing failed: ${error instanceof Error ? error.message : String(error)}`);
+  }
+}
+
+/**
+ * Enhance code using OpenAI
+ */
+export async function enhanceCode(
+  code: string,
+  instructions: string,
+  language: string = "java"
+): Promise<CodeGenerationResponse> {
+  try {
+    console.log(`[${getTimestamp()}] Enhancing code with instructions: ${instructions.substring(0, 100)}...`);
+    
+    // The newest OpenAI model is "gpt-4o" which was released May 13, 2024. do not change this unless explicitly requested by the user
+    const promptText = `
+      Enhance the following ${language} code according to these instructions:
+      
+      Instructions: ${instructions}
+      
+      Current code:
+      \`\`\`${language}
+      ${code}
+      \`\`\`
+      
+      Respond with a JSON object in the following format:
+      {
+        "code": "The enhanced code here",
+        "explanation": "An explanation of the enhancements made and why they improve the code"
+      }
+    `;
+    
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o",
+      messages: [{ role: "user", content: promptText }],
+      response_format: { type: "json_object" },
+      temperature: 0.7,
+    });
+    
+    const result = JSON.parse(response.choices[0].message.content || "{}");
+    
+    return {
+      code: result.code || code,
+      explanation: result.explanation || "Code enhanced successfully",
+    };
+  } catch (error) {
+    console.error("Error enhancing code:", error);
+    throw new Error(`Code enhancement failed: ${error instanceof Error ? error.message : String(error)}`);
+  }
+}
+
+/**
+ * Summarize code using OpenAI
+ */
+export async function summarizeCode(
+  code: string,
+  language: string = "java"
+): Promise<CompletionResponse> {
+  try {
+    console.log(`[${getTimestamp()}] Summarizing code of length: ${code.length}`);
+    
+    // The newest OpenAI model is "gpt-4o" which was released May 13, 2024. do not change this unless explicitly requested by the user
+    const promptText = `
+      Summarize the following ${language} code:
+      
+      \`\`\`${language}
+      ${code}
+      \`\`\`
+      
+      Provide a concise summary that explains:
+      1. What the code does
+      2. Key components and their purposes
+      3. Any patterns or techniques used
+      
+      Respond with a JSON object in the following format:
+      {
+        "text": "The summary of the code"
+      }
+    `;
+    
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o",
+      messages: [{ role: "user", content: promptText }],
+      response_format: { type: "json_object" },
+      temperature: 0.5,
+    });
+    
+    const result = JSON.parse(response.choices[0].message.content || "{}");
+    
+    return {
+      text: result.text || "No summary available",
+    };
+  } catch (error) {
+    console.error("Error summarizing code:", error);
+    throw new Error(`Code summarization failed: ${error instanceof Error ? error.message : String(error)}`);
+  }
+}
+
+/**
+ * Explain an error message using OpenAI
+ */
+export async function explainError(
+  errorMessage: string,
+  code?: string,
+  language: string = "java"
+): Promise<CompletionResponse> {
+  try {
+    console.log(`[${getTimestamp()}] Explaining error: ${errorMessage.substring(0, 100)}...`);
+    
+    // The newest OpenAI model is "gpt-4o" which was released May 13, 2024. do not change this unless explicitly requested by the user
+    const promptText = `
+      Explain the following error message in ${language}:
+      
+      Error: ${errorMessage}
+      
+      ${code ? `Code context:\n\`\`\`${language}\n${code}\n\`\`\`\n` : ""}
+      
+      Provide a clear explanation that includes:
+      1. What the error means
+      2. Common causes of this error
+      3. How to fix it
+      
+      Respond with a JSON object in the following format:
+      {
+        "text": "The explanation of the error"
+      }
+    `;
+    
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o",
+      messages: [{ role: "user", content: promptText }],
+      response_format: { type: "json_object" },
+      temperature: 0.5,
+    });
+    
+    const result = JSON.parse(response.choices[0].message.content || "{}");
+    
+    return {
+      text: result.text || "No explanation available",
+    };
+  } catch (error) {
+    console.error("Error explaining error:", error);
+    throw new Error(`Error explanation failed: ${error instanceof Error ? error.message : String(error)}`);
+  }
+}
+
+/**
+ * Generate documentation for code using OpenAI
+ */
+export async function generateDocumentation(
+  code: string,
+  language: string = "java",
+  style: "javadoc" | "markdown" | "inline" = "javadoc"
+): Promise<CompletionResponse> {
+  try {
+    console.log(`[${getTimestamp()}] Generating ${style} documentation for ${language} code`);
+    
+    // The newest OpenAI model is "gpt-4o" which was released May 13, 2024. do not change this unless explicitly requested by the user
+    const promptText = `
+      Generate ${style} documentation for the following ${language} code:
+      
+      \`\`\`${language}
+      ${code}
+      \`\`\`
+      
+      Documentation style: ${style}
+      
+      Instructions:
+      - Create comprehensive documentation in ${style} format
+      - Document classes, methods, parameters, and return values
+      - Include examples where appropriate
+      - Explain the purpose and functionality of the code
+      
+      Respond with a JSON object in the following format:
+      {
+        "text": "The generated documentation"
+      }
+    `;
+    
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o",
+      messages: [{ role: "user", content: promptText }],
+      response_format: { type: "json_object" },
+      temperature: 0.7,
+    });
+    
+    const result = JSON.parse(response.choices[0].message.content || "{}");
+    
+    return {
+      text: result.text || "No documentation available",
+    };
+  } catch (error) {
+    console.error("Error generating documentation:", error);
+    throw new Error(`Documentation generation failed: ${error instanceof Error ? error.message : String(error)}`);
   }
 }

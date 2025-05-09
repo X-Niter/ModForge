@@ -2,7 +2,19 @@ import type { Express, Request, Response } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { compileMod } from "./compiler";
-import { generateModCode, fixCompilationErrors, addModFeatures } from "./ai-service";
+import { 
+  generateModCode, 
+  fixCompilationErrors, 
+  addModFeatures,
+  generateCode,
+  fixCode,
+  enhanceCode,
+  summarizeCode,
+  explainError,
+  generateDocumentation,
+  type CodeGenerationResponse,
+  type CompletionResponse
+} from "./ai-service";
 import { pushModToGitHub } from "./github";
 import { checkDatabaseHealth } from "./db-health";
 import { continuousService } from "./continuous-service";
@@ -323,8 +335,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // AI Service Endpoints
   
-  // Generate code
-  app.post("/api/ai/generate-code", async (req, res) => {
+  // Generate mod code
+  app.post("/api/ai/generate-mod-code", async (req, res) => {
     try {
       const { modName, modDescription, modLoader, mcVersion, idea } = req.body;
       if (!modName || !modLoader || !idea) {
@@ -359,6 +371,120 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fixing errors:", error);
       res.status(500).json({ message: "Failed to fix errors" });
+    }
+  });
+
+  // Generic code generation
+  app.post("/api/ai/generate-code", async (req, res) => {
+    try {
+      const { prompt, language, context, complexity } = req.body;
+      if (!prompt) {
+        return res.status(400).json({ message: "Prompt is required" });
+      }
+
+      const result = await generateCode(prompt, { language, context, complexity });
+      res.json(result);
+    } catch (error) {
+      console.error("Error generating code:", error);
+      res.status(500).json({ 
+        message: "Failed to generate code",
+        error: error instanceof Error ? error.message : String(error)
+      });
+    }
+  });
+
+  // Fix code with errors
+  app.post("/api/ai/fix-code", async (req, res) => {
+    try {
+      const { code, errors, language } = req.body;
+      if (!code || !errors) {
+        return res.status(400).json({ message: "Code and errors are required" });
+      }
+
+      const result = await fixCode(code, errors, language);
+      res.json(result);
+    } catch (error) {
+      console.error("Error fixing code:", error);
+      res.status(500).json({ 
+        message: "Failed to fix code",
+        error: error instanceof Error ? error.message : String(error)
+      });
+    }
+  });
+
+  // Enhance code
+  app.post("/api/ai/enhance-code", async (req, res) => {
+    try {
+      const { code, instructions, language } = req.body;
+      if (!code || !instructions) {
+        return res.status(400).json({ message: "Code and instructions are required" });
+      }
+
+      const result = await enhanceCode(code, instructions, language);
+      res.json(result);
+    } catch (error) {
+      console.error("Error enhancing code:", error);
+      res.status(500).json({ 
+        message: "Failed to enhance code",
+        error: error instanceof Error ? error.message : String(error)
+      });
+    }
+  });
+
+  // Summarize code
+  app.post("/api/ai/summarize-code", async (req, res) => {
+    try {
+      const { code, language } = req.body;
+      if (!code) {
+        return res.status(400).json({ message: "Code is required" });
+      }
+
+      const result = await summarizeCode(code, language);
+      res.json(result);
+    } catch (error) {
+      console.error("Error summarizing code:", error);
+      res.status(500).json({ 
+        message: "Failed to summarize code",
+        error: error instanceof Error ? error.message : String(error)
+      });
+    }
+  });
+
+  // Explain error
+  app.post("/api/ai/explain-error", async (req, res) => {
+    try {
+      const { errorMessage, code, language } = req.body;
+      if (!errorMessage) {
+        return res.status(400).json({ message: "Error message is required" });
+      }
+
+      const result = await explainError(errorMessage, code, language);
+      res.json(result);
+    } catch (error) {
+      console.error("Error explaining error:", error);
+      res.status(500).json({ 
+        message: "Failed to explain error",
+        error: error instanceof Error ? error.message : String(error)
+      });
+    }
+  });
+
+  // Generate documentation
+  app.post("/api/ai/generate-documentation", async (req, res) => {
+    try {
+      const { code, language, style } = req.body;
+      if (!code) {
+        return res.status(400).json({ message: "Code is required" });
+      }
+
+      const result = await generateDocumentation(code, language, style);
+      res.json(result);
+    } catch (error) {
+      console.error("Error generating documentation:", error);
+      res.status(500).json({ 
+        message: "Failed to generate documentation",
+        error: error instanceof Error ? error.message : String(error)
+      });
     }
   });
 
