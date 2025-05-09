@@ -1,0 +1,144 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<idea-plugin>
+    <id>com.modforge.intellij.plugin</id>
+    <name>ModForge AI</name>
+    <vendor email="support@modforge.ai" url="https://modforge.ai">ModForge AI</vendor>
+    
+    <description><![CDATA[
+        <h2>ModForge AI - AI-Powered Minecraft Mod Development</h2>
+        <p>ModForge AI brings the power of artificial intelligence to Minecraft mod development,
+        making it easier and faster to create high-quality mods.</p>
+        
+        <h3>Key Features:</h3>
+        <ul>
+            <li><b>AI Code Generation:</b> Generate Minecraft mod code from natural language descriptions</li>
+            <li><b>Intelligent Error Resolution:</b> Automatically fix compilation errors with ML-powered suggestions</li>
+            <li><b>Continuous Development:</b> Let AI suggest improvements and new features for your mods</li>
+            <li><b>Pattern Learning:</b> The system learns from your code style and preferences over time</li>
+            <li><b>JAR Analysis:</b> Extract useful patterns and examples from existing mods</li>
+            <li><b>Documentation Explorer:</b> Access modding documentation directly within your IDE</li>
+        </ul>
+        
+        <p>ModForge AI supports multiple mod loaders including Forge, Fabric, Quilt, and NeoForge.</p>
+    ]]></description>
+    
+    <!-- Product and Project compatibility -->
+    <depends>com.intellij.modules.platform</depends>
+    <depends>com.intellij.modules.java</depends>
+    
+    <!-- Plugin's application components -->
+    <applicationListeners>
+        <listener class="com.modforge.intellij.plugin.listeners.ProjectManagerListener"
+                  topic="com.intellij.openapi.project.ProjectManagerListener"/>
+    </applicationListeners>
+    
+    <!-- Plugin's project components -->
+    <projectListeners>
+        <listener class="com.modforge.intellij.plugin.listeners.ModuleListener"
+                  topic="com.intellij.openapi.project.ModuleListener"/>
+    </projectListeners>
+    
+    <!-- Actions -->
+    <actions>
+        <!-- Main Menu Actions -->
+        <group id="ModForgeAI.MainMenu" text="ModForge AI" description="ModForge AI Menu">
+            <add-to-group group-id="ToolsMenu" anchor="last"/>
+            
+            <action id="ModForgeAI.GenerateCode" 
+                    class="com.modforge.intellij.plugin.actions.GenerateCodeAction"
+                    text="Generate Mod Code" 
+                    description="Generate mod code using AI">
+            </action>
+            
+            <action id="ModForgeAI.FixErrors" 
+                    class="com.modforge.intellij.plugin.actions.FixErrorsAction"
+                    text="Fix Errors" 
+                    description="Fix compilation errors using AI">
+            </action>
+            
+            <action id="ModForgeAI.SuggestFeatures" 
+                    class="com.modforge.intellij.plugin.actions.SuggestFeaturesAction"
+                    text="Suggest Features" 
+                    description="Get AI suggestions for new features">
+            </action>
+            
+            <action id="ModForgeAI.AnalyzeJar" 
+                    class="com.modforge.intellij.plugin.actions.AnalyzeJarAction"
+                    text="Analyze JAR File" 
+                    description="Analyze a mod JAR file for patterns">
+            </action>
+            
+            <action id="ModForgeAI.Settings" 
+                    class="com.modforge.intellij.plugin.actions.SettingsAction"
+                    text="Settings" 
+                    description="Configure ModForge AI settings">
+            </action>
+        </group>
+        
+        <!-- Editor Context Menu -->
+        <group id="ModForgeAI.EditorPopupMenu" text="ModForge AI" description="ModForge AI actions">
+            <add-to-group group-id="EditorPopupMenu" anchor="last"/>
+            
+            <action id="ModForgeAI.GenerateCodeContext" 
+                    class="com.modforge.intellij.plugin.actions.GenerateCodeContextAction"
+                    text="Generate Code Here" 
+                    description="Generate code at cursor position">
+            </action>
+            
+            <action id="ModForgeAI.FixErrorContext" 
+                    class="com.modforge.intellij.plugin.actions.FixErrorContextAction"
+                    text="Fix Error with AI" 
+                    description="Fix this error using AI">
+            </action>
+            
+            <action id="ModForgeAI.ExplainCode" 
+                    class="com.modforge.intellij.plugin.actions.ExplainCodeAction"
+                    text="Explain Code" 
+                    description="Get AI explanation of selected code">
+            </action>
+        </group>
+    </actions>
+    
+    <!-- Extensions -->
+    <extensions defaultExtensionNs="com.intellij">
+        <!-- Tool Windows -->
+        <toolWindow id="ModForge AI" 
+                    icon="/icons/modforge-13x13.png"
+                    anchor="right" 
+                    factoryClass="com.modforge.intellij.plugin.toolwindow.ModForgeToolWindowFactory"/>
+        
+        <!-- Live Templates -->
+        <defaultLiveTemplatesProvider implementation="com.modforge.intellij.plugin.templates.ModForgeLiveTemplateProvider"/>
+        <liveTemplateContext implementation="com.modforge.intellij.plugin.templates.ModForgeLiveTemplateContext"/>
+        
+        <!-- Services -->
+        <applicationService serviceImplementation="com.modforge.intellij.plugin.services.ModForgeSettingsService"/>
+        <applicationService serviceImplementation="com.modforge.intellij.plugin.services.AIServiceManager"/>
+        <projectService serviceImplementation="com.modforge.intellij.plugin.services.ModForgeProjectService"/>
+        
+        <!-- Settings -->
+        <applicationConfigurable 
+            parentId="tools" 
+            instance="com.modforge.intellij.plugin.settings.ModForgeSettingsConfigurable"
+            id="com.modforge.intellij.plugin.settings.ModForgeSettingsConfigurable" 
+            displayName="ModForge AI"/>
+        
+        <!-- Inspections -->
+        <localInspection language="JAVA" 
+                         implementationClass="com.modforge.intellij.plugin.inspections.MinecraftModInspection"
+                         displayName="Minecraft Mod Best Practices" 
+                         groupName="ModForge AI"
+                         enabledByDefault="true" 
+                         level="WARNING"/>
+        
+        <!-- Completion Contributors -->
+        <completion.contributor language="JAVA"
+                                implementationClass="com.modforge.intellij.plugin.completion.ModForgeCompletionContributor"/>
+        
+        <!-- Intention Actions -->
+        <intentionAction>
+            <className>com.modforge.intellij.plugin.intentions.GenerateEventHandlerIntention</className>
+            <category>ModForge AI</category>
+        </intentionAction>
+    </extensions>
+</idea-plugin>
