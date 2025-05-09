@@ -9,6 +9,7 @@ import NotFound from "@/pages/not-found";
 import GitHubIntegration from "@/pages/github-integration";
 import Settings from "@/pages/settings";
 import ContinuousDevelopment from "@/pages/continuous-development";
+import IdeaGenerator from "@/pages/idea-generator";
 
 function Router() {
   return (
@@ -17,6 +18,7 @@ function Router() {
       <Route path="/github-integration" component={GitHubIntegration}/>
       <Route path="/settings" component={Settings}/>
       <Route path="/continuous-development" component={ContinuousDevelopment}/>
+      <Route path="/idea-generator" component={IdeaGenerator}/>
       <Route component={NotFound} />
     </Switch>
   );

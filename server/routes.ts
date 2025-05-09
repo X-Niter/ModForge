@@ -6,6 +6,7 @@ import { generateModCode, fixCompilationErrors, addModFeatures } from "./ai-serv
 import { pushModToGitHub } from "./github";
 import { checkDatabaseHealth } from "./db-health";
 import { continuousService } from "./continuous-service";
+import { generateModIdeas, expandModIdea, ideaGenerationRequestSchema } from "./idea-generator-service";
 import { z } from "zod";
 import { insertModSchema } from "@shared/schema";
 import { BuildStatus } from "@/types";
@@ -374,6 +375,50 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error adding features:", error);
       res.status(500).json({ message: "Failed to add features" });
+    }
+  });
+  
+  // Generate mod ideas
+  app.post("/api/ai/generate-ideas", async (req, res) => {
+    try {
+      // Validate request body
+      const validationResult = ideaGenerationRequestSchema.safeParse(req.body);
+      if (!validationResult.success) {
+        return res.status(400).json({ 
+          message: "Invalid request data",
+          errors: validationResult.error.errors 
+        });
+      }
+
+      // Generate ideas
+      const ideas = await generateModIdeas(validationResult.data);
+      res.json(ideas);
+    } catch (error) {
+      console.error("Error generating mod ideas:", error);
+      res.status(500).json({ 
+        message: "Failed to generate mod ideas",
+        error: error instanceof Error ? error.message : String(error)
+      });
+    }
+  });
+  
+  // Expand a mod idea
+  app.post("/api/ai/expand-idea", async (req, res) => {
+    try {
+      const { ideaTitle, ideaDescription } = req.body;
+      if (!ideaTitle || !ideaDescription) {
+        return res.status(400).json({ message: "Missing required fields: ideaTitle and ideaDescription" });
+      }
+
+      // Expand the idea
+      const expandedIdea = await expandModIdea(ideaTitle, ideaDescription);
+      res.json(expandedIdea);
+    } catch (error) {
+      console.error("Error expanding mod idea:", error);
+      res.status(500).json({ 
+        message: "Failed to expand mod idea",
+        error: error instanceof Error ? error.message : String(error)
+      });
     }
   });
 

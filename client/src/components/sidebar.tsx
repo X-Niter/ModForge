@@ -77,6 +77,28 @@ export function Sidebar() {
             Mod Generator
           </NavLink>
           
+          <NavLink href="/idea-generator"
+            icon={
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                className="mr-3"
+                width="20" 
+                height="20"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M9.663 17h4.673M12 12v10M16 7a4 4 0 0 0-8 0v5a4 4 0 0 0 8 0V7z" />
+                <path d="m9.256 3.05 1.155-2.021a.9.9 0 0 1 1.575 0l1.574 2.755a1.9 1.9 0 0 0 3.246.006l.288-.5a.9.9 0 0 1 1.575 0l.488.855a1.9 1.9 0 0 0 2.544.837l.5-.29a.9.9 0 0 1 1.179 1.177l-.3.503a1.9 1.9 0 0 0 .807 2.567l.86.495a.9.9 0 0 1 0 1.574l-.86.495a1.9 1.9 0 0 0-.843 2.546l.3.503a.9.9 0 0 1-1.179 1.177l-.5-.29a1.9 1.9 0 0 0-2.544.838l-.488.854a.9.9 0 0 1-1.575 0l-.288-.5a1.9 1.9 0 0 0-3.246.006l-1.574 2.754a.9.9 0 0 1-1.575 0L9.256 20.95" />
+              </svg>
+            }
+          >
+            Idea Generator
+          </NavLink>
+          
           <NavLink href="/code-explorer"
             icon={
               <svg
