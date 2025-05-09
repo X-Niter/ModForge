@@ -8,6 +8,7 @@ import Home from "@/pages/home";
 import NotFound from "@/pages/not-found";
 import GitHubIntegration from "@/pages/github-integration";
 import Settings from "@/pages/settings";
+import ContinuousDevelopment from "@/pages/continuous-development";
 
 function Router() {
   return (
@@ -15,6 +16,7 @@ function Router() {
       <Route path="/" component={Home}/>
       <Route path="/github-integration" component={GitHubIntegration}/>
       <Route path="/settings" component={Settings}/>
+      <Route path="/continuous-development" component={ContinuousDevelopment}/>
       <Route component={NotFound} />
     </Switch>
   );
