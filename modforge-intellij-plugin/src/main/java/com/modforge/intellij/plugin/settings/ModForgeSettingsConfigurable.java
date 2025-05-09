@@ -1,226 +1,96 @@
 package com.modforge.intellij.plugin.settings;
 
 import com.intellij.openapi.options.Configurable;
-import com.intellij.openapi.options.ConfigurationException;
-import com.intellij.openapi.ui.ComboBox;
+import com.intellij.openapi.util.NlsContexts;
 import com.intellij.ui.components.JBCheckBox;
 import com.intellij.ui.components.JBLabel;
-import com.intellij.ui.components.JBPasswordField;
 import com.intellij.ui.components.JBTextField;
 import com.intellij.util.ui.FormBuilder;
+import com.intellij.util.ui.JBUI;
 import com.intellij.util.ui.UI;
-import org.jetbrains.annotations.Nls;
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import javax.swing.*;
 import java.awt.*;
 
 /**
- * Settings panel for the ModForge plugin.
+ * Configurable for ModForge settings.
  */
-public final class ModForgeSettingsConfigurable implements Configurable {
-    // UI components
+public class ModForgeSettingsConfigurable implements Configurable {
     private JPanel mainPanel;
-    private JBPasswordField apiKeyField;
-    private ComboBox<String> modelComboBox;
-    private JSpinner maxTokensSpinner;
-    private JSpinner temperatureSpinner;
+    private JPasswordField apiKeyField;
     private JBCheckBox continuousDevelopmentCheckbox;
     private JBCheckBox patternRecognitionCheckbox;
-    private JSpinner checkIntervalSpinner;
-    private JBCheckBox autoCompileCheckbox;
-    private JBCheckBox autoFixCheckbox;
-    private JBCheckBox autoDocumentCheckbox;
-    private JBCheckBox forgeSupportCheckbox;
-    private JBCheckBox fabricSupportCheckbox;
-    private JBCheckBox quiltSupportCheckbox;
+    private JSpinner updateFrequencySpinner;
     
-    @Nls(capitalization = Nls.Capitalization.Title)
     @Override
-    public String getDisplayName() {
+    public @NlsContexts.ConfigurableName String getDisplayName() {
         return "ModForge";
     }
     
     @Override
     public @Nullable JComponent createComponent() {
-        // Initialize UI components
-        createUIComponents();
+        // Create UI components
+        apiKeyField = new JPasswordField();
+        continuousDevelopmentCheckbox = new JBCheckBox("Enable continuous development");
+        patternRecognitionCheckbox = new JBCheckBox("Enable pattern recognition to reduce API costs");
         
-        // Create form
-        FormBuilder formBuilder = FormBuilder.createFormBuilder();
+        // Create spinner with number model
+        SpinnerNumberModel spinnerModel = new SpinnerNumberModel(5, 1, 60, 1);
+        updateFrequencySpinner = new JSpinner(spinnerModel);
         
-        // OpenAI settings section
-        formBuilder.addComponent(new JBLabel("OpenAI Settings"));
-        formBuilder.addLabeledComponent("API Key:", apiKeyField);
-        formBuilder.addLabeledComponent("Model:", modelComboBox);
-        formBuilder.addLabeledComponent("Max Tokens:", maxTokensSpinner);
-        formBuilder.addLabeledComponent("Temperature:", temperatureSpinner);
-        formBuilder.addSeparator();
+        // Create panel
+        mainPanel = FormBuilder.createFormBuilder()
+                .addLabeledComponent(new JBLabel("OpenAI API Key:"), apiKeyField, 1, false)
+                .addComponent(continuousDevelopmentCheckbox, 1)
+                .addComponent(patternRecognitionCheckbox, 1)
+                .addLabeledComponent(new JBLabel("Update frequency (minutes):"), updateFrequencySpinner, 1, false)
+                .addComponentFillVertically(new JPanel(), 0)
+                .getPanel();
         
-        // Feature toggles section
-        formBuilder.addComponent(new JBLabel("Feature Toggles"));
-        formBuilder.addComponent(continuousDevelopmentCheckbox);
-        formBuilder.addComponent(patternRecognitionCheckbox);
-        formBuilder.addSeparator();
+        mainPanel.setBorder(JBUI.Borders.empty(10));
         
-        // Development settings section
-        formBuilder.addComponent(new JBLabel("Development Settings"));
-        formBuilder.addLabeledComponent("Check Interval (ms):", checkIntervalSpinner);
-        formBuilder.addComponent(autoCompileCheckbox);
-        formBuilder.addComponent(autoFixCheckbox);
-        formBuilder.addComponent(autoDocumentCheckbox);
-        formBuilder.addSeparator();
-        
-        // Mod loader settings section
-        formBuilder.addComponent(new JBLabel("Mod Loader Support"));
-        formBuilder.addComponent(forgeSupportCheckbox);
-        formBuilder.addComponent(fabricSupportCheckbox);
-        formBuilder.addComponent(quiltSupportCheckbox);
-        
-        // Add some spacing
-        mainPanel = formBuilder.addComponentFillVertically(new JPanel(), 0).getPanel();
+        // Load settings
+        loadSettings();
         
         return mainPanel;
-    }
-    
-    /**
-     * Creates the UI components.
-     */
-    private void createUIComponents() {
-        // OpenAI settings
-        apiKeyField = new JBPasswordField();
-        
-        modelComboBox = new ComboBox<>(new String[] {
-                "gpt-4",
-                "gpt-4-turbo",
-                "gpt-3.5-turbo",
-                "gpt-3.5-turbo-16k"
-        });
-        
-        maxTokensSpinner = new JSpinner(new SpinnerNumberModel(2048, 16, 32768, 16));
-        
-        temperatureSpinner = new JSpinner(new SpinnerNumberModel(0.7, 0.0, 2.0, 0.1));
-        
-        // Feature toggles
-        continuousDevelopmentCheckbox = new JBCheckBox("Enable Continuous Development", false);
-        patternRecognitionCheckbox = new JBCheckBox("Enable Pattern Recognition", true);
-        
-        // Development settings
-        checkIntervalSpinner = new JSpinner(new SpinnerNumberModel(60000, 1000, 3600000, 1000));
-        
-        autoCompileCheckbox = new JBCheckBox("Auto-Compile", true);
-        autoFixCheckbox = new JBCheckBox("Auto-Fix Errors", true);
-        autoDocumentCheckbox = new JBCheckBox("Auto-Document Code", false);
-        
-        // Mod loader settings
-        forgeSupportCheckbox = new JBCheckBox("Forge", true);
-        fabricSupportCheckbox = new JBCheckBox("Fabric", true);
-        quiltSupportCheckbox = new JBCheckBox("Quilt", true);
     }
     
     @Override
     public boolean isModified() {
         ModForgeSettings settings = ModForgeSettings.getInstance();
         
-        // OpenAI settings
-        if (!settings.getOpenAiApiKey().equals(new String(apiKeyField.getPassword())) ||
-                !settings.getOpenAiModel().equals(modelComboBox.getItem()) ||
-                settings.getMaxTokens() != (int) maxTokensSpinner.getValue() ||
-                Math.abs(settings.getTemperature() - (double) temperatureSpinner.getValue()) > 0.001) {
-            return true;
-        }
-        
-        // Feature toggles
-        if (settings.isContinuousDevelopmentEnabled() != continuousDevelopmentCheckbox.isSelected() ||
-                settings.isPatternRecognitionEnabled() != patternRecognitionCheckbox.isSelected()) {
-            return true;
-        }
-        
-        // Development settings
-        if (settings.getCheckIntervalMs() != (long) (int) checkIntervalSpinner.getValue() ||
-                settings.isAutoCompileEnabled() != autoCompileCheckbox.isSelected() ||
-                settings.isAutoFixEnabled() != autoFixCheckbox.isSelected() ||
-                settings.isAutoDocumentEnabled() != autoDocumentCheckbox.isSelected()) {
-            return true;
-        }
-        
-        // Mod loader settings
-        if (settings.isForgeSupported() != forgeSupportCheckbox.isSelected() ||
-                settings.isFabricSupported() != fabricSupportCheckbox.isSelected() ||
-                settings.isQuiltSupported() != quiltSupportCheckbox.isSelected()) {
-            return true;
-        }
-        
-        return false;
+        return !settings.getOpenAiApiKey().equals(new String(apiKeyField.getPassword())) ||
+               settings.isContinuousDevelopmentEnabled() != continuousDevelopmentCheckbox.isSelected() ||
+               settings.isPatternRecognitionEnabled() != patternRecognitionCheckbox.isSelected() ||
+               settings.getUpdateFrequencyMinutes() != (int) updateFrequencySpinner.getValue();
     }
     
     @Override
-    public void apply() throws ConfigurationException {
+    public void apply() {
         ModForgeSettings settings = ModForgeSettings.getInstance();
         
-        // OpenAI settings
         settings.setOpenAiApiKey(new String(apiKeyField.getPassword()));
-        settings.setOpenAiModel(modelComboBox.getItem());
-        settings.setMaxTokens((int) maxTokensSpinner.getValue());
-        settings.setTemperature((double) temperatureSpinner.getValue());
-        
-        // Feature toggles
         settings.setContinuousDevelopmentEnabled(continuousDevelopmentCheckbox.isSelected());
         settings.setPatternRecognitionEnabled(patternRecognitionCheckbox.isSelected());
-        
-        // Development settings
-        settings.setCheckIntervalMs((long) (int) checkIntervalSpinner.getValue());
-        settings.setAutoCompileEnabled(autoCompileCheckbox.isSelected());
-        settings.setAutoFixEnabled(autoFixCheckbox.isSelected());
-        settings.setAutoDocumentEnabled(autoDocumentCheckbox.isSelected());
-        
-        // Mod loader settings
-        settings.setForgeSupported(forgeSupportCheckbox.isSelected());
-        settings.setFabricSupported(fabricSupportCheckbox.isSelected());
-        settings.setQuiltSupported(quiltSupportCheckbox.isSelected());
+        settings.setUpdateFrequencyMinutes((int) updateFrequencySpinner.getValue());
     }
     
     @Override
     public void reset() {
-        ModForgeSettings settings = ModForgeSettings.getInstance();
-        
-        // OpenAI settings
-        apiKeyField.setText(settings.getOpenAiApiKey());
-        modelComboBox.setItem(settings.getOpenAiModel());
-        maxTokensSpinner.setValue(settings.getMaxTokens());
-        temperatureSpinner.setValue(settings.getTemperature());
-        
-        // Feature toggles
-        continuousDevelopmentCheckbox.setSelected(settings.isContinuousDevelopmentEnabled());
-        patternRecognitionCheckbox.setSelected(settings.isPatternRecognitionEnabled());
-        
-        // Development settings
-        checkIntervalSpinner.setValue((int) settings.getCheckIntervalMs());
-        autoCompileCheckbox.setSelected(settings.isAutoCompileEnabled());
-        autoFixCheckbox.setSelected(settings.isAutoFixEnabled());
-        autoDocumentCheckbox.setSelected(settings.isAutoDocumentEnabled());
-        
-        // Mod loader settings
-        forgeSupportCheckbox.setSelected(settings.isForgeSupported());
-        fabricSupportCheckbox.setSelected(settings.isFabricSupported());
-        quiltSupportCheckbox.setSelected(settings.isQuiltSupported());
+        loadSettings();
     }
     
-    @Override
-    public void disposeUIResources() {
-        mainPanel = null;
-        apiKeyField = null;
-        modelComboBox = null;
-        maxTokensSpinner = null;
-        temperatureSpinner = null;
-        continuousDevelopmentCheckbox = null;
-        patternRecognitionCheckbox = null;
-        checkIntervalSpinner = null;
-        autoCompileCheckbox = null;
-        autoFixCheckbox = null;
-        autoDocumentCheckbox = null;
-        forgeSupportCheckbox = null;
-        fabricSupportCheckbox = null;
-        quiltSupportCheckbox = null;
+    /**
+     * Loads settings into UI components.
+     */
+    private void loadSettings() {
+        ModForgeSettings settings = ModForgeSettings.getInstance();
+        
+        apiKeyField.setText(settings.getOpenAiApiKey());
+        continuousDevelopmentCheckbox.setSelected(settings.isContinuousDevelopmentEnabled());
+        patternRecognitionCheckbox.setSelected(settings.isPatternRecognitionEnabled());
+        updateFrequencySpinner.setValue(settings.getUpdateFrequencyMinutes());
     }
 }

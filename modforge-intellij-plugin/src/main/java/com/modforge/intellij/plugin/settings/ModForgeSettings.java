@@ -2,7 +2,6 @@ package com.modforge.intellij.plugin.settings;
 
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.components.PersistentStateComponent;
-import com.intellij.openapi.components.Service;
 import com.intellij.openapi.components.State;
 import com.intellij.openapi.components.Storage;
 import com.intellij.util.xmlb.XmlSerializerUtil;
@@ -10,40 +9,21 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * Persistent settings for the ModForge plugin.
+ * Persistent settings for ModForge.
  */
-@Service
 @State(
-        name = "ModForgeSettings",
-        storages = {
-                @Storage("modforge-settings.xml")
-        }
+        name = "com.modforge.intellij.plugin.settings.ModForgeSettings",
+        storages = {@Storage("ModForgeSettings.xml")}
 )
-public final class ModForgeSettings implements PersistentStateComponent<ModForgeSettings> {
-    // OpenAI settings
+public class ModForgeSettings implements PersistentStateComponent<ModForgeSettings> {
     private String openAiApiKey = "";
-    private String openAiModel = "gpt-4";
-    private int maxTokens = 2048;
-    private double temperature = 0.7;
-    
-    // Feature toggles
     private boolean continuousDevelopmentEnabled = false;
     private boolean patternRecognitionEnabled = true;
-    
-    // Development settings
-    private long checkIntervalMs = 60_000L; // 1 minute
-    private boolean autoCompileEnabled = true;
-    private boolean autoFixEnabled = true;
-    private boolean autoDocumentEnabled = false;
-    
-    // Mod loader settings
-    private boolean forgeSupported = true;
-    private boolean fabricSupported = true;
-    private boolean quiltSupported = true;
+    private int updateFrequencyMinutes = 5;
     
     /**
-     * Gets the instance of the settings.
-     * @return The settings
+     * Gets the instance of this settings.
+     * @return The settings instance
      */
     public static ModForgeSettings getInstance() {
         return ApplicationManager.getApplication().getService(ModForgeSettings.class);
@@ -59,115 +39,77 @@ public final class ModForgeSettings implements PersistentStateComponent<ModForge
         XmlSerializerUtil.copyBean(state, this);
     }
     
-    // OpenAI settings
-    
+    /**
+     * Gets the OpenAI API key.
+     * @return The API key
+     */
     public String getOpenAiApiKey() {
         return openAiApiKey;
     }
     
+    /**
+     * Sets the OpenAI API key.
+     * @param openAiApiKey The API key
+     */
     public void setOpenAiApiKey(String openAiApiKey) {
         this.openAiApiKey = openAiApiKey;
     }
     
-    public String getOpenAiModel() {
-        return openAiModel;
-    }
-    
-    public void setOpenAiModel(String openAiModel) {
-        this.openAiModel = openAiModel;
-    }
-    
-    public int getMaxTokens() {
-        return maxTokens;
-    }
-    
-    public void setMaxTokens(int maxTokens) {
-        this.maxTokens = maxTokens;
-    }
-    
-    public double getTemperature() {
-        return temperature;
-    }
-    
-    public void setTemperature(double temperature) {
-        this.temperature = temperature;
-    }
-    
-    // Feature toggles
-    
+    /**
+     * Checks if continuous development is enabled.
+     * @return True if continuous development is enabled, false otherwise
+     */
     public boolean isContinuousDevelopmentEnabled() {
         return continuousDevelopmentEnabled;
     }
     
+    /**
+     * Sets whether continuous development is enabled.
+     * @param continuousDevelopmentEnabled Whether continuous development is enabled
+     */
     public void setContinuousDevelopmentEnabled(boolean continuousDevelopmentEnabled) {
         this.continuousDevelopmentEnabled = continuousDevelopmentEnabled;
     }
     
+    /**
+     * Checks if pattern recognition is enabled.
+     * @return True if pattern recognition is enabled, false otherwise
+     */
     public boolean isPatternRecognitionEnabled() {
         return patternRecognitionEnabled;
     }
     
+    /**
+     * Sets whether pattern recognition is enabled.
+     * @param patternRecognitionEnabled Whether pattern recognition is enabled
+     */
     public void setPatternRecognitionEnabled(boolean patternRecognitionEnabled) {
         this.patternRecognitionEnabled = patternRecognitionEnabled;
     }
     
-    // Development settings
-    
-    public long getCheckIntervalMs() {
-        return checkIntervalMs;
+    /**
+     * Gets the update frequency in minutes.
+     * @return The update frequency in minutes
+     */
+    public int getUpdateFrequencyMinutes() {
+        return updateFrequencyMinutes;
     }
     
-    public void setCheckIntervalMs(long checkIntervalMs) {
-        this.checkIntervalMs = checkIntervalMs;
+    /**
+     * Sets the update frequency in minutes.
+     * @param updateFrequencyMinutes The update frequency in minutes
+     */
+    public void setUpdateFrequencyMinutes(int updateFrequencyMinutes) {
+        this.updateFrequencyMinutes = updateFrequencyMinutes;
     }
     
-    public boolean isAutoCompileEnabled() {
-        return autoCompileEnabled;
-    }
-    
-    public void setAutoCompileEnabled(boolean autoCompileEnabled) {
-        this.autoCompileEnabled = autoCompileEnabled;
-    }
-    
-    public boolean isAutoFixEnabled() {
-        return autoFixEnabled;
-    }
-    
-    public void setAutoFixEnabled(boolean autoFixEnabled) {
-        this.autoFixEnabled = autoFixEnabled;
-    }
-    
-    public boolean isAutoDocumentEnabled() {
-        return autoDocumentEnabled;
-    }
-    
-    public void setAutoDocumentEnabled(boolean autoDocumentEnabled) {
-        this.autoDocumentEnabled = autoDocumentEnabled;
-    }
-    
-    // Mod loader settings
-    
-    public boolean isForgeSupported() {
-        return forgeSupported;
-    }
-    
-    public void setForgeSupported(boolean forgeSupported) {
-        this.forgeSupported = forgeSupported;
-    }
-    
-    public boolean isFabricSupported() {
-        return fabricSupported;
-    }
-    
-    public void setFabricSupported(boolean fabricSupported) {
-        this.fabricSupported = fabricSupported;
-    }
-    
-    public boolean isQuiltSupported() {
-        return quiltSupported;
-    }
-    
-    public void setQuiltSupported(boolean quiltSupported) {
-        this.quiltSupported = quiltSupported;
+    /**
+     * Resets all settings to their default values.
+     */
+    public void resetToDefaults() {
+        openAiApiKey = "";
+        continuousDevelopmentEnabled = false;
+        patternRecognitionEnabled = true;
+        updateFrequencyMinutes = 5;
     }
 }
