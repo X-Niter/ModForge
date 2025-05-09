@@ -50,52 +50,52 @@ jobs:
           
           # Parse the dependency report and update build.gradle
           python -c "
-import re
-import sys
+          import re
+          import sys
 
-# Read dependency report
-with open('dependency-report.txt', 'r') as f:
-    report = f.read()
+          # Read dependency report
+          with open('dependency-report.txt', 'r') as f:
+              report = f.read()
 
-# Extract dependency updates
-updates = re.findall(r'([a-zA-Z0-9\.\-]+:[a-zA-Z0-9\.\-]+) \[(.*?) -> (.*?)\]', report)
+          # Extract dependency updates
+          updates = re.findall(r'([a-zA-Z0-9\.\-]+:[a-zA-Z0-9\.\-]+) \[(.*?) -> (.*?)\]', report)
 
-if not updates:
-    print('No updateable dependencies found')
-    sys.exit(0)
+          if not updates:
+              print('No updateable dependencies found')
+              sys.exit(0)
 
-print(f'Found {len(updates)} dependencies to update')
+          print(f'Found {len(updates)} dependencies to update')
 
-# Read build.gradle
-with open('build.gradle', 'r') as f:
-    build_gradle = f.read()
+          # Read build.gradle
+          with open('build.gradle', 'r') as f:
+              build_gradle = f.read()
 
-# Update each dependency
-updated_build_gradle = build_gradle
-for dep, old_ver, new_ver in updates:
-    group_id, artifact_id = dep.split(':')
-    
-    # Try different patterns for dependencies
-    patterns = [
-        f'{group_id}:{artifact_id}:{old_ver}',
-        f'\"{group_id}:{artifact_id}:{old_ver}\"',
-        f'group: \"{group_id}\", name: \"{artifact_id}\", version: \"{old_ver}\"'
-    ]
-    
-    for pattern in patterns:
-        if pattern in updated_build_gradle:
-            if ':' in pattern:
-                replacement = pattern.replace(old_ver, new_ver)
-            else:
-                replacement = f'group: \"{group_id}\", name: \"{artifact_id}\", version: \"{new_ver}\"'
-            
-            updated_build_gradle = updated_build_gradle.replace(pattern, replacement)
-            print(f'Updated {dep} from {old_ver} to {new_ver}')
-            break
+          # Update each dependency
+          updated_build_gradle = build_gradle
+          for dep, old_ver, new_ver in updates:
+              group_id, artifact_id = dep.split(':')
+              
+              # Try different patterns for dependencies
+              patterns = [
+                  f'{group_id}:{artifact_id}:{old_ver}',
+                  f'\"{group_id}:{artifact_id}:{old_ver}\"',
+                  f'group: \"{group_id}\", name: \"{artifact_id}\", version: \"{old_ver}\"'
+              ]
+              
+              for pattern in patterns:
+                  if pattern in updated_build_gradle:
+                      if ':' in pattern:
+                          replacement = pattern.replace(old_ver, new_ver)
+                      else:
+                          replacement = f'group: \"{group_id}\", name: \"{artifact_id}\", version: \"{new_ver}\"'
+                      
+                      updated_build_gradle = updated_build_gradle.replace(pattern, replacement)
+                      print(f'Updated {dep} from {old_ver} to {new_ver}')
+                      break
 
-# Write updated build.gradle
-with open('build.gradle', 'w') as f:
-    f.write(updated_build_gradle)
+          # Write updated build.gradle
+          with open('build.gradle', 'w') as f:
+              f.write(updated_build_gradle)
           "
           
           # Update IntelliJ plugin version if available
