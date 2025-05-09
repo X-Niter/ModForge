@@ -386,7 +386,7 @@ const JarAnalyzerPage: React.FC = () => {
               <CardContent>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
                   <div>
-                    <label className="block text-sm font-medium mb-1">Mod Loader</label>
+                    <label className="block text-sm font-medium mb-1">Mod Loader (Optional - Auto-detected)</label>
                     <Select value={modLoader} onValueChange={setModLoader}>
                       <SelectTrigger>
                         <SelectValue placeholder="Select mod loader" />
@@ -401,7 +401,7 @@ const JarAnalyzerPage: React.FC = () => {
                     </Select>
                   </div>
                   <div>
-                    <label className="block text-sm font-medium mb-1">Minecraft Version</label>
+                    <label className="block text-sm font-medium mb-1">Minecraft Version (Optional - Auto-detected)</label>
                     <Select value={mcVersion} onValueChange={setMcVersion}>
                       <SelectTrigger>
                         <SelectValue placeholder="Select MC version" />
@@ -452,6 +452,9 @@ const JarAnalyzerPage: React.FC = () => {
                     </p>
                     <p className="text-xs text-muted-foreground">
                       Supports Forge, Fabric, NeoForge, and Quilt mod files
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-2">
+                      <span className="text-primary font-medium">Auto-detection enabled:</span> Mod loader and Minecraft version will be automatically detected from JAR contents
                     </p>
                   </div>
                 </div>
