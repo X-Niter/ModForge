@@ -485,34 +485,34 @@ Include class-level docs, method docs, parameter descriptions, and return value 
 Focus on code organization, design patterns, and maintainability. Provide the complete refactored code."""
               else:
                   return f"Unknown modification command: {cmd_type}"
-    
-    # Generate modified code using OpenAI
-    try:
-        response = client.chat.completions.create(
-            model="gpt-4",
-            messages=[
-                {"role": "system", "content": f"You are an expert Java developer working on a Minecraft mod and IntelliJ plugin project. Your task is to {cmd_type} code."},
-                {"role": "user", "content": prompt}
-            ],
-            temperature=0.2,
-            max_tokens=4000
-        )
-        
-        modified_code = response.choices[0].message.content
-        
-        # Extract code from markdown code block if present
-        code_match = re.search(r'```(?:java)?\n(.*?)\n```', modified_code, re.DOTALL)
-        if code_match:
-            modified_code = code_match.group(1)
-        
-        # Write the modified code back to the file
-        with open(file_path, 'w', encoding='utf-8') as f:
-            f.write(modified_code)
-        
-        # Commit and push the changes
-        subprocess.run(['git', 'add', file_path], check=True)
-        subprocess.run(['git', 'commit', '-m', f"{cmd_type.capitalize()}: {os.path.basename(file_path)} [ModForge AI]"], check=True)
-        subprocess.run(['git', 'push', 'origin', branch_name], check=True)
+              
+              # Generate modified code using OpenAI
+              try:
+                  response = client.chat.completions.create(
+                      model="gpt-4",
+                      messages=[
+                          {"role": "system", "content": f"You are an expert Java developer working on a Minecraft mod and IntelliJ plugin project. Your task is to {cmd_type} code."},
+                          {"role": "user", "content": prompt}
+                      ],
+                      temperature=0.2,
+                      max_tokens=4000
+                  )
+                  
+                  modified_code = response.choices[0].message.content
+                  
+                  # Extract code from markdown code block if present
+                  code_match = re.search(r'```(?:java)?\n(.*?)\n```', modified_code, re.DOTALL)
+                  if code_match:
+                      modified_code = code_match.group(1)
+                  
+                  # Write the modified code back to the file
+                  with open(file_path, 'w', encoding='utf-8') as f:
+                      f.write(modified_code)
+                  
+                  # Commit and push the changes
+                  subprocess.run(['git', 'add', file_path], check=True)
+                  subprocess.run(['git', 'commit', '-m', f"{cmd_type.capitalize()}: {os.path.basename(file_path)} [ModForge AI]"], check=True)
+                  subprocess.run(['git', 'push', 'origin', branch_name], check=True)
         
         # Create a pull request
         pr_data = {
