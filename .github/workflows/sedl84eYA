@@ -743,7 +743,7 @@ Provide the complete updated code."""
                 max_tokens=3000
             )
             
-            modified_code = response.choices[0].message.content
+            modified_code = response.choices[0].message['content']
             
             # Extract code from markdown code block if present
             code_match = re.search(r'```(?:java)?\n(.*?)\n```', modified_code, re.DOTALL)
@@ -841,7 +841,7 @@ Format your analysis with clear sections and highlight important findings."""
                 max_tokens=3000
             )
             
-            analysis = response.choices[0].message.content
+            analysis = response.choices[0].message['content']
             return f"""# Analysis of `{os.path.basename(file_path)}`
 
 {analysis}
@@ -924,7 +924,7 @@ Format your analysis with clear sections and highlight important findings."""
                 max_tokens=3000
             )
             
-            analysis = response.choices[0].message.content
+            analysis = response.choices[0].message['content']
             return f"""# Analysis of '{target}'
 
 {analysis}
@@ -969,7 +969,7 @@ Explain as if to a developer who is new to the project but familiar with Java an
             max_tokens=3000
         )
         
-        explanation = response.choices[0].message.content
+        explanation = response.choices[0].message['content']
         return f"""# Explanation of `{os.path.basename(file_path)}`
 
 {explanation}
@@ -1067,7 +1067,7 @@ Make the necessary changes to implement the suggestion. Provide the complete upd
                 max_tokens=3000
             )
             
-            modified_code = response.choices[0].message.content
+            modified_code = response.choices[0].message['content']
             
             # Extract code from markdown code block if present
             code_match = re.search(r'```(?:java)?\n(.*?)\n```', modified_code, re.DOTALL)
@@ -1203,7 +1203,7 @@ Make the tests as complete and professional as possible."""
             max_tokens=3000
         )
         
-        test_code = response.choices[0].message.content
+        test_code = response.choices[0].message['content']
         
         # Extract code from markdown code block if present
         code_match = re.search(r'```(?:java)?\n(.*?)\n```', test_code, re.DOTALL)
@@ -1300,7 +1300,7 @@ Sound like a real developer following up, not an AI assistant."""}
         
         followup_text = f"""## Quick follow-up ({current_date})
 
-{response.choices[0].message.content}
+{response.choices[0].message['content']}
 
 _Automated check-in from the ModForge system_
 """
