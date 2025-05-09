@@ -1,43 +1,46 @@
 package com.modforge.intellij.plugin.services;
 
+import com.intellij.compiler.CompilerMessageImpl;
 import com.intellij.openapi.application.ApplicationManager;
+import com.intellij.openapi.application.ReadAction;
+import com.intellij.openapi.compiler.CompileScope;
+import com.intellij.openapi.compiler.CompileStatusNotification;
+import com.intellij.openapi.compiler.CompilerManager;
+import com.intellij.openapi.compiler.CompilerMessage;
 import com.intellij.openapi.components.Service;
 import com.intellij.openapi.diagnostic.Logger;
+import com.intellij.openapi.fileEditor.FileDocumentManager;
 import com.intellij.openapi.project.Project;
-import com.intellij.openapi.util.Computable;
 import com.intellij.openapi.vfs.VirtualFile;
+import com.intellij.psi.PsiFile;
+import com.intellij.psi.PsiManager;
 import com.intellij.util.concurrency.AppExecutorUtil;
 import com.modforge.intellij.plugin.settings.ModForgeSettings;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Map;
-import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.ScheduledFuture;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicInteger;
+import java.util.*;
+import java.util.concurrent.*;
+import java.util.stream.Collectors;
 
 /**
- * Service that manages continuous development tasks.
- * This service is responsible for processing files in the background,
- * enhancing them with AI-powered suggestions, and ensuring they compile correctly.
+ * Service for continuous development of Minecraft mods.
+ * This service automatically compiles, finds errors, and fixes them using AI.
  */
 @Service(Service.Level.PROJECT)
 public final class ContinuousDevelopmentService {
     private static final Logger LOG = Logger.getInstance(ContinuousDevelopmentService.class);
-    private static final int DEFAULT_CHECK_INTERVAL_MS = 30000; // 30 seconds
     
     private final Project project;
+    private final AutonomousCodeGenerationService codeGenService;
     private final ScheduledExecutorService scheduler;
-    private final Map<String, Long> lastModifiedTimes = new ConcurrentHashMap<>();
-    private final Map<String, AtomicInteger> enhancementCounts = new ConcurrentHashMap<>();
-    private final Set<String> processingFiles = new HashSet<>();
-    private final Object lock = new Object();
     
     private ScheduledFuture<?> scheduledTask;
+    private final Map<String, Integer> errorCounts = new ConcurrentHashMap<>();
+    private final Map<String, Integer> fixAttempts = new ConcurrentHashMap<>();
+    
+    private static final int MAX_FIX_ATTEMPTS = 3;
+    private static final int DEFAULT_INTERVAL_MINUTES = 5;
     
     /**
      * Creates a new ContinuousDevelopmentService.
@@ -45,14 +48,10 @@ public final class ContinuousDevelopmentService {
      */
     public ContinuousDevelopmentService(Project project) {
         this.project = project;
+        this.codeGenService = AutonomousCodeGenerationService.getInstance(project);
         this.scheduler = AppExecutorUtil.getAppScheduledExecutorService();
         
         LOG.info("Continuous development service created for project: " + project.getName());
-        
-        // Start continuous development task if enabled
-        if (ModForgeSettings.getInstance().isEnableContinuousDevelopment()) {
-            startContinuousDevelopment();
-        }
     }
     
     /**
@@ -65,187 +64,361 @@ public final class ContinuousDevelopmentService {
     }
     
     /**
-     * Starts the continuous development task.
+     * Starts continuous development.
      */
-    public void startContinuousDevelopment() {
-        synchronized (lock) {
-            if (scheduledTask != null && !scheduledTask.isDone()) {
-                // Already running
-                LOG.info("Continuous development already running for project: " + project.getName());
-                return;
-            }
-            
-            LOG.info("Starting continuous development for project: " + project.getName());
-            
-            // Schedule task
-            scheduledTask = scheduler.scheduleWithFixedDelay(
-                    this::processChangedFiles,
-                    DEFAULT_CHECK_INTERVAL_MS,
-                    DEFAULT_CHECK_INTERVAL_MS,
-                    TimeUnit.MILLISECONDS
-            );
-        }
-    }
-    
-    /**
-     * Stops the continuous development task.
-     */
-    public void stopContinuousDevelopment() {
-        synchronized (lock) {
-            if (scheduledTask != null) {
-                LOG.info("Stopping continuous development for project: " + project.getName());
-                
-                // Cancel task
-                scheduledTask.cancel(false);
-                scheduledTask = null;
-            }
-        }
-    }
-    
-    /**
-     * Stops all development tasks.
-     */
-    public void stopAllDevelopment() {
-        synchronized (lock) {
-            stopContinuousDevelopment();
-            
-            // Clear data
-            lastModifiedTimes.clear();
-            enhancementCounts.clear();
-            processingFiles.clear();
-        }
-    }
-    
-    /**
-     * Notifies the service that a file has changed.
-     * @param file The changed file
-     */
-    public void fileChanged(VirtualFile file) {
-        if (file == null) {
+    public void start() {
+        if (isRunning()) {
+            LOG.info("Continuous development is already running");
             return;
         }
         
-        String path = file.getPath();
+        LOG.info("Starting continuous development");
         
-        // Update last modified time
-        lastModifiedTimes.put(path, file.getTimeStamp());
+        // Get settings
+        ModForgeSettings settings = ModForgeSettings.getInstance();
+        
+        if (!settings.isContinuousDevelopmentEnabled()) {
+            LOG.info("Continuous development is disabled in settings");
+            return;
+        }
+        
+        // Get interval
+        int intervalMinutes = settings.getContinuousDevelopmentIntervalMinutes();
+        
+        if (intervalMinutes <= 0) {
+            intervalMinutes = DEFAULT_INTERVAL_MINUTES;
+        }
+        
+        // Schedule task
+        scheduledTask = scheduler.scheduleAtFixedRate(
+                this::processDevelopmentCycle,
+                0,
+                intervalMinutes,
+                TimeUnit.MINUTES
+        );
+        
+        LOG.info("Continuous development started with interval: " + intervalMinutes + " minutes");
     }
     
     /**
-     * Processes changed files.
+     * Stops continuous development.
      */
-    private void processChangedFiles() {
-        synchronized (lock) {
-            // Check if continuous development is enabled
-            if (!ModForgeSettings.getInstance().isEnableContinuousDevelopment()) {
+    public void stop() {
+        if (!isRunning()) {
+            LOG.info("Continuous development is not running");
+            return;
+        }
+        
+        LOG.info("Stopping continuous development");
+        
+        // Cancel task
+        if (scheduledTask != null) {
+            scheduledTask.cancel(false);
+            scheduledTask = null;
+        }
+        
+        LOG.info("Continuous development stopped");
+    }
+    
+    /**
+     * Checks if continuous development is running.
+     * @return True if running, false otherwise
+     */
+    public boolean isRunning() {
+        return scheduledTask != null && !scheduledTask.isDone() && !scheduledTask.isCancelled();
+    }
+    
+    /**
+     * Resets error counts and fix attempts.
+     */
+    public void reset() {
+        LOG.info("Resetting error counts and fix attempts");
+        errorCounts.clear();
+        fixAttempts.clear();
+    }
+    
+    /**
+     * Gets statistics about the continuous development process.
+     * @return Statistics
+     */
+    public Map<String, Object> getStatistics() {
+        Map<String, Object> stats = new HashMap<>();
+        
+        // Add running status
+        stats.put("running", isRunning());
+        
+        // Get settings
+        ModForgeSettings settings = ModForgeSettings.getInstance();
+        
+        // Add interval
+        stats.put("intervalMinutes", settings.getContinuousDevelopmentIntervalMinutes());
+        
+        // Add error counts
+        stats.put("errorCount", errorCounts.size());
+        stats.put("fixAttempts", fixAttempts.size());
+        
+        // Add files with most errors
+        List<Map.Entry<String, Integer>> topErrors = errorCounts.entrySet().stream()
+                .sorted(Map.Entry.<String, Integer>comparingByValue().reversed())
+                .limit(5)
+                .collect(Collectors.toList());
+        
+        stats.put("topErrors", topErrors);
+        
+        return stats;
+    }
+    
+    /**
+     * Processes a development cycle.
+     * This is the main method that runs periodically.
+     */
+    private void processDevelopmentCycle() {
+        try {
+            LOG.info("Processing development cycle");
+            
+            // Save all documents
+            ApplicationManager.getApplication().invokeAndWait(() -> {
+                FileDocumentManager.getInstance().saveAllDocuments();
+            });
+            
+            // Compile project
+            compileProject();
+            
+        } catch (Exception e) {
+            LOG.error("Error processing development cycle", e);
+        }
+    }
+    
+    /**
+     * Compiles the project and handles errors.
+     */
+    private void compileProject() {
+        LOG.info("Compiling project");
+        
+        CompilerManager compilerManager = CompilerManager.getInstance(project);
+        
+        // Create compile scope
+        CompileScope scope = compilerManager.createProjectCompileScope(project);
+        
+        // Compile notification
+        CompileStatusNotification notification = (aborted, errors, warnings, compileContext) -> {
+            LOG.info("Compilation finished: aborted=" + aborted + ", errors=" + errors + ", warnings=" + warnings);
+            
+            if (aborted) {
+                LOG.info("Compilation was aborted");
                 return;
             }
             
-            LOG.info("Processing changed files for project: " + project.getName());
-            
-            // Get files to process
-            Map<String, Long> filesToProcess = new HashMap<>(lastModifiedTimes);
-            
-            // Process each file
-            for (Map.Entry<String, Long> entry : filesToProcess.entrySet()) {
-                String path = entry.getKey();
+            if (errors > 0) {
+                LOG.info("Compilation had errors, attempting to fix");
                 
-                // Skip if already processing
-                if (processingFiles.contains(path)) {
-                    continue;
+                // Get error messages
+                CompilerMessage[] errorMessages = compileContext.getMessages(CompilerMessage.Kind.ERROR);
+                
+                // Fix errors
+                fixCompilationErrors(errorMessages);
+            } else {
+                LOG.info("Compilation successful");
+                
+                // Reset error counts for successfully compiled files
+                resetSuccessfulFiles();
+            }
+        };
+        
+        // Make sure to run this on the event dispatch thread
+        ApplicationManager.getApplication().invokeAndWait(() -> {
+            compilerManager.compile(scope, notification);
+        });
+    }
+    
+    /**
+     * Resets error counts for successfully compiled files.
+     */
+    private void resetSuccessfulFiles() {
+        // Create a copy of the keys to avoid concurrent modification
+        Set<String> fileKeys = new HashSet<>(errorCounts.keySet());
+        
+        for (String filePath : fileKeys) {
+            try {
+                // Check if the file exists
+                VirtualFile file = project.getBaseDir().findFileByRelativePath(filePath);
+                
+                if (file != null) {
+                    errorCounts.remove(filePath);
+                    fixAttempts.remove(filePath);
+                    LOG.info("Reset error count for successfully compiled file: " + filePath);
                 }
-                
-                // Get file
-                VirtualFile file = ApplicationManager.getApplication().runReadAction(
-                        (Computable<VirtualFile>) () -> {
-                            return com.intellij.openapi.vfs.LocalFileSystem.getInstance().findFileByPath(path);
-                        }
-                );
-                
-                if (file == null || !file.exists()) {
-                    // File no longer exists
-                    lastModifiedTimes.remove(path);
-                    enhancementCounts.remove(path);
-                    continue;
-                }
-                
-                // Check if file needs to be processed
-                if (!shouldProcessFile(file)) {
-                    continue;
-                }
-                
-                // Mark as processing
-                processingFiles.add(path);
-                
-                // Process file in background
-                ApplicationManager.getApplication().executeOnPooledThread(() -> {
-                    try {
-                        processFile(file);
-                    } finally {
-                        // Mark as no longer processing
-                        synchronized (lock) {
-                            processingFiles.remove(path);
-                        }
-                    }
-                });
+            } catch (Exception e) {
+                LOG.error("Error resetting error count for file: " + filePath, e);
             }
         }
     }
     
     /**
-     * Checks if a file should be processed.
-     * @param file The file
-     * @return True if the file should be processed
+     * Fixes compilation errors.
+     * @param errorMessages The error messages
      */
-    private boolean shouldProcessFile(VirtualFile file) {
-        // Skip non-code files
-        String extension = file.getExtension();
-        if (extension == null || !(extension.equals("java") || extension.equals("kt"))) {
-            return false;
+    private void fixCompilationErrors(CompilerMessage[] errorMessages) {
+        if (errorMessages == null || errorMessages.length == 0) {
+            LOG.info("No error messages to fix");
+            return;
         }
         
-        // Skip if max enhancement count reached
-        String path = file.getPath();
-        AtomicInteger count = enhancementCounts.computeIfAbsent(path, k -> new AtomicInteger(0));
-        return count.get() < ModForgeSettings.getInstance().getMaxEnhancementsPerFile();
+        LOG.info("Fixing " + errorMessages.length + " compilation errors");
+        
+        // Group errors by file
+        Map<String, List<CompilerMessage>> errorsByFile = groupErrorsByFile(errorMessages);
+        
+        // Fix each file
+        for (Map.Entry<String, List<CompilerMessage>> entry : errorsByFile.entrySet()) {
+            String filePath = entry.getKey();
+            List<CompilerMessage> errors = entry.getValue();
+            
+            // Check if we should attempt to fix this file
+            if (!shouldAttemptFix(filePath)) {
+                LOG.info("Skipping fix for file: " + filePath + " (too many attempts)");
+                continue;
+            }
+            
+            // Fix file
+            fixFile(filePath, errors);
+        }
     }
     
     /**
-     * Processes a file.
-     * @param file The file to process
+     * Groups error messages by file.
+     * @param errorMessages The error messages
+     * @return Errors grouped by file
      */
-    private void processFile(VirtualFile file) {
-        LOG.info("Processing file: " + file.getName());
+    private Map<String, List<CompilerMessage>> groupErrorsByFile(CompilerMessage[] errorMessages) {
+        Map<String, List<CompilerMessage>> errorsByFile = new HashMap<>();
+        
+        for (CompilerMessage message : errorMessages) {
+            if (message.getVirtualFile() == null) {
+                continue;
+            }
+            
+            String filePath = message.getVirtualFile().getPath();
+            
+            if (!errorsByFile.containsKey(filePath)) {
+                errorsByFile.put(filePath, new ArrayList<>());
+            }
+            
+            errorsByFile.get(filePath).add(message);
+        }
+        
+        return errorsByFile;
+    }
+    
+    /**
+     * Checks if we should attempt to fix a file.
+     * @param filePath The file path
+     * @return True if we should attempt to fix, false otherwise
+     */
+    private boolean shouldAttemptFix(String filePath) {
+        // Get fix attempts
+        int attempts = fixAttempts.getOrDefault(filePath, 0);
+        
+        // Increment
+        fixAttempts.put(filePath, attempts + 1);
+        
+        // Check if we should attempt
+        return attempts < MAX_FIX_ATTEMPTS;
+    }
+    
+    /**
+     * Fixes a file.
+     * @param filePath The file path
+     * @param errors The errors
+     */
+    private void fixFile(String filePath, List<CompilerMessage> errors) {
+        LOG.info("Fixing file: " + filePath + " with " + errors.size() + " errors");
         
         try {
-            // Get service
-            AutonomousCodeGenerationService codeGenService = AutonomousCodeGenerationService.getInstance(project);
+            // Get file
+            VirtualFile file = project.getBaseDir().findFileByRelativePath(filePath);
             
-            // Analyze and enhance file
-            boolean enhanced = codeGenService.analyzeAndEnhanceFile(file)
-                    .thenApply(result -> {
-                        // Update enhancement count if enhanced
-                        if (result) {
-                            String path = file.getPath();
-                            enhancementCounts.computeIfAbsent(path, k -> new AtomicInteger(0))
-                                    .incrementAndGet();
-                        }
-                        
-                        return result;
-                    })
-                    .exceptionally(ex -> {
-                        LOG.error("Error enhancing file: " + file.getName(), ex);
-                        return false;
-                    })
-                    .get(); // Wait for completion
-            
-            if (enhanced) {
-                LOG.info("Enhanced file: " + file.getName());
-            } else {
-                LOG.info("No enhancements made to file: " + file.getName());
+            if (file == null) {
+                LOG.error("File not found: " + filePath);
+                return;
             }
-        } catch (Exception ex) {
-            LOG.error("Error processing file: " + file.getName(), ex);
+            
+            // Get PSI file
+            PsiFile psiFile = ReadAction.compute(() -> PsiManager.getInstance(project).findFile(file));
+            
+            if (psiFile == null) {
+                LOG.error("PSI file not found: " + filePath);
+                return;
+            }
+            
+            // Get file content
+            String content = ReadAction.compute(() -> psiFile.getText());
+            
+            // Build error message
+            StringBuilder errorMessage = new StringBuilder();
+            
+            for (CompilerMessage error : errors) {
+                errorMessage.append(error.getMessage()).append("\n");
+                errorMessage.append("Line: ").append(error.getLine()).append(", Column: ").append(error.getColumn()).append("\n\n");
+            }
+            
+            // Fix code
+            LOG.info("Fixing code with error message: " + errorMessage);
+            
+            CompletableFuture<String> fixedCodeFuture = codeGenService.fixCode(
+                    content,
+                    errorMessage.toString(),
+                    Map.of("filePath", filePath)
+            );
+            
+            // Wait for fixed code
+            String fixedCode;
+            
+            try {
+                fixedCode = fixedCodeFuture.get(30, TimeUnit.SECONDS);
+            } catch (Exception e) {
+                LOG.error("Error getting fixed code", e);
+                return;
+            }
+            
+            if (fixedCode == null || fixedCode.isEmpty() || fixedCode.equals(content)) {
+                LOG.info("No changes in fixed code, skipping update");
+                return;
+            }
+            
+            // Update file
+            updateFile(file, fixedCode);
+            
+            // Update error count
+            int count = errorCounts.getOrDefault(filePath, 0);
+            errorCounts.put(filePath, count + errors.size());
+            
+            LOG.info("File fixed: " + filePath);
+            
+        } catch (Exception e) {
+            LOG.error("Error fixing file: " + filePath, e);
         }
+    }
+    
+    /**
+     * Updates a file with new content.
+     * @param file The file
+     * @param newContent The new content
+     */
+    private void updateFile(VirtualFile file, String newContent) {
+        ApplicationManager.getApplication().invokeLater(() -> {
+            ApplicationManager.getApplication().runWriteAction(() -> {
+                try {
+                    FileDocumentManager fileDocumentManager = FileDocumentManager.getInstance();
+                    fileDocumentManager.getDocument(file).setText(newContent);
+                    fileDocumentManager.saveDocument(fileDocumentManager.getDocument(file));
+                    
+                    LOG.info("File updated: " + file.getPath());
+                    
+                } catch (Exception e) {
+                    LOG.error("Error updating file: " + file.getPath(), e);
+                }
+            });
+        });
     }
 }

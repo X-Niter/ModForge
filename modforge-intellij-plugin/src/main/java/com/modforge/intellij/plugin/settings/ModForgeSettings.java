@@ -2,7 +2,7 @@ package com.modforge.intellij.plugin.settings;
 
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.components.PersistentStateComponent;
-import com.intellij.openapi.components.ServiceManager;
+import com.intellij.openapi.components.Service;
 import com.intellij.openapi.components.State;
 import com.intellij.openapi.components.Storage;
 import com.intellij.util.xmlb.XmlSerializerUtil;
@@ -10,239 +10,225 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * Persistent settings for ModForge plugin.
+ * Settings for ModForge.
+ * These settings are persisted between IDE restarts.
  */
+@Service(Service.Level.APP)
 @State(
-        name = "ModForgeSettings",
-        storages = {@Storage("ModForgeSettings.xml")}
+        name = "com.modforge.intellij.plugin.settings.ModForgeSettings",
+        storages = {@Storage("modForgeSettings.xml")}
 )
-public class ModForgeSettings implements PersistentStateComponent<ModForgeSettings> {
-    // General settings
-    private boolean enableAIAssist = true;
-    private boolean enableContinuousDevelopment = true;
-    private boolean autoFixCompilationErrors = true;
-    private int maxAutoFixAttempts = 3;
-    private int maxEnhancementsPerFile = 5;
-    
+public final class ModForgeSettings implements PersistentStateComponent<ModForgeSettings> {
     // API settings
-    private String openAIApiKey = "";
-    private boolean usePatternRecognition = true;
-    private double similarityThreshold = 0.7;
+    private String apiKey = "";
+    private String aiModel = "gpt-4";
     
-    // Web sync settings
-    private String serverUrl = "https://modforge.io/api";
-    private String apiToken = "";
-    private boolean enableSync = false;
-    private int syncInterval = 300; // 5 minutes
+    // Development settings
+    private boolean continuousDevelopmentEnabled = true;
+    private int continuousDevelopmentIntervalMinutes = 5;
+    private boolean patternRecognitionEnabled = true;
+    
+    // Sync settings
+    private String syncServerUrl = "https://modforge.io/api";
+    private String syncToken = "";
+    private boolean syncEnabled = false;
+    private boolean autoUploadEnabled = false;
+    private boolean autoDownloadEnabled = false;
+    
+    // UI settings
+    private boolean darkTheme = true;
     
     /**
-     * Gets the ModForge settings instance.
-     * @return The ModForge settings
+     * Gets the instance of the settings.
+     * @return The settings instance
      */
     public static ModForgeSettings getInstance() {
         return ApplicationManager.getApplication().getService(ModForgeSettings.class);
     }
-
-    @Nullable
+    
     @Override
-    public ModForgeSettings getState() {
+    public @Nullable ModForgeSettings getState() {
         return this;
     }
-
+    
     @Override
     public void loadState(@NotNull ModForgeSettings state) {
         XmlSerializerUtil.copyBean(state, this);
     }
-
+    
     /**
-     * Checks if AI assist is enabled.
-     * @return True if AI assist is enabled
+     * Gets the API key.
+     * @return The API key
      */
-    public boolean isEnableAIAssist() {
-        return enableAIAssist;
+    public String getApiKey() {
+        return apiKey;
     }
-
+    
     /**
-     * Sets whether AI assist is enabled.
-     * @param enableAIAssist Whether AI assist is enabled
+     * Sets the API key.
+     * @param apiKey The API key
      */
-    public void setEnableAIAssist(boolean enableAIAssist) {
-        this.enableAIAssist = enableAIAssist;
+    public void setApiKey(String apiKey) {
+        this.apiKey = apiKey;
     }
-
+    
+    /**
+     * Gets the AI model.
+     * @return The AI model
+     */
+    public String getAiModel() {
+        return aiModel;
+    }
+    
+    /**
+     * Sets the AI model.
+     * @param aiModel The AI model
+     */
+    public void setAiModel(String aiModel) {
+        this.aiModel = aiModel;
+    }
+    
     /**
      * Checks if continuous development is enabled.
-     * @return True if continuous development is enabled
+     * @return True if enabled, false otherwise
      */
-    public boolean isEnableContinuousDevelopment() {
-        return enableContinuousDevelopment;
+    public boolean isContinuousDevelopmentEnabled() {
+        return continuousDevelopmentEnabled;
     }
-
+    
     /**
      * Sets whether continuous development is enabled.
-     * @param enableContinuousDevelopment Whether continuous development is enabled
+     * @param continuousDevelopmentEnabled True to enable, false to disable
      */
-    public void setEnableContinuousDevelopment(boolean enableContinuousDevelopment) {
-        this.enableContinuousDevelopment = enableContinuousDevelopment;
+    public void setContinuousDevelopmentEnabled(boolean continuousDevelopmentEnabled) {
+        this.continuousDevelopmentEnabled = continuousDevelopmentEnabled;
     }
-
+    
     /**
-     * Checks if automatic compilation error fixing is enabled.
-     * @return True if automatic compilation error fixing is enabled
+     * Gets the continuous development interval in minutes.
+     * @return The interval in minutes
      */
-    public boolean isAutoFixCompilationErrors() {
-        return autoFixCompilationErrors;
+    public int getContinuousDevelopmentIntervalMinutes() {
+        return continuousDevelopmentIntervalMinutes;
     }
-
+    
     /**
-     * Sets whether automatic compilation error fixing is enabled.
-     * @param autoFixCompilationErrors Whether automatic compilation error fixing is enabled
+     * Sets the continuous development interval in minutes.
+     * @param continuousDevelopmentIntervalMinutes The interval in minutes
      */
-    public void setAutoFixCompilationErrors(boolean autoFixCompilationErrors) {
-        this.autoFixCompilationErrors = autoFixCompilationErrors;
+    public void setContinuousDevelopmentIntervalMinutes(int continuousDevelopmentIntervalMinutes) {
+        this.continuousDevelopmentIntervalMinutes = continuousDevelopmentIntervalMinutes;
     }
-
-    /**
-     * Gets the maximum number of automatic fix attempts.
-     * @return The maximum number of automatic fix attempts
-     */
-    public int getMaxAutoFixAttempts() {
-        return maxAutoFixAttempts;
-    }
-
-    /**
-     * Sets the maximum number of automatic fix attempts.
-     * @param maxAutoFixAttempts The maximum number of automatic fix attempts
-     */
-    public void setMaxAutoFixAttempts(int maxAutoFixAttempts) {
-        this.maxAutoFixAttempts = maxAutoFixAttempts;
-    }
-
-    /**
-     * Gets the maximum number of enhancements per file.
-     * @return The maximum number of enhancements per file
-     */
-    public int getMaxEnhancementsPerFile() {
-        return maxEnhancementsPerFile;
-    }
-
-    /**
-     * Sets the maximum number of enhancements per file.
-     * @param maxEnhancementsPerFile The maximum number of enhancements per file
-     */
-    public void setMaxEnhancementsPerFile(int maxEnhancementsPerFile) {
-        this.maxEnhancementsPerFile = maxEnhancementsPerFile;
-    }
-
-    /**
-     * Gets the OpenAI API key.
-     * @return The OpenAI API key
-     */
-    public String getOpenAIApiKey() {
-        return openAIApiKey;
-    }
-
-    /**
-     * Sets the OpenAI API key.
-     * @param openAIApiKey The OpenAI API key
-     */
-    public void setOpenAIApiKey(String openAIApiKey) {
-        this.openAIApiKey = openAIApiKey;
-    }
-
+    
     /**
      * Checks if pattern recognition is enabled.
-     * @return True if pattern recognition is enabled
+     * @return True if enabled, false otherwise
      */
-    public boolean isUsePatternRecognition() {
-        return usePatternRecognition;
+    public boolean isPatternRecognitionEnabled() {
+        return patternRecognitionEnabled;
     }
-
+    
     /**
      * Sets whether pattern recognition is enabled.
-     * @param usePatternRecognition Whether pattern recognition is enabled
+     * @param patternRecognitionEnabled True to enable, false to disable
      */
-    public void setUsePatternRecognition(boolean usePatternRecognition) {
-        this.usePatternRecognition = usePatternRecognition;
+    public void setPatternRecognitionEnabled(boolean patternRecognitionEnabled) {
+        this.patternRecognitionEnabled = patternRecognitionEnabled;
     }
-
+    
     /**
-     * Gets the similarity threshold for pattern matching.
-     * @return The similarity threshold
+     * Gets the sync server URL.
+     * @return The sync server URL
      */
-    public double getSimilarityThreshold() {
-        return similarityThreshold;
+    public String getSyncServerUrl() {
+        return syncServerUrl;
     }
-
+    
     /**
-     * Sets the similarity threshold for pattern matching.
-     * @param similarityThreshold The similarity threshold
+     * Sets the sync server URL.
+     * @param syncServerUrl The sync server URL
      */
-    public void setSimilarityThreshold(double similarityThreshold) {
-        this.similarityThreshold = similarityThreshold;
+    public void setSyncServerUrl(String syncServerUrl) {
+        this.syncServerUrl = syncServerUrl;
     }
-
+    
     /**
-     * Gets the server URL.
-     * @return The server URL
+     * Gets the sync token.
+     * @return The sync token
      */
-    public String getServerUrl() {
-        return serverUrl;
+    public String getSyncToken() {
+        return syncToken;
     }
-
+    
     /**
-     * Sets the server URL.
-     * @param serverUrl The server URL
+     * Sets the sync token.
+     * @param syncToken The sync token
      */
-    public void setServerUrl(String serverUrl) {
-        this.serverUrl = serverUrl;
+    public void setSyncToken(String syncToken) {
+        this.syncToken = syncToken;
     }
-
+    
     /**
-     * Gets the API token.
-     * @return The API token
+     * Checks if sync is enabled.
+     * @return True if enabled, false otherwise
      */
-    public String getApiToken() {
-        return apiToken;
+    public boolean isSyncEnabled() {
+        return syncEnabled;
     }
-
+    
     /**
-     * Sets the API token.
-     * @param apiToken The API token
+     * Sets whether sync is enabled.
+     * @param syncEnabled True to enable, false to disable
      */
-    public void setApiToken(String apiToken) {
-        this.apiToken = apiToken;
+    public void setSyncEnabled(boolean syncEnabled) {
+        this.syncEnabled = syncEnabled;
     }
-
+    
     /**
-     * Checks if synchronization is enabled.
-     * @return True if synchronization is enabled
+     * Checks if auto upload is enabled.
+     * @return True if enabled, false otherwise
      */
-    public boolean isEnableSync() {
-        return enableSync;
+    public boolean isAutoUploadEnabled() {
+        return autoUploadEnabled;
     }
-
+    
     /**
-     * Sets whether synchronization is enabled.
-     * @param enableSync Whether synchronization is enabled
+     * Sets whether auto upload is enabled.
+     * @param autoUploadEnabled True to enable, false to disable
      */
-    public void setEnableSync(boolean enableSync) {
-        this.enableSync = enableSync;
+    public void setAutoUploadEnabled(boolean autoUploadEnabled) {
+        this.autoUploadEnabled = autoUploadEnabled;
     }
-
+    
     /**
-     * Gets the synchronization interval in seconds.
-     * @return The synchronization interval
+     * Checks if auto download is enabled.
+     * @return True if enabled, false otherwise
      */
-    public int getSyncInterval() {
-        return syncInterval;
+    public boolean isAutoDownloadEnabled() {
+        return autoDownloadEnabled;
     }
-
+    
     /**
-     * Sets the synchronization interval in seconds.
-     * @param syncInterval The synchronization interval
+     * Sets whether auto download is enabled.
+     * @param autoDownloadEnabled True to enable, false to disable
      */
-    public void setSyncInterval(int syncInterval) {
-        this.syncInterval = syncInterval;
+    public void setAutoDownloadEnabled(boolean autoDownloadEnabled) {
+        this.autoDownloadEnabled = autoDownloadEnabled;
+    }
+    
+    /**
+     * Checks if dark theme is enabled.
+     * @return True if enabled, false otherwise
+     */
+    public boolean isDarkTheme() {
+        return darkTheme;
+    }
+    
+    /**
+     * Sets whether dark theme is enabled.
+     * @param darkTheme True to enable, false to disable
+     */
+    public void setDarkTheme(boolean darkTheme) {
+        this.darkTheme = darkTheme;
     }
 }

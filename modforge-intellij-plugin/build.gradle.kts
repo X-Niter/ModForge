@@ -1,6 +1,9 @@
+import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
+
 plugins {
     id("java")
-    id("org.jetbrains.intellij") version "1.16.1"
+    id("org.jetbrains.kotlin.jvm") version "1.9.0"
+    id("org.jetbrains.intellij") version "1.16.0"
 }
 
 group = "com.modforge"
@@ -10,87 +13,61 @@ repositories {
     mavenCentral()
 }
 
-dependencies {
-    // WebSocket client for real-time collaboration
-    implementation("org.java-websocket:Java-WebSocket:1.5.4")
-    
-    // JSON processing
-    implementation("com.google.code.gson:gson:2.10.1")
-    
-    // HTTP client for API calls
-    implementation("com.squareup.okhttp3:okhttp:4.11.0")
-}
-
 // Configure Gradle IntelliJ Plugin
 // Read more: https://plugins.jetbrains.com/docs/intellij/tools-gradle-intellij-plugin.html
 intellij {
-    version.set("2023.3")
+    version.set("2023.2")
     type.set("IC") // Target IDE Platform: IntelliJ IDEA Community Edition
-    
-    plugins.set(listOf(
-        "com.intellij.java", // Java plugin for Java support
-        "org.jetbrains.kotlin" // Kotlin plugin for Kotlin support
-    ))
+
+    plugins.set(listOf("com.intellij.java"))
+}
+
+dependencies {
+    implementation("com.squareup.okhttp3:okhttp:4.11.0")
+    implementation("com.google.code.gson:gson:2.10.1")
+    implementation("org.apache.commons:commons-lang3:3.13.0")
+    implementation("org.apache.commons:commons-text:1.10.0")
+    implementation("org.apache.commons:commons-collections4:4.4")
 }
 
 tasks {
-    // Set the JVM compatibility version
+    // Set the JVM compatibility versions
     withType<JavaCompile> {
         sourceCompatibility = "17"
         targetCompatibility = "17"
     }
-    
+    withType<KotlinCompile> {
+        kotlinOptions.jvmTarget = "17"
+    }
+
     patchPluginXml {
-        sinceBuild.set("231") // Minimum IntelliJ version: 2023.1
-        untilBuild.set("")    // No maximum version
+        sinceBuild.set("232")
+        untilBuild.set("242.*")
         
-        // Extract version from plugin.xml
-        version.set(project.version.toString())
-        
-        // Plugin description from plugin.xml
-        pluginDescription.set("""
-            ModForge - AI-powered Minecraft mod development platform.
-            
-            Features:
-            - Autonomous code generation for Minecraft mods
-            - Intelligent error fixing
-            - Real-time collaborative editing
-            - Cross-loader mod development support
-            - API cost reduction through pattern recognition
-            
-            ModForge helps you create, test, and improve Minecraft mods efficiently by leveraging AI and collaborative tools.
-        """.trimIndent())
-        
-        // Change notes for the latest version
         changeNotes.set("""
             <h3>1.0.0</h3>
             <ul>
-                <li>Initial release</li>
-                <li>AI-powered code generation</li>
-                <li>Autonomous error fixing</li>
-                <li>Collaborative editing</li>
-                <li>Pattern recognition for reduced API costs</li>
-                <li>Cross-loader mod development support</li>
+                <li>Initial release of ModForge IntelliJ plugin</li>
+                <li>AI-driven code generation and refactoring</li>
+                <li>Continuous development with automatic error fixing</li>
+                <li>Documentation generation</li>
+                <li>Pattern recognition to reduce API usage</li>
+                <li>Support for multiple mod loaders including Forge, Fabric, and Quilt</li>
             </ul>
-        """.trimIndent())
+        """)
     }
-    
-    // Sign the plugin for distribution
-    signPlugin {
-        // Keystore parameters can be set through environment variables
-        certificateChain.set(System.getenv("INTELLIJ_CERTIFICATE_CHAIN"))
-        privateKey.set(System.getenv("INTELLIJ_PRIVATE_KEY"))
-        password.set(System.getenv("INTELLIJ_PRIVATE_KEY_PASSWORD"))
-    }
-    
-    // Publish the plugin to JetBrains Marketplace
+
     publishPlugin {
         token.set(System.getenv("INTELLIJ_PUBLISH_TOKEN"))
+        channels.set(listOf("stable"))
     }
     
-    // Run IntelliJ with the plugin
+    buildSearchableOptions {
+        enabled = false
+    }
+    
     runIde {
-        // Increase memory for IntelliJ
-        jvmArgs = listOf("-Xmx2048m")
+        // Configure JVM arguments for the IDE instance
+        jvmArgs("-Xmx2g")
     }
 }

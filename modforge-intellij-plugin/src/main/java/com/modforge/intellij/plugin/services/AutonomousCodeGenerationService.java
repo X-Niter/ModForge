@@ -15,6 +15,7 @@ import com.intellij.psi.PsiManager;
 import com.modforge.intellij.plugin.ai.AIServiceManager;
 import com.modforge.intellij.plugin.ai.PatternRecognitionService;
 import com.modforge.intellij.plugin.ai.PatternRecognitionService.Pattern;
+import org.jetbrains.annotations.Nullable;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
