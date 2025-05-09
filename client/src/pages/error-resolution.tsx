@@ -1,5 +1,4 @@
 import { useState, useEffect } from "react";
-import { Layout } from "@/components/ui/layout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
@@ -66,7 +65,6 @@ export default function ErrorResolutionPage() {
     : '0.0%';
 
   return (
-    <Layout>
       <div className="container px-4 pb-8">
         <div className="flex flex-col items-start gap-4 md:flex-row md:justify-between md:gap-8">
           <div className="flex-1 space-y-4">
@@ -341,6 +339,5 @@ export default function ErrorResolutionPage() {
           </TabsContent>
         </Tabs>
       </div>
-    </Layout>
-  );
+    );
 }
