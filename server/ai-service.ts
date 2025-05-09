@@ -20,7 +20,14 @@ function getTimestamp(): string {
   return new Date().toISOString().replace('T', ' ').substring(0, 19);
 }
 
-// Generate mod code using OpenAI
+import { 
+  tryGenerateFromPatterns, 
+  storeCodeGenerationPattern,
+  tryFixFromPatterns,
+  storeErrorFixPattern
+} from './pattern-learning';
+
+// Generate mod code using pattern learning with OpenAI fallback
 export async function generateModCode(
   modName: string,
   modDescription: string,
@@ -36,7 +43,36 @@ export async function generateModCode(
   logs += `[${getTimestamp()}] Using ${modLoader} for Minecraft ${mcVersion}\n`;
   
   try {
-    logs += `[${getTimestamp()}] Sending request to AI service...\n`;
+    // First, try to generate from our existing patterns
+    logs += `[${getTimestamp()}] Searching for similar patterns in our knowledge base...\n`;
+    const patternResult = await tryGenerateFromPatterns(idea, modLoader, mcVersion);
+    
+    // If we found a good pattern match with high confidence, use it
+    if (patternResult.code && patternResult.confidence > 0.8) {
+      logs += `[${getTimestamp()}] Found a highly similar pattern (${Math.round(patternResult.confidence * 100)}% match)! Using cached knowledge...\n`;
+      
+      // Parse the stored code into files
+      // In a real implementation, you would properly store and retrieve the file structure
+      const files = [
+        { 
+          path: `src/main/java/${modName.toLowerCase().replace(/\s+/g, '')}/${modName.replace(/\s+/g, '')}Mod.java`,
+          content: patternResult.code
+        }
+      ];
+      
+      // Record that we used this pattern
+      if (patternResult.patternId) {
+        logs += `[${getTimestamp()}] Using knowledge from pattern #${patternResult.patternId}\n`;
+      }
+      
+      return {
+        files,
+        explanation: "Generated using our knowledge base of Minecraft modding patterns",
+        logs
+      };
+    }
+    
+    logs += `[${getTimestamp()}] No highly similar patterns found. Sending request to AI service...\n`;
     
     // The newest OpenAI model is "gpt-4o" which was released May 13, 2024. do not change this unless explicitly requested by the user
     const prompt = `
@@ -372,7 +408,7 @@ export async function generateCode(
 }
 
 /**
- * Fix code with errors using OpenAI
+ * Fix code with errors using pattern learning with OpenAI fallback
  */
 export async function fixCode(
   code: string,
@@ -381,6 +417,33 @@ export async function fixCode(
 ): Promise<CodeGenerationResponse> {
   try {
     console.log(`[${getTimestamp()}] Fixing code with ${errors.length} errors`);
+    
+    // Extract first error message for pattern matching
+    const firstErrorMessage = errors.length > 0 ? errors[0] : "";
+    
+    // Try to fix from patterns first (if we have an error message to match against)
+    if (firstErrorMessage) {
+      console.log(`[${getTimestamp()}] Searching for known error patterns...`);
+      // Determine mod loader from code content for better pattern matching
+      // This is a simple heuristic - in a real implementation, use proper parsing
+      let modLoader = "unknown";
+      if (code.includes("net.fabricmc")) modLoader = "Fabric";
+      else if (code.includes("net.minecraftforge")) modLoader = "Forge";
+      else if (code.includes("org.bukkit")) modLoader = "Bukkit";
+      
+      const patternResult = await tryFixFromPatterns(firstErrorMessage, code, modLoader);
+      
+      if (patternResult.fixedCode && patternResult.confidence > 0.7) {
+        console.log(`[${getTimestamp()}] Fixed using pattern matching with ${Math.round(patternResult.confidence * 100)}% confidence`);
+        
+        return {
+          code: patternResult.fixedCode,
+          explanation: "Fixed using our knowledge base of common Minecraft modding errors",
+        };
+      }
+    }
+    
+    console.log(`[${getTimestamp()}] No matching pattern found, using AI service...`);
     
     // The newest OpenAI model is "gpt-4o" which was released May 13, 2024. do not change this unless explicitly requested by the user
     const promptText = `
@@ -414,6 +477,34 @@ export async function fixCode(
     });
     
     const result = JSON.parse(response.choices[0].message.content || "{}");
+    
+    // Store the successful fix pattern for future use
+    if (result.code && firstErrorMessage) {
+      console.log(`[${getTimestamp()}] Storing successful fix pattern`);
+      
+      // Determine error type from error message
+      let errorType = "syntax";
+      if (firstErrorMessage.includes("cannot find symbol")) errorType = "symbol_not_found";
+      else if (firstErrorMessage.includes("incompatible types")) errorType = "type_mismatch";
+      else if (firstErrorMessage.includes("is not accessible")) errorType = "access_error";
+      
+      // Determine mod loader if we couldn't earlier
+      let modLoader = "unknown";
+      if (code.includes("net.fabricmc")) modLoader = "Fabric";
+      else if (code.includes("net.minecraftforge")) modLoader = "Forge";
+      else if (code.includes("org.bukkit")) modLoader = "Bukkit";
+      
+      // Simplified fix strategy - in a real implementation, extract a proper pattern
+      const fixStrategy = "Replaced error-causing code with corrected version";
+      
+      // Store the pattern
+      await storeErrorFixPattern(
+        firstErrorMessage,
+        errorType,
+        fixStrategy,
+        modLoader
+      );
+    }
     
     return {
       code: result.code || code,
