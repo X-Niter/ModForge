@@ -1,96 +1,57 @@
 package com.modforge.intellij.plugin.settings;
 
 import com.intellij.openapi.application.ApplicationManager;
-import com.intellij.openapi.components.PersistentStateComponent;
-import com.intellij.openapi.components.Service;
-import com.intellij.openapi.components.State;
-import com.intellij.openapi.components.Storage;
+import com.intellij.openapi.components.*;
 import com.intellij.util.xmlb.XmlSerializerUtil;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * Settings for ModForge.
- * These settings are persisted between IDE restarts.
+ * Persistent settings for the ModForge plugin.
+ * This class is responsible for storing and retrieving plugin settings.
  */
-@Service(Service.Level.APP)
 @State(
-        name = "com.modforge.intellij.plugin.settings.ModForgeSettings",
-        storages = {@Storage("modForgeSettings.xml")}
+        name = "ModForgeSettings",
+        storages = @Storage("modforge.xml")
 )
+@Service(Service.Level.APP)
 public final class ModForgeSettings implements PersistentStateComponent<ModForgeSettings> {
-    // API settings
-    private String apiKey = "";
-    private String aiModel = "gpt-4";
-    
-    // Development settings
-    private boolean continuousDevelopmentEnabled = true;
-    private int continuousDevelopmentIntervalMinutes = 5;
+    private String openAiApiKey = "";
+    private boolean continuousDevelopmentEnabled = false;
+    private long continuousDevelopmentInterval = 60_000; // 1 minute
     private boolean patternRecognitionEnabled = true;
-    
-    // Sync settings
-    private String syncServerUrl = "https://modforge.io/api";
-    private String syncToken = "";
-    private boolean syncEnabled = false;
-    private boolean autoUploadEnabled = false;
-    private boolean autoDownloadEnabled = false;
-    
-    // UI settings
-    private boolean darkTheme = true;
+    private boolean syncWithWebEnabled = false;
+    private String webApiUrl = "https://modforge.io/api";
+    private String webApiKey = "";
     
     /**
-     * Gets the instance of the settings.
-     * @return The settings instance
+     * Gets the ModForge settings.
+     * @return The ModForge settings
      */
     public static ModForgeSettings getInstance() {
         return ApplicationManager.getApplication().getService(ModForgeSettings.class);
     }
     
-    @Override
-    public @Nullable ModForgeSettings getState() {
-        return this;
-    }
-    
-    @Override
-    public void loadState(@NotNull ModForgeSettings state) {
-        XmlSerializerUtil.copyBean(state, this);
+    /**
+     * Gets the OpenAI API key.
+     * @return The OpenAI API key
+     */
+    @NotNull
+    public String getOpenAiApiKey() {
+        return openAiApiKey;
     }
     
     /**
-     * Gets the API key.
-     * @return The API key
+     * Sets the OpenAI API key.
+     * @param openAiApiKey The OpenAI API key
      */
-    public String getApiKey() {
-        return apiKey;
-    }
-    
-    /**
-     * Sets the API key.
-     * @param apiKey The API key
-     */
-    public void setApiKey(String apiKey) {
-        this.apiKey = apiKey;
-    }
-    
-    /**
-     * Gets the AI model.
-     * @return The AI model
-     */
-    public String getAiModel() {
-        return aiModel;
-    }
-    
-    /**
-     * Sets the AI model.
-     * @param aiModel The AI model
-     */
-    public void setAiModel(String aiModel) {
-        this.aiModel = aiModel;
+    public void setOpenAiApiKey(@NotNull String openAiApiKey) {
+        this.openAiApiKey = openAiApiKey;
     }
     
     /**
      * Checks if continuous development is enabled.
-     * @return True if enabled, false otherwise
+     * @return Whether continuous development is enabled
      */
     public boolean isContinuousDevelopmentEnabled() {
         return continuousDevelopmentEnabled;
@@ -98,31 +59,31 @@ public final class ModForgeSettings implements PersistentStateComponent<ModForge
     
     /**
      * Sets whether continuous development is enabled.
-     * @param continuousDevelopmentEnabled True to enable, false to disable
+     * @param enabled Whether continuous development is enabled
      */
-    public void setContinuousDevelopmentEnabled(boolean continuousDevelopmentEnabled) {
-        this.continuousDevelopmentEnabled = continuousDevelopmentEnabled;
+    public void setContinuousDevelopmentEnabled(boolean enabled) {
+        this.continuousDevelopmentEnabled = enabled;
     }
     
     /**
-     * Gets the continuous development interval in minutes.
-     * @return The interval in minutes
+     * Gets the continuous development interval.
+     * @return The continuous development interval in milliseconds
      */
-    public int getContinuousDevelopmentIntervalMinutes() {
-        return continuousDevelopmentIntervalMinutes;
+    public long getContinuousDevelopmentInterval() {
+        return continuousDevelopmentInterval;
     }
     
     /**
-     * Sets the continuous development interval in minutes.
-     * @param continuousDevelopmentIntervalMinutes The interval in minutes
+     * Sets the continuous development interval.
+     * @param intervalMs The continuous development interval in milliseconds
      */
-    public void setContinuousDevelopmentIntervalMinutes(int continuousDevelopmentIntervalMinutes) {
-        this.continuousDevelopmentIntervalMinutes = continuousDevelopmentIntervalMinutes;
+    public void setContinuousDevelopmentInterval(long intervalMs) {
+        this.continuousDevelopmentInterval = intervalMs;
     }
     
     /**
      * Checks if pattern recognition is enabled.
-     * @return True if enabled, false otherwise
+     * @return Whether pattern recognition is enabled
      */
     public boolean isPatternRecognitionEnabled() {
         return patternRecognitionEnabled;
@@ -130,105 +91,70 @@ public final class ModForgeSettings implements PersistentStateComponent<ModForge
     
     /**
      * Sets whether pattern recognition is enabled.
-     * @param patternRecognitionEnabled True to enable, false to disable
+     * @param enabled Whether pattern recognition is enabled
      */
-    public void setPatternRecognitionEnabled(boolean patternRecognitionEnabled) {
-        this.patternRecognitionEnabled = patternRecognitionEnabled;
+    public void setPatternRecognitionEnabled(boolean enabled) {
+        this.patternRecognitionEnabled = enabled;
     }
     
     /**
-     * Gets the sync server URL.
-     * @return The sync server URL
+     * Checks if sync with web is enabled.
+     * @return Whether sync with web is enabled
      */
-    public String getSyncServerUrl() {
-        return syncServerUrl;
+    public boolean isSyncWithWebEnabled() {
+        return syncWithWebEnabled;
     }
     
     /**
-     * Sets the sync server URL.
-     * @param syncServerUrl The sync server URL
+     * Sets whether sync with web is enabled.
+     * @param enabled Whether sync with web is enabled
      */
-    public void setSyncServerUrl(String syncServerUrl) {
-        this.syncServerUrl = syncServerUrl;
+    public void setSyncWithWebEnabled(boolean enabled) {
+        this.syncWithWebEnabled = enabled;
     }
     
     /**
-     * Gets the sync token.
-     * @return The sync token
+     * Gets the web API URL.
+     * @return The web API URL
      */
-    public String getSyncToken() {
-        return syncToken;
+    @NotNull
+    public String getWebApiUrl() {
+        return webApiUrl;
     }
     
     /**
-     * Sets the sync token.
-     * @param syncToken The sync token
+     * Sets the web API URL.
+     * @param webApiUrl The web API URL
      */
-    public void setSyncToken(String syncToken) {
-        this.syncToken = syncToken;
+    public void setWebApiUrl(@NotNull String webApiUrl) {
+        this.webApiUrl = webApiUrl;
     }
     
     /**
-     * Checks if sync is enabled.
-     * @return True if enabled, false otherwise
+     * Gets the web API key.
+     * @return The web API key
      */
-    public boolean isSyncEnabled() {
-        return syncEnabled;
+    @NotNull
+    public String getWebApiKey() {
+        return webApiKey;
     }
     
     /**
-     * Sets whether sync is enabled.
-     * @param syncEnabled True to enable, false to disable
+     * Sets the web API key.
+     * @param webApiKey The web API key
      */
-    public void setSyncEnabled(boolean syncEnabled) {
-        this.syncEnabled = syncEnabled;
+    public void setWebApiKey(@NotNull String webApiKey) {
+        this.webApiKey = webApiKey;
     }
     
-    /**
-     * Checks if auto upload is enabled.
-     * @return True if enabled, false otherwise
-     */
-    public boolean isAutoUploadEnabled() {
-        return autoUploadEnabled;
+    @Nullable
+    @Override
+    public ModForgeSettings getState() {
+        return this;
     }
     
-    /**
-     * Sets whether auto upload is enabled.
-     * @param autoUploadEnabled True to enable, false to disable
-     */
-    public void setAutoUploadEnabled(boolean autoUploadEnabled) {
-        this.autoUploadEnabled = autoUploadEnabled;
-    }
-    
-    /**
-     * Checks if auto download is enabled.
-     * @return True if enabled, false otherwise
-     */
-    public boolean isAutoDownloadEnabled() {
-        return autoDownloadEnabled;
-    }
-    
-    /**
-     * Sets whether auto download is enabled.
-     * @param autoDownloadEnabled True to enable, false to disable
-     */
-    public void setAutoDownloadEnabled(boolean autoDownloadEnabled) {
-        this.autoDownloadEnabled = autoDownloadEnabled;
-    }
-    
-    /**
-     * Checks if dark theme is enabled.
-     * @return True if enabled, false otherwise
-     */
-    public boolean isDarkTheme() {
-        return darkTheme;
-    }
-    
-    /**
-     * Sets whether dark theme is enabled.
-     * @param darkTheme True to enable, false to disable
-     */
-    public void setDarkTheme(boolean darkTheme) {
-        this.darkTheme = darkTheme;
+    @Override
+    public void loadState(@NotNull ModForgeSettings state) {
+        XmlSerializerUtil.copyBean(state, this);
     }
 }

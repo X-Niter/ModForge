@@ -2,64 +2,56 @@ package com.modforge.intellij.plugin.actions;
 
 import com.intellij.openapi.actionSystem.AnAction;
 import com.intellij.openapi.actionSystem.AnActionEvent;
-import com.intellij.openapi.actionSystem.Toggleable;
+import com.intellij.openapi.actionSystem.Presentation;
 import com.intellij.openapi.diagnostic.Logger;
-import com.intellij.openapi.project.Project;
-import com.intellij.openapi.ui.Messages;
-import com.modforge.intellij.plugin.settings.ModForgeSettings;
+import com.modforge.intellij.plugin.ai.PatternRecognitionService;
 import org.jetbrains.annotations.NotNull;
 
 /**
- * Action for toggling pattern recognition.
+ * Action to toggle pattern recognition.
+ * This action enables or disables the pattern recognition service.
  */
-public class TogglePatternRecognitionAction extends AnAction implements Toggleable {
+public final class TogglePatternRecognitionAction extends AnAction {
     private static final Logger LOG = Logger.getInstance(TogglePatternRecognitionAction.class);
     
     @Override
     public void actionPerformed(@NotNull AnActionEvent e) {
-        // Get project
-        Project project = e.getProject();
-        if (project == null) {
-            return;
-        }
-        
         LOG.info("Toggle pattern recognition action performed");
         
-        // Get settings
-        ModForgeSettings settings = ModForgeSettings.getInstance();
+        // Get pattern recognition service
+        PatternRecognitionService service = PatternRecognitionService.getInstance();
         
         // Toggle pattern recognition
-        boolean newValue = !settings.isPatternRecognitionEnabled();
-        settings.setPatternRecognitionEnabled(newValue);
-        
-        if (newValue) {
-            Messages.showInfoMessage(
-                    project,
-                    "Pattern recognition is now enabled. ModForge will learn from your interactions to reduce API usage.",
-                    "Pattern Recognition Enabled"
-            );
-        } else {
-            Messages.showInfoMessage(
-                    project,
-                    "Pattern recognition is now disabled. All API requests will be sent directly to OpenAI.",
-                    "Pattern Recognition Disabled"
-            );
-        }
+        service.setEnabled(!service.isEnabled());
         
         // Update presentation
-        Toggleable.setSelected(e.getPresentation(), newValue);
+        updatePresentation(e.getPresentation(), service.isEnabled());
     }
     
     @Override
     public void update(@NotNull AnActionEvent e) {
-        // Get project
-        Project project = e.getProject();
+        // Show action always
+        e.getPresentation().setEnabledAndVisible(true);
         
-        // Enable only if project is not null
-        e.getPresentation().setEnabled(project != null);
+        // Get pattern recognition service
+        PatternRecognitionService service = PatternRecognitionService.getInstance();
         
-        // Update selected state
-        ModForgeSettings settings = ModForgeSettings.getInstance();
-        Toggleable.setSelected(e.getPresentation(), settings.isPatternRecognitionEnabled());
+        // Update presentation
+        updatePresentation(e.getPresentation(), service.isEnabled());
+    }
+    
+    /**
+     * Updates the action presentation.
+     * @param presentation The presentation to update
+     * @param isEnabled Whether pattern recognition is enabled
+     */
+    private void updatePresentation(@NotNull Presentation presentation, boolean isEnabled) {
+        if (isEnabled) {
+            presentation.setText("Disable Pattern Recognition");
+            presentation.setDescription("Disable pattern recognition to reduce API usage");
+        } else {
+            presentation.setText("Enable Pattern Recognition");
+            presentation.setDescription("Enable pattern recognition to reduce API usage");
+        }
     }
 }

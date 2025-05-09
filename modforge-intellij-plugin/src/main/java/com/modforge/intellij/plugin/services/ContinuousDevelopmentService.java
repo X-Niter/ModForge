@@ -1,46 +1,43 @@
 package com.modforge.intellij.plugin.services;
 
-import com.intellij.compiler.CompilerMessageImpl;
 import com.intellij.openapi.application.ApplicationManager;
-import com.intellij.openapi.application.ReadAction;
-import com.intellij.openapi.compiler.CompileScope;
-import com.intellij.openapi.compiler.CompileStatusNotification;
-import com.intellij.openapi.compiler.CompilerManager;
-import com.intellij.openapi.compiler.CompilerMessage;
 import com.intellij.openapi.components.Service;
 import com.intellij.openapi.diagnostic.Logger;
-import com.intellij.openapi.fileEditor.FileDocumentManager;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiFile;
 import com.intellij.psi.PsiManager;
-import com.intellij.util.concurrency.AppExecutorUtil;
+import com.modforge.intellij.plugin.ai.AIServiceManager;
+import com.modforge.intellij.plugin.listeners.ModForgeCompilationListener;
+import com.modforge.intellij.plugin.services.AutonomousCodeGenerationService.CodeIssue;
 import com.modforge.intellij.plugin.settings.ModForgeSettings;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.*;
 import java.util.concurrent.*;
-import java.util.stream.Collectors;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
- * Service for continuous development of Minecraft mods.
- * This service automatically compiles, finds errors, and fixes them using AI.
+ * Service that provides continuous development capabilities.
+ * This service is responsible for continuously developing code by fixing errors and adding features.
  */
 @Service(Service.Level.PROJECT)
 public final class ContinuousDevelopmentService {
     private static final Logger LOG = Logger.getInstance(ContinuousDevelopmentService.class);
+    private static final long DEFAULT_CHECK_INTERVAL_MS = 60_000; // 1 minute
     
     private final Project project;
-    private final AutonomousCodeGenerationService codeGenService;
-    private final ScheduledExecutorService scheduler;
+    private final AutonomousCodeGenerationService codeGenerationService;
+    private final AtomicBoolean running = new AtomicBoolean(false);
+    private final AtomicInteger fixedErrorCount = new AtomicInteger(0);
+    private final AtomicInteger addedFeatureCount = new AtomicInteger(0);
+    private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
+    private final Map<String, Long> lastModifiedTimes = new ConcurrentHashMap<>();
     
-    private ScheduledFuture<?> scheduledTask;
-    private final Map<String, Integer> errorCounts = new ConcurrentHashMap<>();
-    private final Map<String, Integer> fixAttempts = new ConcurrentHashMap<>();
-    
-    private static final int MAX_FIX_ATTEMPTS = 3;
-    private static final int DEFAULT_INTERVAL_MINUTES = 5;
+    private ScheduledFuture<?> scheduledFuture;
+    private long checkIntervalMs = DEFAULT_CHECK_INTERVAL_MS;
     
     /**
      * Creates a new ContinuousDevelopmentService.
@@ -48,10 +45,20 @@ public final class ContinuousDevelopmentService {
      */
     public ContinuousDevelopmentService(Project project) {
         this.project = project;
-        this.codeGenService = AutonomousCodeGenerationService.getInstance(project);
-        this.scheduler = AppExecutorUtil.getAppScheduledExecutorService();
+        this.codeGenerationService = AutonomousCodeGenerationService.getInstance(project);
         
         LOG.info("Continuous development service created for project: " + project.getName());
+        
+        // Load settings
+        ModForgeSettings settings = ModForgeSettings.getInstance();
+        
+        if (settings != null) {
+            if (settings.isContinuousDevelopmentEnabled()) {
+                start();
+            }
+            
+            checkIntervalMs = settings.getContinuousDevelopmentInterval();
+        }
     }
     
     /**
@@ -67,275 +74,247 @@ public final class ContinuousDevelopmentService {
      * Starts continuous development.
      */
     public void start() {
-        if (isRunning()) {
-            LOG.info("Continuous development is already running");
-            return;
+        if (running.compareAndSet(false, true)) {
+            LOG.info("Starting continuous development");
+            
+            // Schedule periodic checks
+            scheduledFuture = scheduler.scheduleAtFixedRate(this::check, checkIntervalMs, checkIntervalMs, TimeUnit.MILLISECONDS);
+            
+            // Update settings
+            ModForgeSettings settings = ModForgeSettings.getInstance();
+            
+            if (settings != null) {
+                settings.setContinuousDevelopmentEnabled(true);
+            }
         }
-        
-        LOG.info("Starting continuous development");
-        
-        // Get settings
-        ModForgeSettings settings = ModForgeSettings.getInstance();
-        
-        if (!settings.isContinuousDevelopmentEnabled()) {
-            LOG.info("Continuous development is disabled in settings");
-            return;
-        }
-        
-        // Get interval
-        int intervalMinutes = settings.getContinuousDevelopmentIntervalMinutes();
-        
-        if (intervalMinutes <= 0) {
-            intervalMinutes = DEFAULT_INTERVAL_MINUTES;
-        }
-        
-        // Schedule task
-        scheduledTask = scheduler.scheduleAtFixedRate(
-                this::processDevelopmentCycle,
-                0,
-                intervalMinutes,
-                TimeUnit.MINUTES
-        );
-        
-        LOG.info("Continuous development started with interval: " + intervalMinutes + " minutes");
     }
     
     /**
      * Stops continuous development.
      */
     public void stop() {
-        if (!isRunning()) {
-            LOG.info("Continuous development is not running");
-            return;
+        if (running.compareAndSet(true, false)) {
+            LOG.info("Stopping continuous development");
+            
+            // Cancel scheduled checks
+            if (scheduledFuture != null) {
+                scheduledFuture.cancel(false);
+            }
+            
+            // Update settings
+            ModForgeSettings settings = ModForgeSettings.getInstance();
+            
+            if (settings != null) {
+                settings.setContinuousDevelopmentEnabled(false);
+            }
         }
-        
-        LOG.info("Stopping continuous development");
-        
-        // Cancel task
-        if (scheduledTask != null) {
-            scheduledTask.cancel(false);
-            scheduledTask = null;
-        }
-        
-        LOG.info("Continuous development stopped");
     }
     
     /**
      * Checks if continuous development is running.
-     * @return True if running, false otherwise
+     * @return Whether continuous development is running
      */
     public boolean isRunning() {
-        return scheduledTask != null && !scheduledTask.isDone() && !scheduledTask.isCancelled();
+        return running.get();
     }
     
     /**
-     * Resets error counts and fix attempts.
+     * Sets the check interval.
+     * @param intervalMs The check interval in milliseconds
      */
-    public void reset() {
-        LOG.info("Resetting error counts and fix attempts");
-        errorCounts.clear();
-        fixAttempts.clear();
-    }
-    
-    /**
-     * Gets statistics about the continuous development process.
-     * @return Statistics
-     */
-    public Map<String, Object> getStatistics() {
-        Map<String, Object> stats = new HashMap<>();
+    public void setCheckInterval(long intervalMs) {
+        LOG.info("Setting check interval to " + intervalMs + "ms");
         
-        // Add running status
-        stats.put("running", isRunning());
+        this.checkIntervalMs = intervalMs;
         
-        // Get settings
+        // Restart if running
+        if (running.get()) {
+            stop();
+            start();
+        }
+        
+        // Update settings
         ModForgeSettings settings = ModForgeSettings.getInstance();
         
-        // Add interval
-        stats.put("intervalMinutes", settings.getContinuousDevelopmentIntervalMinutes());
-        
-        // Add error counts
-        stats.put("errorCount", errorCounts.size());
-        stats.put("fixAttempts", fixAttempts.size());
-        
-        // Add files with most errors
-        List<Map.Entry<String, Integer>> topErrors = errorCounts.entrySet().stream()
-                .sorted(Map.Entry.<String, Integer>comparingByValue().reversed())
-                .limit(5)
-                .collect(Collectors.toList());
-        
-        stats.put("topErrors", topErrors);
-        
-        return stats;
-    }
-    
-    /**
-     * Processes a development cycle.
-     * This is the main method that runs periodically.
-     */
-    private void processDevelopmentCycle() {
-        try {
-            LOG.info("Processing development cycle");
-            
-            // Save all documents
-            ApplicationManager.getApplication().invokeAndWait(() -> {
-                FileDocumentManager.getInstance().saveAllDocuments();
-            });
-            
-            // Compile project
-            compileProject();
-            
-        } catch (Exception e) {
-            LOG.error("Error processing development cycle", e);
+        if (settings != null) {
+            settings.setContinuousDevelopmentInterval(intervalMs);
         }
     }
     
     /**
-     * Compiles the project and handles errors.
+     * Gets the check interval.
+     * @return The check interval in milliseconds
      */
-    private void compileProject() {
-        LOG.info("Compiling project");
-        
-        CompilerManager compilerManager = CompilerManager.getInstance(project);
-        
-        // Create compile scope
-        CompileScope scope = compilerManager.createProjectCompileScope(project);
-        
-        // Compile notification
-        CompileStatusNotification notification = (aborted, errors, warnings, compileContext) -> {
-            LOG.info("Compilation finished: aborted=" + aborted + ", errors=" + errors + ", warnings=" + warnings);
-            
-            if (aborted) {
-                LOG.info("Compilation was aborted");
-                return;
-            }
-            
-            if (errors > 0) {
-                LOG.info("Compilation had errors, attempting to fix");
-                
-                // Get error messages
-                CompilerMessage[] errorMessages = compileContext.getMessages(CompilerMessage.Kind.ERROR);
-                
-                // Fix errors
-                fixCompilationErrors(errorMessages);
-            } else {
-                LOG.info("Compilation successful");
-                
-                // Reset error counts for successfully compiled files
-                resetSuccessfulFiles();
-            }
-        };
-        
-        // Make sure to run this on the event dispatch thread
-        ApplicationManager.getApplication().invokeAndWait(() -> {
-            compilerManager.compile(scope, notification);
-        });
+    public long getCheckInterval() {
+        return checkIntervalMs;
     }
     
     /**
-     * Resets error counts for successfully compiled files.
+     * Gets statistics about continuous development.
+     * @return Statistics
      */
-    private void resetSuccessfulFiles() {
-        // Create a copy of the keys to avoid concurrent modification
-        Set<String> fileKeys = new HashSet<>(errorCounts.keySet());
+    @NotNull
+    public Map<String, Object> getStatistics() {
+        Map<String, Object> statistics = new HashMap<>();
         
-        for (String filePath : fileKeys) {
-            try {
-                // Check if the file exists
-                VirtualFile file = project.getBaseDir().findFileByRelativePath(filePath);
-                
-                if (file != null) {
-                    errorCounts.remove(filePath);
-                    fixAttempts.remove(filePath);
-                    LOG.info("Reset error count for successfully compiled file: " + filePath);
-                }
-            } catch (Exception e) {
-                LOG.error("Error resetting error count for file: " + filePath, e);
-            }
-        }
+        statistics.put("running", running.get());
+        statistics.put("fixedErrorCount", fixedErrorCount.get());
+        statistics.put("addedFeatureCount", addedFeatureCount.get());
+        statistics.put("checkIntervalMs", checkIntervalMs);
+        
+        return statistics;
     }
     
     /**
-     * Fixes compilation errors.
-     * @param errorMessages The error messages
+     * Performs a check for errors and fixes them.
+     * This method is called periodically by the scheduler.
      */
-    private void fixCompilationErrors(CompilerMessage[] errorMessages) {
-        if (errorMessages == null || errorMessages.length == 0) {
-            LOG.info("No error messages to fix");
+    private void check() {
+        if (!running.get()) {
             return;
         }
         
-        LOG.info("Fixing " + errorMessages.length + " compilation errors");
-        
-        // Group errors by file
-        Map<String, List<CompilerMessage>> errorsByFile = groupErrorsByFile(errorMessages);
-        
-        // Fix each file
-        for (Map.Entry<String, List<CompilerMessage>> entry : errorsByFile.entrySet()) {
-            String filePath = entry.getKey();
-            List<CompilerMessage> errors = entry.getValue();
-            
-            // Check if we should attempt to fix this file
-            if (!shouldAttemptFix(filePath)) {
-                LOG.info("Skipping fix for file: " + filePath + " (too many attempts)");
-                continue;
-            }
-            
-            // Fix file
-            fixFile(filePath, errors);
-        }
-    }
-    
-    /**
-     * Groups error messages by file.
-     * @param errorMessages The error messages
-     * @return Errors grouped by file
-     */
-    private Map<String, List<CompilerMessage>> groupErrorsByFile(CompilerMessage[] errorMessages) {
-        Map<String, List<CompilerMessage>> errorsByFile = new HashMap<>();
-        
-        for (CompilerMessage message : errorMessages) {
-            if (message.getVirtualFile() == null) {
-                continue;
-            }
-            
-            String filePath = message.getVirtualFile().getPath();
-            
-            if (!errorsByFile.containsKey(filePath)) {
-                errorsByFile.put(filePath, new ArrayList<>());
-            }
-            
-            errorsByFile.get(filePath).add(message);
-        }
-        
-        return errorsByFile;
-    }
-    
-    /**
-     * Checks if we should attempt to fix a file.
-     * @param filePath The file path
-     * @return True if we should attempt to fix, false otherwise
-     */
-    private boolean shouldAttemptFix(String filePath) {
-        // Get fix attempts
-        int attempts = fixAttempts.getOrDefault(filePath, 0);
-        
-        // Increment
-        fixAttempts.put(filePath, attempts + 1);
-        
-        // Check if we should attempt
-        return attempts < MAX_FIX_ATTEMPTS;
-    }
-    
-    /**
-     * Fixes a file.
-     * @param filePath The file path
-     * @param errors The errors
-     */
-    private void fixFile(String filePath, List<CompilerMessage> errors) {
-        LOG.info("Fixing file: " + filePath + " with " + errors.size() + " errors");
+        LOG.info("Performing continuous development check");
         
         try {
-            // Get file
+            // Check for errors
+            List<CodeIssue> issues = getActiveIssues();
+            
+            if (!issues.isEmpty()) {
+                LOG.info("Found " + issues.size() + " issues to fix");
+                
+                // Fix issues
+                fixIssues(issues);
+            } else {
+                LOG.info("No issues found");
+                
+                // Try to add features
+                addFeatures();
+            }
+        } catch (Exception e) {
+            LOG.error("Error during continuous development check", e);
+        }
+    }
+    
+    /**
+     * Gets active issues in the project.
+     * @return Active issues
+     */
+    @NotNull
+    private List<CodeIssue> getActiveIssues() {
+        // Get compilation issues from listener
+        ModForgeCompilationListener compilationListener = project.getService(ModForgeCompilationListener.class);
+        
+        if (compilationListener != null) {
+            List<ModForgeCompilationListener.CompilationIssue> compilationIssues = compilationListener.getActiveIssues();
+            
+            if (!compilationIssues.isEmpty()) {
+                // Convert to code issues
+                List<CodeIssue> issues = new ArrayList<>();
+                
+                for (ModForgeCompilationListener.CompilationIssue compilationIssue : compilationIssues) {
+                    // Get file content
+                    String filePath = compilationIssue.getFile();
+                    String fileContent = getFileContent(filePath);
+                    
+                    if (fileContent != null) {
+                        issues.add(new CodeIssue(
+                                compilationIssue.getMessage(),
+                                compilationIssue.getLine(),
+                                compilationIssue.getColumn(),
+                                filePath,
+                                fileContent
+                        ));
+                    }
+                }
+                
+                return issues;
+            }
+        }
+        
+        return Collections.emptyList();
+    }
+    
+    /**
+     * Gets the content of a file.
+     * @param filePath The file path
+     * @return The file content or null if an error occurs
+     */
+    @Nullable
+    private String getFileContent(@NotNull String filePath) {
+        try {
+            // Find the file
+            VirtualFile file = project.getBaseDir().findFileByRelativePath(filePath);
+            
+            if (file == null) {
+                LOG.error("File not found: " + filePath);
+                return null;
+            }
+            
+            // Get PSI file
+            PsiFile psiFile = PsiManager.getInstance(project).findFile(file);
+            
+            if (psiFile == null) {
+                LOG.error("Could not get PSI file for file: " + filePath);
+                return null;
+            }
+            
+            // Get content
+            return psiFile.getText();
+        } catch (Exception e) {
+            LOG.error("Error getting file content: " + filePath, e);
+            return null;
+        }
+    }
+    
+    /**
+     * Fixes issues.
+     * @param issues The issues to fix
+     */
+    private void fixIssues(@NotNull List<CodeIssue> issues) {
+        if (issues.isEmpty()) {
+            return;
+        }
+        
+        LOG.info("Fixing " + issues.size() + " issues");
+        
+        try {
+            // Fix issues
+            CompletableFuture<Map<String, String>> future = codeGenerationService.fixCodeIssues(issues, null);
+            
+            // Wait for result
+            Map<String, String> fixedFiles = future.get(5, TimeUnit.MINUTES);
+            
+            if (fixedFiles.isEmpty()) {
+                LOG.error("Failed to fix issues");
+                return;
+            }
+            
+            // Update fixed files
+            ApplicationManager.getApplication().invokeLater(() -> {
+                for (Map.Entry<String, String> entry : fixedFiles.entrySet()) {
+                    String filePath = entry.getKey();
+                    String fixedCode = entry.getValue();
+                    
+                    updateFile(filePath, fixedCode);
+                }
+                
+                // Update statistics
+                fixedErrorCount.addAndGet(issues.size());
+            });
+        } catch (Exception e) {
+            LOG.error("Error fixing issues", e);
+        }
+    }
+    
+    /**
+     * Updates a file with new content.
+     * @param filePath The file path
+     * @param newContent The new content
+     */
+    private void updateFile(@NotNull String filePath, @NotNull String newContent) {
+        try {
+            // Find the file
             VirtualFile file = project.getBaseDir().findFileByRelativePath(filePath);
             
             if (file == null) {
@@ -343,82 +322,85 @@ public final class ContinuousDevelopmentService {
                 return;
             }
             
-            // Get PSI file
-            PsiFile psiFile = ReadAction.compute(() -> PsiManager.getInstance(project).findFile(file));
-            
-            if (psiFile == null) {
-                LOG.error("PSI file not found: " + filePath);
-                return;
-            }
-            
-            // Get file content
-            String content = ReadAction.compute(() -> psiFile.getText());
-            
-            // Build error message
-            StringBuilder errorMessage = new StringBuilder();
-            
-            for (CompilerMessage error : errors) {
-                errorMessage.append(error.getMessage()).append("\n");
-                errorMessage.append("Line: ").append(error.getLine()).append(", Column: ").append(error.getColumn()).append("\n\n");
-            }
-            
-            // Fix code
-            LOG.info("Fixing code with error message: " + errorMessage);
-            
-            CompletableFuture<String> fixedCodeFuture = codeGenService.fixCode(
-                    content,
-                    errorMessage.toString(),
-                    Map.of("filePath", filePath)
-            );
-            
-            // Wait for fixed code
-            String fixedCode;
-            
-            try {
-                fixedCode = fixedCodeFuture.get(30, TimeUnit.SECONDS);
-            } catch (Exception e) {
-                LOG.error("Error getting fixed code", e);
-                return;
-            }
-            
-            if (fixedCode == null || fixedCode.isEmpty() || fixedCode.equals(content)) {
-                LOG.info("No changes in fixed code, skipping update");
-                return;
-            }
-            
-            // Update file
-            updateFile(file, fixedCode);
-            
-            // Update error count
-            int count = errorCounts.getOrDefault(filePath, 0);
-            errorCounts.put(filePath, count + errors.size());
-            
-            LOG.info("File fixed: " + filePath);
-            
+            // Update file content
+            ApplicationManager.getApplication().runWriteAction(() -> {
+                try {
+                    file.setBinaryContent(newContent.getBytes());
+                    
+                    // Update last modified time
+                    lastModifiedTimes.put(filePath, file.getTimeStamp());
+                    
+                    LOG.info("Updated file: " + filePath);
+                } catch (Exception e) {
+                    LOG.error("Error updating file: " + filePath, e);
+                }
+            });
         } catch (Exception e) {
-            LOG.error("Error fixing file: " + filePath, e);
+            LOG.error("Error updating file: " + filePath, e);
         }
     }
     
     /**
-     * Updates a file with new content.
-     * @param file The file
-     * @param newContent The new content
+     * Adds features to the project.
      */
-    private void updateFile(VirtualFile file, String newContent) {
-        ApplicationManager.getApplication().invokeLater(() -> {
-            ApplicationManager.getApplication().runWriteAction(() -> {
-                try {
-                    FileDocumentManager fileDocumentManager = FileDocumentManager.getInstance();
-                    fileDocumentManager.getDocument(file).setText(newContent);
-                    fileDocumentManager.saveDocument(fileDocumentManager.getDocument(file));
-                    
-                    LOG.info("File updated: " + file.getPath());
-                    
-                } catch (Exception e) {
-                    LOG.error("Error updating file: " + file.getPath(), e);
-                }
-            });
-        });
+    private void addFeatures() {
+        // This is a more complex task that would require analyzing the project
+        // and determining what features to add. For now, we'll leave it as a placeholder.
+        
+        LOG.info("Feature addition is not implemented yet");
+    }
+    
+    /**
+     * Checks if a file has been modified since the last time it was updated.
+     * @param filePath The file path
+     * @return Whether the file has been modified
+     */
+    private boolean isFileModified(@NotNull String filePath) {
+        try {
+            // Find the file
+            VirtualFile file = project.getBaseDir().findFileByRelativePath(filePath);
+            
+            if (file == null) {
+                return false;
+            }
+            
+            // Get last modified time
+            Long lastModifiedTime = lastModifiedTimes.get(filePath);
+            
+            if (lastModifiedTime == null) {
+                // File hasn't been tracked yet
+                lastModifiedTimes.put(filePath, file.getTimeStamp());
+                return false;
+            }
+            
+            // Check if file has been modified
+            return file.getTimeStamp() > lastModifiedTime;
+        } catch (Exception e) {
+            LOG.error("Error checking if file is modified: " + filePath, e);
+            return false;
+        }
+    }
+    
+    /**
+     * Cleans up resources when the project is closed.
+     */
+    public void dispose() {
+        LOG.info("Disposing continuous development service");
+        
+        // Stop continuous development
+        stop();
+        
+        // Shutdown scheduler
+        scheduler.shutdown();
+        
+        try {
+            // Wait for tasks to complete
+            if (!scheduler.awaitTermination(1, TimeUnit.SECONDS)) {
+                scheduler.shutdownNow();
+            }
+        } catch (InterruptedException e) {
+            scheduler.shutdownNow();
+            Thread.currentThread().interrupt();
+        }
     }
 }

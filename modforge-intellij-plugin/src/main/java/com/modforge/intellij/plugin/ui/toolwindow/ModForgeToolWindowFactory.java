@@ -9,40 +9,41 @@ import org.jetbrains.annotations.NotNull;
 
 /**
  * Factory for creating the ModForge tool window.
+ * This factory is responsible for creating the tool window and its contents.
  */
-public class ModForgeToolWindowFactory implements ToolWindowFactory {
+public final class ModForgeToolWindowFactory implements ToolWindowFactory {
     @Override
     public void createToolWindowContent(@NotNull Project project, @NotNull ToolWindow toolWindow) {
         // Create panels
-        AIAssistPanel aiAssistPanel = new AIAssistPanel(project, toolWindow);
-        MetricsPanel metricsPanel = new MetricsPanel(project, toolWindow);
-        SettingsPanel settingsPanel = new SettingsPanel(project, toolWindow);
+        AIAssistPanel aiAssistPanel = new AIAssistPanel(project);
+        MetricsPanel metricsPanel = new MetricsPanel(project);
+        SettingsPanel settingsPanel = new SettingsPanel(project);
         
-        // Get content factory
+        // Create content factory
         ContentFactory contentFactory = ContentFactory.getInstance();
         
-        // Add AI assist panel
+        // Create contents
         Content aiAssistContent = contentFactory.createContent(
                 aiAssistPanel.getContent(),
                 "AI Assist",
                 false
         );
-        toolWindow.getContentManager().addContent(aiAssistContent);
         
-        // Add metrics panel
         Content metricsContent = contentFactory.createContent(
                 metricsPanel.getContent(),
                 "Metrics",
                 false
         );
-        toolWindow.getContentManager().addContent(metricsContent);
         
-        // Add settings panel
         Content settingsContent = contentFactory.createContent(
                 settingsPanel.getContent(),
                 "Settings",
                 false
         );
+        
+        // Add contents to tool window
+        toolWindow.getContentManager().addContent(aiAssistContent);
+        toolWindow.getContentManager().addContent(metricsContent);
         toolWindow.getContentManager().addContent(settingsContent);
     }
 }

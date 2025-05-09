@@ -1,54 +1,53 @@
 package com.modforge.intellij.plugin.ai;
 
-import com.google.gson.Gson;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.components.Service;
 import com.intellij.openapi.diagnostic.Logger;
-import com.intellij.util.concurrency.AppExecutorUtil;
 import com.modforge.intellij.plugin.settings.ModForgeSettings;
-import okhttp3.*;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.io.IOException;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.time.Duration;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.Executor;
+import java.util.concurrent.Executors;
 
 /**
- * Service for interacting with AI services.
- * This service is responsible for making requests to various AI providers.
+ * Service that manages AI API requests.
+ * This service is responsible for handling requests to the OpenAI API.
  */
 @Service(Service.Level.APP)
 public final class AIServiceManager {
     private static final Logger LOG = Logger.getInstance(AIServiceManager.class);
+    private static final int DEFAULT_TIMEOUT_SECONDS = 60;
+    private static final String OPENAI_API_URL = "https://api.openai.com/v1/chat/completions";
+    private static final String DEFAULT_MODEL = "gpt-4o";
     
-    private static final int TIMEOUT_SECONDS = 60;
-    private static final MediaType JSON_MEDIA_TYPE = MediaType.parse("application/json; charset=utf-8");
-    
-    private final OkHttpClient httpClient;
-    private final Gson gson;
-    private final PatternRecognitionService patternRecognitionService;
+    private final HttpClient httpClient;
+    private final Executor executor;
     
     /**
      * Creates a new AIServiceManager.
      */
     public AIServiceManager() {
-        httpClient = new OkHttpClient.Builder()
-                .connectTimeout(TIMEOUT_SECONDS, TimeUnit.SECONDS)
-                .readTimeout(TIMEOUT_SECONDS, TimeUnit.SECONDS)
-                .writeTimeout(TIMEOUT_SECONDS, TimeUnit.SECONDS)
+        this.httpClient = HttpClient.newBuilder()
+                .connectTimeout(Duration.ofSeconds(DEFAULT_TIMEOUT_SECONDS))
                 .build();
         
-        gson = new Gson();
-        patternRecognitionService = ApplicationManager.getApplication().getService(PatternRecognitionService.class);
+        this.executor = Executors.newCachedThreadPool();
         
-        LOG.info("AI service manager initialized");
+        LOG.info("AI service manager created");
     }
     
     /**
-     * Gets the AI service manager instance.
+     * Gets the AI service manager.
      * @return The AI service manager
      */
     public static AIServiceManager getInstance() {
@@ -56,202 +55,233 @@ public final class AIServiceManager {
     }
     
     /**
-     * Generates a chat completion.
+     * Generates a chat completion using the OpenAI API.
      * @param prompt The prompt
-     * @param options The options
-     * @return A future that completes with the generated text
+     * @param options Additional options
+     * @return A future that completes with the response
      */
-    @NotNull
     public CompletableFuture<String> generateChatCompletion(@NotNull String prompt, @Nullable Map<String, Object> options) {
-        CompletableFuture<String> future = new CompletableFuture<>();
+        LOG.info("Generating chat completion for prompt: " + prompt);
         
-        // Get options
+        // Create options if null
         Map<String, Object> requestOptions = options != null ? new HashMap<>(options) : new HashMap<>();
         
-        // Get current API key and model
-        ModForgeSettings settings = ModForgeSettings.getInstance();
-        String apiKey = settings.getApiKey();
-        String model = settings.getAiModel();
+        // Create request body
+        Map<String, Object> requestBody = new HashMap<>();
         
-        if (apiKey == null || apiKey.isEmpty()) {
-            future.completeExceptionally(new IllegalStateException("API key not set"));
-            return future;
+        // Set model
+        String model = (String) requestOptions.getOrDefault("model", DEFAULT_MODEL);
+        requestBody.put("model", model);
+        
+        // Set messages
+        Object systemPrompt = requestOptions.get("systemPrompt");
+        
+        if (systemPrompt != null) {
+            requestBody.put("messages", new Object[]{
+                    Map.of("role", "system", "content", systemPrompt),
+                    Map.of("role", "user", "content", prompt)
+            });
+        } else {
+            requestBody.put("messages", new Object[]{
+                    Map.of("role", "user", "content", prompt)
+            });
         }
         
-        // Record API call for metrics
-        patternRecognitionService.recordApiCall();
+        // Set temperature
+        Object temperature = requestOptions.getOrDefault("temperature", 0.7);
+        requestBody.put("temperature", temperature);
         
-        AppExecutorUtil.getAppExecutorService().execute(() -> {
+        // Set max tokens
+        Object maxTokens = requestOptions.getOrDefault("maxTokens", 2048);
+        requestBody.put("max_tokens", maxTokens);
+        
+        // Convert request body to JSON
+        String requestBodyJson = toJson(requestBody);
+        
+        // Create HTTP request
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(OPENAI_API_URL))
+                .header("Content-Type", "application/json")
+                .header("Authorization", "Bearer " + getApiKey())
+                .POST(HttpRequest.BodyPublishers.ofString(requestBodyJson))
+                .build();
+        
+        // Send request asynchronously
+        return CompletableFuture.supplyAsync(() -> {
             try {
-                String systemPrompt = (String) requestOptions.getOrDefault("systemPrompt", 
-                        "You are a helpful AI assistant for Minecraft mod development.");
+                HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
                 
-                Double temperature = (Double) requestOptions.getOrDefault("temperature", 0.7);
-                Integer maxTokens = (Integer) requestOptions.getOrDefault("maxTokens", 1024);
-                
-                // Determine API endpoint and request format based on model
-                if (model.startsWith("gpt")) {
-                    // OpenAI format
-                    String response = generateOpenAICompletion(prompt, systemPrompt, model, temperature, maxTokens, apiKey);
-                    future.complete(response);
-                } else if (model.startsWith("claude")) {
-                    // Anthropic format
-                    String response = generateAnthropicCompletion(prompt, systemPrompt, model, temperature, maxTokens, apiKey);
-                    future.complete(response);
+                // Check if response is successful
+                if (response.statusCode() >= 200 && response.statusCode() < 300) {
+                    // Parse response
+                    String responseBody = response.body();
+                    
+                    // Extract content
+                    return extractContentFromResponse(responseBody);
                 } else {
-                    future.completeExceptionally(new IllegalArgumentException("Unsupported model: " + model));
+                    LOG.error("Error generating chat completion: " + response.statusCode() + " " + response.body());
+                    throw new IOException("Error generating chat completion: " + response.statusCode() + " " + response.body());
                 }
             } catch (Exception e) {
-                LOG.error("Error generating completion", e);
-                future.completeExceptionally(e);
+                LOG.error("Error generating chat completion", e);
+                throw new RuntimeException("Error generating chat completion", e);
             }
-        });
-        
-        return future;
+        }, executor);
     }
     
     /**
-     * Generates a completion using OpenAI.
-     * @param prompt The prompt
-     * @param systemPrompt The system prompt
-     * @param model The model
-     * @param temperature The temperature
-     * @param maxTokens The maximum number of tokens
-     * @param apiKey The API key
-     * @return The generated text
-     * @throws IOException If an error occurs
+     * Gets the API key from settings.
+     * @return The API key
      */
     @NotNull
-    private String generateOpenAICompletion(
-            @NotNull String prompt,
-            @NotNull String systemPrompt,
-            @NotNull String model,
-            double temperature,
-            int maxTokens,
-            @NotNull String apiKey) throws IOException {
+    private String getApiKey() {
+        ModForgeSettings settings = ModForgeSettings.getInstance();
+        String apiKey = settings.getOpenAiApiKey();
         
-        // Create request body
-        Map<String, Object> message1 = new HashMap<>();
-        message1.put("role", "system");
-        message1.put("content", systemPrompt);
+        if (apiKey == null || apiKey.isEmpty()) {
+            throw new IllegalStateException("OpenAI API key is not set. Please set it in the ModForge settings.");
+        }
         
-        Map<String, Object> message2 = new HashMap<>();
-        message2.put("role", "user");
-        message2.put("content", prompt);
-        
-        Map<String, Object> requestBody = new HashMap<>();
-        requestBody.put("model", model);
-        requestBody.put("messages", new Object[]{message1, message2});
-        requestBody.put("temperature", temperature);
-        requestBody.put("max_tokens", maxTokens);
-        
-        // Create request
-        Request request = new Request.Builder()
-                .url("https://api.openai.com/v1/chat/completions")
-                .addHeader("Authorization", "Bearer " + apiKey)
-                .addHeader("Content-Type", "application/json")
-                .post(RequestBody.create(gson.toJson(requestBody), JSON_MEDIA_TYPE))
-                .build();
-        
-        // Execute request
-        try (Response response = httpClient.newCall(request).execute()) {
-            if (!response.isSuccessful()) {
-                throw new IOException("Unexpected response code: " + response.code() + ", message: " + response.message());
-            }
+        return apiKey;
+    }
+    
+    /**
+     * Converts an object to JSON.
+     * @param object The object
+     * @return The JSON
+     */
+    @NotNull
+    private String toJson(@NotNull Object object) {
+        if (object instanceof Map) {
+            @SuppressWarnings("unchecked")
+            Map<String, Object> map = (Map<String, Object>) object;
             
-            ResponseBody responseBody = response.body();
-            if (responseBody == null) {
-                throw new IOException("Response body is null");
-            }
+            StringBuilder json = new StringBuilder();
+            json.append("{");
             
-            String json = responseBody.string();
-            Map<String, Object> responseMap = gson.fromJson(json, Map.class);
+            boolean first = true;
             
-            // Parse response
-            if (responseMap.containsKey("choices") && responseMap.get("choices") instanceof java.util.List) {
-                java.util.List choices = (java.util.List) responseMap.get("choices");
-                if (!choices.isEmpty() && choices.get(0) instanceof Map) {
-                    Map choice = (Map) choices.get(0);
-                    if (choice.containsKey("message") && choice.get("message") instanceof Map) {
-                        Map message = (Map) choice.get("message");
-                        if (message.containsKey("content")) {
-                            return (String) message.get("content");
-                        }
-                    }
+            for (Map.Entry<String, Object> entry : map.entrySet()) {
+                if (!first) {
+                    json.append(",");
                 }
+                
+                json.append("\"").append(entry.getKey()).append("\":");
+                json.append(objectToJson(entry.getValue()));
+                
+                first = false;
             }
             
-            throw new IOException("Failed to parse response: " + json);
+            json.append("}");
+            
+            return json.toString();
+        } else {
+            return objectToJson(object).toString();
         }
     }
     
     /**
-     * Generates a completion using Anthropic.
-     * @param prompt The prompt
-     * @param systemPrompt The system prompt
-     * @param model The model
-     * @param temperature The temperature
-     * @param maxTokens The maximum number of tokens
-     * @param apiKey The API key
-     * @return The generated text
-     * @throws IOException If an error occurs
+     * Converts an object to a JSON value.
+     * @param object The object
+     * @return The JSON value
      */
     @NotNull
-    private String generateAnthropicCompletion(
-            @NotNull String prompt,
-            @NotNull String systemPrompt,
-            @NotNull String model,
-            double temperature,
-            int maxTokens,
-            @NotNull String apiKey) throws IOException {
-        
-        // Create request body
-        Map<String, Object> message1 = new HashMap<>();
-        message1.put("role", "user");
-        message1.put("content", prompt);
-        
-        Map<String, Object> requestBody = new HashMap<>();
-        requestBody.put("model", model);
-        requestBody.put("messages", new Object[]{message1});
-        requestBody.put("system", systemPrompt);
-        requestBody.put("temperature", temperature);
-        requestBody.put("max_tokens", maxTokens);
-        
-        // Create request
-        Request request = new Request.Builder()
-                .url("https://api.anthropic.com/v1/messages")
-                .addHeader("x-api-key", apiKey)
-                .addHeader("anthropic-version", "2023-06-01")
-                .addHeader("Content-Type", "application/json")
-                .post(RequestBody.create(gson.toJson(requestBody), JSON_MEDIA_TYPE))
-                .build();
-        
-        // Execute request
-        try (Response response = httpClient.newCall(request).execute()) {
-            if (!response.isSuccessful()) {
-                throw new IOException("Unexpected response code: " + response.code() + ", message: " + response.message());
-            }
+    private Object objectToJson(@Nullable Object object) {
+        if (object == null) {
+            return "null";
+        } else if (object instanceof String) {
+            return "\"" + ((String) object).replace("\"", "\\\"") + "\"";
+        } else if (object instanceof Number || object instanceof Boolean) {
+            return object.toString();
+        } else if (object instanceof Map) {
+            return toJson(object);
+        } else if (object instanceof Object[]) {
+            StringBuilder json = new StringBuilder();
+            json.append("[");
             
-            ResponseBody responseBody = response.body();
-            if (responseBody == null) {
-                throw new IOException("Response body is null");
-            }
+            Object[] array = (Object[]) object;
+            boolean first = true;
             
-            String json = responseBody.string();
-            Map<String, Object> responseMap = gson.fromJson(json, Map.class);
-            
-            // Parse response
-            if (responseMap.containsKey("content") && responseMap.get("content") instanceof java.util.List) {
-                java.util.List content = (java.util.List) responseMap.get("content");
-                if (!content.isEmpty() && content.get(0) instanceof Map) {
-                    Map contentItem = (Map) content.get(0);
-                    if (contentItem.containsKey("text")) {
-                        return (String) contentItem.get("text");
-                    }
+            for (Object item : array) {
+                if (!first) {
+                    json.append(",");
                 }
+                
+                json.append(objectToJson(item));
+                
+                first = false;
             }
             
-            throw new IOException("Failed to parse response: " + json);
+            json.append("]");
+            
+            return json.toString();
+        } else {
+            return "\"" + object.toString() + "\"";
         }
+    }
+    
+    /**
+     * Extracts content from OpenAI API response.
+     * @param responseBody The response body
+     * @return The content
+     */
+    @NotNull
+    private String extractContentFromResponse(@NotNull String responseBody) {
+        // Simple JSON extraction for OpenAI API response
+        // In a real implementation, use a proper JSON library
+        
+        // Find choices array
+        int choicesStart = responseBody.indexOf("\"choices\"");
+        
+        if (choicesStart == -1) {
+            throw new IllegalArgumentException("Invalid response: no choices found");
+        }
+        
+        // Find first choice
+        int messageStart = responseBody.indexOf("\"message\"", choicesStart);
+        
+        if (messageStart == -1) {
+            throw new IllegalArgumentException("Invalid response: no message found");
+        }
+        
+        // Find content
+        int contentStart = responseBody.indexOf("\"content\"", messageStart);
+        
+        if (contentStart == -1) {
+            throw new IllegalArgumentException("Invalid response: no content found");
+        }
+        
+        // Find content value
+        int valueStart = responseBody.indexOf(":", contentStart) + 1;
+        
+        if (valueStart == 0) {
+            throw new IllegalArgumentException("Invalid response: no content value found");
+        }
+        
+        // Find content value start (after quotes)
+        int contentValueStart = responseBody.indexOf("\"", valueStart) + 1;
+        
+        if (contentValueStart == 0) {
+            throw new IllegalArgumentException("Invalid response: no content value start found");
+        }
+        
+        // Find content value end (before quotes)
+        int contentValueEnd = responseBody.indexOf("\"", contentValueStart);
+        
+        if (contentValueEnd == -1) {
+            throw new IllegalArgumentException("Invalid response: no content value end found");
+        }
+        
+        // Extract content value
+        String content = responseBody.substring(contentValueStart, contentValueEnd);
+        
+        // Unescape JSON
+        content = content.replace("\\\"", "\"")
+                .replace("\\\\", "\\")
+                .replace("\\n", "\n")
+                .replace("\\r", "\r")
+                .replace("\\t", "\t");
+        
+        return content;
     }
 }
