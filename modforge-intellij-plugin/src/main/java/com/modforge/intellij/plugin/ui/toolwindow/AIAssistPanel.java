@@ -1,52 +1,49 @@
 package com.modforge.intellij.plugin.ui.toolwindow;
 
 import com.intellij.icons.AllIcons;
-import com.intellij.openapi.actionSystem.ActionToolbarPosition;
+import com.intellij.openapi.actionSystem.ActionManager;
+import com.intellij.openapi.actionSystem.ActionToolbar;
+import com.intellij.openapi.actionSystem.DefaultActionGroup;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.editor.EditorFactory;
 import com.intellij.openapi.editor.EditorSettings;
+import com.intellij.openapi.editor.colors.EditorColorsManager;
+import com.intellij.openapi.editor.colors.EditorColorsScheme;
 import com.intellij.openapi.editor.ex.EditorEx;
+import com.intellij.openapi.editor.highlighter.EditorHighlighterFactory;
+import com.intellij.openapi.fileTypes.FileType;
 import com.intellij.openapi.fileTypes.FileTypeManager;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.SimpleToolWindowPanel;
-import com.intellij.ui.EditorTextField;
-import com.intellij.ui.ToolbarDecorator;
+import com.intellij.openapi.util.Disposer;
+import com.intellij.ui.JBSplitter;
 import com.intellij.ui.components.JBLabel;
 import com.intellij.ui.components.JBScrollPane;
-import com.intellij.ui.components.JBTabbedPane;
+import com.intellij.ui.components.JBTextArea;
 import com.intellij.util.ui.JBUI;
-import com.intellij.util.ui.UIUtil;
 import com.modforge.intellij.plugin.services.AutonomousCodeGenerationService;
 import org.jetbrains.annotations.NotNull;
 
 import javax.swing.*;
 import java.awt.*;
-import java.util.HashMap;
-import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 
 /**
- * Panel for AI-assisted development.
+ * Panel for AI assistance in the tool window.
  */
-public final class AIAssistPanel extends SimpleToolWindowPanel {
+public class AIAssistPanel extends SimpleToolWindowPanel {
     private final Project project;
-    private final AutonomousCodeGenerationService codeGenService;
+    private final AutonomousCodeGenerationService codeGenerationService;
     
     private JPanel mainPanel;
-    private JBTabbedPane tabbedPane;
-    private JTextArea promptTextArea;
-    private EditorTextField codeEditorField;
-    private JTextArea outputTextArea;
+    private JBTextArea promptTextArea;
+    private Editor outputEditor;
     private JComboBox<String> languageComboBox;
+    private JComboBox<String> taskComboBox;
     private JButton generateButton;
-    private JButton explainButton;
-    private JButton documentButton;
-    private JButton fixButton;
-    private JPanel statusPanel;
-    private JBLabel statusLabel;
-    private JProgressBar progressBar;
+    private JButton clearButton;
     
     /**
      * Creates a new AIAssistPanel.
@@ -55,7 +52,7 @@ public final class AIAssistPanel extends SimpleToolWindowPanel {
     public AIAssistPanel(@NotNull Project project) {
         super(true);
         this.project = project;
-        this.codeGenService = AutonomousCodeGenerationService.getInstance(project);
+        this.codeGenerationService = AutonomousCodeGenerationService.getInstance(project);
         
         initializeUI();
         
@@ -69,55 +66,70 @@ public final class AIAssistPanel extends SimpleToolWindowPanel {
         mainPanel = new JPanel(new BorderLayout());
         mainPanel.setBorder(JBUI.Borders.empty(5));
         
-        // Create top panel
-        JPanel topPanel = createTopPanel();
-        mainPanel.add(topPanel, BorderLayout.NORTH);
+        // Create toolbar
+        DefaultActionGroup actionGroup = new DefaultActionGroup();
+        actionGroup.add(ActionManager.getInstance().getAction("ModForge.GenerateCode"));
+        actionGroup.add(ActionManager.getInstance().getAction("ModForge.FixErrors"));
+        actionGroup.add(ActionManager.getInstance().getAction("ModForge.ExplainCode"));
+        actionGroup.add(ActionManager.getInstance().getAction("ModForge.GenerateDocumentation"));
         
-        // Create center panel
-        tabbedPane = new JBTabbedPane();
+        ActionToolbar toolbar = ActionManager.getInstance().createActionToolbar("ModForgeAIAssist", actionGroup, true);
+        toolbar.setTargetComponent(mainPanel);
         
-        // Create input tab
+        mainPanel.add(toolbar.getComponent(), BorderLayout.NORTH);
+        
+        // Create content panel
+        JBSplitter splitter = new JBSplitter(true, 0.3f);
+        
+        // Input panel
         JPanel inputPanel = createInputPanel();
-        tabbedPane.addTab("Input", AllIcons.Nodes.Plugin, inputPanel);
+        splitter.setFirstComponent(inputPanel);
         
-        // Create output tab
+        // Output panel
         JPanel outputPanel = createOutputPanel();
-        tabbedPane.addTab("Output", AllIcons.Nodes.Console, outputPanel);
+        splitter.setSecondComponent(outputPanel);
         
-        mainPanel.add(tabbedPane, BorderLayout.CENTER);
-        
-        // Create status panel
-        statusPanel = createStatusPanel();
-        mainPanel.add(statusPanel, BorderLayout.SOUTH);
-        
-        // Register listeners
-        registerListeners();
+        mainPanel.add(splitter, BorderLayout.CENTER);
     }
     
     /**
-     * Creates the top panel.
-     * @return The top panel
+     * Creates the input panel.
+     * @return The input panel
      */
-    private JPanel createTopPanel() {
-        JPanel panel = new JPanel(new BorderLayout());
-        panel.setBorder(JBUI.Borders.empty(0, 0, 5, 0));
+    private JPanel createInputPanel() {
+        JPanel panel = new JPanel(new BorderLayout(0, 5));
+        panel.setBorder(JBUI.Borders.empty(5));
         
-        JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        // Prompt input
+        JPanel promptPanel = new JPanel(new BorderLayout());
+        promptPanel.add(new JBLabel("Enter your prompt:"), BorderLayout.NORTH);
         
-        generateButton = new JButton("Generate", AllIcons.Actions.Execute);
-        explainButton = new JButton("Explain", AllIcons.Actions.Help);
-        documentButton = new JButton("Document", AllIcons.Actions.Documentation);
-        fixButton = new JButton("Fix", AllIcons.Actions.QuickfixBulb);
+        promptTextArea = new JBTextArea();
+        promptTextArea.setLineWrap(true);
+        promptTextArea.setWrapStyleWord(true);
         
-        buttonPanel.add(generateButton);
-        buttonPanel.add(explainButton);
-        buttonPanel.add(documentButton);
-        buttonPanel.add(fixButton);
+        promptPanel.add(new JBScrollPane(promptTextArea), BorderLayout.CENTER);
         
-        panel.add(buttonPanel, BorderLayout.WEST);
+        panel.add(promptPanel, BorderLayout.CENTER);
         
-        JPanel languagePanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+        // Controls panel
+        JPanel controlsPanel = new JPanel(new GridLayout(3, 1, 0, 5));
         
+        // Task selection
+        JPanel taskPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        taskPanel.add(new JBLabel("Task:"));
+        
+        taskComboBox = new JComboBox<>(new String[] {
+                "Generate Code",
+                "Fix Errors",
+                "Explain Code",
+                "Generate Documentation"
+        });
+        
+        taskPanel.add(taskComboBox);
+        
+        // Language selection
+        JPanel languagePanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
         languagePanel.add(new JBLabel("Language:"));
         
         languageComboBox = new JComboBox<>(new String[] {
@@ -131,43 +143,26 @@ public final class AIAssistPanel extends SimpleToolWindowPanel {
         
         languagePanel.add(languageComboBox);
         
-        panel.add(languagePanel, BorderLayout.EAST);
+        // Button panel
+        JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
         
-        return panel;
-    }
-    
-    /**
-     * Creates the input panel.
-     * @return The input panel
-     */
-    private JPanel createInputPanel() {
-        JPanel panel = new JPanel(new BorderLayout());
-        panel.setBorder(JBUI.Borders.empty(5));
+        generateButton = new JButton("Generate", AllIcons.Actions.Execute);
+        generateButton.addActionListener(e -> generateContent());
         
-        JPanel promptPanel = new JPanel(new BorderLayout());
-        promptPanel.setBorder(JBUI.Borders.empty(0, 0, 5, 0));
+        clearButton = new JButton("Clear", AllIcons.Actions.GC);
+        clearButton.addActionListener(e -> {
+            promptTextArea.setText("");
+            updateOutputEditor("");
+        });
         
-        promptPanel.add(new JBLabel("Prompt:"), BorderLayout.NORTH);
+        buttonPanel.add(generateButton);
+        buttonPanel.add(clearButton);
         
-        promptTextArea = new JTextArea();
-        promptTextArea.setLineWrap(true);
-        promptTextArea.setWrapStyleWord(true);
-        promptTextArea.setRows(5);
+        controlsPanel.add(taskPanel);
+        controlsPanel.add(languagePanel);
+        controlsPanel.add(buttonPanel);
         
-        promptPanel.add(new JBScrollPane(promptTextArea), BorderLayout.CENTER);
-        
-        panel.add(promptPanel, BorderLayout.NORTH);
-        
-        JPanel codePanel = new JPanel(new BorderLayout());
-        
-        codePanel.add(new JBLabel("Code:"), BorderLayout.NORTH);
-        
-        Document document = EditorFactory.getInstance().createDocument("");
-        codeEditorField = new EditorTextField(document, project, FileTypeManager.getInstance().getFileTypeByExtension("java"), false, false);
-        
-        codePanel.add(codeEditorField, BorderLayout.CENTER);
-        
-        panel.add(codePanel, BorderLayout.CENTER);
+        panel.add(controlsPanel, BorderLayout.SOUTH);
         
         return panel;
     }
@@ -180,188 +175,169 @@ public final class AIAssistPanel extends SimpleToolWindowPanel {
         JPanel panel = new JPanel(new BorderLayout());
         panel.setBorder(JBUI.Borders.empty(5));
         
-        outputTextArea = new JTextArea();
-        outputTextArea.setEditable(false);
-        outputTextArea.setLineWrap(true);
-        outputTextArea.setWrapStyleWord(true);
+        panel.add(new JBLabel("Output:"), BorderLayout.NORTH);
         
-        panel.add(new JBScrollPane(outputTextArea), BorderLayout.CENTER);
+        // Create editor
+        Document document = EditorFactory.getInstance().createDocument("");
+        outputEditor = EditorFactory.getInstance().createEditor(document, project, FileTypeManager.getInstance().getFileTypeByExtension("java"), false);
+        
+        // Configure editor
+        EditorSettings settings = outputEditor.getSettings();
+        settings.setLineNumbersShown(true);
+        settings.setFoldingOutlineShown(true);
+        settings.setLineMarkerAreaShown(true);
+        settings.setIndentGuidesShown(true);
+        settings.setVirtualSpace(false);
+        settings.setWheelFontChangeEnabled(false);
+        settings.setAdditionalColumnsCount(3);
+        settings.setAdditionalLinesCount(3);
+        settings.setCaretRowShown(true);
+        
+        if (outputEditor instanceof EditorEx) {
+            ((EditorEx) outputEditor).setHighlighter(EditorHighlighterFactory.getInstance().createHighlighter(project, "java"));
+            
+            // Set the editor scheme to match the global scheme
+            EditorColorsScheme scheme = EditorColorsManager.getInstance().getGlobalScheme();
+            ((EditorEx) outputEditor).setColorsScheme(scheme);
+        }
+        
+        panel.add(outputEditor.getComponent(), BorderLayout.CENTER);
+        
+        // Register editor disposal
+        Disposer.register(this, () -> EditorFactory.getInstance().releaseEditor(outputEditor));
         
         return panel;
     }
     
     /**
-     * Creates the status panel.
-     * @return The status panel
+     * Updates the output editor with the given content.
+     * @param content The content
      */
-    private JPanel createStatusPanel() {
-        JPanel panel = new JPanel(new BorderLayout());
-        panel.setBorder(JBUI.Borders.empty(5, 0, 0, 0));
-        
-        statusLabel = new JBLabel("Ready");
-        panel.add(statusLabel, BorderLayout.WEST);
-        
-        progressBar = new JProgressBar();
-        progressBar.setIndeterminate(false);
-        progressBar.setVisible(false);
-        panel.add(progressBar, BorderLayout.EAST);
-        
-        return panel;
-    }
-    
-    /**
-     * Registers the event listeners.
-     */
-    private void registerListeners() {
-        generateButton.addActionListener(e -> generateCode());
-        explainButton.addActionListener(e -> explainCode());
-        documentButton.addActionListener(e -> documentCode());
-        fixButton.addActionListener(e -> fixCode());
-    }
-    
-    /**
-     * Generates code based on the prompt.
-     */
-    private void generateCode() {
-        String prompt = promptTextArea.getText();
+    private void updateOutputEditor(String content) {
+        // Get the selected language
         String language = (String) languageComboBox.getSelectedItem();
         
-        if (prompt.isEmpty()) {
-            showError("Please enter a prompt");
-            return;
+        if (language == null) {
+            language = "Java";
         }
         
-        showStatus("Generating code...", true);
+        // Update editor syntax highlighting
+        if (outputEditor instanceof EditorEx) {
+            FileType fileType = getFileTypeForLanguage(language);
+            ((EditorEx) outputEditor).setHighlighter(EditorHighlighterFactory.getInstance().createHighlighter(project, fileType.getName()));
+        }
         
-        Map<String, Object> options = new HashMap<>();
-        
-        CompletableFuture<String> future = codeGenService.generateCode(prompt, language, options);
-        
-        future.whenComplete((result, error) -> {
-            ApplicationManager.getApplication().invokeLater(() -> {
-                if (error != null) {
-                    showError("Error generating code: " + error.getMessage());
-                    return;
-                }
-                
-                codeEditorField.setText(result);
-                tabbedPane.setSelectedIndex(0); // Switch to input tab
-                showStatus("Code generated successfully", false);
-            });
+        // Update editor content
+        ApplicationManager.getApplication().runWriteAction(() -> {
+            Document document = outputEditor.getDocument();
+            document.setText(content);
         });
     }
     
     /**
-     * Explains the current code.
+     * Gets the file type for the given language.
+     * @param language The language
+     * @return The file type
      */
-    private void explainCode() {
-        String code = codeEditorField.getText();
+    private FileType getFileTypeForLanguage(String language) {
+        switch (language) {
+            case "Kotlin":
+                return FileTypeManager.getInstance().getFileTypeByExtension("kt");
+            case "Groovy":
+                return FileTypeManager.getInstance().getFileTypeByExtension("groovy");
+            case "XML":
+                return FileTypeManager.getInstance().getFileTypeByExtension("xml");
+            case "JSON":
+                return FileTypeManager.getInstance().getFileTypeByExtension("json");
+            case "YAML":
+                return FileTypeManager.getInstance().getFileTypeByExtension("yml");
+            case "Java":
+            default:
+                return FileTypeManager.getInstance().getFileTypeByExtension("java");
+        }
+    }
+    
+    /**
+     * Generates content based on the prompt and selected task.
+     */
+    private void generateContent() {
+        String prompt = promptTextArea.getText();
         
-        if (code.isEmpty()) {
-            showError("Please enter code to explain");
+        if (prompt == null || prompt.trim().isEmpty()) {
+            JOptionPane.showMessageDialog(
+                    mainPanel,
+                    "Please enter a prompt.",
+                    "Empty Prompt",
+                    JOptionPane.ERROR_MESSAGE
+            );
             return;
         }
         
-        showStatus("Explaining code...", true);
+        String task = (String) taskComboBox.getSelectedItem();
+        String language = (String) languageComboBox.getSelectedItem();
         
-        CompletableFuture<String> future = codeGenService.explainCode(code, null);
+        if (task == null) {
+            task = "Generate Code";
+        }
+        
+        if (language == null) {
+            language = "Java";
+        }
+        
+        // Disable controls during generation
+        setControlsEnabled(false);
+        
+        // Clear output
+        updateOutputEditor("");
+        
+        // Generate content
+        CompletableFuture<String> future;
+        
+        switch (task) {
+            case "Fix Errors":
+                future = codeGenerationService.fixCode(prompt, "Unknown error", null);
+                break;
+            case "Explain Code":
+                future = codeGenerationService.explainCode(prompt, null);
+                break;
+            case "Generate Documentation":
+                future = codeGenerationService.generateDocumentation(prompt, null);
+                break;
+            case "Generate Code":
+            default:
+                future = codeGenerationService.generateCode(prompt, language, null);
+                break;
+        }
         
         future.whenComplete((result, error) -> {
-            ApplicationManager.getApplication().invokeLater(() -> {
-                if (error != null) {
-                    showError("Error explaining code: " + error.getMessage());
-                    return;
-                }
-                
-                outputTextArea.setText(result);
-                tabbedPane.setSelectedIndex(1); // Switch to output tab
-                showStatus("Code explained successfully", false);
-            });
+            if (error != null) {
+                SwingUtilities.invokeLater(() -> {
+                    JOptionPane.showMessageDialog(
+                            mainPanel,
+                            "Error generating content: " + error.getMessage(),
+                            "Generation Error",
+                            JOptionPane.ERROR_MESSAGE
+                    );
+                    setControlsEnabled(true);
+                });
+            } else {
+                SwingUtilities.invokeLater(() -> {
+                    updateOutputEditor(result != null ? result : "");
+                    setControlsEnabled(true);
+                });
+            }
         });
     }
     
     /**
-     * Documents the current code.
+     * Enables or disables controls.
+     * @param enabled Whether controls should be enabled
      */
-    private void documentCode() {
-        String code = codeEditorField.getText();
-        
-        if (code.isEmpty()) {
-            showError("Please enter code to document");
-            return;
-        }
-        
-        showStatus("Documenting code...", true);
-        
-        CompletableFuture<String> future = codeGenService.generateDocumentation(code, null);
-        
-        future.whenComplete((result, error) -> {
-            ApplicationManager.getApplication().invokeLater(() -> {
-                if (error != null) {
-                    showError("Error documenting code: " + error.getMessage());
-                    return;
-                }
-                
-                codeEditorField.setText(result);
-                tabbedPane.setSelectedIndex(0); // Switch to input tab
-                showStatus("Code documented successfully", false);
-            });
-        });
-    }
-    
-    /**
-     * Fixes the current code.
-     */
-    private void fixCode() {
-        String code = codeEditorField.getText();
-        
-        if (code.isEmpty()) {
-            showError("Please enter code to fix");
-            return;
-        }
-        
-        showStatus("Fixing code...", true);
-        
-        CompletableFuture<String> future = codeGenService.fixCode(code, null, null);
-        
-        future.whenComplete((result, error) -> {
-            ApplicationManager.getApplication().invokeLater(() -> {
-                if (error != null) {
-                    showError("Error fixing code: " + error.getMessage());
-                    return;
-                }
-                
-                codeEditorField.setText(result);
-                tabbedPane.setSelectedIndex(0); // Switch to input tab
-                showStatus("Code fixed successfully", false);
-            });
-        });
-    }
-    
-    /**
-     * Shows a status message.
-     * @param message The message
-     * @param inProgress Whether the operation is in progress
-     */
-    private void showStatus(String message, boolean inProgress) {
-        statusLabel.setText(message);
-        
-        if (inProgress) {
-            statusLabel.setIcon(AllIcons.Actions.Refresh);
-        } else {
-            statusLabel.setIcon(null);
-        }
-        
-        progressBar.setVisible(inProgress);
-    }
-    
-    /**
-     * Shows an error message.
-     * @param message The error message
-     */
-    private void showError(String message) {
-        statusLabel.setText(message);
-        statusLabel.setIcon(AllIcons.General.Error);
-        progressBar.setVisible(false);
+    private void setControlsEnabled(boolean enabled) {
+        promptTextArea.setEnabled(enabled);
+        taskComboBox.setEnabled(enabled);
+        languageComboBox.setEnabled(enabled);
+        generateButton.setEnabled(enabled);
+        clearButton.setEnabled(enabled);
     }
 }
