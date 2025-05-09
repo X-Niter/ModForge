@@ -3,6 +3,7 @@ import { useModContext } from "@/context/mod-context";
 import { ModLoaderSelect } from "./modloader-select";
 import { useLocation } from "wouter";
 import { NavLink } from "./nav-link";
+import { DatabaseStatus } from "./database-status";
 
 export function Sidebar() {
   const { currentMod, currentBuild } = useModContext();
@@ -189,6 +190,10 @@ export function Sidebar() {
             Settings
           </NavLink>
         </nav>
+
+        <div className="px-2 py-4">
+          <DatabaseStatus />
+        </div>
 
         <div className="p-4 border-t border-gray-700">
           <div className="flex items-center">
