@@ -34,7 +34,7 @@ export function ContinuousDevelopmentControls() {
   const startMutation = useMutation({
     mutationFn: async () => {
       if (!currentMod?.id) return null;
-      return apiRequest(`/api/mods/${currentMod.id}/continuous-development/start`, 'POST');
+      return apiRequest('POST', `/api/mods/${currentMod.id}/continuous-development/start`);
     },
     onSuccess: () => {
       toast({
@@ -56,9 +56,7 @@ export function ContinuousDevelopmentControls() {
   const stopMutation = useMutation({
     mutationFn: async () => {
       if (!currentMod?.id) return null;
-      return apiRequest(`/api/mods/${currentMod.id}/continuous-development/stop`, {
-        method: 'POST'
-      });
+      return apiRequest('POST', `/api/mods/${currentMod.id}/continuous-development/stop`);
     },
     onSuccess: () => {
       toast({
@@ -80,10 +78,7 @@ export function ContinuousDevelopmentControls() {
   const updateFrequencyMutation = useMutation({
     mutationFn: async (newFrequency: string) => {
       if (!currentMod?.id) return null;
-      return apiRequest(`/api/mods/${currentMod.id}`, {
-        method: 'PATCH',
-        body: JSON.stringify({ compileFrequency: newFrequency })
-      });
+      return apiRequest('PATCH', `/api/mods/${currentMod.id}`, { compileFrequency: newFrequency });
     },
     onSuccess: () => {
       toast({
