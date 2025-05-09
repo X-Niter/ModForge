@@ -309,10 +309,16 @@ async function generateModCodeAsync(mod: any, build: any) {
       mod.idea
     );
 
-    // Update build logs
-    let updatedBuild = await storage.updateBuild(build.id, {
+    // Update build logs - use null coalescing to handle undefined case
+    const initialUpdate = await storage.updateBuild(build.id, {
       logs: build.logs + result.logs
     });
+    
+    if (!initialUpdate) {
+      throw new Error(`Failed to update build ${build.id}`);
+    }
+    
+    let currentLogs = initialUpdate.logs || '';
 
     // Store files in storage
     for (const file of result.files) {
@@ -323,30 +329,43 @@ async function generateModCodeAsync(mod: any, build: any) {
       });
     }
 
-    // Compile the mod
-    updatedBuild = await storage.updateBuild(build.id, {
-      logs: updatedBuild.logs + "\nStarting compilation process...\n"
-    });
-
+    // Compile the mod - add to logs safely
+    currentLogs += "\nStarting compilation process...\n";
+    const preCompileUpdate = await storage.updateBuild(build.id, { logs: currentLogs });
+    
+    if (preCompileUpdate) {
+      currentLogs = preCompileUpdate.logs;
+    }
+    
     const compileResult = await compileMod(mod.id);
 
     // Update build with compilation results
     const status = compileResult.success ? BuildStatus.Success : BuildStatus.Failed;
-    updatedBuild = await storage.updateBuild(build.id, {
+    currentLogs += compileResult.logs;
+    
+    const postCompileUpdate = await storage.updateBuild(build.id, {
       status,
-      logs: updatedBuild.logs + compileResult.logs,
+      logs: currentLogs,
       errorCount: compileResult.errors.length,
       warningCount: compileResult.warnings.length,
       downloadUrl: compileResult.downloadUrl
     });
+    
+    if (postCompileUpdate) {
+      currentLogs = postCompileUpdate.logs;
+    }
 
     // If compilation failed and auto-fix is enabled, try to fix errors
     if (!compileResult.success && compileResult.errors.length > 0 && 
         (mod.autoFixLevel === "Balanced" || mod.autoFixLevel === "Aggressive")) {
       
-      updatedBuild = await storage.updateBuild(build.id, {
-        logs: updatedBuild.logs + "\nAttempting to fix compilation errors...\n"
-      });
+      // Add fix logs
+      currentLogs += "\nAttempting to fix compilation errors...\n";
+      const preFixUpdate = await storage.updateBuild(build.id, { logs: currentLogs });
+      
+      if (preFixUpdate) {
+        currentLogs = preFixUpdate.logs;
+      }
 
       // Get all mod files
       const modFiles = await storage.getModFilesByModId(mod.id);
@@ -359,9 +378,12 @@ async function generateModCodeAsync(mod: any, build: any) {
       const fixResult = await fixCompilationErrors(files, compileResult.errors);
 
       // Update logs
-      updatedBuild = await storage.updateBuild(build.id, {
-        logs: updatedBuild.logs + fixResult.logs
-      });
+      currentLogs += fixResult.logs;
+      const fixLogsUpdate = await storage.updateBuild(build.id, { logs: currentLogs });
+      
+      if (fixLogsUpdate) {
+        currentLogs = fixLogsUpdate.logs;
+      }
 
       // Update mod files with fixes
       for (const file of fixResult.files) {
@@ -380,17 +402,22 @@ async function generateModCodeAsync(mod: any, build: any) {
       }
 
       // Try compilation again
-      updatedBuild = await storage.updateBuild(build.id, {
-        logs: updatedBuild.logs + "\nRetrying compilation after fixes...\n"
-      });
+      currentLogs += "\nRetrying compilation after fixes...\n";
+      const preRetryUpdate = await storage.updateBuild(build.id, { logs: currentLogs });
+      
+      if (preRetryUpdate) {
+        currentLogs = preRetryUpdate.logs;
+      }
 
       const retryResult = await compileMod(mod.id);
       
       // Update build with new compilation results
       const newStatus = retryResult.success ? BuildStatus.Success : BuildStatus.Failed;
+      currentLogs += retryResult.logs;
+      
       await storage.updateBuild(build.id, {
         status: newStatus,
-        logs: updatedBuild.logs + retryResult.logs,
+        logs: currentLogs,
         errorCount: retryResult.errors.length,
         warningCount: retryResult.warnings.length,
         downloadUrl: retryResult.downloadUrl
@@ -410,27 +437,39 @@ async function generateModCodeAsync(mod: any, build: any) {
 
 // Asynchronous compilation process
 async function compileModAsync(mod: any, build: any) {
+  let currentLogs = build.logs || '';
+  
   try {
     // Compile the mod
     const compileResult = await compileMod(mod.id);
 
     // Update build with compilation results
     const status = compileResult.success ? BuildStatus.Success : BuildStatus.Failed;
-    let updatedBuild = await storage.updateBuild(build.id, {
+    currentLogs += compileResult.logs;
+    
+    const compileUpdate = await storage.updateBuild(build.id, {
       status,
-      logs: build.logs + compileResult.logs,
+      logs: currentLogs,
       errorCount: compileResult.errors.length,
       warningCount: compileResult.warnings.length,
       downloadUrl: compileResult.downloadUrl
     });
+    
+    if (compileUpdate) {
+      currentLogs = compileUpdate.logs;
+    }
 
     // If compilation failed and auto-fix is enabled, try to fix errors
     if (!compileResult.success && compileResult.errors.length > 0 && 
         (mod.autoFixLevel === "Balanced" || mod.autoFixLevel === "Aggressive")) {
       
-      updatedBuild = await storage.updateBuild(build.id, {
-        logs: updatedBuild.logs + "\nAttempting to fix compilation errors...\n"
-      });
+      // Add to logs safely
+      currentLogs += "\nAttempting to fix compilation errors...\n";
+      const preFixUpdate = await storage.updateBuild(build.id, { logs: currentLogs });
+      
+      if (preFixUpdate) {
+        currentLogs = preFixUpdate.logs;
+      }
 
       // Get all mod files
       const modFiles = await storage.getModFilesByModId(mod.id);
@@ -443,9 +482,12 @@ async function compileModAsync(mod: any, build: any) {
       const fixResult = await fixCompilationErrors(files, compileResult.errors);
 
       // Update logs
-      updatedBuild = await storage.updateBuild(build.id, {
-        logs: updatedBuild.logs + fixResult.logs
-      });
+      currentLogs += fixResult.logs;
+      const fixLogsUpdate = await storage.updateBuild(build.id, { logs: currentLogs });
+      
+      if (fixLogsUpdate) {
+        currentLogs = fixLogsUpdate.logs;
+      }
 
       // Update mod files with fixes
       for (const file of fixResult.files) {
@@ -464,17 +506,22 @@ async function compileModAsync(mod: any, build: any) {
       }
 
       // Try compilation again
-      updatedBuild = await storage.updateBuild(build.id, {
-        logs: updatedBuild.logs + "\nRetrying compilation after fixes...\n"
-      });
+      currentLogs += "\nRetrying compilation after fixes...\n";
+      const preRetryUpdate = await storage.updateBuild(build.id, { logs: currentLogs });
+      
+      if (preRetryUpdate) {
+        currentLogs = preRetryUpdate.logs;
+      }
 
       const retryResult = await compileMod(mod.id);
       
       // Update build with new compilation results
       const newStatus = retryResult.success ? BuildStatus.Success : BuildStatus.Failed;
+      currentLogs += retryResult.logs;
+      
       await storage.updateBuild(build.id, {
         status: newStatus,
-        logs: updatedBuild.logs + retryResult.logs,
+        logs: currentLogs,
         errorCount: retryResult.errors.length,
         warningCount: retryResult.warnings.length,
         downloadUrl: retryResult.downloadUrl

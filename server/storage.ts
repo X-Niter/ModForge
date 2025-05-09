@@ -104,11 +104,13 @@ export class MemStorage implements IStorage {
     const createdAt = new Date();
     const updatedAt = createdAt;
     
+    // Ensure all required fields are present with defaults if needed
     const newMod: Mod = { 
       ...mod, 
       id, 
       createdAt, 
-      updatedAt 
+      updatedAt,
+      githubRepo: null // Ensure githubRepo has a default value
     };
     
     this.mods.set(id, newMod);
@@ -119,9 +121,16 @@ export class MemStorage implements IStorage {
     const mod = this.mods.get(id);
     if (!mod) return undefined;
     
+    // Handle the githubRepo field explicitly to avoid type issues
+    let githubRepo = mod.githubRepo;
+    if ('githubRepo' in modData) {
+      githubRepo = modData.githubRepo as string | null;
+    }
+    
     const updatedMod: Mod = { 
       ...mod, 
       ...modData, 
+      githubRepo, // Use the explicitly handled value
       updatedAt: new Date() 
     };
     
@@ -148,11 +157,17 @@ export class MemStorage implements IStorage {
     const id = this.currentBuildId++;
     const createdAt = new Date();
     
+    // Ensure all required fields are present with defaults
     const newBuild: Build = { 
       ...build, 
       id, 
       createdAt,
-      completedAt: null 
+      completedAt: null,
+      // Ensure required numeric fields have defaults
+      errorCount: build.errorCount ?? 0,
+      warningCount: build.warningCount ?? 0,
+      // Ensure downloadUrl has a default value
+      downloadUrl: build.downloadUrl ?? null
     };
     
     this.builds.set(id, newBuild);
