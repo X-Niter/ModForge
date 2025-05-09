@@ -4,171 +4,271 @@ import com.intellij.openapi.actionSystem.AnAction;
 import com.intellij.openapi.actionSystem.AnActionEvent;
 import com.intellij.openapi.actionSystem.CommonDataKeys;
 import com.intellij.openapi.application.ApplicationManager;
-import com.intellij.openapi.command.WriteCommandAction;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.editor.Editor;
+import com.intellij.openapi.progress.ProgressIndicator;
+import com.intellij.openapi.progress.ProgressManager;
+import com.intellij.openapi.progress.Task;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.Messages;
+import com.intellij.openapi.vfs.VirtualFile;
+import com.intellij.openapi.wm.ToolWindowManager;
+import com.intellij.problems.Problem;
+import com.intellij.problems.ProblemListener;
+import com.intellij.problems.WolfTheProblemSolver;
 import com.intellij.psi.PsiDocumentManager;
 import com.intellij.psi.PsiFile;
+import com.modforge.intellij.plugin.listeners.ModForgeCompilationListener;
 import com.modforge.intellij.plugin.services.AutonomousCodeGenerationService;
+import com.modforge.intellij.plugin.services.AutonomousCodeGenerationService.CodeIssue;
 import org.jetbrains.annotations.NotNull;
 
-import java.util.HashMap;
-import java.util.Map;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
 /**
- * Action for fixing errors in code using AI.
+ * Action to fix errors using AI.
+ * This action uses the AI service to fix compilation errors in the current file.
  */
-public class FixErrorsAction extends AnAction {
+public final class FixErrorsAction extends AnAction {
     private static final Logger LOG = Logger.getInstance(FixErrorsAction.class);
     
     @Override
     public void actionPerformed(@NotNull AnActionEvent e) {
-        // Get project
-        Project project = e.getProject();
-        if (project == null) {
-            return;
-        }
-        
         LOG.info("Fix errors action performed");
         
-        // Get code generation service
-        AutonomousCodeGenerationService codeGenService = AutonomousCodeGenerationService.getInstance(project);
-        
-        // Get editor and file
+        Project project = e.getProject();
         Editor editor = e.getData(CommonDataKeys.EDITOR);
         PsiFile psiFile = e.getData(CommonDataKeys.PSI_FILE);
         
-        if (editor == null || psiFile == null) {
+        if (project == null || editor == null || psiFile == null) {
+            return;
+        }
+        
+        // Get compilation listener
+        ModForgeCompilationListener compilationListener = project.getService(ModForgeCompilationListener.class);
+        
+        if (compilationListener == null) {
             Messages.showErrorDialog(
                     project,
-                    "Please open a file in the editor to fix errors.",
-                    "Fix Errors"
+                    "Could not access the compilation listener. Please try restarting the IDE.",
+                    "Error"
             );
             return;
         }
         
-        // Get the selected text or the entire file
-        String code;
-        String errorMessage = null;
+        // Get issues
+        List<ModForgeCompilationListener.CompilationIssue> activeIssues = compilationListener.getActiveIssues();
         
-        if (editor.getSelectionModel().hasSelection()) {
-            // Get selected text
-            code = editor.getSelectionModel().getSelectedText();
-        } else {
-            // Get entire file content
-            code = editor.getDocument().getText();
-        }
+        // Filter issues for this file
+        VirtualFile virtualFile = psiFile.getVirtualFile();
         
-        if (code == null || code.isEmpty()) {
+        if (virtualFile == null) {
             Messages.showErrorDialog(
                     project,
-                    "No code to fix.",
-                    "Fix Errors"
+                    "The current file is not a physical file.",
+                    "Error"
             );
             return;
         }
         
-        // Show error message input dialog
-        errorMessage = Messages.showInputDialog(
-                project,
-                "Enter the error message (if any):",
-                "Fix Errors",
-                null
-        );
+        String filePath = virtualFile.getPath();
+        String basePath = project.getBasePath();
         
-        // Create options
-        Map<String, Object> options = new HashMap<>();
-        options.put("filePath", psiFile.getVirtualFile().getPath());
-        
-        // Fix code
-        CompletableFuture<String> future = codeGenService.fixCode(code, errorMessage, options);
-        
-        // Handle result
-        future.thenAccept(fixedCode -> {
-            // Show confirmation dialog
-            int result = Messages.showYesNoDialog(
-                    project,
-                    "Do you want to apply the fixed code?",
-                    "Fix Errors",
-                    "Apply",
-                    "Cancel",
-                    null
-            );
+        if (basePath != null && filePath.startsWith(basePath)) {
+            filePath = filePath.substring(basePath.length());
             
-            if (result == Messages.YES) {
-                // Apply the fixed code
-                applyFixedCode(project, editor, psiFile, fixedCode);
-            } else {
-                // Show the fixed code in a dialog
-                Messages.showMultilineInputDialog(
-                        project,
-                        fixedCode,
-                        "Fixed Code",
-                        null,
-                        null,
-                        null
-                );
+            // Remove leading slash
+            if (filePath.startsWith("/")) {
+                filePath = filePath.substring(1);
             }
-        }).exceptionally(ex -> {
-            Messages.showErrorDialog(
-                    project,
-                    "Error fixing code: " + ex.getMessage(),
-                    "Fix Errors Error"
-            );
-            return null;
-        });
-    }
-    
-    /**
-     * Applies the fixed code to the editor.
-     * @param project The project
-     * @param editor The editor
-     * @param psiFile The PSI file
-     * @param fixedCode The fixed code
-     */
-    private void applyFixedCode(@NotNull Project project, @NotNull Editor editor, @NotNull PsiFile psiFile, @NotNull String fixedCode) {
-        ApplicationManager.getApplication().invokeLater(() -> {
-            WriteCommandAction.runWriteCommandAction(project, () -> {
-                try {
-                    Document document = editor.getDocument();
+        }
+        
+        String finalFilePath = filePath;
+        List<ModForgeCompilationListener.CompilationIssue> fileIssues = activeIssues.stream()
+                .filter(issue -> issue.getFile().equals(finalFilePath))
+                .toList();
+        
+        // Check if there are issues
+        if (fileIssues.isEmpty()) {
+            // Check for IDE-detected problems
+            WolfTheProblemSolver problemSolver = WolfTheProblemSolver.getInstance(project);
+            
+            if (problemSolver.hasProblemFilesBeneath(psiFile)) {
+                int result = Messages.showYesNoDialog(
+                        project,
+                        "There are no compilation errors, but there might be other issues. Would you like to try fixing them?",
+                        "Fix Errors",
+                        "Yes, Try Fixing",
+                        "No, Cancel",
+                        Messages.getQuestionIcon()
+                );
+                
+                if (result != Messages.YES) {
+                    return;
+                }
+                
+                // Get code and try to fix it
+                Document document = editor.getDocument();
+                String code = document.getText();
+                
+                // Get code generation service
+                AutonomousCodeGenerationService service = AutonomousCodeGenerationService.getInstance(project);
+                
+                // Show progress dialog and fix code
+                ProgressManager.getInstance().run(new Task.Backgroundable(project, "Fixing Code", false) {
+                    private String fixedCode;
                     
-                    if (editor.getSelectionModel().hasSelection()) {
-                        // Replace selected text
-                        int start = editor.getSelectionModel().getSelectionStart();
-                        int end = editor.getSelectionModel().getSelectionEnd();
-                        document.replaceString(start, end, fixedCode);
-                    } else {
-                        // Replace entire document
-                        document.setText(fixedCode);
+                    @Override
+                    public void run(@NotNull ProgressIndicator indicator) {
+                        indicator.setIndeterminate(true);
+                        
+                        try {
+                            // Fix code
+                            CompletableFuture<String> future = service.fixCode(code, null, null);
+                            
+                            // Wait for result
+                            fixedCode = future.get();
+                        } catch (Exception ex) {
+                            LOG.error("Error fixing code", ex);
+                            
+                            ApplicationManager.getApplication().invokeLater(() -> {
+                                Messages.showErrorDialog(
+                                        project,
+                                        "An error occurred while fixing code: " + ex.getMessage(),
+                                        "Code Fix Error"
+                                );
+                            });
+                        }
                     }
+                    
+                    @Override
+                    public void onSuccess() {
+                        if (fixedCode == null || fixedCode.isEmpty() || fixedCode.equals(code)) {
+                            Messages.showInfoMessage(
+                                    project,
+                                    "No improvements could be made.",
+                                    "Code Fix"
+                            );
+                            return;
+                        }
+                        
+                        // Update document
+                        ApplicationManager.getApplication().runWriteAction(() -> {
+                            document.setText(fixedCode);
+                            
+                            // Commit document
+                            PsiDocumentManager.getInstance(project).commitDocument(document);
+                        });
+                        
+                        Messages.showInfoMessage(
+                                project,
+                                "Code has been fixed. Please check the changes.",
+                                "Code Fix"
+                        );
+                    }
+                });
+                
+                return;
+            }
+            
+            Messages.showInfoMessage(
+                    project,
+                    "No errors found in the current file.",
+                    "Fix Errors"
+            );
+            return;
+        }
+        
+        // Convert to code issues
+        List<CodeIssue> codeIssues = new ArrayList<>();
+        
+        for (ModForgeCompilationListener.CompilationIssue issue : fileIssues) {
+            codeIssues.add(new CodeIssue(
+                    issue.getMessage(),
+                    issue.getLine(),
+                    issue.getColumn(),
+                    issue.getFile(),
+                    psiFile.getText()
+            ));
+        }
+        
+        // Get code generation service
+        AutonomousCodeGenerationService service = AutonomousCodeGenerationService.getInstance(project);
+        
+        // Show progress dialog and fix code
+        ProgressManager.getInstance().run(new Task.Backgroundable(project, "Fixing Errors", false) {
+            private String fixedCode;
+            
+            @Override
+            public void run(@NotNull ProgressIndicator indicator) {
+                indicator.setIndeterminate(true);
+                
+                try {
+                    // Build error message
+                    StringBuilder errorMessage = new StringBuilder();
+                    
+                    for (ModForgeCompilationListener.CompilationIssue issue : fileIssues) {
+                        errorMessage.append(issue.getMessage()).append(" (Line ").append(issue.getLine()).append(")\n");
+                    }
+                    
+                    // Fix code
+                    CompletableFuture<String> future = service.fixCode(psiFile.getText(), errorMessage.toString(), null);
+                    
+                    // Wait for result
+                    fixedCode = future.get();
+                } catch (Exception ex) {
+                    LOG.error("Error fixing errors", ex);
+                    
+                    ApplicationManager.getApplication().invokeLater(() -> {
+                        Messages.showErrorDialog(
+                                project,
+                                "An error occurred while fixing errors: " + ex.getMessage(),
+                                "Error Fix Error"
+                        );
+                    });
+                }
+            }
+            
+            @Override
+            public void onSuccess() {
+                if (fixedCode == null || fixedCode.isEmpty() || fixedCode.equals(psiFile.getText())) {
+                    Messages.showInfoMessage(
+                            project,
+                            "No fixes could be made.",
+                            "Fix Errors"
+                    );
+                    return;
+                }
+                
+                // Update document
+                Document document = editor.getDocument();
+                
+                ApplicationManager.getApplication().runWriteAction(() -> {
+                    document.setText(fixedCode);
                     
                     // Commit document
                     PsiDocumentManager.getInstance(project).commitDocument(document);
-                    
-                    LOG.info("Fixed code applied");
-                } catch (Exception ex) {
-                    LOG.error("Error applying fixed code", ex);
-                    Messages.showErrorDialog(
-                            project,
-                            "Error applying fixed code: " + ex.getMessage(),
-                            "Fix Errors Error"
-                    );
-                }
-            });
+                });
+                
+                Messages.showInfoMessage(
+                        project,
+                        "Errors have been fixed. Please check the changes.",
+                        "Fix Errors"
+                );
+            }
         });
     }
     
     @Override
     public void update(@NotNull AnActionEvent e) {
-        // Get project and editor
+        // Enable action if project, editor, and file are available
         Project project = e.getProject();
         Editor editor = e.getData(CommonDataKeys.EDITOR);
+        PsiFile psiFile = e.getData(CommonDataKeys.PSI_FILE);
         
-        // Enable only if project is not null and editor is not null
-        e.getPresentation().setEnabled(project != null && editor != null);
+        e.getPresentation().setEnabledAndVisible(project != null && editor != null && psiFile != null);
     }
 }

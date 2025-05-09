@@ -1,204 +1,218 @@
 package com.modforge.intellij.plugin.ui.toolwindow;
 
-import com.intellij.openapi.Disposable;
+import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.project.Project;
-import com.intellij.openapi.ui.SimpleToolWindowPanel;
-import com.intellij.openapi.wm.ToolWindow;
 import com.intellij.ui.components.JBLabel;
 import com.intellij.ui.components.JBScrollPane;
+import com.intellij.util.ui.FormBuilder;
 import com.intellij.util.ui.JBUI;
-import com.modforge.intellij.plugin.ai.AIServiceManager;
+import com.intellij.util.ui.UIUtil;
 import com.modforge.intellij.plugin.ai.PatternRecognitionService;
+import com.modforge.intellij.plugin.services.ContinuousDevelopmentService;
 import org.jetbrains.annotations.NotNull;
 
 import javax.swing.*;
 import java.awt.*;
-import java.awt.event.ActionEvent;
+import java.text.DecimalFormat;
+import java.text.NumberFormat;
 import java.util.Map;
 import java.util.Timer;
 import java.util.TimerTask;
 
 /**
- * Panel for displaying metrics.
+ * Panel for the Metrics tab in the tool window.
+ * This panel displays usage statistics and metrics.
  */
-public class MetricsPanel implements Disposable {
-    private final Project project;
-    private final ToolWindow toolWindow;
-    private final SimpleToolWindowPanel panel;
+public final class MetricsPanel {
+    private static final Logger LOG = Logger.getInstance(MetricsPanel.class);
+    private static final long UPDATE_INTERVAL_MS = 5000; // 5 seconds
     
-    private JPanel statsPanel;
-    private JLabel apiCallsLabel;
-    private JLabel patternMatchesLabel;
-    private JLabel tokensSavedLabel;
-    private JLabel costSavedLabel;
-    private JLabel successRateLabel;
+    private final Project project;
+    private final PatternRecognitionService patternRecognitionService;
+    private final ContinuousDevelopmentService continuousDevelopmentService;
+    
+    private JPanel mainPanel;
+    private JPanel patternMetricsPanel;
+    private JPanel continuousDevMetricsPanel;
+    
+    private JBLabel patternCountLabel;
+    private JBLabel apiSavingsLabel;
+    private JBLabel successRateLabel;
+    private JBLabel fixedErrorCountLabel;
+    private JBLabel addedFeatureCountLabel;
+    private JBLabel continuousDevStatusLabel;
     
     private Timer refreshTimer;
-    private static final int REFRESH_INTERVAL = 30000; // 30 seconds
     
     /**
      * Creates a new MetricsPanel.
      * @param project The project
-     * @param toolWindow The tool window
      */
-    public MetricsPanel(@NotNull Project project, @NotNull ToolWindow toolWindow) {
+    public MetricsPanel(@NotNull Project project) {
         this.project = project;
-        this.toolWindow = toolWindow;
+        this.patternRecognitionService = PatternRecognitionService.getInstance();
+        this.continuousDevelopmentService = ContinuousDevelopmentService.getInstance(project);
         
-        // Create panel
-        panel = new SimpleToolWindowPanel(true, true);
-        
-        // Init UI
-        initUI();
-        
-        // Start refresh timer
+        createUI();
         startRefreshTimer();
     }
     
     /**
-     * Initializes the UI.
+     * Gets the panel content.
+     * @return The panel content
      */
-    private void initUI() {
-        // Create components
-        JButton refreshButton = new JButton("Refresh");
-        
-        statsPanel = new JPanel(new GridLayout(0, 1, 0, 5));
-        statsPanel.setBorder(JBUI.Borders.empty(10));
-        
-        apiCallsLabel = new JLabel("API Calls: 0");
-        patternMatchesLabel = new JLabel("Pattern Matches: 0");
-        tokensSavedLabel = new JLabel("Tokens Saved: 0");
-        costSavedLabel = new JLabel("Cost Saved: $0.00");
-        successRateLabel = new JLabel("Success Rate: 0%");
-        
-        statsPanel.add(new JBLabel("<html><b>Pattern Recognition Metrics</b></html>"));
-        statsPanel.add(patternMatchesLabel);
-        statsPanel.add(apiCallsLabel);
-        statsPanel.add(tokensSavedLabel);
-        statsPanel.add(costSavedLabel);
-        statsPanel.add(successRateLabel);
-        
-        // Add separator
-        statsPanel.add(Box.createVerticalStrut(20));
-        statsPanel.add(new JBLabel("<html><b>Pattern Recognition Efficiency</b></html>"));
-        
-        // Add statistics for different pattern types
-        statsPanel.add(new JLabel("Code Generation Patterns: 0"));
-        statsPanel.add(new JLabel("Error Fixing Patterns: 0"));
-        statsPanel.add(new JLabel("Documentation Patterns: 0"));
-        
+    @NotNull
+    public JComponent getContent() {
+        return mainPanel;
+    }
+    
+    /**
+     * Creates the UI for the panel.
+     */
+    private void createUI() {
         // Create main panel
-        JPanel mainPanel = new JPanel(new BorderLayout());
-        mainPanel.add(new JBScrollPane(statsPanel), BorderLayout.CENTER);
-        
-        JPanel bottomPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
-        bottomPanel.add(refreshButton);
-        mainPanel.add(bottomPanel, BorderLayout.SOUTH);
-        
-        // Add padding
+        mainPanel = new JPanel(new BorderLayout());
         mainPanel.setBorder(JBUI.Borders.empty(10));
         
-        // Add to panel
-        panel.setContent(mainPanel);
+        // Create pattern metrics panel
+        patternMetricsPanel = createPatternMetricsPanel();
         
-        // Add action listeners
-        refreshButton.addActionListener(this::onRefreshClicked);
+        // Create continuous development metrics panel
+        continuousDevMetricsPanel = createContinuousDevMetricsPanel();
         
-        // Initial refresh
+        // Create content panel
+        JPanel contentPanel = FormBuilder.createFormBuilder()
+                .addComponent(new JBLabel("Pattern Recognition Metrics", UIUtil.ComponentStyle.LARGE))
+                .addComponentFillVertically(patternMetricsPanel, 0)
+                .addVerticalGap(20)
+                .addComponent(new JBLabel("Continuous Development Metrics", UIUtil.ComponentStyle.LARGE))
+                .addComponentFillVertically(continuousDevMetricsPanel, 0)
+                .addVerticalGap(10)
+                .getPanel();
+        
+        // Create scroll pane
+        JBScrollPane scrollPane = new JBScrollPane(contentPanel);
+        scrollPane.setBorder(JBUI.Borders.empty());
+        
+        // Add scroll pane to main panel
+        mainPanel.add(scrollPane, BorderLayout.CENTER);
+        
+        // Refresh metrics
         refreshMetrics();
+    }
+    
+    /**
+     * Creates the pattern metrics panel.
+     * @return The pattern metrics panel
+     */
+    @NotNull
+    private JPanel createPatternMetricsPanel() {
+        // Create labels
+        patternCountLabel = new JBLabel("Total patterns: 0");
+        patternCountLabel.setBorder(JBUI.Borders.empty(5, 0));
+        
+        apiSavingsLabel = new JBLabel("Estimated API cost savings: $0.00");
+        apiSavingsLabel.setBorder(JBUI.Borders.empty(5, 0));
+        
+        successRateLabel = new JBLabel("Pattern match success rate: 0%");
+        successRateLabel.setBorder(JBUI.Borders.empty(5, 0));
+        
+        // Create panel
+        return FormBuilder.createFormBuilder()
+                .addComponent(patternCountLabel)
+                .addComponent(apiSavingsLabel)
+                .addComponent(successRateLabel)
+                .addVerticalGap(10)
+                .getPanel();
+    }
+    
+    /**
+     * Creates the continuous development metrics panel.
+     * @return The continuous development metrics panel
+     */
+    @NotNull
+    private JPanel createContinuousDevMetricsPanel() {
+        // Create labels
+        continuousDevStatusLabel = new JBLabel("Status: Not running");
+        continuousDevStatusLabel.setBorder(JBUI.Borders.empty(5, 0));
+        
+        fixedErrorCountLabel = new JBLabel("Errors fixed: 0");
+        fixedErrorCountLabel.setBorder(JBUI.Borders.empty(5, 0));
+        
+        addedFeatureCountLabel = new JBLabel("Features added: 0");
+        addedFeatureCountLabel.setBorder(JBUI.Borders.empty(5, 0));
+        
+        // Create panel
+        return FormBuilder.createFormBuilder()
+                .addComponent(continuousDevStatusLabel)
+                .addComponent(fixedErrorCountLabel)
+                .addComponent(addedFeatureCountLabel)
+                .addVerticalGap(10)
+                .getPanel();
     }
     
     /**
      * Starts the refresh timer.
      */
     private void startRefreshTimer() {
-        refreshTimer = new Timer();
+        if (refreshTimer != null) {
+            refreshTimer.cancel();
+        }
+        
+        refreshTimer = new Timer("ModForge-MetricsRefresh");
+        
         refreshTimer.scheduleAtFixedRate(new TimerTask() {
             @Override
             public void run() {
                 SwingUtilities.invokeLater(() -> refreshMetrics());
             }
-        }, REFRESH_INTERVAL, REFRESH_INTERVAL);
+        }, UPDATE_INTERVAL_MS, UPDATE_INTERVAL_MS);
     }
     
     /**
-     * Called when the refresh button is clicked.
-     * @param e The action event
+     * Stops the refresh timer.
      */
-    private void onRefreshClicked(ActionEvent e) {
-        refreshMetrics();
+    public void stopRefreshTimer() {
+        if (refreshTimer != null) {
+            refreshTimer.cancel();
+            refreshTimer = null;
+        }
     }
     
     /**
      * Refreshes the metrics.
      */
     private void refreshMetrics() {
-        // Get metrics from services
-        AIServiceManager aiManager = AIServiceManager.getInstance();
-        PatternRecognitionService patternService = PatternRecognitionService.getInstance();
-        
-        Map<String, Object> metrics = patternService.getMetrics();
-        
-        // Update UI
-        int apiCalls = ((Number) metrics.getOrDefault("apiCalls", 0)).intValue();
-        int patternMatches = ((Number) metrics.getOrDefault("patternMatches", 0)).intValue();
-        int tokensSaved = ((Number) metrics.getOrDefault("tokensSaved", 0)).intValue();
-        double costSaved = ((Number) metrics.getOrDefault("costSaved", 0.0)).doubleValue();
-        
-        apiCallsLabel.setText("API Calls: " + apiCalls);
-        patternMatchesLabel.setText("Pattern Matches: " + patternMatches);
-        tokensSavedLabel.setText("Tokens Saved: " + tokensSaved);
-        costSavedLabel.setText(String.format("Cost Saved: $%.2f", costSaved));
-        
-        // Calculate success rate
-        int totalRequests = apiCalls + patternMatches;
-        double successRate = totalRequests > 0 ? (double) patternMatches / totalRequests * 100.0 : 0.0;
-        successRateLabel.setText(String.format("Success Rate: %.1f%%", successRate));
-        
-        // Update pattern type counts
-        Map<String, Integer> patternCounts = (Map<String, Integer>) metrics.getOrDefault("patternCounts", Map.of());
-        
-        int codePatterns = patternCounts.getOrDefault("code", 0);
-        int errorPatterns = patternCounts.getOrDefault("error", 0);
-        int docPatterns = patternCounts.getOrDefault("documentation", 0);
-        
-        // Remove existing pattern type labels
-        for (int i = statsPanel.getComponentCount() - 1; i >= 0; i--) {
-            Component component = statsPanel.getComponent(i);
-            if (component instanceof JLabel) {
-                String text = ((JLabel) component).getText();
-                if (text.startsWith("Code Generation Patterns") ||
-                        text.startsWith("Error Fixing Patterns") ||
-                        text.startsWith("Documentation Patterns")) {
-                    statsPanel.remove(i);
-                }
-            }
-        }
-        
-        // Add updated pattern type labels
-        statsPanel.add(new JLabel("Code Generation Patterns: " + codePatterns));
-        statsPanel.add(new JLabel("Error Fixing Patterns: " + errorPatterns));
-        statsPanel.add(new JLabel("Documentation Patterns: " + docPatterns));
-        
-        // Revalidate
-        statsPanel.revalidate();
-        statsPanel.repaint();
-    }
-    
-    /**
-     * Gets the content.
-     * @return The content
-     */
-    public JComponent getContent() {
-        return panel;
-    }
-    
-    @Override
-    public void dispose() {
-        // Cancel timer
-        if (refreshTimer != null) {
-            refreshTimer.cancel();
-            refreshTimer = null;
+        try {
+            // Get pattern statistics
+            Map<String, Object> patternStats = patternRecognitionService.getStatistics();
+            
+            // Update pattern metrics
+            int totalPatternCount = (int) patternStats.getOrDefault("totalPatternCount", 0);
+            patternCountLabel.setText("Total patterns: " + totalPatternCount);
+            
+            double estimatedCostSaved = (double) patternStats.getOrDefault("estimatedCostSaved", 0.0);
+            NumberFormat currencyFormat = new DecimalFormat("$#,##0.00");
+            apiSavingsLabel.setText("Estimated API cost savings: " + currencyFormat.format(estimatedCostSaved));
+            
+            double successRate = (double) patternStats.getOrDefault("successRate", 0.0);
+            NumberFormat percentFormat = new DecimalFormat("0.0%");
+            successRateLabel.setText("Pattern match success rate: " + percentFormat.format(successRate));
+            
+            // Get continuous development statistics
+            Map<String, Object> continuousDevStats = continuousDevelopmentService.getStatistics();
+            
+            // Update continuous development metrics
+            boolean running = (boolean) continuousDevStats.getOrDefault("running", false);
+            continuousDevStatusLabel.setText("Status: " + (running ? "Running" : "Not running"));
+            
+            int fixedErrorCount = (int) continuousDevStats.getOrDefault("fixedErrorCount", 0);
+            fixedErrorCountLabel.setText("Errors fixed: " + fixedErrorCount);
+            
+            int addedFeatureCount = (int) continuousDevStats.getOrDefault("addedFeatureCount", 0);
+            addedFeatureCountLabel.setText("Features added: " + addedFeatureCount);
+        } catch (Exception e) {
+            LOG.error("Error refreshing metrics", e);
         }
     }
 }
