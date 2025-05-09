@@ -287,7 +287,7 @@ jobs:
           
           if __name__ == "__main__":
               main()
-EOF
+          EOF
 
           # Run the analysis
           export COMPILATION_SUCCESS=${{ steps.compilation.outputs.compilation_success }}
@@ -502,7 +502,7 @@ EOF
           
           if __name__ == "__main__":
               main()
-EOF
+          EOF
 
           # Run the script to create an issue
           python create_error_issue.py
@@ -608,7 +608,7 @@ EOF
           
           if __name__ == "__main__":
               main()
-EOF
+          EOF
 
           # Run the script to create an issue
           python create_improvement_issue.py
@@ -740,7 +740,7 @@ EOF
 
           if __name__ == "__main__":
               main()
-EOF
+          EOF
 
           # Create the status update issue
           python python_create_guidance_issue.py
