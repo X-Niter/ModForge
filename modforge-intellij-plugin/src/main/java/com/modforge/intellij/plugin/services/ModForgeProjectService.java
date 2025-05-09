@@ -3,13 +3,14 @@ package com.modforge.intellij.plugin.services;
 import com.intellij.openapi.components.Service;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.project.Project;
-import com.intellij.openapi.startup.StartupManager;
+import com.modforge.intellij.plugin.listeners.ModForgeCompilationListener;
+import com.modforge.intellij.plugin.listeners.ModForgeFileListener;
 import com.modforge.intellij.plugin.settings.ModForgeSettings;
 import org.jetbrains.annotations.NotNull;
 
 /**
- * Service for managing ModForge services for a project.
- * This service is responsible for starting and stopping other services.
+ * Project-level service for ModForge.
+ * This service manages other services and listeners for a project.
  */
 @Service(Service.Level.PROJECT)
 public final class ModForgeProjectService {
@@ -17,7 +18,9 @@ public final class ModForgeProjectService {
     
     private final Project project;
     private final AutonomousCodeGenerationService codeGenService;
-    private final ContinuousDevelopmentService continuousDevelopmentService;
+    private final ContinuousDevelopmentService continuousDevService;
+    private final ModForgeFileListener fileListener;
+    private final ModForgeCompilationListener compilationListener;
     
     /**
      * Creates a new ModForgeProjectService.
@@ -26,14 +29,20 @@ public final class ModForgeProjectService {
     public ModForgeProjectService(Project project) {
         this.project = project;
         this.codeGenService = project.getService(AutonomousCodeGenerationService.class);
-        this.continuousDevelopmentService = project.getService(ContinuousDevelopmentService.class);
+        this.continuousDevService = project.getService(ContinuousDevelopmentService.class);
+        this.fileListener = project.getService(ModForgeFileListener.class);
+        this.compilationListener = new ModForgeCompilationListener(project);
         
         LOG.info("ModForge project service created for project: " + project.getName());
         
-        // Initialize services after project is fully loaded
-        StartupManager.getInstance(project).runWhenProjectIsInitialized(() -> {
-            initializeServices();
-        });
+        // Register compilation listener
+        compilationListener.register();
+        
+        // Start continuous development if enabled
+        ModForgeSettings settings = ModForgeSettings.getInstance();
+        if (settings.isContinuousDevelopmentEnabled()) {
+            continuousDevService.start();
+        }
     }
     
     /**
@@ -46,34 +55,24 @@ public final class ModForgeProjectService {
     }
     
     /**
-     * Initializes services.
-     */
-    private void initializeServices() {
-        LOG.info("Initializing ModForge services for project: " + project.getName());
-        
-        // Get settings
-        ModForgeSettings settings = ModForgeSettings.getInstance();
-        
-        // Start continuous development if enabled
-        if (settings.isContinuousDevelopmentEnabled()) {
-            continuousDevelopmentService.start();
-        }
-    }
-    
-    /**
-     * Called when the project is opened.
+     * Handles project opened event.
      */
     public void projectOpened() {
         LOG.info("Project opened: " + project.getName());
     }
     
     /**
-     * Called when the project is closed.
+     * Handles project closed event.
      */
     public void projectClosed() {
         LOG.info("Project closed: " + project.getName());
         
         // Stop continuous development
-        continuousDevelopmentService.stop();
+        if (continuousDevService.isRunning()) {
+            continuousDevService.stop();
+        }
+        
+        // Unregister compilation listener
+        compilationListener.unregister();
     }
 }
