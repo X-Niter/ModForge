@@ -1,0 +1,80 @@
+name: Issue Command Processor
+
+on:
+  issues:
+    types: [opened, edited]
+
+jobs:
+  process-issue-command:
+    runs-on: ubuntu-latest
+    if: contains(github.event.issue.body, '/command')
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Set up JDK 17
+      uses: actions/setup-java@v3
+      with:
+        java-version: '17'
+        distribution: 'temurin'
+        
+    - name: Set up Python for automation
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.10'
+        
+    - name: Configure GitHub credentials
+      run: |
+        git config --global user.name "ModForge Automation"
+        git config --global user.email "automation@modforge.dev"
+        
+    - name: Install AI development dependencies
+      run: |
+        pip install openai
+        pip install requests
+        pip install pyyaml
+        
+    - name: Process command
+      env:
+        OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        ISSUE_BODY: ${{ github.event.issue.body }}
+        ISSUE_NUMBER: ${{ github.event.issue.number }}
+        ISSUE_TITLE: ${{ github.event.issue.title }}
+      run: |
+        python .github/scripts/process_issue_command.py
+        
+    - name: Commit changes if any
+      run: |
+        git add .
+        if git diff --staged --quiet; then
+          echo "No changes to commit"
+        else
+          ISSUE_NUM="${{ github.event.issue.number }}"
+          ISSUE_TITLE="${{ github.event.issue.title }}"
+          git commit -m "Automated Task: #$ISSUE_NUM - $ISSUE_TITLE"
+          git push
+        fi
+        
+    - name: Comment on issue with results
+      uses: actions/github-script@v6
+      with:
+        github-token: ${{secrets.GITHUB_TOKEN}}
+        script: |
+          const fs = require('fs');
+          if (fs.existsSync('issue_response.txt')) {
+            const response = fs.readFileSync('issue_response.txt', 'utf8');
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: response
+            });
+          } else {
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: "Task completed. Please check the latest commit for changes."
+            });
+          }
