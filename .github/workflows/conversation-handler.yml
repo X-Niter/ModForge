@@ -435,56 +435,56 @@ jobs:
           You can also simply ask questions or request help in natural language, and I'll respond accordingly.
           """
               return help_text
-
-def execute_code_modification(cmd_type, target, branch_name):
-    """Modify code based on command type and target"""
-    # Find the target file
-    file_path = find_file(target)
-    if not file_path:
-        return f"Could not find the target file: {target}. Please provide a valid file path or class name."
-    
-    # Read the file
-    try:
-        with open(file_path, 'r', encoding='utf-8') as f:
-            content = f.read()
-    except Exception as e:
-        return f"Error reading file {file_path}: {str(e)}"
-    
-    # Construct prompt based on command type
-    if cmd_type == 'fix':
-        prompt = f"""You are an expert Java developer. Fix any issues or bugs in this code file:
+          
+          def execute_code_modification(cmd_type, target, branch_name):
+              """Modify code based on command type and target"""
+              # Find the target file
+              file_path = find_file(target)
+              if not file_path:
+                  return f"Could not find the target file: {target}. Please provide a valid file path or class name."
+              
+              # Read the file
+              try:
+                  with open(file_path, 'r', encoding='utf-8') as f:
+                      content = f.read()
+              except Exception as e:
+                  return f"Error reading file {file_path}: {str(e)}"
+              
+              # Construct prompt based on command type
+              if cmd_type == 'fix':
+                  prompt = f"""You are an expert Java developer. Fix any issues or bugs in this code file:
 
 ```java
 {content}
 ```
 
 Focus on correctness, performance, and best practices. Provide the complete fixed code, not just the changes."""
-    elif cmd_type == 'improve':
-        prompt = f"""You are an expert Java developer. Improve the quality of this code file while preserving its functionality:
+              elif cmd_type == 'improve':
+                  prompt = f"""You are an expert Java developer. Improve the quality of this code file while preserving its functionality:
 
 ```java
 {content}
 ```
 
 Focus on readability, maintainability, and performance. Provide the complete improved code, not just the changes."""
-    elif cmd_type == 'document':
-        prompt = f"""You are an expert Java developer. Add comprehensive JavaDoc documentation to this code file:
+              elif cmd_type == 'document':
+                  prompt = f"""You are an expert Java developer. Add comprehensive JavaDoc documentation to this code file:
 
 ```java
 {content}
 ```
 
 Include class-level docs, method docs, parameter descriptions, and return value descriptions. Provide the complete documented code."""
-    elif cmd_type == 'refactor':
-        prompt = f"""You are an expert Java developer. Refactor this code to improve its structure while preserving functionality:
+              elif cmd_type == 'refactor':
+                  prompt = f"""You are an expert Java developer. Refactor this code to improve its structure while preserving functionality:
 
 ```java
 {content}
 ```
 
 Focus on code organization, design patterns, and maintainability. Provide the complete refactored code."""
-    else:
-        return f"Unknown modification command: {cmd_type}"
+              else:
+                  return f"Unknown modification command: {cmd_type}"
     
     # Generate modified code using OpenAI
     try:
