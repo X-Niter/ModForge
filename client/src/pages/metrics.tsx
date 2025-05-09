@@ -40,93 +40,18 @@ interface CategoryData {
 export default function MetricsPage() {
   // Fetch usage metrics
   const { data: metricsData, isLoading: metricsLoading } = useQuery({
-    queryKey: ['/api/metrics/usage'],
-    // Mock data until backend is fully implemented
-    initialData: {
-      totalRequests: 1247,
-      patternMatches: 948,
-      apiCalls: 299,
-      estimatedTokensSaved: 1896000,
-      estimatedCostSaved: 56.88,
-      patternMatchRate: "76.02%",
-      apiCallRate: "23.98%"
-    } as MetricsData
+    queryKey: ['/api/metrics/usage']
   });
 
-  // Mock category data for now
-  const categoryData: CategoryData[] = [
-    {
-      category: "Code Generation",
-      matches: 324,
-      calls: 102,
-      matchRate: "76.06%",
-      icon: <Code className="w-5 h-5" />,
-      color: "from-green-500 to-emerald-600"
-    },
-    {
-      category: "Error Fixing",
-      matches: 248,
-      calls: 57,
-      matchRate: "81.31%",
-      icon: <Bug className="w-5 h-5" />,
-      color: "from-blue-500 to-cyan-600"
-    },
-    {
-      category: "Idea Generation",
-      matches: 154,
-      calls: 65,
-      matchRate: "70.32%",
-      icon: <LightbulbIcon className="w-5 h-5" />,
-      color: "from-amber-500 to-yellow-600"
-    },
-    {
-      category: "Feature Addition",
-      matches: 126,
-      calls: 48,
-      matchRate: "72.41%",
-      icon: <Zap className="w-5 h-5" />,
-      color: "from-purple-500 to-indigo-600"
-    },
-    {
-      category: "Documentation",
-      matches: 96,
-      calls: 27,
-      matchRate: "78.05%",
-      icon: <FileText className="w-5 h-5" />,
-      color: "from-pink-500 to-rose-600"
-    }
-  ];
+  // Fetch category data
+  const { data: categoryData = [], isLoading: categoriesLoading } = useQuery<CategoryData[]>({
+    queryKey: ['/api/metrics/categories']
+  });
 
-  // Mock trend data
-  const [trendData, setTrendData] = useState<{ date: string; rate: number }[]>([]);
-
-  useEffect(() => {
-    // Generate sample trend data when component mounts
-    const generateTrendData = () => {
-      const startDate = new Date();
-      startDate.setDate(startDate.getDate() - 30);
-      
-      const data = [];
-      let rate = 50; // Starting at 50%
-      
-      for (let i = 0; i < 30; i++) {
-        const currentDate = new Date(startDate);
-        currentDate.setDate(currentDate.getDate() + i);
-        
-        // Generate an increasing pattern match rate (with some randomness)
-        rate = Math.min(95, rate + (Math.random() * 2 - 0.5));
-        
-        data.push({
-          date: currentDate.toISOString().split('T')[0],
-          rate: parseFloat(rate.toFixed(1))
-        });
-      }
-      
-      return data;
-    };
-    
-    setTrendData(generateTrendData());
-  }, []);
+  // Fetch trend data
+  const { data: trendData = [], isLoading: trendLoading } = useQuery<{ date: string; rate: number }[]>({
+    queryKey: ['/api/metrics/trend']
+  });
 
   return (
     <Layout>

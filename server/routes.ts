@@ -22,6 +22,7 @@ import { generateModIdeas, expandModIdea, ideaGenerationRequestSchema } from "./
 import { z } from "zod";
 import { insertModSchema } from "@shared/schema";
 import { BuildStatus } from "@/types";
+import apiMetricsRouter from "./routes/api-metrics";
 import axios from "axios";
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -798,6 +799,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ message: "Failed to get analytics data" });
     }
   });
+
+  // Mount the metrics API routes
+  app.use('/api/metrics', apiMetricsRouter);
 
   return httpServer;
 }
