@@ -15,6 +15,8 @@ import {
   Moon,
   Sun,
   BarChart3,
+  Brain,
+  Bug,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -102,6 +104,11 @@ export function Layout({ children }: LayoutProps) {
       name: "Continuous Development",
       href: "/continuous-development",
       icon: <RefreshCw className="w-5 h-5 mr-2" />,
+    },
+    {
+      name: "Error Resolution",
+      href: "/error-resolution",
+      icon: <Brain className="w-5 h-5 mr-2" />,
     },
     {
       name: "GitHub Integration",

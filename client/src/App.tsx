@@ -16,6 +16,7 @@ import Documentation from "@/pages/documentation";
 import TermsOfService from "@/pages/terms";
 import LicensePage from "@/pages/license";
 import MetricsPage from "@/pages/metrics";
+import ErrorResolutionPage from "@/pages/error-resolution";
 
 function Router() {
   return (
@@ -30,6 +31,7 @@ function Router() {
       <Route path="/terms" component={TermsOfService}/>
       <Route path="/license" component={LicensePage}/>
       <Route path="/metrics" component={MetricsPage}/>
+      <Route path="/error-resolution" component={ErrorResolutionPage}/>
       <Route component={NotFound} />
     </Switch>
   );
