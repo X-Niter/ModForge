@@ -7,27 +7,26 @@ import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.fileEditor.FileDocumentManager;
 import com.intellij.openapi.project.Project;
+import com.intellij.openapi.util.Computable;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.*;
-import com.intellij.psi.util.PsiTreeUtil;
+import com.intellij.psi.search.GlobalSearchScope;
 import com.intellij.util.IncorrectOperationException;
 import com.modforge.intellij.plugin.ai.AIServiceManager;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
  * Service for autonomous code generation.
- * This service provides capabilities for detecting missing code elements
- * and automatically generating appropriate implementations.
+ * This service provides methods for generating code, analyzing files for issues,
+ * and fixing issues automatically.
  */
 @Service(Service.Level.PROJECT)
 public final class AutonomousCodeGenerationService {
@@ -35,16 +34,10 @@ public final class AutonomousCodeGenerationService {
     
     private final Project project;
     private final AIServiceManager aiServiceManager;
+    private final CodeAnalysisService codeAnalysisService;
     
-    // Patterns for detecting missing implementations
-    private static final Pattern MISSING_METHOD_PATTERN = Pattern.compile(
-            "(?i)(?:method|function)\\s+['\"](\\w+)['\"]\\s+(?:is|must be)\\s+(?:implemented|defined|overridden)");
-    
-    private static final Pattern UNUSED_IMPORT_PATTERN = Pattern.compile(
-            "(?i)unused\\s+import\\s*:?\\s*['\"](\\S+)['\"]");
-    
-    private static final Pattern MISSING_OVERRIDE_PATTERN = Pattern.compile(
-            "(?i)(?:method|function)\\s+['\"](\\w+)['\"]\\s+(?:should have|requires|must have)\\s+@Override");
+    // Cache of analyzed files
+    private final Map<String, List<CodeIssue>> issueCache = new ConcurrentHashMap<>();
     
     /**
      * Creates a new AutonomousCodeGenerationService.
@@ -52,9 +45,10 @@ public final class AutonomousCodeGenerationService {
      */
     public AutonomousCodeGenerationService(@NotNull Project project) {
         this.project = project;
-        this.aiServiceManager = AIServiceManager.getInstance(project);
+        this.aiServiceManager = project.getService(AIServiceManager.class);
+        this.codeAnalysisService = project.getService(CodeAnalysisService.class);
         
-        LOG.info("AutonomousCodeGenerationService initialized");
+        LOG.info("AutonomousCodeGenerationService initialized for project: " + project.getName());
     }
     
     /**
@@ -67,375 +61,177 @@ public final class AutonomousCodeGenerationService {
     }
     
     /**
-     * Analyzes a file for missing code elements.
-     * @param file The file to analyze
-     * @return A list of issues found
+     * Generates code based on a prompt.
+     * @param prompt The prompt
+     * @param language The programming language
+     * @param options Additional options
+     * @return A future that completes with the generated code
      */
+    @NotNull
+    public CompletableFuture<String> generateCode(@NotNull String prompt, @NotNull String language,
+                                               @Nullable Map<String, Object> options) {
+        LOG.info("Generating code for prompt: " + prompt);
+        
+        // Use AI service manager to generate code
+        return aiServiceManager.generateCode(prompt, language, options);
+    }
+    
+    /**
+     * Analyzes a file for potential issues.
+     * @param file The file to analyze
+     * @return A future that completes with a list of issues
+     */
+    @NotNull
     public CompletableFuture<List<CodeIssue>> analyzeFile(@NotNull VirtualFile file) {
         LOG.info("Analyzing file: " + file.getPath());
         
         return CompletableFuture.supplyAsync(() -> {
-            List<CodeIssue> issues = new ArrayList<>();
-            
             try {
-                PsiFile psiFile = PsiManager.getInstance(project).findFile(file);
-                if (psiFile == null) {
-                    LOG.warn("Could not find PSI file for: " + file.getPath());
-                    return issues;
+                // Check cache
+                String filePath = file.getPath();
+                List<CodeIssue> cachedIssues = issueCache.get(filePath);
+                
+                if (cachedIssues != null) {
+                    return cachedIssues;
                 }
                 
-                // Analyze Java files
-                if (psiFile instanceof PsiJavaFile) {
-                    PsiJavaFile javaFile = (PsiJavaFile) psiFile;
-                    
-                    // Analyze classes
-                    for (PsiClass psiClass : javaFile.getClasses()) {
-                        issues.addAll(analyzeClass(psiClass));
-                    }
-                    
-                    // Analyze imports
-                    for (PsiImportStatement importStatement : javaFile.getImportList().getImportStatements()) {
-                        if (importStatement.isOnDemand()) {
-                            continue; // Skip wildcard imports
-                        }
-                        
-                        if (!isImportUsed(importStatement, javaFile)) {
-                            CodeIssue issue = new CodeIssue(
-                                    CodeIssueType.UNUSED_IMPORT,
-                                    importStatement.getTextRange().getStartOffset(),
-                                    "Unused import: " + importStatement.getQualifiedName(),
-                                    importStatement
-                            );
-                            issues.add(issue);
-                        }
-                    }
+                // Get document
+                Document document = FileDocumentManager.getInstance().getDocument(file);
+                if (document == null) {
+                    return Collections.emptyList();
                 }
+                
+                // Get file content
+                String content = document.getText();
+                if (content.isEmpty()) {
+                    return Collections.emptyList();
+                }
+                
+                // Get file extension
+                String extension = file.getExtension();
+                
+                // Detect code issues
+                List<CodeIssue> issues = new ArrayList<>();
+                
+                if ("java".equals(extension)) {
+                    // Analyze Java file
+                    issues.addAll(analyzeJavaFile(file, content));
+                } else if ("kt".equals(extension)) {
+                    // Analyze Kotlin file
+                    issues.addAll(analyzeKotlinFile(content));
+                } else if ("js".equals(extension) || "ts".equals(extension)) {
+                    // Analyze JavaScript/TypeScript file
+                    issues.addAll(analyzeJsFile(content));
+                } else {
+                    // Generic analysis
+                    issues.addAll(analyzeGenericFile(content));
+                }
+                
+                // Cache issues
+                issueCache.put(filePath, issues);
                 
                 return issues;
             } catch (Exception e) {
                 LOG.error("Error analyzing file: " + file.getPath(), e);
-                return issues;
+                return Collections.emptyList();
             }
         });
-    }
-    
-    /**
-     * Analyzes a class for missing code elements.
-     * @param psiClass The class to analyze
-     * @return A list of issues found
-     */
-    private List<CodeIssue> analyzeClass(@NotNull PsiClass psiClass) {
-        List<CodeIssue> issues = new ArrayList<>();
-        
-        try {
-            // Check for unimplemented methods in implemented interfaces
-            for (PsiClass anInterface : psiClass.getInterfaces()) {
-                for (PsiMethod interfaceMethod : anInterface.getMethods()) {
-                    if (!hasImplementation(psiClass, interfaceMethod)) {
-                        CodeIssue issue = new CodeIssue(
-                                CodeIssueType.MISSING_METHOD,
-                                psiClass.getTextRange().getEndOffset() - 1,
-                                "Missing implementation of method: " + interfaceMethod.getName(),
-                                interfaceMethod
-                        );
-                        issues.add(issue);
-                    }
-                }
-            }
-            
-            // Check for missing @Override annotations
-            for (PsiMethod method : psiClass.getMethods()) {
-                if (isOverridingMethod(method) && !hasOverrideAnnotation(method)) {
-                    CodeIssue issue = new CodeIssue(
-                            CodeIssueType.MISSING_OVERRIDE,
-                            method.getTextRange().getStartOffset(),
-                            "Missing @Override annotation on method: " + method.getName(),
-                            method
-                    );
-                    issues.add(issue);
-                }
-            }
-            
-            // Check for missing implementations of abstract methods
-            if (psiClass.getSuperClass() != null && psiClass.getSuperClass().isValid()) {
-                for (PsiMethod superMethod : psiClass.getSuperClass().getMethods()) {
-                    if (superMethod.hasModifierProperty(PsiModifier.ABSTRACT) && 
-                            !hasImplementation(psiClass, superMethod)) {
-                        CodeIssue issue = new CodeIssue(
-                                CodeIssueType.MISSING_METHOD,
-                                psiClass.getTextRange().getEndOffset() - 1,
-                                "Missing implementation of abstract method: " + superMethod.getName(),
-                                superMethod
-                        );
-                        issues.add(issue);
-                    }
-                }
-            }
-            
-            // Recursively analyze inner classes
-            for (PsiClass innerClass : psiClass.getInnerClasses()) {
-                issues.addAll(analyzeClass(innerClass));
-            }
-        } catch (Exception e) {
-            LOG.error("Error analyzing class: " + psiClass.getName(), e);
-        }
-        
-        return issues;
-    }
-    
-    /**
-     * Checks if a class has an implementation of a method.
-     * @param psiClass The class to check
-     * @param methodToCheck The method to check for
-     * @return Whether the class has an implementation of the method
-     */
-    private boolean hasImplementation(@NotNull PsiClass psiClass, @NotNull PsiMethod methodToCheck) {
-        for (PsiMethod method : psiClass.getMethods()) {
-            if (method.getName().equals(methodToCheck.getName()) && 
-                    method.getParameterList().getParametersCount() == methodToCheck.getParameterList().getParametersCount()) {
-                
-                boolean parametersMatch = true;
-                PsiParameter[] params1 = method.getParameterList().getParameters();
-                PsiParameter[] params2 = methodToCheck.getParameterList().getParameters();
-                
-                for (int i = 0; i < params1.length; i++) {
-                    if (!params1[i].getType().equals(params2[i].getType())) {
-                        parametersMatch = false;
-                        break;
-                    }
-                }
-                
-                if (parametersMatch) {
-                    return true;
-                }
-            }
-        }
-        
-        return false;
-    }
-    
-    /**
-     * Checks if a method is overriding a method from a superclass or interface.
-     * @param method The method to check
-     * @return Whether the method is overriding a method
-     */
-    private boolean isOverridingMethod(@NotNull PsiMethod method) {
-        PsiClass containingClass = method.getContainingClass();
-        if (containingClass == null) {
-            return false;
-        }
-        
-        // Check superclass
-        PsiClass superClass = containingClass.getSuperClass();
-        if (superClass != null) {
-            for (PsiMethod superMethod : superClass.getMethods()) {
-                if (isOverriding(method, superMethod)) {
-                    return true;
-                }
-            }
-        }
-        
-        // Check interfaces
-        for (PsiClass anInterface : containingClass.getInterfaces()) {
-            for (PsiMethod interfaceMethod : anInterface.getMethods()) {
-                if (isOverriding(method, interfaceMethod)) {
-                    return true;
-                }
-            }
-        }
-        
-        return false;
-    }
-    
-    /**
-     * Checks if a method is overriding another method.
-     * @param method The method to check
-     * @param potentiallyOverriddenMethod The potentially overridden method
-     * @return Whether method is overriding potentiallyOverriddenMethod
-     */
-    private boolean isOverriding(@NotNull PsiMethod method, @NotNull PsiMethod potentiallyOverriddenMethod) {
-        if (!method.getName().equals(potentiallyOverriddenMethod.getName())) {
-            return false;
-        }
-        
-        if (method.getParameterList().getParametersCount() != 
-                potentiallyOverriddenMethod.getParameterList().getParametersCount()) {
-            return false;
-        }
-        
-        PsiParameter[] params1 = method.getParameterList().getParameters();
-        PsiParameter[] params2 = potentiallyOverriddenMethod.getParameterList().getParameters();
-        
-        for (int i = 0; i < params1.length; i++) {
-            if (!params1[i].getType().equals(params2[i].getType())) {
-                return false;
-            }
-        }
-        
-        return true;
-    }
-    
-    /**
-     * Checks if a method has an @Override annotation.
-     * @param method The method to check
-     * @return Whether the method has an @Override annotation
-     */
-    private boolean hasOverrideAnnotation(@NotNull PsiMethod method) {
-        for (PsiAnnotation annotation : method.getAnnotations()) {
-            if (annotation.getQualifiedName() != null && 
-                    annotation.getQualifiedName().equals("java.lang.Override")) {
-                return true;
-            }
-        }
-        
-        return false;
-    }
-    
-    /**
-     * Checks if an import is used in a file.
-     * @param importStatement The import statement to check
-     * @param javaFile The Java file to check
-     * @return Whether the import is used
-     */
-    private boolean isImportUsed(@NotNull PsiImportStatement importStatement, @NotNull PsiJavaFile javaFile) {
-        String importName = importStatement.getQualifiedName();
-        if (importName == null) {
-            return true; // Can't determine if it's used
-        }
-        
-        String shortName = importName.substring(importName.lastIndexOf('.') + 1);
-        
-        // Check if short name is used in the file
-        return isShortNameUsed(shortName, javaFile);
-    }
-    
-    /**
-     * Checks if a short name is used in a file.
-     * @param shortName The short name to check
-     * @param javaFile The Java file to check
-     * @return Whether the short name is used
-     */
-    private boolean isShortNameUsed(@NotNull String shortName, @NotNull PsiJavaFile javaFile) {
-        // Check if the short name is used in the file text
-        String fileText = javaFile.getText();
-        
-        // Simple heuristic: check if the short name appears outside of import statements
-        int importsEndOffset = javaFile.getImportList().getTextRange().getEndOffset();
-        String codeAfterImports = fileText.substring(importsEndOffset);
-        
-        // Look for the short name as a word boundary
-        Pattern pattern = Pattern.compile("\\b" + shortName + "\\b");
-        Matcher matcher = pattern.matcher(codeAfterImports);
-        
-        return matcher.find();
-    }
-    
-    /**
-     * Gets a description of a code element.
-     * @param element The code element
-     * @return A description of the code element
-     */
-    @NotNull
-    private String getElementDescription(@NotNull PsiElement element) {
-        if (element instanceof PsiMethod) {
-            PsiMethod method = (PsiMethod) element;
-            StringBuilder desc = new StringBuilder();
-            
-            // Add modifiers
-            PsiModifierList modifierList = method.getModifierList();
-            for (String modifier : new String[] {
-                    PsiModifier.PUBLIC, PsiModifier.PROTECTED, PsiModifier.PRIVATE,
-                    PsiModifier.STATIC, PsiModifier.ABSTRACT, PsiModifier.FINAL
-            }) {
-                if (modifierList.hasModifierProperty(modifier)) {
-                    desc.append(modifier).append(" ");
-                }
-            }
-            
-            // Add return type
-            PsiType returnType = method.getReturnType();
-            if (returnType != null) {
-                desc.append(returnType.getPresentableText()).append(" ");
-            }
-            
-            // Add name
-            desc.append(method.getName());
-            
-            // Add parameters
-            desc.append("(");
-            PsiParameter[] parameters = method.getParameterList().getParameters();
-            for (int i = 0; i < parameters.length; i++) {
-                PsiParameter parameter = parameters[i];
-                desc.append(parameter.getType().getPresentableText()).append(" ").append(parameter.getName());
-                if (i < parameters.length - 1) {
-                    desc.append(", ");
-                }
-            }
-            desc.append(")");
-            
-            // Add exceptions
-            PsiClassType[] exceptions = method.getThrowsList().getReferencedTypes();
-            if (exceptions.length > 0) {
-                desc.append(" throws ");
-                for (int i = 0; i < exceptions.length; i++) {
-                    desc.append(exceptions[i].getPresentableText());
-                    if (i < exceptions.length - 1) {
-                        desc.append(", ");
-                    }
-                }
-            }
-            
-            return desc.toString();
-        } else if (element instanceof PsiClass) {
-            PsiClass psiClass = (PsiClass) element;
-            return psiClass.getQualifiedName();
-        } else if (element instanceof PsiField) {
-            PsiField field = (PsiField) element;
-            return field.getType().getPresentableText() + " " + field.getName();
-        } else {
-            return element.getText();
-        }
     }
     
     /**
      * Fixes issues in a file.
      * @param file The file to fix
      * @param issues The issues to fix
-     * @return The number of issues fixed
+     * @return A future that completes with the number of fixed issues
      */
+    @NotNull
     public CompletableFuture<Integer> fixIssues(@NotNull VirtualFile file, @NotNull List<CodeIssue> issues) {
         LOG.info("Fixing " + issues.size() + " issues in file: " + file.getPath());
         
+        if (issues.isEmpty()) {
+            return CompletableFuture.completedFuture(0);
+        }
+        
         return CompletableFuture.supplyAsync(() -> {
-            if (issues.isEmpty()) {
-                return 0;
-            }
-            
-            int fixedCount = 0;
-            
             try {
+                // Get document
                 Document document = FileDocumentManager.getInstance().getDocument(file);
                 if (document == null) {
-                    LOG.warn("Could not get document for file: " + file.getPath());
                     return 0;
                 }
                 
+                // Get file content
+                String content = document.getText();
+                if (content.isEmpty()) {
+                    return 0;
+                }
+                
+                // Get PSI file
                 PsiFile psiFile = PsiManager.getInstance(project).findFile(file);
                 if (psiFile == null) {
-                    LOG.warn("Could not find PSI file for: " + file.getPath());
                     return 0;
                 }
                 
-                for (CodeIssue issue : issues) {
-                    try {
-                        boolean fixed = fixIssue(issue, psiFile, document);
-                        if (fixed) {
+                // Sort issues by position (highest offset first to avoid shifting)
+                List<CodeIssue> sortedIssues = new ArrayList<>(issues);
+                sortedIssues.sort((a, b) -> Integer.compare(b.getPosition(), a.getPosition()));
+                
+                // Fix issues
+                int fixedCount = 0;
+                
+                for (CodeIssue issue : sortedIssues) {
+                    if (issue.hasFix()) {
+                        // Apply fix
+                        String newContent = applyFix(content, issue);
+                        
+                        if (!newContent.equals(content)) {
+                            // Update document
+                            updateDocument(document, newContent);
+                            content = newContent;
                             fixedCount++;
+                            
+                            // Wait a bit to avoid conflicts
+                            Thread.sleep(100);
                         }
-                    } catch (Exception e) {
-                        LOG.error("Error fixing issue: " + issue.getMessage(), e);
+                    } else if (!issue.getDescription().isEmpty() && issue.getPosition() >= 0) {
+                        // Generate fix using AI
+                        try {
+                            // Get relevant code snippet
+                            String codeSnippet = getRelevantCodeSnippet(content, issue.getPosition(), 10);
+                            
+                            // Generate fix
+                            String fixPrompt = "Fix the following code issue: " + issue.getDescription() + 
+                                    "\n\nCode snippet:\n```\n" + codeSnippet + "\n```\n\n" +
+                                    "Provide only the fixed code snippet without any explanations.";
+                            
+                            String fixedCode = aiServiceManager.fixCode(codeSnippet, issue.getDescription(), null)
+                                    .get(30, TimeUnit.SECONDS);
+                            
+                            if (fixedCode != null && !fixedCode.isEmpty() && !fixedCode.equals(codeSnippet)) {
+                                // Clean up AI response
+                                fixedCode = cleanupAiResponse(fixedCode);
+                                
+                                // Apply fix
+                                String newContent = content.substring(0, issue.getPosition()) +
+                                        fixedCode +
+                                        content.substring(issue.getPosition() + codeSnippet.length());
+                                
+                                // Update document
+                                updateDocument(document, newContent);
+                                content = newContent;
+                                fixedCount++;
+                                
+                                // Wait a bit to avoid conflicts
+                                Thread.sleep(100);
+                            }
+                        } catch (Exception e) {
+                            LOG.error("Error generating fix for issue: " + issue.getDescription(), e);
+                        }
                     }
                 }
+                
+                // Clear cache for this file
+                issueCache.remove(file.getPath());
                 
                 return fixedCount;
             } catch (Exception e) {
@@ -446,394 +242,573 @@ public final class AutonomousCodeGenerationService {
     }
     
     /**
-     * Fixes a single issue.
-     * @param issue The issue to fix
-     * @param psiFile The PSI file
-     * @param document The document
-     * @return Whether the issue was fixed
-     */
-    private boolean fixIssue(@NotNull CodeIssue issue, @NotNull PsiFile psiFile, @NotNull Document document) {
-        switch (issue.getType()) {
-            case UNUSED_IMPORT:
-                return fixUnusedImport(issue, psiFile, document);
-                
-            case MISSING_METHOD:
-                return fixMissingMethod(issue, psiFile, document);
-                
-            case MISSING_OVERRIDE:
-                return fixMissingOverride(issue, psiFile, document);
-                
-            default:
-                LOG.warn("Unknown issue type: " + issue.getType());
-                return false;
-        }
-    }
-    
-    /**
-     * Fixes an unused import issue.
-     * @param issue The issue to fix
-     * @param psiFile The PSI file
-     * @param document The document
-     * @return Whether the issue was fixed
-     */
-    private boolean fixUnusedImport(@NotNull CodeIssue issue, @NotNull PsiFile psiFile, @NotNull Document document) {
-        if (!(issue.getElement() instanceof PsiImportStatement)) {
-            return false;
-        }
-        
-        PsiImportStatement importStatement = (PsiImportStatement) issue.getElement();
-        
-        final int[] startOffset = {importStatement.getTextRange().getStartOffset()};
-        final int[] endOffset = {importStatement.getTextRange().getEndOffset()};
-        
-        // Find the next newline to remove it as well
-        String text = document.getText();
-        if (endOffset[0] < text.length() && text.charAt(endOffset[0]) == '\n') {
-            endOffset[0]++;
-        }
-        
-        Runnable runnable = () -> {
-            try {
-                document.deleteString(startOffset[0], endOffset[0]);
-            } catch (Exception e) {
-                LOG.error("Error removing unused import", e);
-            }
-        };
-        
-        ApplicationManager.getApplication().invokeLater(() -> {
-            CommandProcessor.getInstance().executeCommand(project, () -> {
-                ApplicationManager.getApplication().runWriteAction(runnable);
-            }, "Remove Unused Import", null);
-        });
-        
-        return true;
-    }
-    
-    /**
-     * Fixes a missing method issue.
-     * @param issue The issue to fix
-     * @param psiFile The PSI file
-     * @param document The document
-     * @return Whether the issue was fixed
-     */
-    private boolean fixMissingMethod(@NotNull CodeIssue issue, @NotNull PsiFile psiFile, @NotNull Document document) {
-        if (!(issue.getElement() instanceof PsiMethod)) {
-            return false;
-        }
-        
-        PsiMethod methodToImplement = (PsiMethod) issue.getElement();
-        
-        // Find the containing class at the issue offset
-        PsiElement elementAtOffset = psiFile.findElementAt(issue.getOffset());
-        if (elementAtOffset == null) {
-            return false;
-        }
-        
-        PsiClass containingClass = PsiTreeUtil.getParentOfType(elementAtOffset, PsiClass.class);
-        if (containingClass == null) {
-            return false;
-        }
-        
-        // Generate a method implementation
-        String methodDescription = getElementDescription(methodToImplement);
-        String classContext = containingClass.getText();
-        
-        // Build a prompt for the AI service
-        String prompt = "Implement the following method for a Java class:\n\n" +
-                "Method signature: " + methodDescription + "\n\n" +
-                "Class context:\n```java\n" + classContext + "\n```\n\n" +
-                "Please provide a complete method implementation with appropriate Javadoc comments.";
-        
-        try {
-            // Get method implementation from AI service
-            String implementation = aiServiceManager.generateCode(prompt, "java", null)
-                    .get(10, TimeUnit.SECONDS);
-            
-            if (implementation == null || implementation.trim().isEmpty()) {
-                LOG.warn("Failed to generate method implementation");
-                return false;
-            }
-            
-            // Clean up the implementation (remove any extra class declarations, etc.)
-            implementation = cleanMethodImplementation(implementation);
-            
-            // Insert the implementation at the right position
-            final int[] insertPosition = {issue.getOffset()};
-            final String finalImplementation = implementation;
-            
-            Runnable runnable = () -> {
-                try {
-                    // Add a newline if needed
-                    if (!document.getText(
-                            new com.intellij.openapi.util.TextRange(insertPosition[0] - 1, insertPosition[0])
-                    ).equals("\n")) {
-                        document.insertString(insertPosition[0], "\n");
-                        insertPosition[0]++;
-                    }
-                    
-                    document.insertString(insertPosition[0], finalImplementation);
-                } catch (Exception e) {
-                    LOG.error("Error inserting method implementation", e);
-                }
-            };
-            
-            ApplicationManager.getApplication().invokeLater(() -> {
-                CommandProcessor.getInstance().executeCommand(project, () -> {
-                    ApplicationManager.getApplication().runWriteAction(runnable);
-                }, "Add Method Implementation", null);
-            });
-            
-            return true;
-        } catch (Exception e) {
-            LOG.error("Error generating method implementation", e);
-            return false;
-        }
-    }
-    
-    /**
-     * Fixes a missing @Override annotation issue.
-     * @param issue The issue to fix
-     * @param psiFile The PSI file
-     * @param document The document
-     * @return Whether the issue was fixed
-     */
-    private boolean fixMissingOverride(@NotNull CodeIssue issue, @NotNull PsiFile psiFile, @NotNull Document document) {
-        if (!(issue.getElement() instanceof PsiMethod)) {
-            return false;
-        }
-        
-        PsiMethod method = (PsiMethod) issue.getElement();
-        
-        final int[] insertPosition = {method.getTextRange().getStartOffset()};
-        
-        Runnable runnable = () -> {
-            try {
-                document.insertString(insertPosition[0], "@Override\n");
-            } catch (Exception e) {
-                LOG.error("Error adding @Override annotation", e);
-            }
-        };
-        
-        ApplicationManager.getApplication().invokeLater(() -> {
-            CommandProcessor.getInstance().executeCommand(project, () -> {
-                ApplicationManager.getApplication().runWriteAction(runnable);
-            }, "Add @Override Annotation", null);
-        });
-        
-        return true;
-    }
-    
-    /**
-     * Cleans a method implementation.
-     * @param implementation The method implementation to clean
-     * @return The cleaned method implementation
+     * Analyzes a Java file for issues.
+     * @param file The file to analyze
+     * @param content The file content
+     * @return A list of issues
      */
     @NotNull
-    private String cleanMethodImplementation(@NotNull String implementation) {
-        // Extract just the method declaration and body
-        // This is a simple implementation and might need enhancement for real-world use
+    private List<CodeIssue> analyzeJavaFile(@NotNull VirtualFile file, @NotNull String content) {
+        List<CodeIssue> issues = new ArrayList<>();
         
-        // Remove any class declarations
-        implementation = implementation.replaceAll("(?s)\\bclass\\s+\\w+\\s*\\{", "");
-        
-        // Remove any interface declarations
-        implementation = implementation.replaceAll("(?s)\\binterface\\s+\\w+\\s*\\{", "");
-        
-        // Remove any closing braces at the end that might be from class declarations
-        implementation = implementation.replaceAll("\\}\\s*$", "");
-        
-        // Remove any "public", "protected", or "private" keywords from the beginning
-        // of the implementation if there are multiple (we only want one)
-        implementation = implementation.replaceAll("(public|protected|private)\\s+(public|protected|private)", "$1");
-        
-        // Ensure the implementation ends with a newline
-        if (!implementation.endsWith("\n")) {
-            implementation += "\n";
-        }
-        
-        return implementation.trim();
-    }
-    
-    /**
-     * Performs autonomous code generation based on compiler error messages.
-     * @param file The file to fix
-     * @param errorMessage The compiler error message
-     * @return Whether any issues were fixed
-     */
-    public CompletableFuture<Boolean> fixCompilerError(@NotNull VirtualFile file, @NotNull String errorMessage) {
-        LOG.info("Fixing compiler error in file: " + file.getPath());
-        LOG.info("Error message: " + errorMessage);
-        
-        return CompletableFuture.supplyAsync(() -> {
-            try {
-                Document document = FileDocumentManager.getInstance().getDocument(file);
-                if (document == null) {
-                    LOG.warn("Could not get document for file: " + file.getPath());
-                    return false;
-                }
-                
-                PsiFile psiFile = PsiManager.getInstance(project).findFile(file);
-                if (psiFile == null) {
-                    LOG.warn("Could not find PSI file for: " + file.getPath());
-                    return false;
-                }
-                
-                List<CodeIssue> issues = new ArrayList<>();
-                
-                // Check for missing methods
-                Matcher missingMethodMatcher = MISSING_METHOD_PATTERN.matcher(errorMessage);
-                while (missingMethodMatcher.find()) {
-                    String methodName = missingMethodMatcher.group(1);
-                    LOG.info("Detected missing method: " + methodName);
-                    
-                    // Find the class that needs the method
-                    if (psiFile instanceof PsiJavaFile) {
-                        PsiClass[] classes = ((PsiJavaFile) psiFile).getClasses();
-                        if (classes.length > 0) {
-                            PsiClass targetClass = classes[0];
-                            
-                            // Create a code issue for the missing method
-                            CodeIssue issue = new CodeIssue(
-                                    CodeIssueType.MISSING_METHOD,
-                                    targetClass.getTextRange().getEndOffset() - 1,
-                                    "Missing method: " + methodName,
-                                    createPlaceholderMethod(methodName)
-                            );
-                            issues.add(issue);
+        try {
+            // Get PSI file
+            PsiFile psiFile = PsiManager.getInstance(project).findFile(file);
+            if (!(psiFile instanceof PsiJavaFile)) {
+                return issues;
+            }
+            
+            PsiJavaFile javaFile = (PsiJavaFile) psiFile;
+            
+            // Check for missing @Override annotations
+            for (PsiClass psiClass : javaFile.getClasses()) {
+                for (PsiMethod method : psiClass.getMethods()) {
+                    // Skip methods that already have @Override
+                    boolean hasOverride = false;
+                    for (PsiAnnotation annotation : method.getAnnotations()) {
+                        if (annotation.getQualifiedName() != null && 
+                                annotation.getQualifiedName().equals("java.lang.Override")) {
+                            hasOverride = true;
+                            break;
                         }
                     }
+                    
+                    if (hasOverride) {
+                        continue;
+                    }
+                    
+                    // Check if method overrides a superclass or interface method
+                    PsiMethod[] superMethods = method.findSuperMethods();
+                    if (superMethods.length > 0) {
+                        CodeIssue issue = new CodeIssue(
+                                CodeIssueType.MISSING_OVERRIDE,
+                                "Missing @Override annotation for method: " + method.getName(),
+                                method.getTextOffset(),
+                                true,
+                                "Add @Override annotation"
+                        );
+                        
+                        issues.add(issue);
+                    }
+                }
+            }
+            
+            // Check for unused imports
+            for (PsiImportStatement importStatement : javaFile.getImportList().getImportStatements()) {
+                PsiJavaCodeReferenceElement reference = importStatement.getImportReference();
+                if (reference == null) {
+                    continue;
                 }
                 
-                // Check for missing @Override annotations
-                Matcher missingOverrideMatcher = MISSING_OVERRIDE_PATTERN.matcher(errorMessage);
-                while (missingOverrideMatcher.find()) {
-                    String methodName = missingOverrideMatcher.group(1);
-                    LOG.info("Detected missing @Override annotation: " + methodName);
+                boolean isReferenced = ApplicationManager.getApplication().runReadAction(
+                        (Computable<Boolean>) () -> {
+                            PsiElement target = reference.resolve();
+                            return target != null && 
+                                    com.intellij.psi.codeStyle.JavaCodeStyleManager.getInstance(project)
+                                            .isReferenceUsed(reference, javaFile);
+                        });
+                
+                if (!isReferenced) {
+                    CodeIssue issue = new CodeIssue(
+                            CodeIssueType.UNUSED_IMPORT,
+                            "Unused import: " + reference.getQualifiedName(),
+                            importStatement.getTextOffset(),
+                            true,
+                            "Remove unused import"
+                    );
                     
-                    // Find the method that needs the annotation
-                    if (psiFile instanceof PsiJavaFile) {
-                        PsiClass[] classes = ((PsiJavaFile) psiFile).getClasses();
-                        for (PsiClass psiClass : classes) {
-                            for (PsiMethod method : psiClass.getMethods()) {
-                                if (method.getName().equals(methodName) && !hasOverrideAnnotation(method)) {
-                                    // Create a code issue for the missing annotation
-                                    CodeIssue issue = new CodeIssue(
-                                            CodeIssueType.MISSING_OVERRIDE,
-                                            method.getTextRange().getStartOffset(),
-                                            "Missing @Override annotation on method: " + methodName,
-                                            method
-                                    );
-                                    issues.add(issue);
+                    issues.add(issue);
+                }
+            }
+            
+            // Check for non-final fields that could be final
+            for (PsiClass psiClass : javaFile.getClasses()) {
+                for (PsiField field : psiClass.getFields()) {
+                    // Skip already final fields
+                    if (field.hasModifierProperty(PsiModifier.FINAL)) {
+                        continue;
+                    }
+                    
+                    // Skip static fields
+                    if (field.hasModifierProperty(PsiModifier.STATIC)) {
+                        continue;
+                    }
+                    
+                    // Check if field is assigned only once
+                    boolean isAssignedOnce = ApplicationManager.getApplication().runReadAction(
+                            (Computable<Boolean>) () -> {
+                                // Check for assignments in the class
+                                PsiReference[] references = com.intellij.psi.search.searches.ReferencesSearch
+                                        .search(field, GlobalSearchScope.fileScope(javaFile))
+                                        .toArray(PsiReference.EMPTY_ARRAY);
+                                
+                                int assignmentCount = 0;
+                                
+                                // Count field declaration assignment
+                                if (field.getInitializer() != null) {
+                                    assignmentCount++;
                                 }
-                            }
-                        }
-                    }
-                }
-                
-                // Check for unused imports
-                Matcher unusedImportMatcher = UNUSED_IMPORT_PATTERN.matcher(errorMessage);
-                while (unusedImportMatcher.find()) {
-                    String importName = unusedImportMatcher.group(1);
-                    LOG.info("Detected unused import: " + importName);
+                                
+                                // Count assignments in code
+                                for (PsiReference reference : references) {
+                                    PsiElement element = reference.getElement();
+                                    PsiElement parent = element.getParent();
+                                    
+                                    if (parent instanceof PsiAssignmentExpression) {
+                                        PsiAssignmentExpression assignment = (PsiAssignmentExpression) parent;
+                                        if (assignment.getLExpression() == element) {
+                                            assignmentCount++;
+                                        }
+                                    }
+                                }
+                                
+                                return assignmentCount == 1;
+                            });
                     
-                    // Find the import statement
-                    if (psiFile instanceof PsiJavaFile) {
-                        PsiJavaFile javaFile = (PsiJavaFile) psiFile;
-                        for (PsiImportStatement importStatement : javaFile.getImportList().getImportStatements()) {
-                            String qualifiedName = importStatement.getQualifiedName();
-                            if (qualifiedName != null && qualifiedName.equals(importName)) {
-                                // Create a code issue for the unused import
-                                CodeIssue issue = new CodeIssue(
-                                        CodeIssueType.UNUSED_IMPORT,
-                                        importStatement.getTextRange().getStartOffset(),
-                                        "Unused import: " + importName,
-                                        importStatement
-                                );
-                                issues.add(issue);
-                            }
-                        }
+                    if (isAssignedOnce) {
+                        CodeIssue issue = new CodeIssue(
+                                CodeIssueType.FIELD_COULD_BE_FINAL,
+                                "Field could be final: " + field.getName(),
+                                field.getTextOffset(),
+                                true,
+                                "Make field final"
+                        );
+                        
+                        issues.add(issue);
                     }
                 }
-                
-                if (issues.isEmpty()) {
-                    // No specific issues found, try general AI-based fixing
-                    return fixWithGeneralAI(file, errorMessage);
-                } else {
-                    // Fix the specific issues found
-                    int fixedCount = fixIssues(file, issues).get(10, TimeUnit.SECONDS);
-                    return fixedCount > 0;
-                }
-            } catch (Exception e) {
-                LOG.error("Error fixing compiler error", e);
-                return false;
             }
+        } catch (Exception e) {
+            LOG.error("Error analyzing Java file: " + file.getPath(), e);
+        }
+        
+        // Add more Java-specific checks
+        
+        return issues;
+    }
+    
+    /**
+     * Analyzes a Kotlin file for issues.
+     * @param content The file content
+     * @return A list of issues
+     */
+    @NotNull
+    private List<CodeIssue> analyzeKotlinFile(@NotNull String content) {
+        List<CodeIssue> issues = new ArrayList<>();
+        
+        // Check for deprecated functions and classes
+        Pattern deprecatedPattern = Pattern.compile("@Deprecated[\\s\\S]{0,100}fun\\s+(\\w+)|@Deprecated[\\s\\S]{0,100}class\\s+(\\w+)");
+        Matcher deprecatedMatcher = deprecatedPattern.matcher(content);
+        
+        while (deprecatedMatcher.find()) {
+            String name = deprecatedMatcher.group(1) != null ? deprecatedMatcher.group(1) : deprecatedMatcher.group(2);
+            String type = deprecatedMatcher.group(1) != null ? "function" : "class";
+            
+            CodeIssue issue = new CodeIssue(
+                    CodeIssueType.USING_DEPRECATED_API,
+                    "Using deprecated " + type + ": " + name,
+                    deprecatedMatcher.start(),
+                    false,
+                    "Replace with non-deprecated alternative"
+            );
+            
+            issues.add(issue);
+        }
+        
+        // Check for var that could be val
+        Pattern varPattern = Pattern.compile("var\\s+(\\w+)\\s*:\\s*[\\w<>?]+\\s*=\\s*");
+        Matcher varMatcher = varPattern.matcher(content);
+        
+        while (varMatcher.find()) {
+            String name = varMatcher.group(1);
+            
+            // Check if variable is reassigned
+            Pattern reassignPattern = Pattern.compile(name + "\\s*=");
+            Matcher reassignMatcher = reassignPattern.matcher(content.substring(varMatcher.end()));
+            
+            if (!reassignMatcher.find()) {
+                CodeIssue issue = new CodeIssue(
+                        CodeIssueType.VAR_COULD_BE_VAL,
+                        "Variable could be val: " + name,
+                        varMatcher.start(),
+                        true,
+                        "Change var to val"
+                );
+                
+                issues.add(issue);
+            }
+        }
+        
+        return issues;
+    }
+    
+    /**
+     * Analyzes a JavaScript/TypeScript file for issues.
+     * @param content The file content
+     * @return A list of issues
+     */
+    @NotNull
+    private List<CodeIssue> analyzeJsFile(@NotNull String content) {
+        List<CodeIssue> issues = new ArrayList<>();
+        
+        // Check for let that could be const
+        Pattern letPattern = Pattern.compile("let\\s+(\\w+)\\s*=\\s*");
+        Matcher letMatcher = letPattern.matcher(content);
+        
+        while (letMatcher.find()) {
+            String name = letMatcher.group(1);
+            
+            // Check if variable is reassigned
+            Pattern reassignPattern = Pattern.compile(name + "\\s*=");
+            Matcher reassignMatcher = reassignPattern.matcher(content.substring(letMatcher.end()));
+            
+            if (!reassignMatcher.find()) {
+                CodeIssue issue = new CodeIssue(
+                        CodeIssueType.LET_COULD_BE_CONST,
+                        "Variable could be const: " + name,
+                        letMatcher.start(),
+                        true,
+                        "Change let to const"
+                );
+                
+                issues.add(issue);
+            }
+        }
+        
+        // Check for console.log statements
+        Pattern consoleLogPattern = Pattern.compile("console\\.log\\(");
+        Matcher consoleLogMatcher = consoleLogPattern.matcher(content);
+        
+        while (consoleLogMatcher.find()) {
+            CodeIssue issue = new CodeIssue(
+                    CodeIssueType.CONSOLE_LOG,
+                    "Console.log statement should be removed in production code",
+                    consoleLogMatcher.start(),
+                    true,
+                    "Remove console.log statement"
+            );
+            
+            issues.add(issue);
+        }
+        
+        return issues;
+    }
+    
+    /**
+     * Analyzes a generic file for issues.
+     * @param content The file content
+     * @return A list of issues
+     */
+    @NotNull
+    private List<CodeIssue> analyzeGenericFile(@NotNull String content) {
+        List<CodeIssue> issues = new ArrayList<>();
+        
+        // Check for TODO comments
+        Pattern todoPattern = Pattern.compile("//\\s*TODO[:\\s]|/\\*\\s*TODO[:\\s]|#\\s*TODO[:\\s]");
+        Matcher todoMatcher = todoPattern.matcher(content);
+        
+        while (todoMatcher.find()) {
+            CodeIssue issue = new CodeIssue(
+                    CodeIssueType.TODO_COMMENT,
+                    "TODO comment found",
+                    todoMatcher.start(),
+                    false,
+                    "Implement TODO item"
+            );
+            
+            issues.add(issue);
+        }
+        
+        // Check for long lines
+        String[] lines = content.split("\n");
+        int position = 0;
+        
+        for (String line : lines) {
+            if (line.length() > 120) {
+                CodeIssue issue = new CodeIssue(
+                        CodeIssueType.LINE_TOO_LONG,
+                        "Line is too long (" + line.length() + " characters)",
+                        position,
+                        false,
+                        "Break line into multiple lines"
+                );
+                
+                issues.add(issue);
+            }
+            
+            position += line.length() + 1; // +1 for the newline
+        }
+        
+        return issues;
+    }
+    
+    /**
+     * Gets a relevant code snippet around a position.
+     * @param content The content
+     * @param position The position
+     * @param contextLines The number of context lines
+     * @return The code snippet
+     */
+    @NotNull
+    private String getRelevantCodeSnippet(@NotNull String content, int position, int contextLines) {
+        try {
+            // Find start of the current line
+            int start = position;
+            while (start > 0 && content.charAt(start - 1) != '\n') {
+                start--;
+            }
+            
+            // Find end of the current line
+            int end = position;
+            while (end < content.length() && content.charAt(end) != '\n') {
+                end++;
+            }
+            
+            // Expand to include context lines
+            int contextStart = start;
+            int lineCount = 0;
+            
+            // Go back contextLines lines
+            while (contextStart > 0 && lineCount < contextLines) {
+                contextStart--;
+                if (content.charAt(contextStart) == '\n') {
+                    lineCount++;
+                }
+                
+                if (contextStart == 0) {
+                    break;
+                }
+            }
+            
+            if (contextStart > 0) {
+                contextStart++; // Skip the last newline
+            }
+            
+            int contextEnd = end;
+            lineCount = 0;
+            
+            // Go forward contextLines lines
+            while (contextEnd < content.length() && lineCount < contextLines) {
+                if (content.charAt(contextEnd) == '\n') {
+                    lineCount++;
+                }
+                contextEnd++;
+                
+                if (contextEnd == content.length()) {
+                    break;
+                }
+            }
+            
+            return content.substring(contextStart, contextEnd);
+        } catch (Exception e) {
+            LOG.error("Error getting relevant code snippet", e);
+            
+            // Return a small snippet around the position as fallback
+            int start = Math.max(0, position - 100);
+            int end = Math.min(content.length(), position + 100);
+            
+            return content.substring(start, end);
+        }
+    }
+    
+    /**
+     * Updates a document with new content.
+     * @param document The document to update
+     * @param newContent The new content
+     */
+    private void updateDocument(@NotNull Document document, @NotNull String newContent) {
+        ApplicationManager.getApplication().invokeLater(() -> {
+            CommandProcessor.getInstance().executeCommand(
+                    project,
+                    () -> ApplicationManager.getApplication().runWriteAction(() -> {
+                        document.setText(newContent);
+                    }),
+                    "Fix Code Issues",
+                    null
+            );
         });
     }
     
     /**
-     * Creates a placeholder method for code generation.
-     * @param methodName The method name
-     * @return A placeholder method
+     * Applies a fix to content.
+     * @param content The content to fix
+     * @param issue The issue with the fix
+     * @return The fixed content
      */
     @NotNull
-    private PsiMethod createPlaceholderMethod(@NotNull String methodName) {
+    private String applyFix(@NotNull String content, @NotNull CodeIssue issue) {
         try {
-            PsiElementFactory factory = PsiElementFactory.getInstance(project);
-            return factory.createMethodFromText("public void " + methodName + "() {}", null);
-        } catch (IncorrectOperationException e) {
-            LOG.error("Error creating placeholder method", e);
-            throw new RuntimeException("Error creating placeholder method", e);
+            if (!issue.hasFix()) {
+                return content;
+            }
+            
+            switch (issue.getType()) {
+                case UNUSED_IMPORT:
+                    // Remove the entire line
+                    int lineStart = content.lastIndexOf('\n', issue.getPosition()) + 1;
+                    int lineEnd = content.indexOf('\n', issue.getPosition());
+                    if (lineEnd == -1) {
+                        lineEnd = content.length();
+                    }
+                    
+                    return content.substring(0, lineStart) + content.substring(lineEnd);
+                    
+                case FIELD_COULD_BE_FINAL:
+                    // Add final modifier
+                    return addFinalModifier(content, issue.getPosition());
+                    
+                case VAR_COULD_BE_VAL:
+                    // Change var to val
+                    return content.substring(0, issue.getPosition()) + 
+                            content.substring(issue.getPosition()).replaceFirst("var", "val");
+                    
+                case LET_COULD_BE_CONST:
+                    // Change let to const
+                    return content.substring(0, issue.getPosition()) + 
+                            content.substring(issue.getPosition()).replaceFirst("let", "const");
+                    
+                case CONSOLE_LOG:
+                    // Remove the entire console.log statement
+                    return removeConsoleLog(content, issue.getPosition());
+                    
+                case MISSING_OVERRIDE:
+                    // Add @Override annotation
+                    return addOverrideAnnotation(content, issue.getPosition());
+                    
+                default:
+                    return content;
+            }
+        } catch (Exception e) {
+            LOG.error("Error applying fix", e);
+            return content;
         }
     }
     
     /**
-     * Fixes a file with general AI-based error resolution.
-     * @param file The file to fix
-     * @param errorMessage The error message
-     * @return Whether the file was fixed
+     * Adds a final modifier to a field.
+     * @param content The content
+     * @param position The position
+     * @return The updated content
      */
-    private boolean fixWithGeneralAI(@NotNull VirtualFile file, @NotNull String errorMessage) {
-        try {
-            Document document = FileDocumentManager.getInstance().getDocument(file);
-            if (document == null) {
-                LOG.warn("Could not get document for file: " + file.getPath());
-                return false;
-            }
-            
-            // Get the current code
-            String code = document.getText();
-            
-            // Use the AI service to fix the code
-            String fixedCode = aiServiceManager.fixCode(code, errorMessage, null)
-                    .get(30, TimeUnit.SECONDS);
-            
-            if (fixedCode == null || fixedCode.trim().isEmpty() || fixedCode.equals(code)) {
-                LOG.warn("AI service could not fix the code or returned the same code");
-                return false;
-            }
-            
-            // Apply the fix
-            final String finalFixedCode = fixedCode;
-            
-            Runnable runnable = () -> {
-                try {
-                    document.setText(finalFixedCode);
-                } catch (Exception e) {
-                    LOG.error("Error applying fixed code", e);
-                }
-            };
-            
-            ApplicationManager.getApplication().invokeLater(() -> {
-                CommandProcessor.getInstance().executeCommand(project, () -> {
-                    ApplicationManager.getApplication().runWriteAction(runnable);
-                }, "Fix Compiler Error", null);
-            });
-            
-            return true;
-        } catch (Exception e) {
-            LOG.error("Error fixing with general AI", e);
-            return false;
+    @NotNull
+    private String addFinalModifier(@NotNull String content, int position) {
+        // Find the field declaration
+        int start = position;
+        while (start > 0 && !Character.isWhitespace(content.charAt(start - 1))) {
+            start--;
         }
+        
+        // Find modifiers
+        while (start > 0 && Character.isWhitespace(content.charAt(start - 1))) {
+            start--;
+        }
+        
+        // Check for existing modifiers
+        String modifiers = "";
+        while (start > 0 && !Character.isWhitespace(content.charAt(start - 1)) && 
+                content.charAt(start - 1) != ';' && content.charAt(start - 1) != '{' && 
+                content.charAt(start - 1) != '}') {
+            start--;
+            
+            int tempStart = start;
+            while (tempStart > 0 && !Character.isWhitespace(content.charAt(tempStart - 1)) && 
+                    content.charAt(tempStart - 1) != ';' && content.charAt(tempStart - 1) != '{' && 
+                    content.charAt(tempStart - 1) != '}') {
+                tempStart--;
+            }
+            
+            modifiers = content.substring(tempStart, start) + " " + modifiers;
+        }
+        
+        // Check if final is already present
+        if (modifiers.contains("final")) {
+            return content;
+        }
+        
+        // Add final modifier
+        String newModifiers = modifiers + "final ";
+        
+        return content.substring(0, start) + newModifiers + content.substring(start + modifiers.length());
+    }
+    
+    /**
+     * Removes a console.log statement.
+     * @param content The content
+     * @param position The position
+     * @return The updated content
+     */
+    @NotNull
+    private String removeConsoleLog(@NotNull String content, int position) {
+        // Find the start of the statement
+        int start = position;
+        while (start > 0 && content.charAt(start - 1) != ';' && content.charAt(start - 1) != '{' && 
+                content.charAt(start - 1) != '}' && content.charAt(start - 1) != '\n') {
+            start--;
+        }
+        
+        // Find the end of the statement
+        int end = position;
+        while (end < content.length()) {
+            if (content.charAt(end) == ';') {
+                end++;
+                break;
+            } else if (content.charAt(end) == '\n') {
+                break;
+            }
+            end++;
+        }
+        
+        // Remove any leading whitespace
+        while (start > 0 && Character.isWhitespace(content.charAt(start - 1))) {
+            start--;
+        }
+        
+        return content.substring(0, start) + content.substring(end);
+    }
+    
+    /**
+     * Adds an @Override annotation.
+     * @param content The content
+     * @param position The position
+     * @return The updated content
+     */
+    @NotNull
+    private String addOverrideAnnotation(@NotNull String content, int position) {
+        // Find the start of the method declaration
+        int start = position;
+        
+        // Find the beginning of the line
+        while (start > 0 && content.charAt(start - 1) != '\n') {
+            start--;
+        }
+        
+        // Get indentation
+        int indentEnd = start;
+        while (indentEnd < content.length() && Character.isWhitespace(content.charAt(indentEnd)) && 
+                content.charAt(indentEnd) != '\n') {
+            indentEnd++;
+        }
+        
+        String indentation = content.substring(start, indentEnd);
+        
+        // Add @Override annotation
+        return content.substring(0, start) + indentation + "@Override\n" + content.substring(start);
+    }
+    
+    /**
+     * Cleans up an AI response by removing code fences and extra whitespace.
+     * @param response The AI response
+     * @return The cleaned up response
+     */
+    @NotNull
+    private String cleanupAiResponse(@NotNull String response) {
+        // Remove code fences
+        String cleaned = response.replaceAll("```(?:java|kotlin|javascript|js|typescript|ts)?", "");
+        
+        // Trim whitespace
+        cleaned = cleaned.trim();
+        
+        return cleaned;
     }
     
     /**
@@ -841,8 +816,14 @@ public final class AutonomousCodeGenerationService {
      */
     public enum CodeIssueType {
         UNUSED_IMPORT,
-        MISSING_METHOD,
-        MISSING_OVERRIDE
+        MISSING_OVERRIDE,
+        FIELD_COULD_BE_FINAL,
+        VAR_COULD_BE_VAL,
+        LET_COULD_BE_CONST,
+        CONSOLE_LOG,
+        TODO_COMMENT,
+        LINE_TOO_LONG,
+        USING_DEPRECATED_API
     }
     
     /**
@@ -850,23 +831,26 @@ public final class AutonomousCodeGenerationService {
      */
     public static class CodeIssue {
         private final CodeIssueType type;
-        private final int offset;
-        private final String message;
-        private final PsiElement element;
+        private final String description;
+        private final int position;
+        private final boolean hasFix;
+        private final String fixDescription;
         
         /**
          * Creates a new CodeIssue.
          * @param type The issue type
-         * @param offset The offset
-         * @param message The message
-         * @param element The element
+         * @param description The issue description
+         * @param position The issue position
+         * @param hasFix Whether the issue has a fix
+         * @param fixDescription The fix description
          */
-        public CodeIssue(@NotNull CodeIssueType type, int offset, @NotNull String message, 
-                @Nullable PsiElement element) {
+        public CodeIssue(@NotNull CodeIssueType type, @NotNull String description, int position, 
+                        boolean hasFix, @NotNull String fixDescription) {
             this.type = type;
-            this.offset = offset;
-            this.message = message;
-            this.element = element;
+            this.description = description;
+            this.position = position;
+            this.hasFix = hasFix;
+            this.fixDescription = fixDescription;
         }
         
         /**
@@ -879,29 +863,37 @@ public final class AutonomousCodeGenerationService {
         }
         
         /**
-         * Gets the offset.
-         * @return The offset
-         */
-        public int getOffset() {
-            return offset;
-        }
-        
-        /**
-         * Gets the message.
-         * @return The message
+         * Gets the issue description.
+         * @return The issue description
          */
         @NotNull
-        public String getMessage() {
-            return message;
+        public String getDescription() {
+            return description;
         }
         
         /**
-         * Gets the element.
-         * @return The element
+         * Gets the issue position.
+         * @return The issue position
          */
-        @Nullable
-        public PsiElement getElement() {
-            return element;
+        public int getPosition() {
+            return position;
+        }
+        
+        /**
+         * Gets whether the issue has a fix.
+         * @return Whether the issue has a fix
+         */
+        public boolean hasFix() {
+            return hasFix;
+        }
+        
+        /**
+         * Gets the fix description.
+         * @return The fix description
+         */
+        @NotNull
+        public String getFixDescription() {
+            return fixDescription;
         }
     }
 }

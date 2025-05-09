@@ -1,116 +1,129 @@
+<?xml version="1.0" encoding="UTF-8"?>
 <idea-plugin>
     <id>com.modforge.intellij.plugin</id>
     <name>ModForge</name>
-    <vendor email="support@modforge.io" url="https://modforge.io">ModForge</vendor>
-    
-    <description><![CDATA[
-    ModForge - AI-powered Minecraft mod development platform.
-    <br>
-    <br>
-    Features:
-    <ul>
-        <li>Autonomous code generation for Minecraft mods</li>
-        <li>Intelligent error fixing</li>
-        <li>Real-time collaborative editing</li>
-        <li>Cross-loader mod development support</li>
-        <li>API cost reduction through pattern recognition</li>
-    </ul>
-    <br>
-    ModForge helps you create, test, and improve Minecraft mods efficiently by leveraging AI and collaborative tools.
-    ]]></description>
+    <vendor email="support@modforge.dev" url="https://modforge.dev">ModForge</vendor>
     
     <depends>com.intellij.modules.platform</depends>
     <depends>com.intellij.modules.java</depends>
+    <depends>org.jetbrains.kotlin</depends>
+    
+    <description><![CDATA[
+        <h1>ModForge - AI-powered Minecraft mod development platform</h1>
+        <p>ModForge is an advanced AI-powered Minecraft mod development platform that combines intelligent
+        automation with collaborative technologies to simplify and enhance mod creation across multiple platforms.</p>
+        
+        <h2>Key Features:</h2>
+        <ul>
+            <li><strong>AI-powered code generation</strong> - Automatically generate high-quality mod code</li>
+            <li><strong>Intelligent error fixing</strong> - Automatically detect and fix compilation errors</li>
+            <li><strong>Pattern recognition</strong> - Reduce API costs by learning from past interactions</li>
+            <li><strong>Real-time collaborative editing</strong> - Work together with other developers</li>
+            <li><strong>Cross-loader mod development</strong> - Support for Forge, Fabric, Quilt, and more</li>
+            <li><strong>Continuous development</strong> - Automatically improve your mod over time</li>
+        </ul>
+        
+        <p>ModForge helps you create, test, and improve Minecraft mods efficiently by leveraging AI and collaborative tools.</p>
+    ]]></description>
+    
+    <change-notes><![CDATA[
+        <h3>1.0.0</h3>
+        <ul>
+            <li>Initial release</li>
+            <li>AI-powered code generation</li>
+            <li>Autonomous error fixing</li>
+            <li>Collaborative editing</li>
+            <li>Pattern recognition for reduced API costs</li>
+            <li>Cross-loader mod development support</li>
+        </ul>
+    ]]></change-notes>
     
     <extensions defaultExtensionNs="com.intellij">
-        <!-- Services -->
-        <applicationService serviceImplementation="com.modforge.intellij.plugin.settings.ModForgeSettings"/>
-        
-        <projectService serviceImplementation="com.modforge.intellij.plugin.ai.AIServiceManager"/>
-        <projectService serviceImplementation="com.modforge.intellij.plugin.services.CodeAnalysisService"/>
-        <projectService serviceImplementation="com.modforge.intellij.plugin.services.AutonomousCodeGenerationService"/>
-        <projectService serviceImplementation="com.modforge.intellij.plugin.services.AutomatedRefactoringService"/>
-        <projectService serviceImplementation="com.modforge.intellij.plugin.collaboration.CollaborationService"/>
-        
         <!-- Tool Windows -->
-        <toolWindow id="ModForge"
-                    anchor="right"
-                    icon="AllIcons.General.Modified"
+        <toolWindow id="ModForge" anchor="right" icon="/icons/modforge.svg"
                     factoryClass="com.modforge.intellij.plugin.ui.toolwindow.ModForgeToolWindowFactory"/>
         
+        <!-- Services -->
+        <applicationService serviceImplementation="com.modforge.intellij.plugin.settings.ModForgeSettings"/>
+        <projectService serviceImplementation="com.modforge.intellij.plugin.ai.AIServiceManager"/>
+        <projectService serviceImplementation="com.modforge.intellij.plugin.ai.PatternRecognitionService"/>
+        <projectService serviceImplementation="com.modforge.intellij.plugin.services.AutonomousCodeGenerationService"/>
+        <projectService serviceImplementation="com.modforge.intellij.plugin.services.AutomatedRefactoringService"/>
+        <projectService serviceImplementation="com.modforge.intellij.plugin.collaboration.CollaborativeEditor"/>
+        
         <!-- Settings -->
-        <applicationConfigurable
-                parentId="tools"
-                instance="com.modforge.intellij.plugin.settings.ModForgeSettingsConfigurable"
-                id="com.modforge.intellij.plugin.settings.ModForgeSettingsConfigurable"
-                displayName="ModForge Settings"/>
-        
-        <!-- Editor Extensions -->
-        <editorFactoryListener implementation="com.modforge.intellij.plugin.listeners.EditorFactoryListener"/>
-        
-        <!-- Compiler Extensions -->
-        <compiler.buildTargetScopeProvider implementation="com.modforge.intellij.plugin.compiler.ModForgeBuildTargetScopeProvider"/>
-        <compiler.task execute="AFTER" implementation="com.modforge.intellij.plugin.compiler.ModForgeCompilerTask"/>
+        <applicationConfigurable parentId="tools" instance="com.modforge.intellij.plugin.settings.ModForgeSettingsConfigurable"
+                               id="com.modforge.intellij.plugin.settings.ModForgeSettingsConfigurable"
+                               displayName="ModForge"/>
     </extensions>
     
     <actions>
-        <!-- Action Groups -->
-        <group id="ModForge.ActionGroup" text="ModForge" description="ModForge actions">
-            <add-to-group group-id="ToolsMenu" anchor="last"/>
-            <action id="ModForge.GenerateCode"
-                    class="com.modforge.intellij.plugin.actions.GenerateCodeAction"
-                    text="Generate Code with AI"
-                    description="Generate code using AI">
-                <keyboard-shortcut keymap="$default" first-keystroke="shift ctrl G"/>
+        <!-- Main Menu Actions -->
+        <group id="ModForge.MainMenu" text="ModForge" description="ModForge actions">
+            <add-to-group group-id="MainMenu" anchor="before" relative-to-action="HelpMenu"/>
+            
+            <action id="ModForge.GenerateCode" class="com.modforge.intellij.plugin.actions.GenerateCodeAction"
+                    text="Generate Code" description="Generate code using AI">
+                <keyboard-shortcut keymap="$default" first-keystroke="ctrl shift G"/>
             </action>
-            <action id="ModForge.FixErrors"
-                    class="com.modforge.intellij.plugin.actions.FixErrorsAction"
-                    text="Fix Errors with AI"
-                    description="Fix errors using AI">
-                <keyboard-shortcut keymap="$default" first-keystroke="shift ctrl F"/>
+            
+            <action id="ModForge.FixErrors" class="com.modforge.intellij.plugin.actions.FixErrorsAction"
+                    text="Fix Errors" description="Fix errors using AI">
+                <keyboard-shortcut keymap="$default" first-keystroke="ctrl shift F"/>
             </action>
+            
+            <action id="ModForge.GenerateDocumentation" class="com.modforge.intellij.plugin.actions.GenerateDocumentationAction"
+                    text="Generate Documentation" description="Generate documentation using AI">
+                <keyboard-shortcut keymap="$default" first-keystroke="ctrl shift D"/>
+            </action>
+            
+            <action id="ModForge.ExplainCode" class="com.modforge.intellij.plugin.actions.ExplainCodeAction"
+                    text="Explain Code" description="Explain code using AI">
+                <keyboard-shortcut keymap="$default" first-keystroke="ctrl shift E"/>
+            </action>
+            
             <separator/>
-            <action id="ModForge.StartCollaboration"
-                    class="com.modforge.intellij.plugin.actions.StartCollaborationAction"
-                    text="Start Collaboration"
-                    description="Start collaboration session"/>
-            <action id="ModForge.JoinCollaboration"
-                    class="com.modforge.intellij.plugin.actions.JoinCollaborationAction"
-                    text="Join Collaboration"
-                    description="Join collaboration session"/>
-            <separator/>
-            <action id="ModForge.SyncWithWeb"
-                    class="com.modforge.intellij.plugin.actions.SyncWithWebAction"
-                    text="Sync with Web Platform"
-                    description="Synchronize with ModForge web platform"/>
+            
+            <action id="ModForge.ShowToolWindow" class="com.modforge.intellij.plugin.actions.ShowToolWindowAction"
+                    text="Show ModForge Tool Window" description="Show ModForge tool window">
+            </action>
+            
+            <action id="ModForge.Settings" class="com.modforge.intellij.plugin.actions.OpenSettingsAction"
+                    text="Settings..." description="Open ModForge settings">
+            </action>
         </group>
         
-        <!-- Editor Context Menu -->
-        <group id="ModForge.EditorPopupMenu">
+        <!-- Editor Popup Menu Actions -->
+        <group id="ModForge.EditorPopupMenu" text="ModForge" description="ModForge actions">
             <add-to-group group-id="EditorPopupMenu" anchor="last"/>
-            <separator/>
-            <action id="ModForge.GenerateCodeContext"
-                    class="com.modforge.intellij.plugin.actions.GenerateCodeAction"
-                    text="ModForge: Generate Code"
-                    description="Generate code using AI"/>
-            <action id="ModForge.FixErrorsContext"
-                    class="com.modforge.intellij.plugin.actions.FixErrorsAction"
-                    text="ModForge: Fix Errors"
-                    description="Fix errors using AI"/>
+            
+            <action id="ModForge.EditorGenerateCode" class="com.modforge.intellij.plugin.actions.GenerateCodeAction"
+                    text="Generate Code" description="Generate code using AI">
+            </action>
+            
+            <action id="ModForge.EditorFixErrors" class="com.modforge.intellij.plugin.actions.FixErrorsAction"
+                    text="Fix Errors" description="Fix errors using AI">
+            </action>
+            
+            <action id="ModForge.EditorGenerateDocumentation" class="com.modforge.intellij.plugin.actions.GenerateDocumentationAction"
+                    text="Generate Documentation" description="Generate documentation using AI">
+            </action>
+            
+            <action id="ModForge.EditorExplainCode" class="com.modforge.intellij.plugin.actions.ExplainCodeAction"
+                    text="Explain Code" description="Explain code using AI">
+            </action>
         </group>
     </actions>
     
-    <applicationListeners>
-        <!-- Application Listeners -->
-        <listener class="com.modforge.intellij.plugin.listeners.AppLifecycleListener"
-                  topic="com.intellij.ide.AppLifecycleListener"/>
-    </applicationListeners>
-    
     <projectListeners>
-        <!-- Project Listeners -->
-        <listener class="com.modforge.intellij.plugin.listeners.ProjectListener"
-                  topic="com.intellij.openapi.project.ProjectManagerListener"/>
+        <!-- Project listeners -->
         <listener class="com.modforge.intellij.plugin.listeners.CompilationStatusListener"
-                  topic="com.intellij.openapi.compiler.CompilationStatusListener"/>
+                  topic="com.intellij.compiler.CompilationStatusListener"/>
+        
+        <listener class="com.modforge.intellij.plugin.listeners.FileEditorManagerListener"
+                  topic="com.intellij.openapi.fileEditor.FileEditorManagerListener"/>
+        
+        <listener class="com.modforge.intellij.plugin.listeners.ProjectManagerListener"
+                  topic="com.intellij.openapi.project.ProjectManagerListener"/>
     </projectListeners>
 </idea-plugin>

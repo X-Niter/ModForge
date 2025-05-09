@@ -1,58 +1,60 @@
 package com.modforge.intellij.plugin.ui.toolwindow.panels;
 
-import com.intellij.openapi.actionSystem.ActionManager;
-import com.intellij.openapi.actionSystem.ActionToolbar;
-import com.intellij.openapi.actionSystem.DefaultActionGroup;
+import com.intellij.icons.AllIcons;
+import com.intellij.openapi.actionSystem.*;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.editor.EditorFactory;
-import com.intellij.openapi.editor.EditorSettings;
 import com.intellij.openapi.editor.ex.EditorEx;
 import com.intellij.openapi.editor.highlighter.EditorHighlighterFactory;
 import com.intellij.openapi.fileEditor.FileEditorManager;
+import com.intellij.openapi.fileTypes.FileType;
 import com.intellij.openapi.fileTypes.FileTypeManager;
-import com.intellij.openapi.progress.ProgressIndicator;
-import com.intellij.openapi.progress.ProgressManager;
-import com.intellij.openapi.progress.Task;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.ComboBox;
-import com.intellij.openapi.ui.Messages;
 import com.intellij.openapi.ui.SimpleToolWindowPanel;
 import com.intellij.openapi.vfs.VirtualFile;
-import com.intellij.ui.EditorTextField;
-import com.intellij.ui.JBSplitter;
+import com.intellij.openapi.wm.IdeFocusManager;
+import com.intellij.ui.JBColor;
+import com.intellij.ui.OnePixelSplitter;
 import com.intellij.ui.components.JBLabel;
 import com.intellij.ui.components.JBPanel;
 import com.intellij.ui.components.JBScrollPane;
+import com.intellij.ui.components.JBTextArea;
 import com.intellij.util.ui.JBUI;
-import com.intellij.util.ui.UIUtil;
+import com.intellij.util.ui.components.BorderLayoutPanel;
 import com.modforge.intellij.plugin.ai.AIServiceManager;
+import com.modforge.intellij.plugin.settings.ModForgeSettings;
 import org.jetbrains.annotations.NotNull;
 
 import javax.swing.*;
 import java.awt.*;
-import java.util.concurrent.atomic.AtomicReference;
+import java.awt.event.ActionEvent;
+import java.awt.event.ItemEvent;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
 
 /**
- * Panel for AI-assisted code generation and improvement.
+ * Panel for AI assistance.
+ * This panel provides AI-powered assistance for code generation, fixing, and documentation.
  */
 public class AIAssistPanel {
     private static final Logger LOG = Logger.getInstance(AIAssistPanel.class);
     
     private final Project project;
-    private final AIServiceManager aiServiceManager;
-    
-    private JPanel mainPanel;
-    private JBSplitter splitter;
-    private EditorTextField promptField;
+    private final JPanel mainPanel;
+    private final JBTextArea promptArea;
+    private final ComboBox<String> modelComboBox;
+    private final ComboBox<String> actionComboBox;
+    private final JButton generateButton;
     private Editor responseEditor;
-    private ComboBox<String> taskTypeComboBox;
-    private JButton generateButton;
-    private JButton improveButton;
-    private JButton explainButton;
-    private JButton insertButton;
+    private Document responseDocument;
+    private final JBLabel statusLabel;
+    private final JProgressBar progressBar;
     
     /**
      * Creates a new AIAssistPanel.
@@ -60,383 +62,409 @@ public class AIAssistPanel {
      */
     public AIAssistPanel(@NotNull Project project) {
         this.project = project;
-        this.aiServiceManager = project.getService(AIServiceManager.class);
-        createPanel();
-    }
-    
-    /**
-     * Creates the panel.
-     */
-    private void createPanel() {
-        // Create main panel
-        mainPanel = new SimpleToolWindowPanel(true, true);
         
-        // Create splitter
-        splitter = new JBSplitter(true, 0.4f);
-        splitter.setDividerWidth(3);
-        splitter.getDivider().setBackground(UIUtil.getPanelBackground());
+        mainPanel = new JBPanel<>(new BorderLayout());
         
-        // Create prompt panel
-        JPanel promptPanel = createPromptPanel();
-        splitter.setFirstComponent(promptPanel);
+        // Create UI components
+        promptArea = new JBTextArea();
+        promptArea.setRows(5);
+        promptArea.setLineWrap(true);
+        promptArea.setWrapStyleWord(true);
+        promptArea.setBorder(JBUI.Borders.empty(5));
         
-        // Create response panel
-        JPanel responsePanel = createResponsePanel();
-        splitter.setSecondComponent(responsePanel);
-        
-        // Create toolbar
-        DefaultActionGroup actionGroup = new DefaultActionGroup();
-        // Add actions as needed
-        
-        ActionToolbar toolbar = ActionManager.getInstance().createActionToolbar(
-                "ModForge.AIAssist", actionGroup, true);
-        toolbar.setTargetComponent(mainPanel);
-        
-        // Add components to main panel
-        mainPanel.setToolbar(toolbar.getComponent());
-        mainPanel.setContent(splitter);
-    }
-    
-    /**
-     * Creates the prompt panel.
-     * @return The prompt panel
-     */
-    private JPanel createPromptPanel() {
-        JPanel panel = new JBPanel<>(new BorderLayout());
-        panel.setBorder(BorderFactory.createTitledBorder("Prompt"));
-        
-        // Create prompt field
-        promptField = new EditorTextField();
-        promptField.setPreferredSize(new Dimension(400, 200));
-        
-        // Create actions panel
-        JPanel actionsPanel = new JBPanel<>(new BorderLayout());
-        
-        // Task type combobox
-        JPanel taskTypePanel = new JBPanel<>(new FlowLayout(FlowLayout.LEFT));
-        taskTypePanel.add(new JBLabel("Task:"));
-        
-        taskTypeComboBox = new ComboBox<>(new String[] {
-                "Generate Code", "Improve Code", "Fix Issues", "Explain Code", "Add Comments"
+        // Create models combo box
+        modelComboBox = new ComboBox<>(new String[]{"gpt-4", "gpt-4-turbo", "gpt-3.5-turbo"});
+        modelComboBox.setSelectedItem(ModForgeSettings.getInstance().getOpenAiModel());
+        modelComboBox.addItemListener(e -> {
+            if (e.getStateChange() == ItemEvent.SELECTED) {
+                String model = (String) e.getItem();
+                ModForgeSettings.getInstance().setOpenAiModel(model);
+            }
         });
-        taskTypePanel.add(taskTypeComboBox);
         
-        actionsPanel.add(taskTypePanel, BorderLayout.WEST);
+        // Create action combo box
+        actionComboBox = new ComboBox<>(new String[]{
+                "Generate Code",
+                "Fix Code",
+                "Generate Documentation",
+                "Explain Code"
+        });
         
-        // Buttons
-        JPanel buttonsPanel = new JBPanel<>(new FlowLayout(FlowLayout.RIGHT));
-        
+        // Create generate button
         generateButton = new JButton("Generate");
-        generateButton.addActionListener(e -> generateCode());
-        buttonsPanel.add(generateButton);
-        
-        improveButton = new JButton("Improve");
-        improveButton.addActionListener(e -> improveCode());
-        buttonsPanel.add(improveButton);
-        
-        explainButton = new JButton("Explain");
-        explainButton.addActionListener(e -> explainCode());
-        buttonsPanel.add(explainButton);
-        
-        actionsPanel.add(buttonsPanel, BorderLayout.EAST);
-        
-        panel.add(promptField, BorderLayout.CENTER);
-        panel.add(actionsPanel, BorderLayout.SOUTH);
-        
-        return panel;
-    }
-    
-    /**
-     * Creates the response panel.
-     * @return The response panel
-     */
-    private JPanel createResponsePanel() {
-        JPanel panel = new JBPanel<>(new BorderLayout());
-        panel.setBorder(BorderFactory.createTitledBorder("Response"));
+        generateButton.addActionListener(this::onGenerateClick);
         
         // Create response editor
-        Document document = EditorFactory.getInstance().createDocument("");
-        responseEditor = EditorFactory.getInstance().createEditor(document, project, 
-                FileTypeManager.getInstance().getFileTypeByExtension("java"), false);
+        responseDocument = EditorFactory.getInstance().createDocument("");
+        responseEditor = EditorFactory.getInstance().createEditor(
+                responseDocument,
+                project,
+                FileTypeManager.getInstance().getFileTypeByExtension("java"),
+                false
+        );
         
-        // Configure editor
-        EditorSettings settings = responseEditor.getSettings();
-        settings.setLineNumbersShown(true);
-        settings.setFoldingOutlineShown(true);
-        settings.setLineMarkerAreaShown(true);
-        settings.setIndentGuidesShown(true);
-        settings.setVirtualSpace(false);
-        
-        // Set Java syntax highlighting
+        // Set editor settings
         if (responseEditor instanceof EditorEx) {
-            ((EditorEx) responseEditor).setHighlighter(
-                    EditorHighlighterFactory.getInstance().createJavaHighlighter(
-                            null, null, project));
+            EditorEx editorEx = (EditorEx) responseEditor;
+            editorEx.setHorizontalScrollbarVisible(true);
+            editorEx.setVerticalScrollbarVisible(true);
+            editorEx.setCaretVisible(true);
+            editorEx.setEmbeddedIntoDialogWrapper(true);
+            
+            // Set highlighter
+            editorEx.setHighlighter(EditorHighlighterFactory.getInstance().createHighlighter(
+                    project,
+                    FileTypeManager.getInstance().getFileTypeByExtension("java")
+            ));
         }
         
-        // Create actions panel
-        JPanel actionsPanel = new JBPanel<>(new BorderLayout());
+        // Create status label
+        statusLabel = new JBLabel("");
+        statusLabel.setBorder(JBUI.Borders.empty(5, 10));
         
-        // Buttons
-        JPanel buttonsPanel = new JBPanel<>(new FlowLayout(FlowLayout.RIGHT));
+        // Create progress bar
+        progressBar = new JProgressBar();
+        progressBar.setIndeterminate(true);
+        progressBar.setVisible(false);
         
-        insertButton = new JButton("Insert into Editor");
-        insertButton.addActionListener(e -> insertIntoEditor());
-        buttonsPanel.add(insertButton);
+        // Create action toolbar
+        DefaultActionGroup actionGroup = new DefaultActionGroup();
         
-        actionsPanel.add(buttonsPanel, BorderLayout.EAST);
-        
-        panel.add(responseEditor.getComponent(), BorderLayout.CENTER);
-        panel.add(actionsPanel, BorderLayout.SOUTH);
-        
-        return panel;
-    }
-    
-    /**
-     * Generates code based on the prompt.
-     */
-    private void generateCode() {
-        String prompt = promptField.getText();
-        if (prompt.isEmpty()) {
-            Messages.showErrorDialog(mainPanel, "Please enter a prompt", "Error");
-            return;
-        }
-        
-        setButtonsEnabled(false);
-        
-        ProgressManager.getInstance().run(new Task.Backgroundable(project, "Generating Code", false) {
+        // Add Insert to Editor action
+        actionGroup.add(new AnAction("Insert to Editor", "Insert to current editor", AllIcons.Actions.MenuPaste) {
             @Override
-            public void run(@NotNull ProgressIndicator indicator) {
-                try {
-                    indicator.setIndeterminate(true);
-                    indicator.setText("Generating code...");
-                    
-                    // This is a simplified implementation
-                    // In a real implementation, we would use AIServiceManager to generate code
-                    AtomicReference<String> result = new AtomicReference<>("");
-                    
-                    // Simulate API call
-                    try {
-                        Thread.sleep(2000);
-                        
-                        // Simplified example output
-                        result.set("/**\n" +
-                                " * Generated code based on prompt: " + prompt + "\n" +
-                                " */\n" +
-                                "public class GeneratedCode {\n" +
-                                "    public static void main(String[] args) {\n" +
-                                "        System.out.println(\"Hello, ModForge!\");\n" +
-                                "    }\n" +
-                                "}");
-                    } catch (InterruptedException e) {
-                        Thread.currentThread().interrupt();
-                    }
-                    
-                    // Update UI
-                    ApplicationManager.getApplication().invokeLater(() -> {
-                        try {
-                            responseEditor.getDocument().setText(result.get());
-                        } finally {
-                            setButtonsEnabled(true);
-                        }
-                    });
-                } catch (Exception e) {
-                    LOG.error("Error generating code", e);
-                    
-                    ApplicationManager.getApplication().invokeLater(() -> {
-                        Messages.showErrorDialog(
-                                project,
-                                "Error generating code: " + e.getMessage(),
-                                "Error"
-                        );
-                        setButtonsEnabled(true);
-                    });
-                }
+            public void actionPerformed(@NotNull AnActionEvent e) {
+                insertToEditor();
+            }
+            
+            @Override
+            public void update(@NotNull AnActionEvent e) {
+                // Enable only if there is a response and an active editor
+                e.getPresentation().setEnabled(
+                        responseDocument.getText().length() > 0 &&
+                                FileEditorManager.getInstance(project).getSelectedTextEditor() != null
+                );
             }
         });
-    }
-    
-    /**
-     * Improves the code in the current editor.
-     */
-    private void improveCode() {
-        VirtualFile currentFile = FileEditorManager.getInstance(project).getSelectedFiles().length > 0
-                ? FileEditorManager.getInstance(project).getSelectedFiles()[0]
-                : null;
         
-        if (currentFile == null) {
-            Messages.showErrorDialog(mainPanel, "No file selected", "Error");
-            return;
-        }
-        
-        setButtonsEnabled(false);
-        
-        ProgressManager.getInstance().run(new Task.Backgroundable(project, "Improving Code", false) {
+        // Add Clear action
+        actionGroup.add(new AnAction("Clear", "Clear prompt and response", AllIcons.Actions.Cancel) {
             @Override
-            public void run(@NotNull ProgressIndicator indicator) {
-                try {
-                    indicator.setIndeterminate(true);
-                    indicator.setText("Improving code...");
-                    
-                    // This is a simplified implementation
-                    // In a real implementation, we would use AIServiceManager to improve code
-                    AtomicReference<String> result = new AtomicReference<>("");
-                    
-                    // Simulate API call
-                    try {
-                        Thread.sleep(2000);
-                        
-                        // Simplified example output
-                        result.set("/**\n" +
-                                " * Improved version of " + currentFile.getName() + "\n" +
-                                " */\n" +
-                                "public class ImprovedCode {\n" +
-                                "    public static void main(String[] args) {\n" +
-                                "        // More efficient implementation\n" +
-                                "        System.out.println(\"Hello, Improved ModForge!\");\n" +
-                                "    }\n" +
-                                "}");
-                    } catch (InterruptedException e) {
-                        Thread.currentThread().interrupt();
-                    }
-                    
-                    // Update UI
-                    ApplicationManager.getApplication().invokeLater(() -> {
-                        try {
-                            responseEditor.getDocument().setText(result.get());
-                        } finally {
-                            setButtonsEnabled(true);
-                        }
-                    });
-                } catch (Exception e) {
-                    LOG.error("Error improving code", e);
-                    
-                    ApplicationManager.getApplication().invokeLater(() -> {
-                        Messages.showErrorDialog(
-                                project,
-                                "Error improving code: " + e.getMessage(),
-                                "Error"
-                        );
-                        setButtonsEnabled(true);
-                    });
-                }
+            public void actionPerformed(@NotNull AnActionEvent e) {
+                promptArea.setText("");
+                responseDocument.setText("");
+                statusLabel.setText("");
+                IdeFocusManager.getInstance(project).requestFocus(promptArea, true);
             }
         });
+        
+        ActionToolbar toolbar = ActionManager.getInstance().createActionToolbar(
+                "ModForgeAIAssist",
+                actionGroup,
+                true
+        );
+        
+        // Create panels
+        JPanel controlPanel = new JBPanel<>(new BorderLayout());
+        
+        JPanel promptPanel = new JBPanel<>(new BorderLayout());
+        promptPanel.setBorder(JBUI.Borders.empty(5));
+        promptPanel.add(new JBLabel("Enter your prompt:"), BorderLayout.NORTH);
+        promptPanel.add(new JBScrollPane(promptArea), BorderLayout.CENTER);
+        
+        JPanel optionsPanel = new JBPanel<>(new FlowLayout(FlowLayout.LEFT));
+        optionsPanel.add(new JBLabel("Action:"));
+        optionsPanel.add(actionComboBox);
+        optionsPanel.add(new JBLabel("Model:"));
+        optionsPanel.add(modelComboBox);
+        optionsPanel.add(generateButton);
+        
+        JPanel statusPanel = new JBPanel<>(new BorderLayout());
+        statusPanel.add(statusLabel, BorderLayout.WEST);
+        statusPanel.add(progressBar, BorderLayout.CENTER);
+        
+        controlPanel.add(promptPanel, BorderLayout.CENTER);
+        controlPanel.add(optionsPanel, BorderLayout.NORTH);
+        controlPanel.add(statusPanel, BorderLayout.SOUTH);
+        
+        JPanel responsePanel = new JBPanel<>(new BorderLayout());
+        responsePanel.setBorder(JBUI.Borders.empty(5));
+        responsePanel.add(new JBLabel("Response:"), BorderLayout.NORTH);
+        responsePanel.add(responseEditor.getComponent(), BorderLayout.CENTER);
+        
+        // Create splitter
+        OnePixelSplitter splitter = new OnePixelSplitter(true, 0.3f);
+        splitter.setFirstComponent(controlPanel);
+        splitter.setSecondComponent(responsePanel);
+        
+        // Create toolbar wrapper
+        BorderLayoutPanel toolbarWrapper = JBUI.Panels.simplePanel();
+        toolbarWrapper.addToLeft(toolbar.getComponent());
+        
+        // Set up main panel
+        mainPanel.add(splitter, BorderLayout.CENTER);
+        mainPanel.add(toolbarWrapper, BorderLayout.NORTH);
     }
     
     /**
-     * Explains the code in the current editor.
+     * Gets the main panel.
+     * @return The main panel
      */
-    private void explainCode() {
-        VirtualFile currentFile = FileEditorManager.getInstance(project).getSelectedFiles().length > 0
-                ? FileEditorManager.getInstance(project).getSelectedFiles()[0]
-                : null;
-        
-        if (currentFile == null) {
-            Messages.showErrorDialog(mainPanel, "No file selected", "Error");
-            return;
-        }
-        
-        setButtonsEnabled(false);
-        
-        ProgressManager.getInstance().run(new Task.Backgroundable(project, "Explaining Code", false) {
-            @Override
-            public void run(@NotNull ProgressIndicator indicator) {
-                try {
-                    indicator.setIndeterminate(true);
-                    indicator.setText("Explaining code...");
-                    
-                    // This is a simplified implementation
-                    // In a real implementation, we would use AIServiceManager to explain code
-                    AtomicReference<String> result = new AtomicReference<>("");
-                    
-                    // Simulate API call
-                    try {
-                        Thread.sleep(2000);
-                        
-                        // Simplified example output
-                        result.set("# Explanation of " + currentFile.getName() + "\n\n" +
-                                "This code does the following:\n\n" +
-                                "1. It defines a class with a main method\n" +
-                                "2. The main method prints a greeting message\n" +
-                                "3. It demonstrates basic Java syntax and structure\n\n" +
-                                "The code is a simple 'Hello World' program that serves as a starting point for Java applications.");
-                    } catch (InterruptedException e) {
-                        Thread.currentThread().interrupt();
-                    }
-                    
-                    // Update UI
-                    ApplicationManager.getApplication().invokeLater(() -> {
-                        try {
-                            responseEditor.getDocument().setText(result.get());
-                        } finally {
-                            setButtonsEnabled(true);
-                        }
-                    });
-                } catch (Exception e) {
-                    LOG.error("Error explaining code", e);
-                    
-                    ApplicationManager.getApplication().invokeLater(() -> {
-                        Messages.showErrorDialog(
-                                project,
-                                "Error explaining code: " + e.getMessage(),
-                                "Error"
-                        );
-                        setButtonsEnabled(true);
-                    });
-                }
-            }
-        });
-    }
-    
-    /**
-     * Inserts the generated code into the current editor.
-     */
-    private void insertIntoEditor() {
-        Editor editor = FileEditorManager.getInstance(project).getSelectedTextEditor();
-        if (editor == null) {
-            Messages.showErrorDialog(mainPanel, "No editor selected", "Error");
-            return;
-        }
-        
-        String code = responseEditor.getDocument().getText();
-        if (code.isEmpty()) {
-            Messages.showErrorDialog(mainPanel, "No code to insert", "Error");
-            return;
-        }
-        
-        // Insert code at caret position
-        final int offset = editor.getCaretModel().getOffset();
-        ApplicationManager.getApplication().runWriteAction(() -> {
-            editor.getDocument().insertString(offset, code);
-        });
-    }
-    
-    /**
-     * Enables or disables the buttons.
-     * @param enabled Whether to enable the buttons
-     */
-    private void setButtonsEnabled(boolean enabled) {
-        generateButton.setEnabled(enabled);
-        improveButton.setEnabled(enabled);
-        explainButton.setEnabled(enabled);
-        insertButton.setEnabled(enabled);
-    }
-    
-    /**
-     * Gets the content component.
-     * @return The content component
-     */
+    @NotNull
     public JComponent getContent() {
         return mainPanel;
     }
     
     /**
-     * Releases the panel resources.
+     * Disposes the panel.
      */
     public void dispose() {
         if (responseEditor != null) {
             EditorFactory.getInstance().releaseEditor(responseEditor);
+            responseEditor = null;
         }
+    }
+    
+    /**
+     * Handles Generate button click.
+     * @param e The action event
+     */
+    private void onGenerateClick(ActionEvent e) {
+        // Get prompt
+        String prompt = promptArea.getText().trim();
+        if (prompt.isEmpty()) {
+            showError("Please enter a prompt");
+            return;
+        }
+        
+        // Get action
+        String action = (String) actionComboBox.getSelectedItem();
+        if (action == null) {
+            showError("Please select an action");
+            return;
+        }
+        
+        // Check API key
+        String apiKey = ModForgeSettings.getInstance().getOpenAiApiKey();
+        if (apiKey == null || apiKey.trim().isEmpty()) {
+            showError("OpenAI API key is not set. Please configure it in the settings.");
+            return;
+        }
+        
+        // Get model
+        String model = (String) modelComboBox.getSelectedItem();
+        if (model == null) {
+            model = "gpt-4";
+        }
+        
+        // Show progress
+        progressBar.setVisible(true);
+        generateButton.setEnabled(false);
+        statusLabel.setText("Generating...");
+        statusLabel.setForeground(JBColor.GRAY);
+        
+        // Get active file and editor
+        Editor activeEditor = FileEditorManager.getInstance(project).getSelectedTextEditor();
+        VirtualFile activeFile = activeEditor != null ? 
+                FileEditorManager.getInstance(project).getSelectedFiles().length > 0 ? 
+                        FileEditorManager.getInstance(project).getSelectedFiles()[0] : null : null;
+        
+        // Get selected text
+        String selectedText = "";
+        if (activeEditor != null) {
+            selectedText = activeEditor.getSelectionModel().getSelectedText();
+        }
+        
+        // Create options
+        Map<String, Object> options = new HashMap<>();
+        
+        if (activeFile != null) {
+            options.put("fileName", activeFile.getName());
+            options.put("fileExtension", activeFile.getExtension());
+            
+            // Get file type
+            FileType fileType = FileTypeManager.getInstance().getFileTypeByFile(activeFile);
+            if (fileType != null) {
+                options.put("fileType", fileType.getName());
+            }
+        }
+        
+        // Call AI service
+        AIServiceManager aiServiceManager = AIServiceManager.getInstance(project);
+        CompletableFuture<String> future;
+        
+        switch (action) {
+            case "Generate Code":
+                future = aiServiceManager.generateCode(prompt, getLanguageFromFile(activeFile), options);
+                break;
+                
+            case "Fix Code":
+                String code = selectedText != null && !selectedText.isEmpty() ? selectedText : prompt;
+                future = aiServiceManager.fixCode(code, null, options);
+                break;
+                
+            case "Generate Documentation":
+                String codeToDocument = selectedText != null && !selectedText.isEmpty() ? selectedText : prompt;
+                future = aiServiceManager.generateDocumentation(codeToDocument, options);
+                break;
+                
+            case "Explain Code":
+                String codeToExplain = selectedText != null && !selectedText.isEmpty() ? selectedText : prompt;
+                future = aiServiceManager.explainCode(codeToExplain, options);
+                break;
+                
+            default:
+                showError("Unknown action: " + action);
+                return;
+        }
+        
+        // Handle response
+        future.whenComplete((response, exception) -> {
+            ApplicationManager.getApplication().invokeLater(() -> {
+                progressBar.setVisible(false);
+                generateButton.setEnabled(true);
+                
+                if (exception != null) {
+                    LOG.error("Error generating response", exception);
+                    showError("Error: " + exception.getMessage());
+                    return;
+                }
+                
+                // Show response
+                if (response == null || response.isEmpty()) {
+                    showError("No response received");
+                    return;
+                }
+                
+                responseDocument.setText(response);
+                statusLabel.setText("Generated successfully");
+                statusLabel.setForeground(JBColor.GRAY);
+                
+                // Highlight syntax based on file type
+                if (responseEditor instanceof EditorEx && activeFile != null) {
+                    EditorEx editorEx = (EditorEx) responseEditor;
+                    editorEx.setHighlighter(EditorHighlighterFactory.getInstance().createHighlighter(
+                            project,
+                            FileTypeManager.getInstance().getFileTypeByFile(activeFile)
+                    ));
+                }
+            });
+        }).exceptionally(ex -> {
+            ApplicationManager.getApplication().invokeLater(() -> {
+                progressBar.setVisible(false);
+                generateButton.setEnabled(true);
+                showError("Error: " + ex.getMessage());
+            });
+            return null;
+        });
+    }
+    
+    /**
+     * Gets the programming language from a file.
+     * @param file The file
+     * @return The programming language
+     */
+    @NotNull
+    private String getLanguageFromFile(@Nullable VirtualFile file) {
+        if (file == null) {
+            return "java";
+        }
+        
+        String extension = file.getExtension();
+        if (extension == null) {
+            return "java";
+        }
+        
+        switch (extension.toLowerCase()) {
+            case "java":
+                return "java";
+            case "kt":
+            case "kts":
+                return "kotlin";
+            case "js":
+            case "jsx":
+            case "ts":
+            case "tsx":
+                return "javascript";
+            case "py":
+                return "python";
+            case "rb":
+                return "ruby";
+            case "go":
+                return "go";
+            case "cs":
+                return "csharp";
+            case "cpp":
+            case "cc":
+            case "cxx":
+            case "c":
+            case "h":
+            case "hpp":
+                return "cpp";
+            case "php":
+                return "php";
+            case "rs":
+                return "rust";
+            case "swift":
+                return "swift";
+            case "scala":
+                return "scala";
+            case "groovy":
+                return "groovy";
+            case "dart":
+                return "dart";
+            default:
+                return "java";
+        }
+    }
+    
+    /**
+     * Inserts the response text into the active editor.
+     */
+    private void insertToEditor() {
+        Editor activeEditor = FileEditorManager.getInstance(project).getSelectedTextEditor();
+        if (activeEditor == null) {
+            showError("No active editor");
+            return;
+        }
+        
+        String text = responseDocument.getText();
+        if (text.isEmpty()) {
+            showError("No response to insert");
+            return;
+        }
+        
+        // Insert text
+        ApplicationManager.getApplication().runWriteAction(() -> {
+            CommandProcessor.getInstance().executeCommand(
+                    project,
+                    () -> {
+                        // Replace selection or insert at caret
+                        if (activeEditor.getSelectionModel().hasSelection()) {
+                            int start = activeEditor.getSelectionModel().getSelectionStart();
+                            int end = activeEditor.getSelectionModel().getSelectionEnd();
+                            activeEditor.getDocument().replaceString(start, end, text);
+                        } else {
+                            int offset = activeEditor.getCaretModel().getOffset();
+                            activeEditor.getDocument().insertString(offset, text);
+                        }
+                    },
+                    "Insert AI Response",
+                    null
+            );
+        });
+        
+        statusLabel.setText("Inserted to editor");
+        statusLabel.setForeground(JBColor.GRAY);
+    }
+    
+    /**
+     * Shows an error message.
+     * @param message The error message
+     */
+    private void showError(@NotNull String message) {
+        statusLabel.setText(message);
+        statusLabel.setForeground(JBColor.RED);
+        LOG.warn(message);
     }
 }
