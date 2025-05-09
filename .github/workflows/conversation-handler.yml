@@ -644,7 +644,7 @@ If the file path suggests a package, include the appropriate package declaration
 Make the class comprehensive and complete, ready to be integrated into the project."""
         
         try:
-            response = openai.ChatCompletion.create(
+            response = client.chat.completions.create(
                 model="gpt-4",
                 messages=[
                     {"role": "system", "content": "You are an expert Java developer working on a Minecraft mod and IntelliJ plugin project."},
@@ -654,7 +654,7 @@ Make the class comprehensive and complete, ready to be integrated into the proje
                 max_tokens=3000
             )
             
-            new_code = response.choices[0].message['content']
+            new_code = response.choices[0].message.content
             
             # Extract code from markdown code block if present
             code_match = re.search(r'```(?:java)?\n(.*?)\n```', new_code, re.DOTALL)
