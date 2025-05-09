@@ -4,6 +4,7 @@ import { storage } from "./storage";
 import { compileMod } from "./compiler";
 import { generateModCode, fixCompilationErrors, addModFeatures } from "./ai-service";
 import { pushModToGitHub } from "./github";
+import { checkDatabaseHealth } from "./db-health";
 import { z } from "zod";
 import { insertModSchema } from "@shared/schema";
 import { BuildStatus } from "@/types";
@@ -12,6 +13,34 @@ import axios from "axios";
 export async function registerRoutes(app: Express): Promise<Server> {
   // Create HTTP server
   const httpServer = createServer(app);
+
+  // Health check endpoint
+  app.get("/api/health", async (req, res) => {
+    try {
+      const dbHealth = await checkDatabaseHealth();
+      
+      if (dbHealth.status === "healthy") {
+        return res.status(200).json({
+          status: "healthy",
+          message: "Service is healthy",
+          database: dbHealth
+        });
+      } else {
+        return res.status(503).json({
+          status: "unhealthy",
+          message: "Service is experiencing issues",
+          database: dbHealth
+        });
+      }
+    } catch (error) {
+      console.error("Health check failed:", error);
+      return res.status(500).json({
+        status: "error",
+        message: "Health check failed",
+        error: error instanceof Error ? error.message : String(error)
+      });
+    }
+  });
 
   // Get all mods for a user
   app.get("/api/mods", async (req, res) => {
