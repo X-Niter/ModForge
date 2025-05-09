@@ -1,5 +1,4 @@
 import { Link } from "wouter";
-import { Layout } from "@/components/ui/layout";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -23,7 +22,7 @@ import {
 
 export default function Home() {
   return (
-    <Layout>
+    <>
       {/* Hero Section */}
       <section className="relative">
         {/* Background with gradient and pattern */}
@@ -297,6 +296,6 @@ export default function Home() {
           </div>
         </div>
       </section>
-    </Layout>
+    </>
   );
 }
