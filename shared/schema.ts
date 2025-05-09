@@ -1,6 +1,7 @@
-import { pgTable, text, serial, integer, boolean, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, boolean, timestamp, primaryKey } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
+import { relations } from "drizzle-orm";
 
 export const users = pgTable("users", {
   id: serial("id").primaryKey(),
@@ -103,3 +104,31 @@ export const insertModFileSchema = createInsertSchema(modFiles).omit({
 
 export type InsertModFile = z.infer<typeof insertModFileSchema>;
 export type ModFile = typeof modFiles.$inferSelect;
+
+// Relationships
+export const usersRelations = relations(users, ({ many }) => ({
+  mods: many(mods),
+}));
+
+export const modsRelations = relations(mods, ({ one, many }) => ({
+  user: one(users, {
+    fields: [mods.userId],
+    references: [users.id],
+  }),
+  builds: many(builds),
+  files: many(modFiles),
+}));
+
+export const buildsRelations = relations(builds, ({ one }) => ({
+  mod: one(mods, {
+    fields: [builds.modId],
+    references: [mods.id],
+  }),
+}));
+
+export const modFilesRelations = relations(modFiles, ({ one }) => ({
+  mod: one(mods, {
+    fields: [modFiles.modId],
+    references: [mods.id],
+  }),
+}));
