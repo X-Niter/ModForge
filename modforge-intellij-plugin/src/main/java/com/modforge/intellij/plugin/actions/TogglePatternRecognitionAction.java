@@ -1,57 +1,50 @@
 package com.modforge.intellij.plugin.actions;
 
-import com.intellij.openapi.actionSystem.AnAction;
 import com.intellij.openapi.actionSystem.AnActionEvent;
-import com.intellij.openapi.actionSystem.Presentation;
+import com.intellij.openapi.actionSystem.ToggleAction;
 import com.intellij.openapi.diagnostic.Logger;
+import com.intellij.openapi.project.Project;
 import com.modforge.intellij.plugin.ai.PatternRecognitionService;
 import org.jetbrains.annotations.NotNull;
 
 /**
- * Action to toggle pattern recognition.
- * This action enables or disables the pattern recognition service.
+ * Toggle action to enable/disable pattern recognition.
+ * This action toggles the pattern recognition service when invoked.
  */
-public final class TogglePatternRecognitionAction extends AnAction {
+public final class TogglePatternRecognitionAction extends ToggleAction {
     private static final Logger LOG = Logger.getInstance(TogglePatternRecognitionAction.class);
     
     @Override
-    public void actionPerformed(@NotNull AnActionEvent e) {
-        LOG.info("Toggle pattern recognition action performed");
-        
+    public boolean isSelected(@NotNull AnActionEvent e) {
         // Get pattern recognition service
         PatternRecognitionService service = PatternRecognitionService.getInstance();
         
-        // Toggle pattern recognition
-        service.setEnabled(!service.isEnabled());
+        // Return current state
+        return service.isEnabled();
+    }
+    
+    @Override
+    public void setSelected(@NotNull AnActionEvent e, boolean state) {
+        // Get pattern recognition service
+        PatternRecognitionService service = PatternRecognitionService.getInstance();
         
-        // Update presentation
-        updatePresentation(e.getPresentation(), service.isEnabled());
+        // Update state
+        if (state) {
+            LOG.info("Enabling pattern recognition service");
+            service.setEnabled(true);
+        } else {
+            LOG.info("Disabling pattern recognition service");
+            service.setEnabled(false);
+        }
     }
     
     @Override
     public void update(@NotNull AnActionEvent e) {
-        // Show action always
-        e.getPresentation().setEnabledAndVisible(true);
+        Project project = e.getProject();
         
-        // Get pattern recognition service
-        PatternRecognitionService service = PatternRecognitionService.getInstance();
+        // Enable action if project is open
+        e.getPresentation().setEnabledAndVisible(project != null);
         
-        // Update presentation
-        updatePresentation(e.getPresentation(), service.isEnabled());
-    }
-    
-    /**
-     * Updates the action presentation.
-     * @param presentation The presentation to update
-     * @param isEnabled Whether pattern recognition is enabled
-     */
-    private void updatePresentation(@NotNull Presentation presentation, boolean isEnabled) {
-        if (isEnabled) {
-            presentation.setText("Disable Pattern Recognition");
-            presentation.setDescription("Disable pattern recognition to reduce API usage");
-        } else {
-            presentation.setText("Enable Pattern Recognition");
-            presentation.setDescription("Enable pattern recognition to reduce API usage");
-        }
+        super.update(e);
     }
 }

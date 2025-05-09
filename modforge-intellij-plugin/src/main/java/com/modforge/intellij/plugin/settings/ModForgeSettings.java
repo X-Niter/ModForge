@@ -1,150 +1,37 @@
 package com.modforge.intellij.plugin.settings;
 
 import com.intellij.openapi.application.ApplicationManager;
-import com.intellij.openapi.components.*;
+import com.intellij.openapi.components.PersistentStateComponent;
+import com.intellij.openapi.components.State;
+import com.intellij.openapi.components.Storage;
 import com.intellij.util.xmlb.XmlSerializerUtil;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * Persistent settings for the ModForge plugin.
+ * Settings for the ModForge plugin.
  * This class is responsible for storing and retrieving plugin settings.
  */
 @State(
         name = "ModForgeSettings",
-        storages = @Storage("modforge.xml")
+        storages = {@Storage("modforge.xml")}
 )
-@Service(Service.Level.APP)
 public final class ModForgeSettings implements PersistentStateComponent<ModForgeSettings> {
     private String openAiApiKey = "";
-    private boolean continuousDevelopmentEnabled = false;
-    private long continuousDevelopmentInterval = 60_000; // 1 minute
-    private boolean patternRecognitionEnabled = true;
-    private boolean syncWithWebEnabled = false;
-    private String webApiUrl = "https://modforge.io/api";
-    private String webApiKey = "";
+    private String openAiModel = "gpt-4";
+    private int maxTokens = 2048;
+    private double temperature = 0.7;
+    private boolean usePatternRecognition = true;
+    private boolean syncWithWebEnabled = true;
+    private String webSyncUrl = "";
+    private String webSyncApiKey = "";
     
     /**
-     * Gets the ModForge settings.
-     * @return The ModForge settings
+     * Gets the instance of the settings.
+     * @return The settings
      */
     public static ModForgeSettings getInstance() {
         return ApplicationManager.getApplication().getService(ModForgeSettings.class);
-    }
-    
-    /**
-     * Gets the OpenAI API key.
-     * @return The OpenAI API key
-     */
-    @NotNull
-    public String getOpenAiApiKey() {
-        return openAiApiKey;
-    }
-    
-    /**
-     * Sets the OpenAI API key.
-     * @param openAiApiKey The OpenAI API key
-     */
-    public void setOpenAiApiKey(@NotNull String openAiApiKey) {
-        this.openAiApiKey = openAiApiKey;
-    }
-    
-    /**
-     * Checks if continuous development is enabled.
-     * @return Whether continuous development is enabled
-     */
-    public boolean isContinuousDevelopmentEnabled() {
-        return continuousDevelopmentEnabled;
-    }
-    
-    /**
-     * Sets whether continuous development is enabled.
-     * @param enabled Whether continuous development is enabled
-     */
-    public void setContinuousDevelopmentEnabled(boolean enabled) {
-        this.continuousDevelopmentEnabled = enabled;
-    }
-    
-    /**
-     * Gets the continuous development interval.
-     * @return The continuous development interval in milliseconds
-     */
-    public long getContinuousDevelopmentInterval() {
-        return continuousDevelopmentInterval;
-    }
-    
-    /**
-     * Sets the continuous development interval.
-     * @param intervalMs The continuous development interval in milliseconds
-     */
-    public void setContinuousDevelopmentInterval(long intervalMs) {
-        this.continuousDevelopmentInterval = intervalMs;
-    }
-    
-    /**
-     * Checks if pattern recognition is enabled.
-     * @return Whether pattern recognition is enabled
-     */
-    public boolean isPatternRecognitionEnabled() {
-        return patternRecognitionEnabled;
-    }
-    
-    /**
-     * Sets whether pattern recognition is enabled.
-     * @param enabled Whether pattern recognition is enabled
-     */
-    public void setPatternRecognitionEnabled(boolean enabled) {
-        this.patternRecognitionEnabled = enabled;
-    }
-    
-    /**
-     * Checks if sync with web is enabled.
-     * @return Whether sync with web is enabled
-     */
-    public boolean isSyncWithWebEnabled() {
-        return syncWithWebEnabled;
-    }
-    
-    /**
-     * Sets whether sync with web is enabled.
-     * @param enabled Whether sync with web is enabled
-     */
-    public void setSyncWithWebEnabled(boolean enabled) {
-        this.syncWithWebEnabled = enabled;
-    }
-    
-    /**
-     * Gets the web API URL.
-     * @return The web API URL
-     */
-    @NotNull
-    public String getWebApiUrl() {
-        return webApiUrl;
-    }
-    
-    /**
-     * Sets the web API URL.
-     * @param webApiUrl The web API URL
-     */
-    public void setWebApiUrl(@NotNull String webApiUrl) {
-        this.webApiUrl = webApiUrl;
-    }
-    
-    /**
-     * Gets the web API key.
-     * @return The web API key
-     */
-    @NotNull
-    public String getWebApiKey() {
-        return webApiKey;
-    }
-    
-    /**
-     * Sets the web API key.
-     * @param webApiKey The web API key
-     */
-    public void setWebApiKey(@NotNull String webApiKey) {
-        this.webApiKey = webApiKey;
     }
     
     @Nullable
@@ -156,5 +43,137 @@ public final class ModForgeSettings implements PersistentStateComponent<ModForge
     @Override
     public void loadState(@NotNull ModForgeSettings state) {
         XmlSerializerUtil.copyBean(state, this);
+    }
+    
+    /**
+     * Gets the OpenAI API key.
+     * @return The API key
+     */
+    @NotNull
+    public String getOpenAiApiKey() {
+        return openAiApiKey;
+    }
+    
+    /**
+     * Sets the OpenAI API key.
+     * @param openAiApiKey The API key
+     */
+    public void setOpenAiApiKey(@NotNull String openAiApiKey) {
+        this.openAiApiKey = openAiApiKey;
+    }
+    
+    /**
+     * Gets the OpenAI model.
+     * @return The model
+     */
+    @NotNull
+    public String getOpenAiModel() {
+        return openAiModel;
+    }
+    
+    /**
+     * Sets the OpenAI model.
+     * @param openAiModel The model
+     */
+    public void setOpenAiModel(@NotNull String openAiModel) {
+        this.openAiModel = openAiModel;
+    }
+    
+    /**
+     * Gets the maximum tokens.
+     * @return The maximum tokens
+     */
+    public int getMaxTokens() {
+        return maxTokens;
+    }
+    
+    /**
+     * Sets the maximum tokens.
+     * @param maxTokens The maximum tokens
+     */
+    public void setMaxTokens(int maxTokens) {
+        this.maxTokens = maxTokens;
+    }
+    
+    /**
+     * Gets the temperature.
+     * @return The temperature
+     */
+    public double getTemperature() {
+        return temperature;
+    }
+    
+    /**
+     * Sets the temperature.
+     * @param temperature The temperature
+     */
+    public void setTemperature(double temperature) {
+        this.temperature = temperature;
+    }
+    
+    /**
+     * Checks if pattern recognition is enabled.
+     * @return {@code true} if pattern recognition is enabled, {@code false} otherwise
+     */
+    public boolean isUsePatternRecognition() {
+        return usePatternRecognition;
+    }
+    
+    /**
+     * Sets whether pattern recognition is enabled.
+     * @param usePatternRecognition {@code true} to enable pattern recognition, {@code false} to disable it
+     */
+    public void setUsePatternRecognition(boolean usePatternRecognition) {
+        this.usePatternRecognition = usePatternRecognition;
+    }
+    
+    /**
+     * Checks if sync with web is enabled.
+     * @return {@code true} if sync with web is enabled, {@code false} otherwise
+     */
+    public boolean isSyncWithWebEnabled() {
+        return syncWithWebEnabled;
+    }
+    
+    /**
+     * Sets whether sync with web is enabled.
+     * @param syncWithWebEnabled {@code true} to enable sync with web, {@code false} to disable it
+     */
+    public void setSyncWithWebEnabled(boolean syncWithWebEnabled) {
+        this.syncWithWebEnabled = syncWithWebEnabled;
+    }
+    
+    /**
+     * Gets the web sync URL.
+     * @return The web sync URL
+     */
+    @NotNull
+    public String getWebSyncUrl() {
+        return webSyncUrl;
+    }
+    
+    /**
+     * Sets the web sync URL.
+     * @param webSyncUrl The web sync URL
+     */
+    public void setWebSyncUrl(@NotNull String webSyncUrl) {
+        this.webSyncUrl = webSyncUrl;
+    }
+    
+    /**
+     * Gets the web sync API key.
+     * @return The web sync API key
+     */
+    @NotNull
+    public String getWebSyncApiKey() {
+        return webSyncApiKey;
+    }
+    
+    /**
+     * Sets the web sync API key.
+     * @param webSyncApiKey The web sync API key
+     */
+    public void setWebSyncApiKey(@NotNull String webSyncApiKey) {
+        this.webSyncApiKey = webSyncApiKey;
     }
 }

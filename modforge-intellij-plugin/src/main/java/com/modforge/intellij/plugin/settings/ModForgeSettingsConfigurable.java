@@ -1,120 +1,125 @@
 package com.modforge.intellij.plugin.settings;
 
 import com.intellij.openapi.options.Configurable;
+import com.intellij.openapi.options.ConfigurationException;
 import com.intellij.openapi.ui.ComboBox;
+import com.intellij.ui.DocumentAdapter;
+import com.intellij.ui.JBIntSpinner;
 import com.intellij.ui.components.JBCheckBox;
 import com.intellij.ui.components.JBLabel;
 import com.intellij.ui.components.JBPasswordField;
 import com.intellij.ui.components.JBTextField;
 import com.intellij.util.ui.FormBuilder;
 import com.intellij.util.ui.JBUI;
-import com.intellij.util.ui.UI;
 import org.jetbrains.annotations.Nls;
 import org.jetbrains.annotations.Nullable;
 
 import javax.swing.*;
+import javax.swing.event.DocumentEvent;
 import java.awt.*;
 import java.util.Objects;
 
 /**
- * Configurable component for plugin settings.
- * This class is responsible for creating the settings UI and handling changes.
+ * Configurable for ModForge settings.
+ * This class provides UI for editing ModForge settings.
  */
 public final class ModForgeSettingsConfigurable implements Configurable {
     private JPanel mainPanel;
-    private JBPasswordField openAiApiKeyField;
-    private JBCheckBox continuousDevelopmentCheckBox;
-    private ComboBox<String> continuousDevelopmentIntervalComboBox;
-    private JBCheckBox patternRecognitionCheckBox;
-    private JBCheckBox syncWithWebCheckBox;
-    private JBTextField webApiUrlField;
-    private JBPasswordField webApiKeyField;
+    private JBPasswordField apiKeyField;
+    private ComboBox<String> modelComboBox;
+    private JBIntSpinner maxTokensSpinner;
+    private JBIntSpinner temperatureSpinner;
+    private JBCheckBox usePatternRecognitionCheckBox;
+    private JBCheckBox syncWithWebEnabledCheckBox;
+    private JBTextField webSyncUrlField;
+    private JBPasswordField webSyncApiKeyField;
     
-    private final ModForgeSettings settings;
+    private boolean isModified = false;
     
-    /**
-     * Creates a new ModForgeSettingsConfigurable.
-     */
-    public ModForgeSettingsConfigurable() {
-        this.settings = ModForgeSettings.getInstance();
-    }
-    
+    @Nls(capitalization = Nls.Capitalization.Title)
     @Override
-    public @Nls(capitalization = Nls.Capitalization.Title) String getDisplayName() {
+    public String getDisplayName() {
         return "ModForge";
     }
     
+    @Nullable
     @Override
-    public @Nullable JComponent createComponent() {
-        // Create UI components
-        openAiApiKeyField = new JBPasswordField();
-        openAiApiKeyField.setColumns(30);
-        
-        continuousDevelopmentCheckBox = new JBCheckBox("Enable continuous development");
-        
-        continuousDevelopmentIntervalComboBox = new ComboBox<>(new String[] {
-                "30 seconds",
-                "1 minute",
-                "5 minutes",
-                "15 minutes",
-                "30 minutes",
-                "1 hour"
+    public JComponent createComponent() {
+        // Create API key field
+        apiKeyField = new JBPasswordField();
+        apiKeyField.getDocument().addDocumentListener(new DocumentAdapter() {
+            @Override
+            protected void textChanged(DocumentEvent e) {
+                isModified = true;
+            }
         });
         
-        patternRecognitionCheckBox = new JBCheckBox("Enable pattern recognition");
+        // Create model combo box
+        modelComboBox = new ComboBox<>(new String[] {
+                "gpt-4",
+                "gpt-4-32k",
+                "gpt-3.5-turbo",
+                "gpt-3.5-turbo-16k"
+        });
+        modelComboBox.addActionListener(e -> isModified = true);
         
-        syncWithWebCheckBox = new JBCheckBox("Enable sync with web platform");
+        // Create max tokens spinner
+        maxTokensSpinner = new JBIntSpinner(2048, 100, 32000, 100);
+        maxTokensSpinner.addChangeListener(e -> isModified = true);
         
-        webApiUrlField = new JBTextField();
-        webApiUrlField.setColumns(30);
+        // Create temperature spinner (0.0 to 1.0 in 0.1 increments)
+        SpinnerNumberModel temperatureModel = new SpinnerNumberModel(0.7, 0.0, 1.0, 0.1);
+        temperatureSpinner = new JBIntSpinner(temperatureModel);
+        temperatureSpinner.addChangeListener(e -> isModified = true);
         
-        webApiKeyField = new JBPasswordField();
-        webApiKeyField.setColumns(30);
+        // Create pattern recognition checkbox
+        usePatternRecognitionCheckBox = new JBCheckBox("Use pattern recognition to reduce API usage");
+        usePatternRecognitionCheckBox.addActionListener(e -> isModified = true);
         
-        // Create sections
-        JPanel aiSection = FormBuilder.createFormBuilder()
-                .addLabeledComponent("OpenAI API Key:", openAiApiKeyField)
-                .addComponent(patternRecognitionCheckBox)
-                .addVerticalGap(10)
-                .getPanel();
+        // Create sync with web enabled checkbox
+        syncWithWebEnabledCheckBox = new JBCheckBox("Enable synchronization with web platform");
+        syncWithWebEnabledCheckBox.addActionListener(e -> {
+            isModified = true;
+            updateWebSyncFields();
+        });
         
-        JPanel continuousDevSection = FormBuilder.createFormBuilder()
-                .addComponent(continuousDevelopmentCheckBox)
-                .addLabeledComponent("Check Interval:", continuousDevelopmentIntervalComboBox)
-                .addVerticalGap(10)
-                .getPanel();
+        // Create web sync URL field
+        webSyncUrlField = new JBTextField();
+        webSyncUrlField.getDocument().addDocumentListener(new DocumentAdapter() {
+            @Override
+            protected void textChanged(DocumentEvent e) {
+                isModified = true;
+            }
+        });
         
-        JPanel syncSection = FormBuilder.createFormBuilder()
-                .addComponent(syncWithWebCheckBox)
-                .addLabeledComponent("Web API URL:", webApiUrlField)
-                .addLabeledComponent("Web API Key:", webApiKeyField)
-                .addVerticalGap(10)
-                .getPanel();
+        // Create web sync API key field
+        webSyncApiKeyField = new JBPasswordField();
+        webSyncApiKeyField.getDocument().addDocumentListener(new DocumentAdapter() {
+            @Override
+            protected void textChanged(DocumentEvent e) {
+                isModified = true;
+            }
+        });
         
-        // Create main panel with sections
+        // Create main panel
         mainPanel = FormBuilder.createFormBuilder()
-                .addComponent(new JBLabel("AI Settings", JBLabel.LEFT))
-                .addComponentFillVertically(JBUI.Panels.simplePanel().addToCenter(aiSection), 0)
+                .addComponent(new JBLabel("OpenAI Settings"))
+                .addVerticalGap(5)
+                .addLabeledComponent("API Key:", apiKeyField)
+                .addLabeledComponent("Model:", modelComboBox)
+                .addLabeledComponent("Max Tokens:", maxTokensSpinner)
+                .addLabeledComponent("Temperature:", temperatureSpinner)
+                .addComponent(usePatternRecognitionCheckBox)
                 .addVerticalGap(20)
-                .addComponent(new JBLabel("Continuous Development", JBLabel.LEFT))
-                .addComponentFillVertically(JBUI.Panels.simplePanel().addToCenter(continuousDevSection), 0)
-                .addVerticalGap(20)
-                .addComponent(new JBLabel("Web Sync", JBLabel.LEFT))
-                .addComponentFillVertically(JBUI.Panels.simplePanel().addToCenter(syncSection), 0)
-                .addVerticalGap(10)
+                .addComponent(new JBLabel("Web Platform Integration"))
+                .addVerticalGap(5)
+                .addComponent(syncWithWebEnabledCheckBox)
+                .addLabeledComponent("URL:", webSyncUrlField)
+                .addLabeledComponent("API Key:", webSyncApiKeyField)
+                .addComponentFillVertically(new JPanel(), 0)
                 .getPanel();
         
         mainPanel.setBorder(JBUI.Borders.empty(10));
-        
-        // Add listeners
-        continuousDevelopmentCheckBox.addActionListener(e -> {
-            continuousDevelopmentIntervalComboBox.setEnabled(continuousDevelopmentCheckBox.isSelected());
-        });
-        
-        syncWithWebCheckBox.addActionListener(e -> {
-            webApiUrlField.setEnabled(syncWithWebCheckBox.isSelected());
-            webApiKeyField.setEnabled(syncWithWebCheckBox.isSelected());
-        });
         
         // Load settings
         reset();
@@ -124,114 +129,92 @@ public final class ModForgeSettingsConfigurable implements Configurable {
     
     @Override
     public boolean isModified() {
-        // Compare current settings with UI values
-        if (!Objects.equals(String.valueOf(openAiApiKeyField.getPassword()), settings.getOpenAiApiKey())) {
-            return true;
-        }
-        
-        if (continuousDevelopmentCheckBox.isSelected() != settings.isContinuousDevelopmentEnabled()) {
-            return true;
-        }
-        
-        if (getSelectedIntervalMs() != settings.getContinuousDevelopmentInterval()) {
-            return true;
-        }
-        
-        if (patternRecognitionCheckBox.isSelected() != settings.isPatternRecognitionEnabled()) {
-            return true;
-        }
-        
-        if (syncWithWebCheckBox.isSelected() != settings.isSyncWithWebEnabled()) {
-            return true;
-        }
-        
-        if (!Objects.equals(webApiUrlField.getText(), settings.getWebApiUrl())) {
-            return true;
-        }
-        
-        if (!Objects.equals(String.valueOf(webApiKeyField.getPassword()), settings.getWebApiKey())) {
-            return true;
-        }
-        
-        return false;
+        return isModified;
     }
     
     @Override
-    public void apply() {
-        // Save settings
-        settings.setOpenAiApiKey(String.valueOf(openAiApiKeyField.getPassword()));
-        settings.setContinuousDevelopmentEnabled(continuousDevelopmentCheckBox.isSelected());
-        settings.setContinuousDevelopmentInterval(getSelectedIntervalMs());
-        settings.setPatternRecognitionEnabled(patternRecognitionCheckBox.isSelected());
-        settings.setSyncWithWebEnabled(syncWithWebCheckBox.isSelected());
-        settings.setWebApiUrl(webApiUrlField.getText());
-        settings.setWebApiKey(String.valueOf(webApiKeyField.getPassword()));
+    public void apply() throws ConfigurationException {
+        ModForgeSettings settings = ModForgeSettings.getInstance();
+        
+        // Validate and save settings
+        if (apiKeyField.getPassword().length == 0) {
+            throw new ConfigurationException("OpenAI API Key is required. Get one at https://platform.openai.com/api-keys", "Missing API Key");
+        }
+        
+        // Get values
+        String apiKey = new String(apiKeyField.getPassword());
+        String model = (String) modelComboBox.getSelectedItem();
+        int maxTokens = maxTokensSpinner.getNumber();
+        double temperature = ((Number) temperatureSpinner.getValue()).doubleValue();
+        boolean usePatternRecognition = usePatternRecognitionCheckBox.isSelected();
+        boolean syncWithWebEnabled = syncWithWebEnabledCheckBox.isSelected();
+        String webSyncUrl = webSyncUrlField.getText();
+        String webSyncApiKey = new String(webSyncApiKeyField.getPassword());
+        
+        // Validate web sync settings if enabled
+        if (syncWithWebEnabled) {
+            if (webSyncUrl.isEmpty()) {
+                throw new ConfigurationException("Web Sync URL is required when synchronization is enabled", "Missing Web Sync URL");
+            }
+            
+            if (webSyncApiKey.isEmpty()) {
+                throw new ConfigurationException("Web Sync API Key is required when synchronization is enabled", "Missing Web Sync API Key");
+            }
+        }
+        
+        // Update settings
+        settings.setOpenAiApiKey(apiKey);
+        settings.setOpenAiModel(model);
+        settings.setMaxTokens(maxTokens);
+        settings.setTemperature(temperature);
+        settings.setUsePatternRecognition(usePatternRecognition);
+        settings.setSyncWithWebEnabled(syncWithWebEnabled);
+        settings.setWebSyncUrl(webSyncUrl);
+        settings.setWebSyncApiKey(webSyncApiKey);
+        
+        isModified = false;
     }
     
     @Override
     public void reset() {
-        // Load settings to UI
-        openAiApiKeyField.setText(settings.getOpenAiApiKey());
-        continuousDevelopmentCheckBox.setSelected(settings.isContinuousDevelopmentEnabled());
-        setSelectedInterval(settings.getContinuousDevelopmentInterval());
-        patternRecognitionCheckBox.setSelected(settings.isPatternRecognitionEnabled());
-        syncWithWebCheckBox.setSelected(settings.isSyncWithWebEnabled());
-        webApiUrlField.setText(settings.getWebApiUrl());
-        webApiKeyField.setText(settings.getWebApiKey());
+        ModForgeSettings settings = ModForgeSettings.getInstance();
         
-        // Update enabled state
-        continuousDevelopmentIntervalComboBox.setEnabled(continuousDevelopmentCheckBox.isSelected());
-        webApiUrlField.setEnabled(syncWithWebCheckBox.isSelected());
-        webApiKeyField.setEnabled(syncWithWebCheckBox.isSelected());
+        // Load settings
+        apiKeyField.setText(settings.getOpenAiApiKey());
+        modelComboBox.setSelectedItem(settings.getOpenAiModel());
+        maxTokensSpinner.setNumber(settings.getMaxTokens());
+        temperatureSpinner.setValue(settings.getTemperature());
+        usePatternRecognitionCheckBox.setSelected(settings.isUsePatternRecognition());
+        syncWithWebEnabledCheckBox.setSelected(settings.isSyncWithWebEnabled());
+        webSyncUrlField.setText(settings.getWebSyncUrl());
+        webSyncApiKeyField.setText(settings.getWebSyncApiKey());
+        
+        // Update UI state
+        updateWebSyncFields();
+        
+        isModified = false;
     }
     
     @Override
     public void disposeUIResources() {
         mainPanel = null;
-        openAiApiKeyField = null;
-        continuousDevelopmentCheckBox = null;
-        continuousDevelopmentIntervalComboBox = null;
-        patternRecognitionCheckBox = null;
-        syncWithWebCheckBox = null;
-        webApiUrlField = null;
-        webApiKeyField = null;
+        apiKeyField = null;
+        modelComboBox = null;
+        maxTokensSpinner = null;
+        temperatureSpinner = null;
+        usePatternRecognitionCheckBox = null;
+        syncWithWebEnabledCheckBox = null;
+        webSyncUrlField = null;
+        webSyncApiKeyField = null;
     }
     
     /**
-     * Gets the selected interval in milliseconds.
-     * @return The selected interval in milliseconds
+     * Updates the web sync fields based on the enabled state.
      */
-    private long getSelectedIntervalMs() {
-        String selected = (String) continuousDevelopmentIntervalComboBox.getSelectedItem();
+    private void updateWebSyncFields() {
+        boolean enabled = syncWithWebEnabledCheckBox.isSelected();
         
-        if (selected == null) {
-            return 60_000; // 1 minute default
-        }
-        
-        return switch (selected) {
-            case "30 seconds" -> 30_000L;
-            case "5 minutes" -> 300_000L;
-            case "15 minutes" -> 900_000L;
-            case "30 minutes" -> 1_800_000L;
-            case "1 hour" -> 3_600_000L;
-            default -> 60_000L; // 1 minute default
-        };
-    }
-    
-    /**
-     * Sets the selected interval based on milliseconds.
-     * @param intervalMs The interval in milliseconds
-     */
-    private void setSelectedInterval(long intervalMs) {
-        String interval = switch ((int) (intervalMs / 1000)) {
-            case 30 -> "30 seconds";
-            case 300 -> "5 minutes";
-            case 900 -> "15 minutes";
-            case 1800 -> "30 minutes";
-            case 3600 -> "1 hour";
-            default -> "1 minute";
-        };
-        
-        continuousDevelopmentIntervalComboBox.setSelectedItem(interval);
+        webSyncUrlField.setEnabled(enabled);
+        webSyncApiKeyField.setEnabled(enabled);
     }
 }

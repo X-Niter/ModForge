@@ -1,50 +1,42 @@
 package com.modforge.intellij.plugin.ui.toolwindow;
 
-import com.intellij.openapi.Disposable;
+import com.intellij.icons.AllIcons;
+import com.intellij.openapi.actionSystem.ActionManager;
+import com.intellij.openapi.actionSystem.ActionPlaces;
+import com.intellij.openapi.actionSystem.ActionToolbar;
+import com.intellij.openapi.actionSystem.DefaultActionGroup;
 import com.intellij.openapi.diagnostic.Logger;
-import com.intellij.openapi.editor.Document;
-import com.intellij.openapi.editor.Editor;
-import com.intellij.openapi.editor.EditorFactory;
-import com.intellij.openapi.editor.EditorSettings;
-import com.intellij.openapi.editor.ex.EditorEx;
-import com.intellij.openapi.editor.colors.EditorColorsManager;
-import com.intellij.openapi.editor.colors.EditorColorsScheme;
-import com.intellij.openapi.fileTypes.FileTypeManager;
 import com.intellij.openapi.project.Project;
-import com.intellij.openapi.util.Disposer;
-import com.intellij.ui.EditorTextField;
+import com.intellij.openapi.ui.SimpleToolWindowPanel;
+import com.intellij.ui.JBColor;
 import com.intellij.ui.components.JBLabel;
 import com.intellij.ui.components.JBScrollPane;
-import com.intellij.ui.components.panels.VerticalLayout;
+import com.intellij.ui.components.JBTabbedPane;
+import com.intellij.util.ui.FormBuilder;
 import com.intellij.util.ui.JBUI;
-import com.modforge.intellij.plugin.services.AutonomousCodeGenerationService;
+import com.intellij.util.ui.UIUtil;
+import com.modforge.intellij.plugin.actions.GenerateCodeAction;
+import com.modforge.intellij.plugin.actions.GenerateDocumentationAction;
+import com.modforge.intellij.plugin.actions.ExplainCodeAction;
+import com.modforge.intellij.plugin.actions.FixErrorsAction;
 import org.jetbrains.annotations.NotNull;
 
 import javax.swing.*;
+import javax.swing.border.TitledBorder;
 import java.awt.*;
-import java.awt.event.ActionEvent;
-import java.awt.event.KeyAdapter;
-import java.awt.event.KeyEvent;
-import java.util.HashMap;
-import java.util.List;
-import java.util.concurrent.CompletableFuture;
 
 /**
  * Panel for the AI Assist tab in the tool window.
- * This panel provides a chat interface to interact with the AI.
+ * This panel provides access to various AI-assisted development actions.
  */
-public final class AIAssistPanel implements Disposable {
+public final class AIAssistPanel {
     private static final Logger LOG = Logger.getInstance(AIAssistPanel.class);
     
     private final Project project;
-    private final AutonomousCodeGenerationService codeGenerationService;
     
     private JPanel mainPanel;
-    private JPanel chatContainer;
-    private EditorTextField inputField;
-    private JButton sendButton;
-    
-    private final List<Editor> editors = new java.util.ArrayList<>();
+    private JPanel quickActionsPanel;
+    private JPanel helpPanel;
     
     /**
      * Creates a new AIAssistPanel.
@@ -52,7 +44,6 @@ public final class AIAssistPanel implements Disposable {
      */
     public AIAssistPanel(@NotNull Project project) {
         this.project = project;
-        this.codeGenerationService = AutonomousCodeGenerationService.getInstance(project);
         
         createUI();
     }
@@ -70,229 +61,212 @@ public final class AIAssistPanel implements Disposable {
      * Creates the UI for the panel.
      */
     private void createUI() {
+        // Create simple tool window panel
+        SimpleToolWindowPanel panel = new SimpleToolWindowPanel(true, true);
+        
+        // Create toolbar
+        ActionToolbar toolbar = createToolbar();
+        panel.setToolbar(toolbar.getComponent());
+        
+        // Create content
+        JBTabbedPane tabbedPane = createTabbedPane();
+        panel.setContent(tabbedPane);
+        
         // Create main panel
         mainPanel = new JPanel(new BorderLayout());
-        
-        // Create chat container
-        chatContainer = new JPanel(new VerticalLayout(10));
-        chatContainer.setBorder(JBUI.Borders.empty(10));
-        
-        // Create scroll pane for chat
-        JBScrollPane scrollPane = new JBScrollPane(chatContainer);
-        scrollPane.setBorder(JBUI.Borders.empty());
-        
-        // Create input panel
-        JPanel inputPanel = new JPanel(new BorderLayout());
-        inputPanel.setBorder(JBUI.Borders.empty(0, 10, 10, 10));
-        
-        // Create input field
-        inputField = new EditorTextField("", project, FileTypeManager.getInstance().getFileTypeByExtension("txt"));
-        inputField.setOneLineMode(false);
-        inputField.setPreferredSize(new Dimension(-1, 80));
-        
-        // Add key listener for Enter key
-        inputField.addKeyListener(new KeyAdapter() {
-            @Override
-            public void keyPressed(KeyEvent e) {
-                if (e.getKeyCode() == KeyEvent.VK_ENTER && e.isControlDown()) {
-                    e.consume();
-                    sendMessage();
-                }
-            }
-        });
-        
-        // Create send button
-        sendButton = new JButton("Send");
-        sendButton.addActionListener(this::onSendButtonClick);
-        
-        // Add components to input panel
-        inputPanel.add(inputField, BorderLayout.CENTER);
-        inputPanel.add(sendButton, BorderLayout.EAST);
-        
-        // Add components to main panel
-        mainPanel.add(scrollPane, BorderLayout.CENTER);
-        mainPanel.add(inputPanel, BorderLayout.SOUTH);
-        
-        // Add welcome message
-        addBotMessage("Hi! I'm your ModForge AI assistant. How can I help you with your Minecraft mod development?");
+        mainPanel.add(panel, BorderLayout.CENTER);
     }
     
     /**
-     * Handles send button click.
-     * @param e The action event
-     */
-    private void onSendButtonClick(ActionEvent e) {
-        sendMessage();
-    }
-    
-    /**
-     * Sends a message from the input field.
-     */
-    private void sendMessage() {
-        String message = inputField.getText();
-        
-        if (message.isEmpty()) {
-            return;
-        }
-        
-        // Add user message to chat
-        addUserMessage(message);
-        
-        // Clear input field
-        inputField.setText("");
-        
-        // Generate response
-        sendButton.setEnabled(false);
-        inputField.setEnabled(false);
-        
-        CompletableFuture<String> future = codeGenerationService.generateChatResponse(message, new HashMap<>());
-        
-        future.thenAccept(response -> {
-            SwingUtilities.invokeLater(() -> {
-                // Add bot message to chat
-                addBotMessage(response);
-                
-                // Re-enable input
-                sendButton.setEnabled(true);
-                inputField.setEnabled(true);
-                inputField.requestFocus();
-            });
-        }).exceptionally(ex -> {
-            LOG.error("Error generating chat response", ex);
-            
-            SwingUtilities.invokeLater(() -> {
-                // Add error message to chat
-                addBotMessage("Sorry, I encountered an error. Please try again.");
-                
-                // Re-enable input
-                sendButton.setEnabled(true);
-                inputField.setEnabled(true);
-                inputField.requestFocus();
-            });
-            
-            return null;
-        });
-    }
-    
-    /**
-     * Adds a user message to the chat.
-     * @param message The message to add
-     */
-    private void addUserMessage(@NotNull String message) {
-        // Create user message panel
-        JPanel messagePanel = new JPanel(new BorderLayout());
-        messagePanel.setBorder(JBUI.Borders.empty(5));
-        messagePanel.setBackground(JBUI.CurrentTheme.List.Focused.BACKGROUND);
-        
-        // Create avatar label
-        JBLabel avatarLabel = new JBLabel("You");
-        avatarLabel.setBorder(JBUI.Borders.empty(0, 0, 0, 10));
-        avatarLabel.setForeground(JBUI.CurrentTheme.Label.FOREGROUND);
-        avatarLabel.setFont(avatarLabel.getFont().deriveFont(Font.BOLD));
-        
-        // Create message editor
-        Editor editor = createReadOnlyEditor(message);
-        ((EditorEx) editor).setBackgroundColor(JBUI.CurrentTheme.List.Focused.BACKGROUND);
-        
-        // Add components to message panel
-        messagePanel.add(avatarLabel, BorderLayout.WEST);
-        messagePanel.add(editor.getComponent(), BorderLayout.CENTER);
-        
-        // Add message panel to chat container
-        chatContainer.add(messagePanel);
-        chatContainer.revalidate();
-        chatContainer.repaint();
-        
-        // Scroll to bottom
-        SwingUtilities.invokeLater(() -> {
-            JScrollPane scrollPane = (JScrollPane) chatContainer.getParent().getParent();
-            JScrollBar vertical = scrollPane.getVerticalScrollBar();
-            vertical.setValue(vertical.getMaximum());
-        });
-    }
-    
-    /**
-     * Adds a bot message to the chat.
-     * @param message The message to add
-     */
-    private void addBotMessage(@NotNull String message) {
-        // Create bot message panel
-        JPanel messagePanel = new JPanel(new BorderLayout());
-        messagePanel.setBorder(JBUI.Borders.empty(5));
-        
-        // Create avatar label
-        JBLabel avatarLabel = new JBLabel("ModForge");
-        avatarLabel.setBorder(JBUI.Borders.empty(0, 0, 0, 10));
-        avatarLabel.setForeground(JBUI.CurrentTheme.Label.FOREGROUND);
-        avatarLabel.setFont(avatarLabel.getFont().deriveFont(Font.BOLD));
-        
-        // Create message editor
-        Editor editor = createReadOnlyEditor(message);
-        
-        // Add components to message panel
-        messagePanel.add(avatarLabel, BorderLayout.WEST);
-        messagePanel.add(editor.getComponent(), BorderLayout.CENTER);
-        
-        // Add message panel to chat container
-        chatContainer.add(messagePanel);
-        chatContainer.revalidate();
-        chatContainer.repaint();
-        
-        // Scroll to bottom
-        SwingUtilities.invokeLater(() -> {
-            JScrollPane scrollPane = (JScrollPane) chatContainer.getParent().getParent();
-            JScrollBar vertical = scrollPane.getVerticalScrollBar();
-            vertical.setValue(vertical.getMaximum());
-        });
-    }
-    
-    /**
-     * Creates a read-only editor for displaying messages.
-     * @param text The text to display
-     * @return The created editor
+     * Creates the toolbar.
+     * @return The toolbar
      */
     @NotNull
-    private Editor createReadOnlyEditor(@NotNull String text) {
-        EditorFactory editorFactory = EditorFactory.getInstance();
-        Document document = editorFactory.createDocument(text);
+    private ActionToolbar createToolbar() {
+        DefaultActionGroup group = new DefaultActionGroup();
         
-        Editor editor = editorFactory.createEditor(document, project);
-        editor.setBorder(null);
+        // Add actions
+        group.add(ActionManager.getInstance().getAction("ModForge.GenerateCode"));
+        group.add(ActionManager.getInstance().getAction("ModForge.FixErrors"));
+        group.add(ActionManager.getInstance().getAction("ModForge.GenerateDocumentation"));
+        group.add(ActionManager.getInstance().getAction("ModForge.ExplainCode"));
         
-        EditorSettings settings = editor.getSettings();
-        settings.setLineNumbersShown(false);
-        settings.setFoldingOutlineShown(false);
-        settings.setRightMarginShown(false);
-        settings.setLineMarkerAreaShown(false);
-        settings.setIndentGuidesShown(false);
-        settings.setVirtualSpace(false);
-        settings.setWheelFontChangeEnabled(false);
-        settings.setAdditionalColumnsCount(0);
-        settings.setAdditionalLinesCount(0);
-        settings.setCaretRowShown(false);
+        // Create toolbar
+        ActionToolbar toolbar = ActionManager.getInstance().createActionToolbar(
+                ActionPlaces.TOOLBAR,
+                group,
+                true
+        );
         
-        if (editor instanceof EditorEx) {
-            EditorEx editorEx = (EditorEx) editor;
-            editorEx.setHorizontalScrollbarVisible(false);
-            editorEx.setVerticalScrollbarVisible(false);
-            editorEx.setContextMenuGroupId(null);
-            
-            EditorColorsScheme scheme = EditorColorsManager.getInstance().getGlobalScheme();
-            editorEx.setColorsScheme(scheme);
-        }
-        
-        editors.add(editor);
-        
-        return editor;
+        return toolbar;
     }
     
-    @Override
-    public void dispose() {
-        // Dispose editors
-        for (Editor editor : editors) {
-            EditorFactory.getInstance().releaseEditor(editor);
-        }
+    /**
+     * Creates the tabbed pane.
+     * @return The tabbed pane
+     */
+    @NotNull
+    private JBTabbedPane createTabbedPane() {
+        JBTabbedPane tabbedPane = new JBTabbedPane();
         
-        editors.clear();
+        // Create quick actions panel
+        quickActionsPanel = createQuickActionsPanel();
+        
+        // Create help panel
+        helpPanel = createHelpPanel();
+        
+        // Add tabs
+        tabbedPane.add("Quick Actions", quickActionsPanel);
+        tabbedPane.add("Help", helpPanel);
+        
+        return tabbedPane;
+    }
+    
+    /**
+     * Creates the quick actions panel.
+     * @return The quick actions panel
+     */
+    @NotNull
+    private JPanel createQuickActionsPanel() {
+        // Create buttons
+        JButton generateCodeButton = createActionButton(
+                "Generate Code",
+                AllIcons.Actions.Execute,
+                "Generate code using AI.",
+                new GenerateCodeAction()
+        );
+        
+        JButton fixErrorsButton = createActionButton(
+                "Fix Errors",
+                AllIcons.Actions.QuickfixBulb,
+                "Fix errors using AI.",
+                new FixErrorsAction()
+        );
+        
+        JButton generateDocumentationButton = createActionButton(
+                "Generate Documentation",
+                AllIcons.Actions.Documentation,
+                "Generate documentation using AI.",
+                new GenerateDocumentationAction()
+        );
+        
+        JButton explainCodeButton = createActionButton(
+                "Explain Code",
+                AllIcons.Actions.Help,
+                "Explain code using AI.",
+                new ExplainCodeAction()
+        );
+        
+        // Create code actions panel
+        JPanel codeActionsPanel = new JPanel(new GridLayout(2, 2, 10, 10));
+        codeActionsPanel.setBorder(JBUI.Borders.empty(10));
+        codeActionsPanel.add(generateCodeButton);
+        codeActionsPanel.add(fixErrorsButton);
+        codeActionsPanel.add(generateDocumentationButton);
+        codeActionsPanel.add(explainCodeButton);
+        
+        // Create code actions titled panel
+        JPanel codeTitledPanel = new JPanel(new BorderLayout());
+        codeTitledPanel.setBorder(BorderFactory.createTitledBorder(
+                BorderFactory.createLineBorder(UIUtil.getBorderColor()),
+                "Code Actions",
+                TitledBorder.LEFT,
+                TitledBorder.TOP
+        ));
+        codeTitledPanel.add(codeActionsPanel, BorderLayout.CENTER);
+        
+        // Create panel
+        JPanel panel = new JPanel(new BorderLayout());
+        panel.setBorder(JBUI.Borders.empty(10));
+        panel.add(codeTitledPanel, BorderLayout.NORTH);
+        
+        // Create status panel
+        JPanel statusPanel = new JPanel(new BorderLayout());
+        statusPanel.setBorder(JBUI.Borders.empty(10, 0, 0, 0));
+        
+        JBLabel statusLabel = new JBLabel("Ready to help with your Minecraft mod development.");
+        statusLabel.setForeground(JBColor.GRAY);
+        statusPanel.add(statusLabel, BorderLayout.CENTER);
+        
+        panel.add(statusPanel, BorderLayout.SOUTH);
+        
+        return panel;
+    }
+    
+    /**
+     * Creates the help panel.
+     * @return The help panel
+     */
+    @NotNull
+    private JPanel createHelpPanel() {
+        // Create panel
+        JPanel panel = new JPanel(new BorderLayout());
+        panel.setBorder(JBUI.Borders.empty(10));
+        
+        // Create content
+        JPanel contentPanel = FormBuilder.createFormBuilder()
+                .addComponent(new JBLabel("ModForge AI Assistant", UIUtil.ComponentStyle.LARGE))
+                .addVerticalGap(10)
+                .addComponent(new JBLabel("Use the AI assistant to help with your Minecraft mod development:"))
+                .addVerticalGap(5)
+                .addComponent(createHelpItem("Generate Code", "Generate code based on your description."))
+                .addComponent(createHelpItem("Fix Errors", "Fix compilation errors in your code."))
+                .addComponent(createHelpItem("Generate Documentation", "Add documentation to your code."))
+                .addComponent(createHelpItem("Explain Code", "Get an explanation of your code."))
+                .addVerticalGap(10)
+                .addComponent(new JBLabel("Tips:", UIUtil.ComponentStyle.BOLD))
+                .addVerticalGap(5)
+                .addComponent(new JBLabel("- You can select specific code or work with entire files."))
+                .addComponent(new JBLabel("- For best results, provide clear descriptions when generating code."))
+                .addComponent(new JBLabel("- Use pattern recognition to reduce API usage and improve response time."))
+                .addComponent(new JBLabel("- Enable continuous development to automatically fix errors."))
+                .addVerticalGap(10)
+                .getPanel();
+        
+        // Create scroll pane
+        JBScrollPane scrollPane = new JBScrollPane(contentPanel);
+        scrollPane.setBorder(JBUI.Borders.empty());
+        
+        panel.add(scrollPane, BorderLayout.CENTER);
+        
+        return panel;
+    }
+    
+    /**
+     * Creates a help item.
+     * @param title The title
+     * @param description The description
+     * @return The help item
+     */
+    @NotNull
+    private JPanel createHelpItem(@NotNull String title, @NotNull String description) {
+        JPanel panel = new JPanel(new BorderLayout());
+        panel.setBorder(JBUI.Borders.empty(5, 0));
+        
+        JBLabel titleLabel = new JBLabel(title, UIUtil.ComponentStyle.BOLD);
+        JBLabel descriptionLabel = new JBLabel(description);
+        descriptionLabel.setForeground(JBColor.GRAY);
+        
+        panel.add(titleLabel, BorderLayout.NORTH);
+        panel.add(descriptionLabel, BorderLayout.CENTER);
+        
+        return panel;
+    }
+    
+    /**
+     * Creates an action button.
+     * @param text The button text
+     * @param icon The button icon
+     * @param toolTipText The button tool tip text
+     * @param action The action to perform
+     * @return The button
+     */
+    @NotNull
+    private JButton createActionButton(@NotNull String text, Icon icon, @NotNull String toolTipText, @NotNull Action action) {
+        JButton button = new JButton(text, icon);
+        button.setToolTipText(toolTipText);
+        button.addActionListener(e -> action.actionPerformed(null));
+        
+        return button;
     }
 }
