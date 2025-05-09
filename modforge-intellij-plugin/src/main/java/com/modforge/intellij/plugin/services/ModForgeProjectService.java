@@ -1,23 +1,23 @@
 package com.modforge.intellij.plugin.services;
 
 import com.intellij.openapi.components.Service;
-import com.intellij.openapi.components.ServiceManager;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.project.Project;
-import com.modforge.intellij.plugin.listeners.ModForgeCompilationListener;
-import com.modforge.intellij.plugin.listeners.ModForgeFileListener;
+import com.intellij.openapi.startup.StartupManager;
+import com.modforge.intellij.plugin.settings.ModForgeSettings;
 import org.jetbrains.annotations.NotNull;
 
 /**
- * Service that manages ModForge plugin services and listeners for a project.
- * This service is created when a project is opened and disposed when a project is closed.
+ * Service for managing ModForge services for a project.
+ * This service is responsible for starting and stopping other services.
  */
 @Service(Service.Level.PROJECT)
 public final class ModForgeProjectService {
     private static final Logger LOG = Logger.getInstance(ModForgeProjectService.class);
+    
     private final Project project;
-    private ModForgeCompilationListener compilationListener;
-    private ModForgeFileListener fileListener;
+    private final AutonomousCodeGenerationService codeGenService;
+    private final ContinuousDevelopmentService continuousDevelopmentService;
     
     /**
      * Creates a new ModForgeProjectService.
@@ -25,10 +25,15 @@ public final class ModForgeProjectService {
      */
     public ModForgeProjectService(Project project) {
         this.project = project;
+        this.codeGenService = project.getService(AutonomousCodeGenerationService.class);
+        this.continuousDevelopmentService = project.getService(ContinuousDevelopmentService.class);
+        
         LOG.info("ModForge project service created for project: " + project.getName());
         
-        // Initialize listeners
-        initListeners();
+        // Initialize services after project is fully loaded
+        StartupManager.getInstance(project).runWhenProjectIsInitialized(() -> {
+            initializeServices();
+        });
     }
     
     /**
@@ -41,31 +46,34 @@ public final class ModForgeProjectService {
     }
     
     /**
-     * Initializes listeners.
+     * Initializes services.
      */
-    private void initListeners() {
-        // Create compilation listener
-        compilationListener = new ModForgeCompilationListener(project);
+    private void initializeServices() {
+        LOG.info("Initializing ModForge services for project: " + project.getName());
         
-        // Create file listener
-        fileListener = new ModForgeFileListener(project);
+        // Get settings
+        ModForgeSettings settings = ModForgeSettings.getInstance();
+        
+        // Start continuous development if enabled
+        if (settings.isContinuousDevelopmentEnabled()) {
+            continuousDevelopmentService.start();
+        }
     }
     
     /**
-     * Disposes the service.
+     * Called when the project is opened.
      */
-    public void dispose() {
-        LOG.info("ModForge project service disposed for project: " + project.getName());
+    public void projectOpened() {
+        LOG.info("Project opened: " + project.getName());
+    }
+    
+    /**
+     * Called when the project is closed.
+     */
+    public void projectClosed() {
+        LOG.info("Project closed: " + project.getName());
         
-        // Dispose listeners
-        if (compilationListener != null) {
-            compilationListener.dispose();
-            compilationListener = null;
-        }
-        
-        if (fileListener != null) {
-            fileListener.dispose();
-            fileListener = null;
-        }
+        // Stop continuous development
+        continuousDevelopmentService.stop();
     }
 }

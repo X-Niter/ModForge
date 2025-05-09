@@ -1,48 +1,85 @@
 package com.modforge.intellij.plugin.ai;
 
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.components.Service;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.util.concurrency.AppExecutorUtil;
 import com.modforge.intellij.plugin.settings.ModForgeSettings;
+import org.apache.commons.text.similarity.CosineSimilarity;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.io.File;
+import java.io.FileReader;
+import java.io.FileWriter;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
+import java.util.regex.Matcher;
+import java.util.stream.Collectors;
 
 /**
- * Service that provides pattern recognition for code generation.
- * This service helps reduce API calls by recognizing patterns in code
- * and using stored patterns to generate responses without calling the API.
+ * Service for pattern recognition.
+ * This service is responsible for recognizing and applying patterns to reduce API usage.
  */
-@Service
+@Service(Service.Level.APP)
 public final class PatternRecognitionService {
     private static final Logger LOG = Logger.getInstance(PatternRecognitionService.class);
-    private static final int MAX_PATTERNS = 10000;
-    private static final double MIN_SIMILARITY_THRESHOLD = 0.7;
     
-    private final ExecutorService executor;
-    private final Map<String, Pattern> codePatterns = new ConcurrentHashMap<>();
-    private final Map<String, Pattern> errorPatterns = new ConcurrentHashMap<>();
-    private final Map<String, Pattern> documentationPatterns = new ConcurrentHashMap<>();
-    private final AtomicInteger patternMatches = new AtomicInteger(0);
-    private final AtomicInteger patternMisses = new AtomicInteger(0);
+    private static final int MAX_PATTERNS = 1000;
+    private static final int SAVE_INTERVAL_MINUTES = 30;
+    
+    private final List<Pattern> codePatterns = Collections.synchronizedList(new ArrayList<>());
+    private final List<Pattern> errorPatterns = Collections.synchronizedList(new ArrayList<>());
+    private final List<Pattern> documentationPatterns = Collections.synchronizedList(new ArrayList<>());
+    
+    private final Map<String, Integer> patternUsageCounts = new ConcurrentHashMap<>();
+    private final Map<String, Integer> patternSuccessCounts = new ConcurrentHashMap<>();
+    
+    private final ScheduledExecutorService scheduler;
+    
+    // Metrics
+    private int totalApiCalls = 0;
+    private int totalPatternMatches = 0;
+    private int totalTokensSaved = 0;
+    private double totalCostSaved = 0.0;
+    
+    // Cost estimation (average cost per 1K tokens)
+    private static final double COST_PER_1K_TOKENS = 0.015;
     
     /**
      * Creates a new PatternRecognitionService.
      */
     public PatternRecognitionService() {
-        this.executor = AppExecutorUtil.createBoundedApplicationPoolExecutor("PatternRecognitionService", 2);
+        scheduler = Executors.newSingleThreadScheduledExecutor(r -> {
+            Thread thread = new Thread(r, "ModForge Pattern Recognition Service");
+            thread.setDaemon(true);
+            return thread;
+        });
         
-        LOG.info("Pattern recognition service created");
+        // Load patterns
+        loadPatterns();
+        
+        // Schedule auto-save
+        scheduler.scheduleAtFixedRate(
+                this::savePatterns,
+                SAVE_INTERVAL_MINUTES,
+                SAVE_INTERVAL_MINUTES,
+                TimeUnit.MINUTES
+        );
+        
+        LOG.info("Pattern recognition service initialized with " + 
+                 codePatterns.size() + " code patterns, " + 
+                 errorPatterns.size() + " error patterns, " + 
+                 documentationPatterns.size() + " documentation patterns");
     }
     
     /**
@@ -54,72 +91,85 @@ public final class PatternRecognitionService {
     }
     
     /**
-     * Represents a pattern for code generation.
+     * Represents a pattern.
      */
     public static class Pattern {
-        private final String key;
-        private final String input;
-        private final String output;
-        private final Map<String, Object> metadata;
-        private final long timestamp;
+        private String id;
+        private String type;
+        private String input;
+        private String output;
+        private Map<String, Object> options;
+        private long creationTime;
         private int usageCount;
         private int successCount;
+        private Map<String, Double> inputEmbedding;
         
         /**
          * Creates a new Pattern.
-         * @param key The pattern key
-         * @param input The input text
-         * @param output The output text
-         * @param metadata The metadata
+         * @param id The ID
+         * @param type The type
+         * @param input The input
+         * @param output The output
+         * @param options The options
          */
-        public Pattern(String key, String input, String output, Map<String, Object> metadata) {
-            this.key = key;
+        public Pattern(String id, String type, String input, String output, Map<String, Object> options) {
+            this.id = id;
+            this.type = type;
             this.input = input;
             this.output = output;
-            this.metadata = metadata != null ? new HashMap<>(metadata) : new HashMap<>();
-            this.timestamp = System.currentTimeMillis();
+            this.options = options != null ? new HashMap<>(options) : new HashMap<>();
+            this.creationTime = System.currentTimeMillis();
             this.usageCount = 0;
             this.successCount = 0;
+            this.inputEmbedding = generateEmbedding(input);
         }
         
         /**
-         * Gets the pattern key.
-         * @return The pattern key
+         * Gets the ID.
+         * @return The ID
          */
-        public String getKey() {
-            return key;
+        public String getId() {
+            return id;
         }
         
         /**
-         * Gets the input text.
-         * @return The input text
+         * Gets the type.
+         * @return The type
+         */
+        public String getType() {
+            return type;
+        }
+        
+        /**
+         * Gets the input.
+         * @return The input
          */
         public String getInput() {
             return input;
         }
         
         /**
-         * Gets the output text.
-         * @return The output text
+         * Gets the output.
+         * @return The output
          */
         public String getOutput() {
             return output;
         }
         
         /**
-         * Gets the metadata.
-         * @return The metadata
+         * Gets the options.
+         * @return The options
          */
-        public Map<String, Object> getMetadata() {
-            return Collections.unmodifiableMap(metadata);
+        public Map<String, Object> getOptions() {
+            return options;
         }
         
         /**
-         * Gets the timestamp.
-         * @return The timestamp
+         * Gets the creation time.
+         * @return The creation time
          */
-        public long getTimestamp() {
-            return timestamp;
+        public long getCreationTime() {
+            return creationTime;
         }
         
         /**
@@ -131,18 +181,18 @@ public final class PatternRecognitionService {
         }
         
         /**
+         * Increments the usage count.
+         */
+        public void incrementUsageCount() {
+            usageCount++;
+        }
+        
+        /**
          * Gets the success count.
          * @return The success count
          */
         public int getSuccessCount() {
             return successCount;
-        }
-        
-        /**
-         * Increments the usage count.
-         */
-        public void incrementUsageCount() {
-            usageCount++;
         }
         
         /**
@@ -157,399 +207,616 @@ public final class PatternRecognitionService {
          * @return The success rate
          */
         public double getSuccessRate() {
-            return usageCount > 0 ? (double) successCount / usageCount : 0;
-        }
-    }
-    
-    /**
-     * Finds a matching pattern for code generation.
-     * @param input The input text
-     * @param options The options
-     * @return The matching pattern, or null if no match found
-     */
-    @Nullable
-    public Pattern findCodePattern(@NotNull String input, @Nullable Map<String, Object> options) {
-        // Check if pattern recognition is enabled
-        if (!ModForgeSettings.getInstance().isUsePatternRecognition()) {
-            return null;
+            return usageCount > 0 ? (double) successCount / usageCount : 0.0;
         }
         
-        // Get language from options
-        String language = options != null ? (String) options.getOrDefault("language", "java") : "java";
-        
-        // Find best match
-        Pattern bestMatch = findBestMatch(input, codePatterns, options);
-        
-        if (bestMatch != null) {
-            // Increment usage count
-            bestMatch.incrementUsageCount();
-            
-            // Increment pattern matches
-            patternMatches.incrementAndGet();
-            
-            // Record pattern match in AI service
-            AIServiceManager.getInstance().recordPatternMatch();
-            
-            return bestMatch;
+        /**
+         * Gets the input embedding.
+         * @return The input embedding
+         */
+        public Map<String, Double> getInputEmbedding() {
+            return inputEmbedding;
         }
-        
-        // Increment pattern misses
-        patternMisses.incrementAndGet();
-        
-        return null;
-    }
-    
-    /**
-     * Finds a matching pattern for error resolution.
-     * @param errorMessage The error message
-     * @param options The options
-     * @return The matching pattern, or null if no match found
-     */
-    @Nullable
-    public Pattern findErrorPattern(@NotNull String errorMessage, @Nullable Map<String, Object> options) {
-        // Check if pattern recognition is enabled
-        if (!ModForgeSettings.getInstance().isUsePatternRecognition()) {
-            return null;
-        }
-        
-        // Find best match
-        Pattern bestMatch = findBestMatch(errorMessage, errorPatterns, options);
-        
-        if (bestMatch != null) {
-            // Increment usage count
-            bestMatch.incrementUsageCount();
-            
-            // Increment pattern matches
-            patternMatches.incrementAndGet();
-            
-            // Record pattern match in AI service
-            AIServiceManager.getInstance().recordPatternMatch();
-            
-            return bestMatch;
-        }
-        
-        // Increment pattern misses
-        patternMisses.incrementAndGet();
-        
-        return null;
-    }
-    
-    /**
-     * Finds a matching pattern for documentation generation.
-     * @param code The code
-     * @param options The options
-     * @return The matching pattern, or null if no match found
-     */
-    @Nullable
-    public Pattern findDocumentationPattern(@NotNull String code, @Nullable Map<String, Object> options) {
-        // Check if pattern recognition is enabled
-        if (!ModForgeSettings.getInstance().isUsePatternRecognition()) {
-            return null;
-        }
-        
-        // Find best match
-        Pattern bestMatch = findBestMatch(code, documentationPatterns, options);
-        
-        if (bestMatch != null) {
-            // Increment usage count
-            bestMatch.incrementUsageCount();
-            
-            // Increment pattern matches
-            patternMatches.incrementAndGet();
-            
-            // Record pattern match in AI service
-            AIServiceManager.getInstance().recordPatternMatch();
-            
-            return bestMatch;
-        }
-        
-        // Increment pattern misses
-        patternMisses.incrementAndGet();
-        
-        return null;
-    }
-    
-    /**
-     * Finds the best matching pattern.
-     * @param input The input text
-     * @param patterns The patterns
-     * @param options The options
-     * @return The best matching pattern, or null if no match found
-     */
-    @Nullable
-    private Pattern findBestMatch(@NotNull String input, @NotNull Map<String, Pattern> patterns, 
-                                @Nullable Map<String, Object> options) {
-        if (patterns.isEmpty()) {
-            return null;
-        }
-        
-        // Get similarity threshold
-        double similarityThreshold = options != null ? 
-                (double) options.getOrDefault("similarityThreshold", MIN_SIMILARITY_THRESHOLD) : 
-                MIN_SIMILARITY_THRESHOLD;
-        
-        // Get patterns sorted by similarity
-        List<Map.Entry<Double, Pattern>> matches = new ArrayList<>();
-        
-        for (Pattern pattern : patterns.values()) {
-            double similarity = calculateSimilarity(input, pattern.getInput());
-            
-            if (similarity >= similarityThreshold) {
-                matches.add(Map.entry(similarity, pattern));
-            }
-        }
-        
-        // Sort by similarity (highest first)
-        matches.sort(Map.Entry.<Double, Pattern>comparingByKey().reversed());
-        
-        // Return best match if any
-        return matches.isEmpty() ? null : matches.get(0).getValue();
-    }
-    
-    /**
-     * Calculates the similarity between two strings.
-     * @param str1 The first string
-     * @param str2 The second string
-     * @return The similarity (0-1)
-     */
-    private double calculateSimilarity(@NotNull String str1, @NotNull String str2) {
-        // Simple similarity calculation based on the Levenshtein distance
-        int distance = levenshteinDistance(str1, str2);
-        int maxLength = Math.max(str1.length(), str2.length());
-        
-        return maxLength > 0 ? 1.0 - (double) distance / maxLength : 1.0;
-    }
-    
-    /**
-     * Calculates the Levenshtein distance between two strings.
-     * @param str1 The first string
-     * @param str2 The second string
-     * @return The Levenshtein distance
-     */
-    private int levenshteinDistance(@NotNull String str1, @NotNull String str2) {
-        int[][] dp = new int[str1.length() + 1][str2.length() + 1];
-        
-        for (int i = 0; i <= str1.length(); i++) {
-            dp[i][0] = i;
-        }
-        
-        for (int j = 0; j <= str2.length(); j++) {
-            dp[0][j] = j;
-        }
-        
-        for (int i = 1; i <= str1.length(); i++) {
-            for (int j = 1; j <= str2.length(); j++) {
-                int cost = str1.charAt(i - 1) == str2.charAt(j - 1) ? 0 : 1;
-                dp[i][j] = Math.min(Math.min(dp[i - 1][j] + 1, dp[i][j - 1] + 1), dp[i - 1][j - 1] + cost);
-            }
-        }
-        
-        return dp[str1.length()][str2.length()];
     }
     
     /**
      * Stores a code pattern.
-     * @param input The input text
-     * @param output The output text
+     * @param prompt The prompt
+     * @param code The generated code
      * @param options The options
      */
-    public void storeCodePattern(@NotNull String input, @NotNull String output, @Nullable Map<String, Object> options) {
-        if (!ModForgeSettings.getInstance().isUsePatternRecognition()) {
+    public void storeCodePattern(@NotNull String prompt, @NotNull String code, @Nullable Map<String, Object> options) {
+        if (!isPatternRecognitionEnabled()) {
             return;
         }
         
-        executor.execute(() -> {
-            try {
-                // Get key
-                String key = generateKey(input);
+        String id = UUID.randomUUID().toString();
+        Pattern pattern = new Pattern(id, "code", prompt, code, options);
+        
+        synchronized (codePatterns) {
+            codePatterns.add(pattern);
+            
+            // Trim if needed
+            if (codePatterns.size() > MAX_PATTERNS) {
+                // Sort by success rate and usage count
+                codePatterns.sort((p1, p2) -> {
+                    int successRateCompare = Double.compare(p2.getSuccessRate(), p1.getSuccessRate());
+                    if (successRateCompare != 0) {
+                        return successRateCompare;
+                    }
+                    return Integer.compare(p2.getUsageCount(), p1.getUsageCount());
+                });
                 
-                // Create pattern
-                Pattern pattern = new Pattern(key, input, output, options);
-                
-                // Store pattern
-                codePatterns.put(key, pattern);
-                
-                // Clean up if needed
-                cleanupPatterns(codePatterns);
-                
-                LOG.info("Stored code pattern: " + key);
-            } catch (Exception ex) {
-                LOG.error("Error storing code pattern", ex);
+                // Remove least useful patterns
+                while (codePatterns.size() > MAX_PATTERNS) {
+                    codePatterns.remove(codePatterns.size() - 1);
+                }
             }
-        });
+        }
+        
+        LOG.info("Stored code pattern: " + id);
+        
+        // Save patterns
+        AppExecutorUtil.getAppExecutorService().execute(this::savePatterns);
     }
     
     /**
      * Stores an error pattern.
-     * @param errorMessage The error message
-     * @param fix The fix
+     * @param error The error
+     * @param fixedCode The fixed code
      * @param options The options
      */
-    public void storeErrorPattern(@NotNull String errorMessage, @NotNull String fix, @Nullable Map<String, Object> options) {
-        if (!ModForgeSettings.getInstance().isUsePatternRecognition()) {
+    public void storeErrorPattern(@NotNull String error, @NotNull String fixedCode, @Nullable Map<String, Object> options) {
+        if (!isPatternRecognitionEnabled()) {
             return;
         }
         
-        executor.execute(() -> {
-            try {
-                // Get key
-                String key = generateKey(errorMessage);
+        String id = UUID.randomUUID().toString();
+        Pattern pattern = new Pattern(id, "error", error, fixedCode, options);
+        
+        synchronized (errorPatterns) {
+            errorPatterns.add(pattern);
+            
+            // Trim if needed
+            if (errorPatterns.size() > MAX_PATTERNS) {
+                // Sort by success rate and usage count
+                errorPatterns.sort((p1, p2) -> {
+                    int successRateCompare = Double.compare(p2.getSuccessRate(), p1.getSuccessRate());
+                    if (successRateCompare != 0) {
+                        return successRateCompare;
+                    }
+                    return Integer.compare(p2.getUsageCount(), p1.getUsageCount());
+                });
                 
-                // Create pattern
-                Pattern pattern = new Pattern(key, errorMessage, fix, options);
-                
-                // Store pattern
-                errorPatterns.put(key, pattern);
-                
-                // Clean up if needed
-                cleanupPatterns(errorPatterns);
-                
-                LOG.info("Stored error pattern: " + key);
-            } catch (Exception ex) {
-                LOG.error("Error storing error pattern", ex);
+                // Remove least useful patterns
+                while (errorPatterns.size() > MAX_PATTERNS) {
+                    errorPatterns.remove(errorPatterns.size() - 1);
+                }
             }
-        });
+        }
+        
+        LOG.info("Stored error pattern: " + id);
+        
+        // Save patterns
+        AppExecutorUtil.getAppExecutorService().execute(this::savePatterns);
     }
     
     /**
      * Stores a documentation pattern.
      * @param code The code
-     * @param documentation The documentation
+     * @param documentedCode The documented code
      * @param options The options
      */
-    public void storeDocumentationPattern(@NotNull String code, @NotNull String documentation, @Nullable Map<String, Object> options) {
-        if (!ModForgeSettings.getInstance().isUsePatternRecognition()) {
+    public void storeDocumentationPattern(@NotNull String code, @NotNull String documentedCode, @Nullable Map<String, Object> options) {
+        if (!isPatternRecognitionEnabled()) {
             return;
         }
         
-        executor.execute(() -> {
-            try {
-                // Get key
-                String key = generateKey(code);
+        String id = UUID.randomUUID().toString();
+        Pattern pattern = new Pattern(id, "documentation", code, documentedCode, options);
+        
+        synchronized (documentationPatterns) {
+            documentationPatterns.add(pattern);
+            
+            // Trim if needed
+            if (documentationPatterns.size() > MAX_PATTERNS) {
+                // Sort by success rate and usage count
+                documentationPatterns.sort((p1, p2) -> {
+                    int successRateCompare = Double.compare(p2.getSuccessRate(), p1.getSuccessRate());
+                    if (successRateCompare != 0) {
+                        return successRateCompare;
+                    }
+                    return Integer.compare(p2.getUsageCount(), p1.getUsageCount());
+                });
                 
-                // Create pattern
-                Pattern pattern = new Pattern(key, code, documentation, options);
-                
-                // Store pattern
-                documentationPatterns.put(key, pattern);
-                
-                // Clean up if needed
-                cleanupPatterns(documentationPatterns);
-                
-                LOG.info("Stored documentation pattern: " + key);
-            } catch (Exception ex) {
-                LOG.error("Error storing documentation pattern", ex);
+                // Remove least useful patterns
+                while (documentationPatterns.size() > MAX_PATTERNS) {
+                    documentationPatterns.remove(documentationPatterns.size() - 1);
+                }
             }
-        });
+        }
+        
+        LOG.info("Stored documentation pattern: " + id);
+        
+        // Save patterns
+        AppExecutorUtil.getAppExecutorService().execute(this::savePatterns);
     }
     
     /**
-     * Records a pattern match result.
+     * Finds a code pattern.
+     * @param prompt The prompt
+     * @param options The options
+     * @return The pattern or null if not found
+     */
+    @Nullable
+    public Pattern findCodePattern(@NotNull String prompt, @Nullable Map<String, Object> options) {
+        if (!isPatternRecognitionEnabled()) {
+            return null;
+        }
+        
+        Map<String, Double> promptEmbedding = generateEmbedding(prompt);
+        
+        List<PatternMatch> matches = new ArrayList<>();
+        
+        synchronized (codePatterns) {
+            for (Pattern pattern : codePatterns) {
+                double similarity = calculateSimilarity(promptEmbedding, pattern.getInputEmbedding());
+                
+                if (similarity >= 0.85) { // Threshold for match
+                    matches.add(new PatternMatch(pattern, similarity));
+                }
+            }
+        }
+        
+        if (matches.isEmpty()) {
+            return null;
+        }
+        
+        // Sort by similarity
+        matches.sort((m1, m2) -> Double.compare(m2.getSimilarity(), m1.getSimilarity()));
+        
+        // Get best match
+        Pattern bestMatch = matches.get(0).getPattern();
+        
+        // Increment usage count
+        bestMatch.incrementUsageCount();
+        patternUsageCounts.compute(bestMatch.getId(), (id, count) -> count == null ? 1 : count + 1);
+        
+        // Update metrics
+        totalPatternMatches++;
+        
+        // Estimate tokens saved (rough estimate based on input length)
+        int tokensSaved = estimateTokens(prompt) + estimateTokens(bestMatch.getOutput());
+        totalTokensSaved += tokensSaved;
+        
+        // Estimate cost saved
+        double costSaved = (tokensSaved / 1000.0) * COST_PER_1K_TOKENS;
+        totalCostSaved += costSaved;
+        
+        LOG.info("Found code pattern match with similarity: " + matches.get(0).getSimilarity());
+        
+        return bestMatch;
+    }
+    
+    /**
+     * Finds an error pattern.
+     * @param error The error
+     * @param options The options
+     * @return The pattern or null if not found
+     */
+    @Nullable
+    public Pattern findErrorPattern(@NotNull String error, @Nullable Map<String, Object> options) {
+        if (!isPatternRecognitionEnabled()) {
+            return null;
+        }
+        
+        Map<String, Double> errorEmbedding = generateEmbedding(error);
+        
+        List<PatternMatch> matches = new ArrayList<>();
+        
+        synchronized (errorPatterns) {
+            for (Pattern pattern : errorPatterns) {
+                double similarity = calculateSimilarity(errorEmbedding, pattern.getInputEmbedding());
+                
+                if (similarity >= 0.9) { // Higher threshold for errors
+                    matches.add(new PatternMatch(pattern, similarity));
+                }
+            }
+        }
+        
+        if (matches.isEmpty()) {
+            return null;
+        }
+        
+        // Sort by similarity
+        matches.sort((m1, m2) -> Double.compare(m2.getSimilarity(), m1.getSimilarity()));
+        
+        // Get best match
+        Pattern bestMatch = matches.get(0).getPattern();
+        
+        // Increment usage count
+        bestMatch.incrementUsageCount();
+        patternUsageCounts.compute(bestMatch.getId(), (id, count) -> count == null ? 1 : count + 1);
+        
+        // Update metrics
+        totalPatternMatches++;
+        
+        // Estimate tokens saved (rough estimate based on input length)
+        int tokensSaved = estimateTokens(error) + estimateTokens(bestMatch.getOutput());
+        totalTokensSaved += tokensSaved;
+        
+        // Estimate cost saved
+        double costSaved = (tokensSaved / 1000.0) * COST_PER_1K_TOKENS;
+        totalCostSaved += costSaved;
+        
+        LOG.info("Found error pattern match with similarity: " + matches.get(0).getSimilarity());
+        
+        return bestMatch;
+    }
+    
+    /**
+     * Finds a documentation pattern.
+     * @param code The code
+     * @param options The options
+     * @return The pattern or null if not found
+     */
+    @Nullable
+    public Pattern findDocumentationPattern(@NotNull String code, @Nullable Map<String, Object> options) {
+        if (!isPatternRecognitionEnabled()) {
+            return null;
+        }
+        
+        Map<String, Double> codeEmbedding = generateEmbedding(code);
+        
+        List<PatternMatch> matches = new ArrayList<>();
+        
+        synchronized (documentationPatterns) {
+            for (Pattern pattern : documentationPatterns) {
+                double similarity = calculateSimilarity(codeEmbedding, pattern.getInputEmbedding());
+                
+                if (similarity >= 0.85) { // Threshold for match
+                    matches.add(new PatternMatch(pattern, similarity));
+                }
+            }
+        }
+        
+        if (matches.isEmpty()) {
+            return null;
+        }
+        
+        // Sort by similarity
+        matches.sort((m1, m2) -> Double.compare(m2.getSimilarity(), m1.getSimilarity()));
+        
+        // Get best match
+        Pattern bestMatch = matches.get(0).getPattern();
+        
+        // Increment usage count
+        bestMatch.incrementUsageCount();
+        patternUsageCounts.compute(bestMatch.getId(), (id, count) -> count == null ? 1 : count + 1);
+        
+        // Update metrics
+        totalPatternMatches++;
+        
+        // Estimate tokens saved (rough estimate based on input length)
+        int tokensSaved = estimateTokens(code) + estimateTokens(bestMatch.getOutput());
+        totalTokensSaved += tokensSaved;
+        
+        // Estimate cost saved
+        double costSaved = (tokensSaved / 1000.0) * COST_PER_1K_TOKENS;
+        totalCostSaved += costSaved;
+        
+        LOG.info("Found documentation pattern match with similarity: " + matches.get(0).getSimilarity());
+        
+        return bestMatch;
+    }
+    
+    /**
+     * Records the result of a pattern.
      * @param pattern The pattern
-     * @param success Whether the match was successful
+     * @param success Whether the pattern was successful
      */
     public void recordPatternResult(@NotNull Pattern pattern, boolean success) {
         if (success) {
             pattern.incrementSuccessCount();
+            patternSuccessCounts.compute(pattern.getId(), (id, count) -> count == null ? 1 : count + 1);
         }
     }
     
     /**
-     * Generates a key for a pattern.
-     * @param input The input text
-     * @return The key
+     * Records an API call.
      */
-    private String generateKey(@NotNull String input) {
-        // Simple key generation based on content hash
-        return String.valueOf(Math.abs(input.hashCode()));
+    public void recordApiCall() {
+        totalApiCalls++;
     }
     
     /**
-     * Cleans up patterns if needed.
-     * @param patterns The patterns
+     * Generates an embedding for text.
+     * @param text The text
+     * @return The embedding
      */
-    private void cleanupPatterns(@NotNull Map<String, Pattern> patterns) {
-        if (patterns.size() <= MAX_PATTERNS) {
-            return;
+    @NotNull
+    private Map<String, Double> generateEmbedding(@NotNull String text) {
+        // Tokenize and clean
+        String cleanedText = text.toLowerCase()
+                .replaceAll("[^a-z0-9\\s]", " ")
+                .replaceAll("\\s+", " ")
+                .trim();
+        
+        // Split into tokens (words)
+        String[] tokens = cleanedText.split("\\s+");
+        
+        // Create term frequency map
+        Map<String, Double> embedding = new HashMap<>();
+        
+        for (String token : tokens) {
+            embedding.compute(token, (key, count) -> count == null ? 1.0 : count + 1.0);
         }
         
-        // Sort patterns by success rate and timestamp
-        List<Pattern> sortedPatterns = new ArrayList<>(patterns.values());
+        return embedding;
+    }
+    
+    /**
+     * Calculates the similarity between two embeddings.
+     * @param embedding1 The first embedding
+     * @param embedding2 The second embedding
+     * @return The similarity
+     */
+    private double calculateSimilarity(@NotNull Map<String, Double> embedding1, @NotNull Map<String, Double> embedding2) {
+        if (embedding1.isEmpty() || embedding2.isEmpty()) {
+            return 0.0;
+        }
         
-        // Sort by success rate (descending) and then by timestamp (descending)
-        sortedPatterns.sort(Comparator.<Pattern>comparingDouble(Pattern::getSuccessRate)
-                .reversed()
-                .thenComparingLong(Pattern::getTimestamp)
-                .reversed());
+        CosineSimilarity cosineSimilarity = new CosineSimilarity();
+        return cosineSimilarity.cosineSimilarity(embedding1, embedding2);
+    }
+    
+    /**
+     * Gets metrics about pattern recognition.
+     * @return The metrics
+     */
+    @NotNull
+    public Map<String, Object> getMetrics() {
+        Map<String, Object> metrics = new HashMap<>();
         
-        // Remove excess patterns
-        for (int i = MAX_PATTERNS; i < sortedPatterns.size(); i++) {
-            patterns.remove(sortedPatterns.get(i).getKey());
+        metrics.put("apiCalls", totalApiCalls);
+        metrics.put("patternMatches", totalPatternMatches);
+        metrics.put("tokensSaved", totalTokensSaved);
+        metrics.put("costSaved", totalCostSaved);
+        
+        // Pattern counts
+        Map<String, Integer> patternCounts = new HashMap<>();
+        patternCounts.put("code", codePatterns.size());
+        patternCounts.put("error", errorPatterns.size());
+        patternCounts.put("documentation", documentationPatterns.size());
+        
+        metrics.put("patternCounts", patternCounts);
+        
+        // Success rates
+        Map<String, Double> successRates = new HashMap<>();
+        
+        synchronized (codePatterns) {
+            double codeSuccessRate = codePatterns.stream()
+                    .filter(p -> p.getUsageCount() > 0)
+                    .mapToDouble(Pattern::getSuccessRate)
+                    .average()
+                    .orElse(0.0);
+            successRates.put("code", codeSuccessRate);
+        }
+        
+        synchronized (errorPatterns) {
+            double errorSuccessRate = errorPatterns.stream()
+                    .filter(p -> p.getUsageCount() > 0)
+                    .mapToDouble(Pattern::getSuccessRate)
+                    .average()
+                    .orElse(0.0);
+            successRates.put("error", errorSuccessRate);
+        }
+        
+        synchronized (documentationPatterns) {
+            double docSuccessRate = documentationPatterns.stream()
+                    .filter(p -> p.getUsageCount() > 0)
+                    .mapToDouble(Pattern::getSuccessRate)
+                    .average()
+                    .orElse(0.0);
+            successRates.put("documentation", docSuccessRate);
+        }
+        
+        metrics.put("successRates", successRates);
+        
+        return metrics;
+    }
+    
+    /**
+     * Loads patterns from disk.
+     */
+    private void loadPatterns() {
+        try {
+            // Create patterns directory if it doesn't exist
+            Path patternsDir = getPatternDirectory();
+            if (!Files.exists(patternsDir)) {
+                Files.createDirectories(patternsDir);
+            }
+            
+            // Load code patterns
+            loadPatternsOfType(patternsDir, "code", codePatterns);
+            
+            // Load error patterns
+            loadPatternsOfType(patternsDir, "error", errorPatterns);
+            
+            // Load documentation patterns
+            loadPatternsOfType(patternsDir, "documentation", documentationPatterns);
+            
+            LOG.info("Loaded patterns: " + 
+                     codePatterns.size() + " code, " + 
+                     errorPatterns.size() + " error, " + 
+                     documentationPatterns.size() + " documentation");
+            
+        } catch (Exception e) {
+            LOG.error("Error loading patterns", e);
         }
     }
     
     /**
-     * Gets the pattern match count.
-     * @return The pattern match count
+     * Loads patterns of a specific type.
+     * @param patternsDir The patterns directory
+     * @param type The type
+     * @param patternList The pattern list to populate
      */
-    public int getPatternMatchCount() {
-        return patternMatches.get();
+    private void loadPatternsOfType(Path patternsDir, String type, List<Pattern> patternList) {
+        try {
+            Path typeDir = patternsDir.resolve(type);
+            
+            if (!Files.exists(typeDir)) {
+                Files.createDirectories(typeDir);
+                return;
+            }
+            
+            // Get pattern files
+            List<Path> patternFiles = Files.list(typeDir)
+                    .filter(path -> path.toString().endsWith(".json"))
+                    .collect(Collectors.toList());
+            
+            Gson gson = new GsonBuilder().create();
+            
+            for (Path patternFile : patternFiles) {
+                try (FileReader reader = new FileReader(patternFile.toFile())) {
+                    Pattern pattern = gson.fromJson(reader, Pattern.class);
+                    patternList.add(pattern);
+                    
+                    // Update metrics
+                    patternUsageCounts.put(pattern.getId(), pattern.getUsageCount());
+                    patternSuccessCounts.put(pattern.getId(), pattern.getSuccessCount());
+                } catch (Exception e) {
+                    LOG.error("Error loading pattern file: " + patternFile, e);
+                }
+            }
+        } catch (Exception e) {
+            LOG.error("Error loading patterns of type: " + type, e);
+        }
     }
     
     /**
-     * Gets the pattern miss count.
-     * @return The pattern miss count
+     * Saves patterns to disk.
      */
-    public int getPatternMissCount() {
-        return patternMisses.get();
+    private void savePatterns() {
+        try {
+            // Create patterns directory if it doesn't exist
+            Path patternsDir = getPatternDirectory();
+            if (!Files.exists(patternsDir)) {
+                Files.createDirectories(patternsDir);
+            }
+            
+            // Save code patterns
+            savePatternsOfType(patternsDir, "code", codePatterns);
+            
+            // Save error patterns
+            savePatternsOfType(patternsDir, "error", errorPatterns);
+            
+            // Save documentation patterns
+            savePatternsOfType(patternsDir, "documentation", documentationPatterns);
+            
+            LOG.info("Saved patterns: " + 
+                     codePatterns.size() + " code, " + 
+                     errorPatterns.size() + " error, " + 
+                     documentationPatterns.size() + " documentation");
+            
+        } catch (Exception e) {
+            LOG.error("Error saving patterns", e);
+        }
     }
     
     /**
-     * Gets the code pattern count.
-     * @return The code pattern count
+     * Saves patterns of a specific type.
+     * @param patternsDir The patterns directory
+     * @param type The type
+     * @param patternList The pattern list
      */
-    public int getCodePatternCount() {
-        return codePatterns.size();
+    private void savePatternsOfType(Path patternsDir, String type, List<Pattern> patternList) {
+        try {
+            Path typeDir = patternsDir.resolve(type);
+            
+            if (!Files.exists(typeDir)) {
+                Files.createDirectories(typeDir);
+            }
+            
+            Gson gson = new GsonBuilder().setPrettyPrinting().create();
+            
+            synchronized (patternList) {
+                for (Pattern pattern : patternList) {
+                    Path patternFile = typeDir.resolve(pattern.getId() + ".json");
+                    
+                    try (FileWriter writer = new FileWriter(patternFile.toFile())) {
+                        gson.toJson(pattern, writer);
+                    } catch (Exception e) {
+                        LOG.error("Error saving pattern file: " + patternFile, e);
+                    }
+                }
+            }
+        } catch (Exception e) {
+            LOG.error("Error saving patterns of type: " + type, e);
+        }
     }
     
     /**
-     * Gets the error pattern count.
-     * @return The error pattern count
+     * Gets the pattern directory.
+     * @return The pattern directory
      */
-    public int getErrorPatternCount() {
-        return errorPatterns.size();
+    @NotNull
+    private Path getPatternDirectory() {
+        Path configDir = Paths.get(System.getProperty("user.home"), ".modforge");
+        return configDir.resolve("patterns");
     }
     
     /**
-     * Gets the documentation pattern count.
-     * @return The documentation pattern count
+     * Estimates the number of tokens in text.
+     * @param text The text
+     * @return The estimated number of tokens
      */
-    public int getDocumentationPatternCount() {
-        return documentationPatterns.size();
+    private int estimateTokens(@NotNull String text) {
+        // Very rough estimate: 1 token per 4 characters
+        return Math.max(1, text.length() / 4);
     }
     
     /**
-     * Gets the total pattern count.
-     * @return The total pattern count
+     * Checks if pattern recognition is enabled.
+     * @return True if enabled, false otherwise
      */
-    public int getTotalPatternCount() {
-        return codePatterns.size() + errorPatterns.size() + documentationPatterns.size();
+    private boolean isPatternRecognitionEnabled() {
+        ModForgeSettings settings = ModForgeSettings.getInstance();
+        return settings.isPatternRecognitionEnabled();
     }
     
     /**
-     * Clears all patterns.
+     * Represents a pattern match.
      */
-    public void clearPatterns() {
-        codePatterns.clear();
-        errorPatterns.clear();
-        documentationPatterns.clear();
-    }
-    
-    /**
-     * Resets metrics.
-     */
-    public void resetMetrics() {
-        patternMatches.set(0);
-        patternMisses.set(0);
+    private static class PatternMatch {
+        private final Pattern pattern;
+        private final double similarity;
+        
+        /**
+         * Creates a new PatternMatch.
+         * @param pattern The pattern
+         * @param similarity The similarity
+         */
+        public PatternMatch(Pattern pattern, double similarity) {
+            this.pattern = pattern;
+            this.similarity = similarity;
+        }
+        
+        /**
+         * Gets the pattern.
+         * @return The pattern
+         */
+        public Pattern getPattern() {
+            return pattern;
+        }
+        
+        /**
+         * Gets the similarity.
+         * @return The similarity
+         */
+        public double getSimilarity() {
+            return similarity;
+        }
     }
 }
