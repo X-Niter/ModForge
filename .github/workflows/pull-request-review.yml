@@ -279,7 +279,7 @@ jobs:
 
           if __name__ == "__main__":
               main()
-EOF
+        EOF
 
         # Run the code review script
         python review_pr.py $JAVA_FILES
