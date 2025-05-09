@@ -1,4 +1,4 @@
-import { Layout } from "@/components/ui/layout";
+
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -16,7 +16,6 @@ import {
 
 export default function DocumentationPage() {
   return (
-    <Layout>
       <div className="container mx-auto">
         <div className="mb-6">
           <h1 className="text-3xl font-bold tracking-tight mb-2">Documentation</h1>
@@ -502,6 +501,5 @@ export default function DocumentationPage() {
           </TabsContent>
         </Tabs>
       </div>
-    </Layout>
   );
 }
