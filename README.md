@@ -137,6 +137,141 @@ The system is designed to work with OpenAI's GPT-4 by default, but can be adapte
 4. **Improved Code Generation**: Better code quality and documentation generation
 5. **Extended IDE Integration**: Support for additional IDEs beyond IntelliJ
 
+## IntelliJ Plugin Setup & Usage Guide
+
+The ModForge system includes an IntelliJ plugin that provides direct IDE integration for a seamless development experience. This guide explains how to set up and use the plugin effectively.
+
+### Installation
+
+1. **Build the Plugin**:
+   ```bash
+   cd modforge-intellij-plugin
+   ./gradlew buildPlugin
+   ```
+   This will generate a plugin JAR file in `build/distributions/`.
+
+2. **Install in IntelliJ IDEA**:
+   - Open IntelliJ IDEA
+   - Go to File → Settings → Plugins
+   - Click the gear icon and select "Install Plugin from Disk..."
+   - Navigate to the generated JAR file and install it
+   - Restart IntelliJ when prompted
+
+3. **Configuration**:
+   - Open the ModForge settings panel in IntelliJ (Settings → Tools → ModForge)
+   - Enter your GitHub credentials and API token
+   - Set the path to your local repository clone
+   - Enter your OpenAI API key
+
+### Key Features
+
+1. **AI Assistant Panel**:
+   - Access via View → Tool Windows → ModForge Assistant
+   - Ask questions about your code
+   - Request code improvements
+   - Get documentation help
+
+2. **Two-Way Synchronization**:
+   - Changes made in the IDE are automatically pushed to GitHub
+   - Changes made through the web interface are pulled to the IDE
+   - Real-time conflict resolution
+
+3. **Context-Aware Actions**:
+   - Right-click on a file or code selection to access ModForge actions
+   - Options include: Improve Code, Add Feature, Document, Fix Issues
+
+4. **Command Reference**:
+   The following commands can be used in the AI Assistant panel:
+
+   ```
+   /help - Show available commands
+   /fix [file] - Fix bugs or issues in a file
+   /improve [file] - Improve code quality of a file
+   /add "[feature]" to [file] - Add a new feature to a file
+   /document [file] - Add comprehensive documentation
+   /analyze [topic] - Analyze code or architecture
+   /explain [file] - Get a detailed explanation of code
+   ```
+
+5. **Mod Testing**:
+   - Run Minecraft with your mod directly from the IDE
+   - Access mod testing logs and error reports
+   - Integrated debugging with the autonomous system
+
+### Workflow Integration
+
+1. **Starting a New Mod**:
+   - Create a new mod via File → New → Minecraft Mod Project
+   - Select mod loader, Minecraft version, and other settings
+   - The plugin automatically sets up the project structure
+
+2. **Working with Continuous Development**:
+   - Enable continuous development via Tools → ModForge → Enable Continuous Development
+   - The system will monitor your code for errors, suggest improvements, and perform optimizations
+   - Review suggested changes in the ModForge panel
+
+3. **Collaboration**:
+   - Share mods with team members via the ModForge panel
+   - View all active issues and PRs directly in the IDE
+   - Respond to comments and reviews without leaving the IDE
+
+### Troubleshooting
+
+1. **Connection Issues**:
+   - Verify your GitHub token has the correct permissions
+   - Check network connectivity to both GitHub and OpenAI
+   - Validate your API keys in the settings panel
+
+2. **Plugin Errors**:
+   - Check the IntelliJ logs at Help → Show Log in Explorer/Finder
+   - Try disabling and re-enabling the plugin
+   - Update to the latest plugin version
+
+3. **Synchronization Problems**:
+   - Use Tools → ModForge → Force Synchronize to reset the connection
+   - Manually pull changes if automatic sync fails
+   - Check for merge conflicts in the Git panel
+
+### Running the Plugin in Development Mode
+
+For developers working on the plugin itself, you can run it directly from the source code:
+
+1. **Prerequisites**:
+   - IntelliJ IDEA (Community or Ultimate)
+   - Java Development Kit (JDK) 17 or later
+   - Gradle 7.5+
+
+2. **Import the Plugin Project**:
+   ```bash
+   cd modforge-intellij-plugin
+   ```
+   Open the project in IntelliJ IDEA by selecting the directory.
+
+3. **Configure Plugin SDK**:
+   - Go to File → Project Structure → Project
+   - Set the Project SDK to JDK 17 or higher
+   - Set the Project Language Level to 17
+
+4. **Run/Debug the Plugin**:
+   - Configure a Plugin run configuration via Run → Edit Configurations
+   - Add a new Gradle configuration with the following settings:
+     - Gradle project: `modforge-intellij-plugin`
+     - Tasks: `runIde`
+   - Run this configuration to start an instance of IntelliJ with the plugin installed
+
+5. **Hot Reload**:
+   When making changes to the plugin code, you can use hot reload for some changes:
+   - Make your code changes
+   - Select Build → Build Project
+   - In the running development IDE instance, go to File → Invalidate Caches / Restart
+   - Select "Invalidate and Restart"
+
+6. **Debugging**:
+   - Set breakpoints in your plugin code
+   - Start the plugin in debug mode via Run → Debug
+   - The debugger will connect to the development IDE instance
+   - You can now step through your code, inspect variables, etc.
+
 ## License
 
 This project is licensed under the MIT License - see the LICENSE file for details.
