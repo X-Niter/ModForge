@@ -1,24 +1,36 @@
 package com.modforge.intellij.plugin.actions;
 
-import com.intellij.openapi.actionSystem.AnAction;
 import com.intellij.openapi.actionSystem.AnActionEvent;
-import com.intellij.openapi.actionSystem.Presentation;
+import com.intellij.openapi.actionSystem.ToggleAction;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.project.Project;
 import com.modforge.intellij.plugin.services.ContinuousDevelopmentService;
 import org.jetbrains.annotations.NotNull;
 
 /**
- * Action to toggle continuous development mode.
- * This action enables or disables the continuous development service.
+ * Toggle action to enable/disable continuous development.
+ * This action toggles the continuous development service when invoked.
  */
-public final class ToggleContinuousDevelopmentAction extends AnAction {
+public final class ToggleContinuousDevelopmentAction extends ToggleAction {
     private static final Logger LOG = Logger.getInstance(ToggleContinuousDevelopmentAction.class);
     
     @Override
-    public void actionPerformed(@NotNull AnActionEvent e) {
-        LOG.info("Toggle continuous development action performed");
+    public boolean isSelected(@NotNull AnActionEvent e) {
+        Project project = e.getProject();
         
+        if (project == null) {
+            return false;
+        }
+        
+        // Get continuous development service
+        ContinuousDevelopmentService service = ContinuousDevelopmentService.getInstance(project);
+        
+        // Return current state
+        return service.isRunning();
+    }
+    
+    @Override
+    public void setSelected(@NotNull AnActionEvent e, boolean state) {
         Project project = e.getProject();
         
         if (project == null) {
@@ -28,48 +40,23 @@ public final class ToggleContinuousDevelopmentAction extends AnAction {
         // Get continuous development service
         ContinuousDevelopmentService service = ContinuousDevelopmentService.getInstance(project);
         
-        // Toggle continuous development
-        if (service.isRunning()) {
-            service.stop();
-        } else {
+        // Update state
+        if (state) {
+            LOG.info("Starting continuous development service");
             service.start();
+        } else {
+            LOG.info("Stopping continuous development service");
+            service.stop();
         }
-        
-        // Update presentation
-        updatePresentation(e.getPresentation(), service.isRunning());
     }
     
     @Override
     public void update(@NotNull AnActionEvent e) {
         Project project = e.getProject();
         
-        if (project == null) {
-            e.getPresentation().setEnabledAndVisible(false);
-            return;
-        }
+        // Enable action if project is open
+        e.getPresentation().setEnabledAndVisible(project != null);
         
-        // Show action when project is open
-        e.getPresentation().setEnabledAndVisible(true);
-        
-        // Get continuous development service
-        ContinuousDevelopmentService service = ContinuousDevelopmentService.getInstance(project);
-        
-        // Update presentation
-        updatePresentation(e.getPresentation(), service.isRunning());
-    }
-    
-    /**
-     * Updates the action presentation.
-     * @param presentation The presentation to update
-     * @param isRunning Whether continuous development is running
-     */
-    private void updatePresentation(@NotNull Presentation presentation, boolean isRunning) {
-        if (isRunning) {
-            presentation.setText("Disable Continuous Development");
-            presentation.setDescription("Disable continuous development mode");
-        } else {
-            presentation.setText("Enable Continuous Development");
-            presentation.setDescription("Enable continuous development mode");
-        }
+        super.update(e);
     }
 }

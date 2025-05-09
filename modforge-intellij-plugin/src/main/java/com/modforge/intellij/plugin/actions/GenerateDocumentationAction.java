@@ -4,10 +4,12 @@ import com.intellij.openapi.actionSystem.AnAction;
 import com.intellij.openapi.actionSystem.AnActionEvent;
 import com.intellij.openapi.actionSystem.CommonDataKeys;
 import com.intellij.openapi.application.ApplicationManager;
-import com.intellij.openapi.command.WriteCommandAction;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.editor.Editor;
+import com.intellij.openapi.progress.ProgressIndicator;
+import com.intellij.openapi.progress.ProgressManager;
+import com.intellij.openapi.progress.Task;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.Messages;
 import com.intellij.psi.PsiDocumentManager;
@@ -15,151 +17,151 @@ import com.intellij.psi.PsiFile;
 import com.modforge.intellij.plugin.services.AutonomousCodeGenerationService;
 import org.jetbrains.annotations.NotNull;
 
-import java.util.HashMap;
-import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 
 /**
- * Action for generating documentation for code using AI.
+ * Action to generate documentation for code using AI.
+ * This action uses the AI service to add documentation to the current file.
  */
-public class GenerateDocumentationAction extends AnAction {
+public final class GenerateDocumentationAction extends AnAction {
     private static final Logger LOG = Logger.getInstance(GenerateDocumentationAction.class);
     
     @Override
     public void actionPerformed(@NotNull AnActionEvent e) {
-        // Get project
-        Project project = e.getProject();
-        if (project == null) {
-            return;
-        }
-        
         LOG.info("Generate documentation action performed");
         
-        // Get code generation service
-        AutonomousCodeGenerationService codeGenService = AutonomousCodeGenerationService.getInstance(project);
-        
-        // Get editor and file
+        Project project = e.getProject();
         Editor editor = e.getData(CommonDataKeys.EDITOR);
         PsiFile psiFile = e.getData(CommonDataKeys.PSI_FILE);
         
-        if (editor == null || psiFile == null) {
-            Messages.showErrorDialog(
+        if (project == null || editor == null || psiFile == null) {
+            return;
+        }
+        
+        // Get selected text or use the entire file
+        String codeToDocument = getCodeToDocument(editor, psiFile);
+        
+        if (codeToDocument.isEmpty()) {
+            Messages.showInfoMessage(
                     project,
-                    "Please open a file in the editor to generate documentation.",
+                    "No code found to document.",
                     "Generate Documentation"
             );
             return;
         }
         
-        // Get the selected text or the entire file
-        String code;
+        // Get code generation service
+        AutonomousCodeGenerationService service = AutonomousCodeGenerationService.getInstance(project);
         
-        if (editor.getSelectionModel().hasSelection()) {
-            // Get selected text
-            code = editor.getSelectionModel().getSelectedText();
-        } else {
-            // Get entire file content
-            code = editor.getDocument().getText();
-        }
-        
-        if (code == null || code.isEmpty()) {
-            Messages.showErrorDialog(
-                    project,
-                    "No code to document.",
-                    "Generate Documentation"
-            );
-            return;
-        }
-        
-        // Create options
-        Map<String, Object> options = new HashMap<>();
-        options.put("filePath", psiFile.getVirtualFile().getPath());
-        
-        // Generate documentation
-        CompletableFuture<String> future = codeGenService.generateDocumentation(code, options);
-        
-        // Handle result
-        future.thenAccept(documentedCode -> {
-            // Show confirmation dialog
-            int result = Messages.showYesNoDialog(
-                    project,
-                    "Do you want to apply the documented code?",
-                    "Generate Documentation",
-                    "Apply",
-                    "Cancel",
-                    null
-            );
+        // Show progress dialog and generate documentation
+        ProgressManager.getInstance().run(new Task.Backgroundable(project, "Generating Documentation", false) {
+            private String documentedCode;
             
-            if (result == Messages.YES) {
-                // Apply the documented code
-                applyDocumentedCode(project, editor, psiFile, documentedCode);
-            } else {
-                // Show the documented code in a dialog
-                Messages.showMultilineInputDialog(
+            @Override
+            public void run(@NotNull ProgressIndicator indicator) {
+                indicator.setIndeterminate(true);
+                
+                try {
+                    // Generate documentation
+                    CompletableFuture<String> future = service.generateDocumentation(codeToDocument, null);
+                    
+                    // Wait for result
+                    documentedCode = future.get();
+                } catch (Exception ex) {
+                    LOG.error("Error generating documentation", ex);
+                    
+                    ApplicationManager.getApplication().invokeLater(() -> {
+                        Messages.showErrorDialog(
+                                project,
+                                "An error occurred while generating documentation: " + ex.getMessage(),
+                                "Documentation Generation Error"
+                        );
+                    });
+                }
+            }
+            
+            @Override
+            public void onSuccess() {
+                if (documentedCode == null || documentedCode.isEmpty() || documentedCode.equals(codeToDocument)) {
+                    Messages.showInfoMessage(
+                            project,
+                            "No documentation could be generated or the documentation is already complete.",
+                            "Generate Documentation"
+                    );
+                    return;
+                }
+                
+                // Update document
+                updateDocument(editor, psiFile, codeToDocument, documentedCode);
+                
+                Messages.showInfoMessage(
                         project,
-                        documentedCode,
-                        "Documented Code",
-                        null,
-                        null,
-                        null
+                        "Documentation has been generated. Please check the changes.",
+                        "Generate Documentation"
                 );
             }
-        }).exceptionally(ex -> {
-            Messages.showErrorDialog(
-                    project,
-                    "Error generating documentation: " + ex.getMessage(),
-                    "Generate Documentation Error"
-            );
-            return null;
-        });
-    }
-    
-    /**
-     * Applies the documented code to the editor.
-     * @param project The project
-     * @param editor The editor
-     * @param psiFile The PSI file
-     * @param documentedCode The documented code
-     */
-    private void applyDocumentedCode(@NotNull Project project, @NotNull Editor editor, @NotNull PsiFile psiFile, @NotNull String documentedCode) {
-        ApplicationManager.getApplication().invokeLater(() -> {
-            WriteCommandAction.runWriteCommandAction(project, () -> {
-                try {
-                    Document document = editor.getDocument();
-                    
-                    if (editor.getSelectionModel().hasSelection()) {
-                        // Replace selected text
-                        int start = editor.getSelectionModel().getSelectionStart();
-                        int end = editor.getSelectionModel().getSelectionEnd();
-                        document.replaceString(start, end, documentedCode);
-                    } else {
-                        // Replace entire document
-                        document.setText(documentedCode);
-                    }
-                    
-                    // Commit document
-                    PsiDocumentManager.getInstance(project).commitDocument(document);
-                    
-                    LOG.info("Documented code applied");
-                } catch (Exception ex) {
-                    LOG.error("Error applying documented code", ex);
-                    Messages.showErrorDialog(
-                            project,
-                            "Error applying documented code: " + ex.getMessage(),
-                            "Generate Documentation Error"
-                    );
-                }
-            });
         });
     }
     
     @Override
     public void update(@NotNull AnActionEvent e) {
-        // Get project and editor
+        // Enable action if project, editor, and file are available
         Project project = e.getProject();
         Editor editor = e.getData(CommonDataKeys.EDITOR);
+        PsiFile psiFile = e.getData(CommonDataKeys.PSI_FILE);
         
-        // Enable only if project is not null and editor is not null
-        e.getPresentation().setEnabled(project != null && editor != null);
+        e.getPresentation().setEnabledAndVisible(project != null && editor != null && psiFile != null);
+    }
+    
+    /**
+     * Gets the code to document.
+     * @param editor The editor
+     * @param psiFile The PSI file
+     * @return The code to document
+     */
+    @NotNull
+    private String getCodeToDocument(@NotNull Editor editor, @NotNull PsiFile psiFile) {
+        // Check if text is selected
+        String selectedText = editor.getSelectionModel().getSelectedText();
+        
+        if (selectedText != null && !selectedText.isEmpty()) {
+            return selectedText;
+        }
+        
+        // Use the entire file
+        return psiFile.getText();
+    }
+    
+    /**
+     * Updates the document with the documented code.
+     * @param editor The editor
+     * @param psiFile The PSI file
+     * @param originalCode The original code
+     * @param documentedCode The documented code
+     */
+    private void updateDocument(@NotNull Editor editor, @NotNull PsiFile psiFile, @NotNull String originalCode, @NotNull String documentedCode) {
+        Document document = editor.getDocument();
+        
+        // Check if selection or entire file
+        if (editor.getSelectionModel().hasSelection()) {
+            // Replace selection
+            int startOffset = editor.getSelectionModel().getSelectionStart();
+            int endOffset = editor.getSelectionModel().getSelectionEnd();
+            
+            ApplicationManager.getApplication().runWriteAction(() -> {
+                document.replaceString(startOffset, endOffset, documentedCode);
+                
+                // Commit document
+                PsiDocumentManager.getInstance(psiFile.getProject()).commitDocument(document);
+            });
+        } else {
+            // Replace entire document
+            ApplicationManager.getApplication().runWriteAction(() -> {
+                document.setText(documentedCode);
+                
+                // Commit document
+                PsiDocumentManager.getInstance(psiFile.getProject()).commitDocument(document);
+            });
+        }
     }
 }
