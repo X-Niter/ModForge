@@ -1,0 +1,95 @@
+name: Comment Command Processor
+
+on:
+  issue_comment:
+    types: [created]
+  pull_request_review_comment:
+    types: [created]
+
+jobs:
+  process-comment-command:
+    runs-on: ubuntu-latest
+    if: contains(github.event.comment.body, '/') && !github.event.comment.user.login == 'github-actions[bot]'
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+    
+    steps:
+    - uses: actions/checkout@v3
+      with:
+        fetch-depth: 0
+    
+    - name: Checkout PR if comment is on PR
+      if: github.event.issue.pull_request
+      run: |
+        PR_URL="${{ github.event.issue.pull_request.url }}"
+        PR_NUM=${PR_URL##*/}
+        git fetch origin pull/$PR_NUM/head:pr-branch
+        git checkout pr-branch
+    
+    - name: Set up JDK 17
+      uses: actions/setup-java@v3
+      with:
+        java-version: '17'
+        distribution: 'temurin'
+    
+    - name: Set up Python for automation
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.10'
+    
+    - name: Configure Git
+      run: |
+        git config --global user.name "ModForge Automation"
+        git config --global user.email "automation@modforge.dev"
+    
+    - name: Install AI development dependencies
+      run: |
+        pip install openai
+        pip install requests
+        pip install pyyaml
+    
+    - name: Process comment command
+      env:
+        OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        COMMENT_BODY: ${{ github.event.comment.body }}
+        ISSUE_NUMBER: ${{ github.event.issue.number }}
+        ISSUE_TITLE: ${{ github.event.issue.title }}
+        COMMENT_ID: ${{ github.event.comment.id }}
+        PR_NUMBER: ${{ github.event.pull_request.number }}
+        IS_PR: ${{ github.event.issue.pull_request != null }}
+      run: |
+        python .github/scripts/process_comment_command.py
+    
+    - name: Commit changes if any
+      run: |
+        if git diff --staged --quiet; then
+          echo "No changes to commit"
+        else
+          ISSUE_NUM="${{ github.event.issue.number }}"
+          git commit -m "Automated changes from comment on #$ISSUE_NUM [ModForge AI]"
+          
+          if [[ "${{ github.event.issue.pull_request }}" == "null" ]]; then
+            git push
+          else
+            git push origin HEAD:pr-branch
+          fi
+        fi
+    
+    - name: Comment with results
+      uses: actions/github-script@v6
+      with:
+        github-token: ${{ secrets.GITHUB_TOKEN }}
+        script: |
+          const fs = require('fs');
+          if (fs.existsSync('comment_response.txt')) {
+            const response = fs.readFileSync('comment_response.txt', 'utf8');
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: response
+            });
+          }
