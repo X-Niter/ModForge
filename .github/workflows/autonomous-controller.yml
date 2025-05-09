@@ -267,7 +267,7 @@ jobs:
               except Exception as e:
                   print(f"Error checking last scan time: {e}")
               
-              hours_since_scan = float('inf')  # Default to infinity if we can't determine
+              hours_since_scan = 9999  # Default to a very large number if we can't determine
               if last_scan_time:
                   hours_since_scan = (utc_now - last_scan_time).total_seconds() / 3600
               
@@ -275,7 +275,7 @@ jobs:
                   print(f"Code changes detected or it's been {hours_since_scan:.1f}h since last scan - triggering scanning")
                   save_action_needed("scanning", {
                       "reason": "recent_commits" if recent_commits else "timed_scan",
-                      "hours_since_scan": hours_since_scan
+                      "hours_since_scan": min(9999, hours_since_scan)  # Ensure value is JSON serializable
                   })
                   return
               
