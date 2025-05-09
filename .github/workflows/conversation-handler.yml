@@ -591,92 +591,92 @@ Please review the PR and merge it if the changes look good."""
               
               return "Made changes as requested"
 
-def execute_feature_addition(cmd_args, branch_name):
-    """Add a new feature to a component"""
-    feature = cmd_args.get('feature')
-    target = cmd_args.get('target')
-    
-    if not feature or not target:
-        return "Invalid arguments for add command. Format: /add [feature] to [target]"
-    
-    # Find the target file
-    file_path = find_file(target)
-    
-    # If target file doesn't exist, we might need to create a new file
-    if not file_path:
-        # Check if it looks like a package.class specification
-        if '.' in target:
-            parts = target.split('.')
-            class_name = parts[-1]
-            package_path = '/'.join(parts[:-1])
-            
-            # Try to find the package directory
-            package_exists = False
-            for root, dirs, _ in os.walk('.'):
-                if any(skip in root for skip in ['/build/', '/.git/', '/.github/']):
-                    continue
-                
-                package_dir = os.path.join(root, package_path)
-                if os.path.exists(package_dir):
-                    package_exists = True
-                    file_path = os.path.join(package_dir, f"{class_name}.java")
-                    break
-            
-            if not package_exists:
-                # Create directory structure if needed
-                os.makedirs(os.path.join('src/main/java', package_path), exist_ok=True)
-                file_path = os.path.join('src/main/java', package_path, f"{class_name}.java")
-        else:
-            # Assume it's a new file in the current directory
-            file_path = f"{target}.java"
-    
-    # Check if we need to create a new file or modify an existing one
-    new_file = not os.path.exists(file_path)
-    
-    if new_file:
-        # Generate a new file with the feature implemented
-        prompt = f"""Create a new Java class for an IntelliJ plugin that implements the following feature: {feature}
+          def execute_feature_addition(cmd_args, branch_name):
+              """Add a new feature to a component"""
+              feature = cmd_args.get('feature')
+              target = cmd_args.get('target')
+              
+              if not feature or not target:
+                  return "Invalid arguments for add command. Format: /add [feature] to [target]"
+              
+              # Find the target file
+              file_path = find_file(target)
+              
+              # If target file doesn't exist, we might need to create a new file
+              if not file_path:
+                  # Check if it looks like a package.class specification
+                  if '.' in target:
+                      parts = target.split('.')
+                      class_name = parts[-1]
+                      package_path = '/'.join(parts[:-1])
+                      
+                      # Try to find the package directory
+                      package_exists = False
+                      for root, dirs, _ in os.walk('.'):
+                          if any(skip in root for skip in ['/build/', '/.git/', '/.github/']):
+                              continue
+                          
+                          package_dir = os.path.join(root, package_path)
+                          if os.path.exists(package_dir):
+                              package_exists = True
+                              file_path = os.path.join(package_dir, f"{class_name}.java")
+                              break
+                      
+                      if not package_exists:
+                          # Create directory structure if needed
+                          os.makedirs(os.path.join('src/main/java', package_path), exist_ok=True)
+                          file_path = os.path.join('src/main/java', package_path, f"{class_name}.java")
+                  else:
+                      # Assume it's a new file in the current directory
+                      file_path = f"{target}.java"
+              
+              # Check if we need to create a new file or modify an existing one
+              new_file = not os.path.exists(file_path)
+              
+              if new_file:
+                  # Generate a new file with the feature implemented
+                  prompt = f"""Create a new Java class for an IntelliJ plugin that implements the following feature: {feature}
 
 Use proper JavaDoc, follow IntelliJ platform conventions, and include all necessary imports.
 The file path will be: {file_path}
 
 If the file path suggests a package, include the appropriate package declaration.
 Make the class comprehensive and complete, ready to be integrated into the project."""
-        
-        try:
-            response = client.chat.completions.create(
-                model="gpt-4",
-                messages=[
-                    {"role": "system", "content": "You are an expert Java developer working on a Minecraft mod and IntelliJ plugin project."},
-                    {"role": "user", "content": prompt}
-                ],
-                temperature=0.2,
-                max_tokens=3000
-            )
-            
-            new_code = response.choices[0].message.content
-            
-            # Extract code from markdown code block if present
-            code_match = re.search(r'```(?:java)?\n(.*?)\n```', new_code, re.DOTALL)
-            if code_match:
-                new_code = code_match.group(1)
-            
-            # Ensure directory exists
-            os.makedirs(os.path.dirname(file_path), exist_ok=True)
-            
-            # Write the code to the file
-            with open(file_path, 'w', encoding='utf-8') as f:
-                f.write(new_code)
-            
-            # Commit and push the changes
-            subprocess.run(['git', 'add', file_path], check=True)
-            subprocess.run(['git', 'commit', '-m', f"Add: {feature} in {os.path.basename(file_path)} [ModForge AI]"], check=True)
-            subprocess.run(['git', 'push', 'origin', branch_name], check=True)
-            
-            # Create a pull request
-            pr_data = {
-                'title': f"Add: {feature}",
-                'body': f"""This PR was created by ModForge AI in response to an /add command.
+                  
+                  try:
+                      response = client.chat.completions.create(
+                          model="gpt-4",
+                          messages=[
+                              {"role": "system", "content": "You are an expert Java developer working on a Minecraft mod and IntelliJ plugin project."},
+                              {"role": "user", "content": prompt}
+                          ],
+                          temperature=0.2,
+                          max_tokens=3000
+                      )
+                      
+                      new_code = response.choices[0].message.content
+                      
+                      # Extract code from markdown code block if present
+                      code_match = re.search(r'```(?:java)?\n(.*?)\n```', new_code, re.DOTALL)
+                      if code_match:
+                          new_code = code_match.group(1)
+                      
+                      # Ensure directory exists
+                      os.makedirs(os.path.dirname(file_path), exist_ok=True)
+                      
+                      # Write the code to the file
+                      with open(file_path, 'w', encoding='utf-8') as f:
+                          f.write(new_code)
+                      
+                      # Commit and push the changes
+                      subprocess.run(['git', 'add', file_path], check=True)
+                      subprocess.run(['git', 'commit', '-m', f"Add: {feature} in {os.path.basename(file_path)} [ModForge AI]"], check=True)
+                      subprocess.run(['git', 'push', 'origin', branch_name], check=True)
+                      
+                      # Create a pull request
+                      pr_data = {
+                          'title': f"Add: {feature}",
+                          'body': f"""This PR was created by ModForge AI in response to an /add command.
 
 ## Feature Added
 Added "{feature}" by creating a new file: `{os.path.basename(file_path)}`
@@ -688,16 +688,16 @@ Please review these changes and provide feedback.
 
 _This PR was automatically created by the ModForge Autonomous System_
 """,
-                'head': branch_name,
-                'base': 'main',
-                'maintainer_can_modify': True
-            }
-            
-            response = requests.post(f"{api_url}/pulls", headers=headers, json=pr_data)
-            
-            if response.status_code == 201:
-                pr_url = response.json().get('html_url')
-                return f"""I've created a new file `{os.path.basename(file_path)}` implementing the "{feature}" feature.
+                          'head': branch_name,
+                          'base': 'main',
+                          'maintainer_can_modify': True
+                      }
+                      
+                      response = requests.post(f"{api_url}/pulls", headers=headers, json=pr_data)
+                      
+                      if response.status_code == 201:
+                          pr_url = response.json().get('html_url')
+                          return f"""I've created a new file `{os.path.basename(file_path)}` implementing the "{feature}" feature.
 
 [View Pull Request]({pr_url})
 
@@ -707,11 +707,11 @@ The new file includes:
 - All necessary imports and dependencies
 
 Please review the PR and merge it if the implementation looks good."""
-            else:
-                return f"I've created a new file for the feature, but couldn't create a PR. Error: {response.status_code} {response.text}"
-                
-        except Exception as e:
-            return f"Error creating new file for feature: {str(e)}"
+                      else:
+                          return f"I've created a new file for the feature, but couldn't create a PR. Error: {response.status_code} {response.text}"
+                  
+                  except Exception as e:
+                      return f"Error creating new file for feature: {str(e)}"
     else:
         # Modify existing file to add the feature
         try:
