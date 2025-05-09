@@ -12,6 +12,11 @@ on:
   repository_dispatch:
     types: [autonomous-conversation, autonomous-followup]
 
+# Prevent overlapping conversation handling
+concurrency:
+  group: conversation-${{ github.event.issue.number || github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: false
+
 jobs:
   process-conversation:
     runs-on: ubuntu-latest

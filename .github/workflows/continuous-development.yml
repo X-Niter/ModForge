@@ -26,6 +26,11 @@ on:
   # Run on schedule (every 6 hours)
   schedule:
     - cron: '0 */6 * * *'
+    
+# Prevent multiple instances of the same workflow from running simultaneously
+concurrency:
+  group: continuous-development
+  cancel-in-progress: false
 
 jobs:
   build-and-test:

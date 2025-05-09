@@ -7,6 +7,11 @@ on:
   repository_dispatch:
     types: [autonomous-scanning]  # Triggered by the controller
 
+# This ensures only one scanning job runs at a time
+concurrency:
+  group: autonomous-scanning
+  cancel-in-progress: false
+
 jobs:
   scan-and-test:
     runs-on: ubuntu-latest
