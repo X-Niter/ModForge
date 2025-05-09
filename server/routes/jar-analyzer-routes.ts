@@ -44,11 +44,9 @@ const upload = multer({
 
 // Validation schema for JAR uploads
 const jarUploadSchema = z.object({
-  modLoader: z.string({
-    required_error: "Mod loader is required"
-  }),
+  modLoader: z.string().optional(), // Now optional since we auto-detect it
   version: z.string().optional(),
-  mcVersion: z.string().optional()
+  mcVersion: z.string().optional() // Optional since we auto-detect it
 });
 
 // Get all JAR files
@@ -190,8 +188,9 @@ router.post("/jars/download", async (req: Request, res: Response) => {
   try {
     const { url, modName, modLoader, version, mcVersion } = req.body;
     
-    if (!url || !modName || !modLoader || !version || !mcVersion) {
-      return res.status(400).json({ error: "Missing required fields" });
+    // Only URL and modName are required, other fields will be auto-detected
+    if (!url || !modName) {
+      return res.status(400).json({ error: "URL and mod name are required" });
     }
 
     const jarFile = await jarAnalyzerService.downloadJarFile(

@@ -36,8 +36,8 @@ interface ModrinthMod {
   description: string;
   author: string;
   modLoader: string;
-  downloadUrl: string;
-  iconUrl?: string;
+  url: string;
+  downloads: number;
 }
 
 interface JarStats {
@@ -379,7 +379,8 @@ const JarAnalyzerPage: React.FC = () => {
                   <span>Upload JAR File</span>
                 </CardTitle>
                 <CardDescription>
-                  Upload a Minecraft mod JAR file to analyze its classes and code patterns.
+                  Upload a Minecraft mod JAR file to analyze its classes and code patterns. 
+                  Mod loader type and Minecraft version will be auto-detected.
                 </CardDescription>
               </CardHeader>
               <CardContent>
