@@ -49,12 +49,17 @@ export const extractedContent = pgTable('extracted_content', {
 /**
  * Add a new documentation source to be explored
  */
-export async function addWebSource(
-  url: string,
-  description: string = "",
-  contentType: string = "documentation",
-  tags: string[] = []
-): Promise<typeof webSources.$inferSelect> {
+export async function addWebSource({
+  url,
+  description = "",
+  contentType = "documentation",
+  tags = []
+}: {
+  url: string;
+  description?: string;
+  contentType: string;
+  tags: string[];
+}): Promise<typeof webSources.$inferSelect> {
   try {
     // Get page title by making a request
     let title = url;

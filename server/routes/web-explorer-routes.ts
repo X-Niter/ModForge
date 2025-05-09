@@ -1,157 +1,113 @@
-import { Router } from 'express';
-import { z } from 'zod';
-import {
-  addWebSource,
-  getWebSources,
-  getWebSourceById,
-  updateWebSource,
-  deleteWebSource,
-  getWebScrapingStats,
-  triggerWebScraping
-} from '../web-explorer-service';
+import { Request, Response, Router } from "express";
+import { z } from "zod";
+import * as webExplorerService from "../web-explorer-service";
 
 const router = Router();
 
-// Schema for adding a web source
+// Validation schema for adding a new web source
 const addWebSourceSchema = z.object({
-  url: z.string().url(),
+  url: z.string().url({ message: "Please enter a valid URL" }),
   description: z.string().optional(),
   contentType: z.string(),
-  tags: z.array(z.string()).optional()
+  tags: z.array(z.string())
 });
 
 // Get all web sources
-router.get('/sources', async (req, res) => {
+router.get("/sources", async (_req: Request, res: Response) => {
   try {
-    const sources = await getWebSources();
-    res.json(sources);
+    const sources = await webExplorerService.getWebSources();
+    return res.json(sources);
   } catch (error) {
-    console.error('Error fetching web sources:', error);
-    res.status(500).json({ 
-      error: 'Failed to fetch web sources',
-      message: error instanceof Error ? error.message : String(error)
-    });
+    console.error("Error fetching web sources:", error);
+    return res.status(500).json({ error: "Failed to fetch web sources" });
   }
 });
 
-// Get web source by ID
-router.get('/sources/:id', async (req, res) => {
+// Get a single web source by ID
+router.get("/sources/:id", async (req: Request, res: Response) => {
   try {
     const id = parseInt(req.params.id);
     if (isNaN(id)) {
-      return res.status(400).json({ error: 'Invalid ID' });
+      return res.status(400).json({ error: "Invalid ID format" });
     }
 
-    const source = await getWebSourceById(id);
+    const source = await webExplorerService.getWebSourceById(id);
     if (!source) {
-      return res.status(404).json({ error: 'Source not found' });
+      return res.status(404).json({ error: "Web source not found" });
     }
 
-    res.json(source);
+    return res.json(source);
   } catch (error) {
-    console.error(`Error fetching web source:`, error);
-    res.status(500).json({ 
-      error: 'Failed to fetch web source',
-      message: error instanceof Error ? error.message : String(error)
-    });
+    console.error(`Error fetching web source ${req.params.id}:`, error);
+    return res.status(500).json({ error: "Failed to fetch web source" });
   }
 });
 
 // Add a new web source
-router.post('/sources', async (req, res) => {
+router.post("/sources", async (req: Request, res: Response) => {
   try {
-    const validationResult = addWebSourceSchema.safeParse(req.body);
-    if (!validationResult.success) {
+    const validatedData = addWebSourceSchema.parse(req.body);
+    
+    const source = await webExplorerService.addWebSource({
+      url: validatedData.url,
+      description: validatedData.description,
+      contentType: validatedData.contentType,
+      tags: validatedData.tags
+    });
+
+    return res.status(201).json(source);
+  } catch (error) {
+    if (error instanceof z.ZodError) {
       return res.status(400).json({ 
-        error: 'Invalid request data',
-        details: validationResult.error.format()
+        error: "Invalid source data", 
+        details: error.errors 
       });
     }
-
-    const { url, description, contentType, tags } = validationResult.data;
-    const newSource = await addWebSource(url, description, contentType, tags);
-    res.status(201).json(newSource);
-  } catch (error) {
-    console.error('Error adding web source:', error);
-    res.status(500).json({ 
-      error: 'Failed to add web source',
-      message: error instanceof Error ? error.message : String(error)
-    });
-  }
-});
-
-// Update a web source
-router.patch('/sources/:id', async (req, res) => {
-  try {
-    const id = parseInt(req.params.id);
-    if (isNaN(id)) {
-      return res.status(400).json({ error: 'Invalid ID' });
-    }
-
-    const source = await getWebSourceById(id);
-    if (!source) {
-      return res.status(404).json({ error: 'Source not found' });
-    }
-
-    const updatedSource = await updateWebSource(id, req.body);
-    res.json(updatedSource);
-  } catch (error) {
-    console.error(`Error updating web source:`, error);
-    res.status(500).json({ 
-      error: 'Failed to update web source',
-      message: error instanceof Error ? error.message : String(error)
-    });
+    
+    console.error("Error adding web source:", error);
+    return res.status(500).json({ error: "Failed to add web source" });
   }
 });
 
 // Delete a web source
-router.delete('/sources/:id', async (req, res) => {
+router.delete("/sources/:id", async (req: Request, res: Response) => {
   try {
     const id = parseInt(req.params.id);
     if (isNaN(id)) {
-      return res.status(400).json({ error: 'Invalid ID' });
+      return res.status(400).json({ error: "Invalid ID format" });
     }
 
-    const success = await deleteWebSource(id);
+    const success = await webExplorerService.deleteWebSource(id);
     if (!success) {
-      return res.status(404).json({ error: 'Source not found' });
+      return res.status(404).json({ error: "Web source not found" });
     }
 
-    res.status(204).send();
+    return res.json({ success: true });
   } catch (error) {
-    console.error(`Error deleting web source:`, error);
-    res.status(500).json({ 
-      error: 'Failed to delete web source',
-      message: error instanceof Error ? error.message : String(error)
-    });
+    console.error(`Error deleting web source ${req.params.id}:`, error);
+    return res.status(500).json({ error: "Failed to delete web source" });
   }
 });
 
 // Get web scraping statistics
-router.get('/stats', async (req, res) => {
+router.get("/stats", async (_req: Request, res: Response) => {
   try {
-    const stats = await getWebScrapingStats();
-    res.json(stats);
+    const stats = await webExplorerService.getWebScrapingStats();
+    return res.json(stats);
   } catch (error) {
-    console.error('Error fetching web scraping stats:', error);
-    res.status(500).json({ 
-      error: 'Failed to fetch web scraping stats',
-      message: error instanceof Error ? error.message : String(error)
-    });
+    console.error("Error fetching web scraping stats:", error);
+    return res.status(500).json({ error: "Failed to fetch web scraping statistics" });
   }
 });
 
-// Trigger web scraping
-router.post('/trigger', async (req, res) => {
+// Trigger web scraping for pending sources
+router.post("/trigger", async (_req: Request, res: Response) => {
   try {
-    const result = await triggerWebScraping();
-    res.json(result);
+    const result = await webExplorerService.triggerWebScraping();
+    return res.json(result);
   } catch (error) {
-    console.error('Error triggering web scraping:', error);
-    res.status(500).json({ 
-      error: 'Failed to trigger web scraping',
-      message: error instanceof Error ? error.message : String(error)
-    });
+    console.error("Error triggering web scraping:", error);
+    return res.status(500).json({ error: "Failed to trigger web scraping" });
   }
 });
 
