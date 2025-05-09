@@ -2,62 +2,134 @@ package com.modforge.intellij.plugin.services;
 
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.command.CommandProcessor;
+import com.intellij.openapi.command.WriteCommandAction;
 import com.intellij.openapi.components.Service;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.fileEditor.FileDocumentManager;
 import com.intellij.openapi.project.Project;
-import com.intellij.openapi.util.Computable;
 import com.intellij.openapi.vfs.VirtualFile;
-import com.intellij.psi.*;
-import com.intellij.psi.search.GlobalSearchScope;
-import com.intellij.util.IncorrectOperationException;
+import com.intellij.psi.PsiDocumentManager;
+import com.intellij.psi.PsiFile;
+import com.intellij.psi.PsiManager;
 import com.modforge.intellij.plugin.ai.AIServiceManager;
+import com.modforge.intellij.plugin.ai.PatternRecognitionService;
+import com.modforge.intellij.plugin.ai.PatternRecognitionService.Pattern;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-import java.util.*;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * Service for autonomous code generation.
- * This service provides methods for generating code, analyzing files for issues,
- * and fixing issues automatically.
+ * Service that provides autonomous code generation capabilities.
+ * This service is responsible for generating and modifying code using AI.
  */
 @Service(Service.Level.PROJECT)
 public final class AutonomousCodeGenerationService {
     private static final Logger LOG = Logger.getInstance(AutonomousCodeGenerationService.class);
+    private static final int DEFAULT_TIMEOUT_SECONDS = 30;
     
     private final Project project;
     private final AIServiceManager aiServiceManager;
-    private final CodeAnalysisService codeAnalysisService;
-    
-    // Cache of analyzed files
-    private final Map<String, List<CodeIssue>> issueCache = new ConcurrentHashMap<>();
+    private final PatternRecognitionService patternRecognitionService;
     
     /**
      * Creates a new AutonomousCodeGenerationService.
      * @param project The project
      */
-    public AutonomousCodeGenerationService(@NotNull Project project) {
+    public AutonomousCodeGenerationService(Project project) {
         this.project = project;
-        this.aiServiceManager = project.getService(AIServiceManager.class);
-        this.codeAnalysisService = project.getService(CodeAnalysisService.class);
+        this.aiServiceManager = AIServiceManager.getInstance();
+        this.patternRecognitionService = PatternRecognitionService.getInstance();
         
-        LOG.info("AutonomousCodeGenerationService initialized for project: " + project.getName());
+        LOG.info("Autonomous code generation service created for project: " + project.getName());
     }
     
     /**
-     * Gets the AutonomousCodeGenerationService instance.
+     * Gets the autonomous code generation service for a project.
      * @param project The project
-     * @return The AutonomousCodeGenerationService instance
+     * @return The autonomous code generation service
      */
     public static AutonomousCodeGenerationService getInstance(@NotNull Project project) {
         return project.getService(AutonomousCodeGenerationService.class);
+    }
+    
+    /**
+     * Represents a code issue.
+     */
+    public static class CodeIssue {
+        private final String message;
+        private final int line;
+        private final int column;
+        private final String file;
+        private final String code;
+        
+        /**
+         * Creates a new CodeIssue.
+         * @param message The error message
+         * @param line The line number
+         * @param column The column number
+         * @param file The file path
+         * @param code The code snippet
+         */
+        public CodeIssue(String message, int line, int column, String file, String code) {
+            this.message = message;
+            this.line = line;
+            this.column = column;
+            this.file = file;
+            this.code = code;
+        }
+        
+        /**
+         * Gets the error message.
+         * @return The error message
+         */
+        public String getMessage() {
+            return message;
+        }
+        
+        /**
+         * Gets the line number.
+         * @return The line number
+         */
+        public int getLine() {
+            return line;
+        }
+        
+        /**
+         * Gets the column number.
+         * @return The column number
+         */
+        public int getColumn() {
+            return column;
+        }
+        
+        /**
+         * Gets the file path.
+         * @return The file path
+         */
+        public String getFile() {
+            return file;
+        }
+        
+        /**
+         * Gets the code snippet.
+         * @return The code snippet
+         */
+        public String getCode() {
+            return code;
+        }
     }
     
     /**
@@ -67,833 +139,596 @@ public final class AutonomousCodeGenerationService {
      * @param options Additional options
      * @return A future that completes with the generated code
      */
-    @NotNull
-    public CompletableFuture<String> generateCode(@NotNull String prompt, @NotNull String language,
-                                               @Nullable Map<String, Object> options) {
+    public CompletableFuture<String> generateCode(@NotNull String prompt, @NotNull String language, 
+                                                @Nullable Map<String, Object> options) {
         LOG.info("Generating code for prompt: " + prompt);
         
-        // Use AI service manager to generate code
-        return aiServiceManager.generateCode(prompt, language, options);
+        // Create options if null
+        Map<String, Object> requestOptions = options != null ? new HashMap<>(options) : new HashMap<>();
+        
+        // Add language to options
+        requestOptions.put("language", language);
+        
+        // Check if a pattern matches
+        Pattern pattern = patternRecognitionService.findCodePattern(prompt, requestOptions);
+        
+        if (pattern != null) {
+            LOG.info("Found matching pattern for code generation");
+            
+            // Get output from pattern
+            String output = pattern.getOutput();
+            
+            // Record pattern result
+            patternRecognitionService.recordPatternResult(pattern, true);
+            
+            return CompletableFuture.completedFuture(output);
+        }
+        
+        // No pattern matched, use AI service
+        LOG.info("No matching pattern found, using AI service for code generation");
+        
+        // Create system prompt for code generation
+        String systemPrompt = "You are an expert Minecraft mod developer. " +
+                "Generate high-quality, well-documented " + language + " code based on the user's request. " +
+                "Focus on creating efficient, maintainable code that follows best practices for Minecraft modding. " +
+                "Make sure the generated code is complete and ready to use. " +
+                "Only output the code, no explanations or markdown formatting.";
+        
+        requestOptions.put("systemPrompt", systemPrompt);
+        requestOptions.put("temperature", 0.2);
+        requestOptions.put("maxTokens", 2048);
+        
+        // Generate code using AI service
+        CompletableFuture<String> future = aiServiceManager.generateChatCompletion(prompt, requestOptions);
+        
+        // Store pattern when finished
+        future.thenAccept(code -> {
+            if (code != null && !code.isEmpty()) {
+                patternRecognitionService.storeCodePattern(prompt, code, requestOptions);
+            }
+        });
+        
+        return future;
     }
     
     /**
-     * Analyzes a file for potential issues.
+     * Fixes code based on an error message.
+     * @param code The code to fix
+     * @param errorMessage The error message
+     * @param options Additional options
+     * @return A future that completes with the fixed code
+     */
+    public CompletableFuture<String> fixCode(@NotNull String code, @Nullable String errorMessage, 
+                                          @Nullable Map<String, Object> options) {
+        LOG.info("Fixing code with error: " + (errorMessage != null ? errorMessage : "No error message"));
+        
+        // Create options if null
+        Map<String, Object> requestOptions = options != null ? new HashMap<>(options) : new HashMap<>();
+        
+        // Check if a pattern matches
+        String patternInput = errorMessage != null ? code + "\n\nError: " + errorMessage : code;
+        Pattern pattern = patternRecognitionService.findErrorPattern(patternInput, requestOptions);
+        
+        if (pattern != null) {
+            LOG.info("Found matching pattern for error fixing");
+            
+            // Get output from pattern
+            String output = pattern.getOutput();
+            
+            // Record pattern result
+            patternRecognitionService.recordPatternResult(pattern, true);
+            
+            return CompletableFuture.completedFuture(output);
+        }
+        
+        // No pattern matched, use AI service
+        LOG.info("No matching pattern found, using AI service for error fixing");
+        
+        // Create prompt for error fixing
+        String prompt = "Fix the following code:\n\n" + code;
+        
+        if (errorMessage != null && !errorMessage.isEmpty()) {
+            prompt += "\n\nError: " + errorMessage;
+        }
+        
+        // Create system prompt for error fixing
+        String systemPrompt = "You are an expert Minecraft mod developer and debugging assistant. " +
+                "Fix the provided code to resolve any errors or issues. " +
+                "Maintain the original functionality while making the code more robust and efficient. " +
+                "Only output the fixed code, no explanations or markdown formatting.";
+        
+        requestOptions.put("systemPrompt", systemPrompt);
+        requestOptions.put("temperature", 0.1);
+        requestOptions.put("maxTokens", 2048);
+        
+        // Fix code using AI service
+        CompletableFuture<String> future = aiServiceManager.generateChatCompletion(prompt, requestOptions);
+        
+        // Store pattern when finished
+        future.thenAccept(fixedCode -> {
+            if (fixedCode != null && !fixedCode.isEmpty() && !fixedCode.equals(code)) {
+                patternRecognitionService.storeErrorPattern(patternInput, fixedCode, requestOptions);
+            }
+        });
+        
+        return future;
+    }
+    
+    /**
+     * Generates documentation for code.
+     * @param code The code to document
+     * @param options Additional options
+     * @return A future that completes with the documented code
+     */
+    public CompletableFuture<String> generateDocumentation(@NotNull String code, @Nullable Map<String, Object> options) {
+        LOG.info("Generating documentation for code");
+        
+        // Create options if null
+        Map<String, Object> requestOptions = options != null ? new HashMap<>(options) : new HashMap<>();
+        
+        // Check if a pattern matches
+        Pattern pattern = patternRecognitionService.findDocumentationPattern(code, requestOptions);
+        
+        if (pattern != null) {
+            LOG.info("Found matching pattern for documentation generation");
+            
+            // Get output from pattern
+            String output = pattern.getOutput();
+            
+            // Record pattern result
+            patternRecognitionService.recordPatternResult(pattern, true);
+            
+            return CompletableFuture.completedFuture(output);
+        }
+        
+        // No pattern matched, use AI service
+        LOG.info("No matching pattern found, using AI service for documentation generation");
+        
+        // Create prompt for documentation generation
+        String prompt = "Generate documentation for the following code:\n\n" + code;
+        
+        // Create system prompt for documentation generation
+        String systemPrompt = "You are an expert Minecraft mod developer and technical writer. " +
+                "Generate comprehensive JavaDoc/KDoc style documentation for the provided code. " +
+                "Include class-level documentation, method documentation with parameter and return value descriptions, " +
+                "and field documentation. Maintain the original code while adding detailed comments. " +
+                "Only output the documented code, no explanations or markdown formatting.";
+        
+        requestOptions.put("systemPrompt", systemPrompt);
+        requestOptions.put("temperature", 0.1);
+        requestOptions.put("maxTokens", 2048);
+        
+        // Generate documentation using AI service
+        CompletableFuture<String> future = aiServiceManager.generateChatCompletion(prompt, requestOptions);
+        
+        // Store pattern when finished
+        future.thenAccept(documentedCode -> {
+            if (documentedCode != null && !documentedCode.isEmpty() && !documentedCode.equals(code)) {
+                patternRecognitionService.storeDocumentationPattern(code, documentedCode, requestOptions);
+            }
+        });
+        
+        return future;
+    }
+    
+    /**
+     * Explains code.
+     * @param code The code to explain
+     * @param options Additional options
+     * @return A future that completes with the explanation
+     */
+    public CompletableFuture<String> explainCode(@NotNull String code, @Nullable Map<String, Object> options) {
+        LOG.info("Explaining code");
+        
+        // Create options if null
+        Map<String, Object> requestOptions = options != null ? new HashMap<>(options) : new HashMap<>();
+        
+        // Create prompt for code explanation
+        String prompt = "Explain the following code in detail:\n\n" + code;
+        
+        // Create system prompt for code explanation
+        String systemPrompt = "You are an expert Minecraft mod developer and educator. " +
+                "Provide a detailed explanation of the provided code. " +
+                "Break down the explanation into sections: " +
+                "1. Overview - What the code does at a high level " +
+                "2. Key Components - The main classes, methods, and data structures " +
+                "3. Flow - How the code executes step by step " +
+                "4. Best Practices - Good patterns used in the code " +
+                "5. Potential Improvements - Any suggestions for making the code better";
+        
+        requestOptions.put("systemPrompt", systemPrompt);
+        requestOptions.put("temperature", 0.3);
+        requestOptions.put("maxTokens", 2048);
+        
+        // Explain code using AI service
+        return aiServiceManager.generateChatCompletion(prompt, requestOptions);
+    }
+    
+    /**
+     * Analyzes a file for issues.
      * @param file The file to analyze
      * @return A future that completes with a list of issues
      */
-    @NotNull
     public CompletableFuture<List<CodeIssue>> analyzeFile(@NotNull VirtualFile file) {
-        LOG.info("Analyzing file: " + file.getPath());
+        LOG.info("Analyzing file: " + file.getName());
         
         return CompletableFuture.supplyAsync(() -> {
             try {
-                // Check cache
-                String filePath = file.getPath();
-                List<CodeIssue> cachedIssues = issueCache.get(filePath);
-                
-                if (cachedIssues != null) {
-                    return cachedIssues;
-                }
-                
                 // Get document
                 Document document = FileDocumentManager.getInstance().getDocument(file);
+                
                 if (document == null) {
-                    return Collections.emptyList();
+                    LOG.warn("Could not get document for file: " + file.getName());
+                    return new ArrayList<>();
                 }
                 
                 // Get file content
                 String content = document.getText();
-                if (content.isEmpty()) {
-                    return Collections.emptyList();
+                
+                // Get PSI file
+                PsiFile psiFile = PsiManager.getInstance(project).findFile(file);
+                
+                if (psiFile == null) {
+                    LOG.warn("Could not get PSI file for file: " + file.getName());
+                    return new ArrayList<>();
                 }
                 
-                // Get file extension
-                String extension = file.getExtension();
+                // Get language
+                String language = psiFile.getLanguage().getDisplayName().toLowerCase();
                 
-                // Detect code issues
-                List<CodeIssue> issues = new ArrayList<>();
+                // Create options
+                Map<String, Object> options = new HashMap<>();
+                options.put("language", language);
+                options.put("fileName", file.getName());
+                options.put("filePath", file.getPath());
                 
-                if ("java".equals(extension)) {
-                    // Analyze Java file
-                    issues.addAll(analyzeJavaFile(file, content));
-                } else if ("kt".equals(extension)) {
-                    // Analyze Kotlin file
-                    issues.addAll(analyzeKotlinFile(content));
-                } else if ("js".equals(extension) || "ts".equals(extension)) {
-                    // Analyze JavaScript/TypeScript file
-                    issues.addAll(analyzeJsFile(content));
-                } else {
-                    // Generic analysis
-                    issues.addAll(analyzeGenericFile(content));
-                }
+                // Create prompt for code analysis
+                String prompt = "Analyze the following code for potential issues and improvements:\n\n" + content;
                 
-                // Cache issues
-                issueCache.put(filePath, issues);
+                // Create system prompt for code analysis
+                String systemPrompt = "You are an expert code analyzer and Minecraft mod developer. " +
+                        "Identify potential issues, bugs, and areas for improvement in the provided code. " +
+                        "Focus on issues that would cause compilation errors, runtime errors, or poor performance. " +
+                        "Format your response as a JSON array of issues. Each issue should have the following fields: " +
+                        "message (string), line (number), column (number), file (string), code (string snippet). " +
+                        "Only include the JSON array in your response, no other text.";
                 
-                return issues;
-            } catch (Exception e) {
-                LOG.error("Error analyzing file: " + file.getPath(), e);
-                return Collections.emptyList();
+                options.put("systemPrompt", systemPrompt);
+                options.put("temperature", 0.1);
+                options.put("maxTokens", 2048);
+                
+                // Analyze code using AI service
+                String response = aiServiceManager.generateChatCompletion(prompt, options)
+                        .get(DEFAULT_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+                
+                // Parse response
+                return parseIssues(response, file.getPath());
+            } catch (IOException | InterruptedException | ExecutionException | TimeoutException e) {
+                LOG.error("Error analyzing file: " + file.getName(), e);
+                return new ArrayList<>();
             }
         });
     }
     
     /**
      * Fixes issues in a file.
-     * @param file The file to fix
+     * @param file The file
      * @param issues The issues to fix
-     * @return A future that completes with the number of fixed issues
+     * @return A future that completes with the number of issues fixed
      */
-    @NotNull
     public CompletableFuture<Integer> fixIssues(@NotNull VirtualFile file, @NotNull List<CodeIssue> issues) {
-        LOG.info("Fixing " + issues.size() + " issues in file: " + file.getPath());
-        
-        if (issues.isEmpty()) {
-            return CompletableFuture.completedFuture(0);
-        }
+        LOG.info("Fixing " + issues.size() + " issues in file: " + file.getName());
         
         return CompletableFuture.supplyAsync(() -> {
             try {
                 // Get document
                 Document document = FileDocumentManager.getInstance().getDocument(file);
+                
                 if (document == null) {
+                    LOG.warn("Could not get document for file: " + file.getName());
                     return 0;
                 }
                 
                 // Get file content
                 String content = document.getText();
-                if (content.isEmpty()) {
-                    return 0;
-                }
                 
-                // Get PSI file
-                PsiFile psiFile = PsiManager.getInstance(project).findFile(file);
-                if (psiFile == null) {
-                    return 0;
-                }
-                
-                // Sort issues by position (highest offset first to avoid shifting)
-                List<CodeIssue> sortedIssues = new ArrayList<>(issues);
-                sortedIssues.sort((a, b) -> Integer.compare(b.getPosition(), a.getPosition()));
-                
-                // Fix issues
+                // Count fixed issues
                 int fixedCount = 0;
                 
-                for (CodeIssue issue : sortedIssues) {
-                    if (issue.hasFix()) {
-                        // Apply fix
-                        String newContent = applyFix(content, issue);
+                // Fix each issue
+                for (CodeIssue issue : issues) {
+                    try {
+                        // Get code snippet
+                        String codeSnippet = issue.getCode();
                         
-                        if (!newContent.equals(content)) {
-                            // Update document
-                            updateDocument(document, newContent);
-                            content = newContent;
-                            fixedCount++;
-                            
-                            // Wait a bit to avoid conflicts
-                            Thread.sleep(100);
+                        if (codeSnippet == null || codeSnippet.isEmpty()) {
+                            LOG.warn("No code snippet for issue: " + issue.getMessage());
+                            continue;
                         }
-                    } else if (!issue.getDescription().isEmpty() && issue.getPosition() >= 0) {
-                        // Generate fix using AI
-                        try {
-                            // Get relevant code snippet
-                            String codeSnippet = getRelevantCodeSnippet(content, issue.getPosition(), 10);
-                            
-                            // Generate fix
-                            String fixPrompt = "Fix the following code issue: " + issue.getDescription() + 
-                                    "\n\nCode snippet:\n```\n" + codeSnippet + "\n```\n\n" +
-                                    "Provide only the fixed code snippet without any explanations.";
-                            
-                            String fixedCode = aiServiceManager.fixCode(codeSnippet, issue.getDescription(), null)
-                                    .get(30, TimeUnit.SECONDS);
-                            
-                            if (fixedCode != null && !fixedCode.isEmpty() && !fixedCode.equals(codeSnippet)) {
-                                // Clean up AI response
-                                fixedCode = cleanupAiResponse(fixedCode);
-                                
-                                // Apply fix
-                                String newContent = content.substring(0, issue.getPosition()) +
-                                        fixedCode +
-                                        content.substring(issue.getPosition() + codeSnippet.length());
-                                
-                                // Update document
-                                updateDocument(document, newContent);
-                                content = newContent;
-                                fixedCount++;
-                                
-                                // Wait a bit to avoid conflicts
-                                Thread.sleep(100);
-                            }
-                        } catch (Exception e) {
-                            LOG.error("Error generating fix for issue: " + issue.getDescription(), e);
+                        
+                        // Fix code snippet
+                        Map<String, Object> options = new HashMap<>();
+                        options.put("fileName", file.getName());
+                        options.put("filePath", file.getPath());
+                        options.put("line", issue.getLine());
+                        options.put("column", issue.getColumn());
+                        
+                        String fixedSnippet = fixCode(codeSnippet, issue.getMessage(), options)
+                                .get(DEFAULT_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+                        
+                        if (fixedSnippet.equals(codeSnippet)) {
+                            LOG.warn("Could not fix issue: " + issue.getMessage());
+                            continue;
                         }
+                        
+                        // Replace code snippet in document
+                        int startOffset = content.indexOf(codeSnippet);
+                        
+                        if (startOffset == -1) {
+                            LOG.warn("Could not find code snippet in file: " + file.getName());
+                            continue;
+                        }
+                        
+                        int endOffset = startOffset + codeSnippet.length();
+                        
+                        // Update document
+                        ApplicationManager.getApplication().invokeAndWait(() -> {
+                            WriteCommandAction.runWriteCommandAction(project, () -> {
+                                CommandProcessor.getInstance().executeCommand(project, () -> {
+                                    document.replaceString(startOffset, endOffset, fixedSnippet);
+                                    
+                                    // Save document
+                                    FileDocumentManager.getInstance().saveDocument(document);
+                                }, "Fix Issue", null);
+                            });
+                        });
+                        
+                        // Update content
+                        content = document.getText();
+                        
+                        // Increment fixed count
+                        fixedCount++;
+                    } catch (Exception e) {
+                        LOG.error("Error fixing issue: " + issue.getMessage(), e);
                     }
                 }
                 
-                // Clear cache for this file
-                issueCache.remove(file.getPath());
-                
                 return fixedCount;
             } catch (Exception e) {
-                LOG.error("Error fixing issues in file: " + file.getPath(), e);
+                LOG.error("Error fixing issues in file: " + file.getName(), e);
                 return 0;
             }
         });
     }
     
     /**
-     * Analyzes a Java file for issues.
-     * @param file The file to analyze
-     * @param content The file content
-     * @return A list of issues
+     * Fixes errors in a file.
+     * @param file The file
+     * @param errorMessages The error messages
+     * @return A future that completes with a boolean indicating success
      */
-    @NotNull
-    private List<CodeIssue> analyzeJavaFile(@NotNull VirtualFile file, @NotNull String content) {
-        List<CodeIssue> issues = new ArrayList<>();
+    public CompletableFuture<Boolean> fixErrorsInFile(@NotNull VirtualFile file, @NotNull List<String> errorMessages) {
+        LOG.info("Fixing errors in file: " + file.getName());
         
-        try {
-            // Get PSI file
-            PsiFile psiFile = PsiManager.getInstance(project).findFile(file);
-            if (!(psiFile instanceof PsiJavaFile)) {
-                return issues;
-            }
-            
-            PsiJavaFile javaFile = (PsiJavaFile) psiFile;
-            
-            // Check for missing @Override annotations
-            for (PsiClass psiClass : javaFile.getClasses()) {
-                for (PsiMethod method : psiClass.getMethods()) {
-                    // Skip methods that already have @Override
-                    boolean hasOverride = false;
-                    for (PsiAnnotation annotation : method.getAnnotations()) {
-                        if (annotation.getQualifiedName() != null && 
-                                annotation.getQualifiedName().equals("java.lang.Override")) {
-                            hasOverride = true;
-                            break;
-                        }
-                    }
-                    
-                    if (hasOverride) {
-                        continue;
-                    }
-                    
-                    // Check if method overrides a superclass or interface method
-                    PsiMethod[] superMethods = method.findSuperMethods();
-                    if (superMethods.length > 0) {
-                        CodeIssue issue = new CodeIssue(
-                                CodeIssueType.MISSING_OVERRIDE,
-                                "Missing @Override annotation for method: " + method.getName(),
-                                method.getTextOffset(),
-                                true,
-                                "Add @Override annotation"
-                        );
-                        
-                        issues.add(issue);
-                    }
-                }
-            }
-            
-            // Check for unused imports
-            for (PsiImportStatement importStatement : javaFile.getImportList().getImportStatements()) {
-                PsiJavaCodeReferenceElement reference = importStatement.getImportReference();
-                if (reference == null) {
-                    continue;
+        return CompletableFuture.supplyAsync(() -> {
+            try {
+                // Get document
+                Document document = FileDocumentManager.getInstance().getDocument(file);
+                
+                if (document == null) {
+                    LOG.warn("Could not get document for file: " + file.getName());
+                    return false;
                 }
                 
-                boolean isReferenced = ApplicationManager.getApplication().runReadAction(
-                        (Computable<Boolean>) () -> {
-                            PsiElement target = reference.resolve();
-                            return target != null && 
-                                    com.intellij.psi.codeStyle.JavaCodeStyleManager.getInstance(project)
-                                            .isReferenceUsed(reference, javaFile);
-                        });
+                // Get file content
+                String content = document.getText();
                 
-                if (!isReferenced) {
-                    CodeIssue issue = new CodeIssue(
-                            CodeIssueType.UNUSED_IMPORT,
-                            "Unused import: " + reference.getQualifiedName(),
-                            importStatement.getTextOffset(),
-                            true,
-                            "Remove unused import"
-                    );
-                    
-                    issues.add(issue);
-                }
-            }
-            
-            // Check for non-final fields that could be final
-            for (PsiClass psiClass : javaFile.getClasses()) {
-                for (PsiField field : psiClass.getFields()) {
-                    // Skip already final fields
-                    if (field.hasModifierProperty(PsiModifier.FINAL)) {
-                        continue;
-                    }
-                    
-                    // Skip static fields
-                    if (field.hasModifierProperty(PsiModifier.STATIC)) {
-                        continue;
-                    }
-                    
-                    // Check if field is assigned only once
-                    boolean isAssignedOnce = ApplicationManager.getApplication().runReadAction(
-                            (Computable<Boolean>) () -> {
-                                // Check for assignments in the class
-                                PsiReference[] references = com.intellij.psi.search.searches.ReferencesSearch
-                                        .search(field, GlobalSearchScope.fileScope(javaFile))
-                                        .toArray(PsiReference.EMPTY_ARRAY);
-                                
-                                int assignmentCount = 0;
-                                
-                                // Count field declaration assignment
-                                if (field.getInitializer() != null) {
-                                    assignmentCount++;
-                                }
-                                
-                                // Count assignments in code
-                                for (PsiReference reference : references) {
-                                    PsiElement element = reference.getElement();
-                                    PsiElement parent = element.getParent();
-                                    
-                                    if (parent instanceof PsiAssignmentExpression) {
-                                        PsiAssignmentExpression assignment = (PsiAssignmentExpression) parent;
-                                        if (assignment.getLExpression() == element) {
-                                            assignmentCount++;
-                                        }
-                                    }
-                                }
-                                
-                                return assignmentCount == 1;
-                            });
-                    
-                    if (isAssignedOnce) {
-                        CodeIssue issue = new CodeIssue(
-                                CodeIssueType.FIELD_COULD_BE_FINAL,
-                                "Field could be final: " + field.getName(),
-                                field.getTextOffset(),
-                                true,
-                                "Make field final"
-                        );
-                        
-                        issues.add(issue);
-                    }
-                }
-            }
-        } catch (Exception e) {
-            LOG.error("Error analyzing Java file: " + file.getPath(), e);
-        }
-        
-        // Add more Java-specific checks
-        
-        return issues;
-    }
-    
-    /**
-     * Analyzes a Kotlin file for issues.
-     * @param content The file content
-     * @return A list of issues
-     */
-    @NotNull
-    private List<CodeIssue> analyzeKotlinFile(@NotNull String content) {
-        List<CodeIssue> issues = new ArrayList<>();
-        
-        // Check for deprecated functions and classes
-        Pattern deprecatedPattern = Pattern.compile("@Deprecated[\\s\\S]{0,100}fun\\s+(\\w+)|@Deprecated[\\s\\S]{0,100}class\\s+(\\w+)");
-        Matcher deprecatedMatcher = deprecatedPattern.matcher(content);
-        
-        while (deprecatedMatcher.find()) {
-            String name = deprecatedMatcher.group(1) != null ? deprecatedMatcher.group(1) : deprecatedMatcher.group(2);
-            String type = deprecatedMatcher.group(1) != null ? "function" : "class";
-            
-            CodeIssue issue = new CodeIssue(
-                    CodeIssueType.USING_DEPRECATED_API,
-                    "Using deprecated " + type + ": " + name,
-                    deprecatedMatcher.start(),
-                    false,
-                    "Replace with non-deprecated alternative"
-            );
-            
-            issues.add(issue);
-        }
-        
-        // Check for var that could be val
-        Pattern varPattern = Pattern.compile("var\\s+(\\w+)\\s*:\\s*[\\w<>?]+\\s*=\\s*");
-        Matcher varMatcher = varPattern.matcher(content);
-        
-        while (varMatcher.find()) {
-            String name = varMatcher.group(1);
-            
-            // Check if variable is reassigned
-            Pattern reassignPattern = Pattern.compile(name + "\\s*=");
-            Matcher reassignMatcher = reassignPattern.matcher(content.substring(varMatcher.end()));
-            
-            if (!reassignMatcher.find()) {
-                CodeIssue issue = new CodeIssue(
-                        CodeIssueType.VAR_COULD_BE_VAL,
-                        "Variable could be val: " + name,
-                        varMatcher.start(),
-                        true,
-                        "Change var to val"
-                );
+                // Create options
+                Map<String, Object> options = new HashMap<>();
+                options.put("fileName", file.getName());
+                options.put("filePath", file.getPath());
                 
-                issues.add(issue);
-            }
-        }
-        
-        return issues;
-    }
-    
-    /**
-     * Analyzes a JavaScript/TypeScript file for issues.
-     * @param content The file content
-     * @return A list of issues
-     */
-    @NotNull
-    private List<CodeIssue> analyzeJsFile(@NotNull String content) {
-        List<CodeIssue> issues = new ArrayList<>();
-        
-        // Check for let that could be const
-        Pattern letPattern = Pattern.compile("let\\s+(\\w+)\\s*=\\s*");
-        Matcher letMatcher = letPattern.matcher(content);
-        
-        while (letMatcher.find()) {
-            String name = letMatcher.group(1);
-            
-            // Check if variable is reassigned
-            Pattern reassignPattern = Pattern.compile(name + "\\s*=");
-            Matcher reassignMatcher = reassignPattern.matcher(content.substring(letMatcher.end()));
-            
-            if (!reassignMatcher.find()) {
-                CodeIssue issue = new CodeIssue(
-                        CodeIssueType.LET_COULD_BE_CONST,
-                        "Variable could be const: " + name,
-                        letMatcher.start(),
-                        true,
-                        "Change let to const"
-                );
+                // Join error messages
+                String errorMessage = String.join("\n", errorMessages);
                 
-                issues.add(issue);
-            }
-        }
-        
-        // Check for console.log statements
-        Pattern consoleLogPattern = Pattern.compile("console\\.log\\(");
-        Matcher consoleLogMatcher = consoleLogPattern.matcher(content);
-        
-        while (consoleLogMatcher.find()) {
-            CodeIssue issue = new CodeIssue(
-                    CodeIssueType.CONSOLE_LOG,
-                    "Console.log statement should be removed in production code",
-                    consoleLogMatcher.start(),
-                    true,
-                    "Remove console.log statement"
-            );
-            
-            issues.add(issue);
-        }
-        
-        return issues;
-    }
-    
-    /**
-     * Analyzes a generic file for issues.
-     * @param content The file content
-     * @return A list of issues
-     */
-    @NotNull
-    private List<CodeIssue> analyzeGenericFile(@NotNull String content) {
-        List<CodeIssue> issues = new ArrayList<>();
-        
-        // Check for TODO comments
-        Pattern todoPattern = Pattern.compile("//\\s*TODO[:\\s]|/\\*\\s*TODO[:\\s]|#\\s*TODO[:\\s]");
-        Matcher todoMatcher = todoPattern.matcher(content);
-        
-        while (todoMatcher.find()) {
-            CodeIssue issue = new CodeIssue(
-                    CodeIssueType.TODO_COMMENT,
-                    "TODO comment found",
-                    todoMatcher.start(),
-                    false,
-                    "Implement TODO item"
-            );
-            
-            issues.add(issue);
-        }
-        
-        // Check for long lines
-        String[] lines = content.split("\n");
-        int position = 0;
-        
-        for (String line : lines) {
-            if (line.length() > 120) {
-                CodeIssue issue = new CodeIssue(
-                        CodeIssueType.LINE_TOO_LONG,
-                        "Line is too long (" + line.length() + " characters)",
-                        position,
-                        false,
-                        "Break line into multiple lines"
-                );
+                // Fix code
+                String fixedCode = fixCode(content, errorMessage, options)
+                        .get(DEFAULT_TIMEOUT_SECONDS, TimeUnit.SECONDS);
                 
-                issues.add(issue);
-            }
-            
-            position += line.length() + 1; // +1 for the newline
-        }
-        
-        return issues;
-    }
-    
-    /**
-     * Gets a relevant code snippet around a position.
-     * @param content The content
-     * @param position The position
-     * @param contextLines The number of context lines
-     * @return The code snippet
-     */
-    @NotNull
-    private String getRelevantCodeSnippet(@NotNull String content, int position, int contextLines) {
-        try {
-            // Find start of the current line
-            int start = position;
-            while (start > 0 && content.charAt(start - 1) != '\n') {
-                start--;
-            }
-            
-            // Find end of the current line
-            int end = position;
-            while (end < content.length() && content.charAt(end) != '\n') {
-                end++;
-            }
-            
-            // Expand to include context lines
-            int contextStart = start;
-            int lineCount = 0;
-            
-            // Go back contextLines lines
-            while (contextStart > 0 && lineCount < contextLines) {
-                contextStart--;
-                if (content.charAt(contextStart) == '\n') {
-                    lineCount++;
+                if (fixedCode.equals(content)) {
+                    LOG.warn("Could not fix errors in file: " + file.getName());
+                    return false;
                 }
                 
-                if (contextStart == 0) {
-                    break;
-                }
-            }
-            
-            if (contextStart > 0) {
-                contextStart++; // Skip the last newline
-            }
-            
-            int contextEnd = end;
-            lineCount = 0;
-            
-            // Go forward contextLines lines
-            while (contextEnd < content.length() && lineCount < contextLines) {
-                if (content.charAt(contextEnd) == '\n') {
-                    lineCount++;
-                }
-                contextEnd++;
+                // Update document
+                ApplicationManager.getApplication().invokeAndWait(() -> {
+                    WriteCommandAction.runWriteCommandAction(project, () -> {
+                        CommandProcessor.getInstance().executeCommand(project, () -> {
+                            document.setText(fixedCode);
+                            
+                            // Save document
+                            FileDocumentManager.getInstance().saveDocument(document);
+                        }, "Fix Errors", null);
+                    });
+                });
                 
-                if (contextEnd == content.length()) {
-                    break;
-                }
+                return true;
+            } catch (Exception e) {
+                LOG.error("Error fixing errors in file: " + file.getName(), e);
+                return false;
             }
-            
-            return content.substring(contextStart, contextEnd);
-        } catch (Exception e) {
-            LOG.error("Error getting relevant code snippet", e);
-            
-            // Return a small snippet around the position as fallback
-            int start = Math.max(0, position - 100);
-            int end = Math.min(content.length(), position + 100);
-            
-            return content.substring(start, end);
-        }
-    }
-    
-    /**
-     * Updates a document with new content.
-     * @param document The document to update
-     * @param newContent The new content
-     */
-    private void updateDocument(@NotNull Document document, @NotNull String newContent) {
-        ApplicationManager.getApplication().invokeLater(() -> {
-            CommandProcessor.getInstance().executeCommand(
-                    project,
-                    () -> ApplicationManager.getApplication().runWriteAction(() -> {
-                        document.setText(newContent);
-                    }),
-                    "Fix Code Issues",
-                    null
-            );
         });
     }
     
     /**
-     * Applies a fix to content.
-     * @param content The content to fix
-     * @param issue The issue with the fix
-     * @return The fixed content
+     * Analyzes and enhances a file.
+     * @param file The file to analyze and enhance
+     * @return A future that completes with a boolean indicating if enhancements were made
      */
-    @NotNull
-    private String applyFix(@NotNull String content, @NotNull CodeIssue issue) {
-        try {
-            if (!issue.hasFix()) {
-                return content;
+    public CompletableFuture<Boolean> analyzeAndEnhanceFile(@NotNull VirtualFile file) {
+        LOG.info("Analyzing and enhancing file: " + file.getName());
+        
+        return CompletableFuture.supplyAsync(() -> {
+            try {
+                // Get document
+                Document document = FileDocumentManager.getInstance().getDocument(file);
+                
+                if (document == null) {
+                    LOG.warn("Could not get document for file: " + file.getName());
+                    return false;
+                }
+                
+                // Get file content
+                String content = document.getText();
+                
+                // Get PSI file
+                PsiFile psiFile = PsiManager.getInstance(project).findFile(file);
+                
+                if (psiFile == null) {
+                    LOG.warn("Could not get PSI file for file: " + file.getName());
+                    return false;
+                }
+                
+                // Get language
+                String language = psiFile.getLanguage().getDisplayName().toLowerCase();
+                
+                // Create options
+                Map<String, Object> options = new HashMap<>();
+                options.put("language", language);
+                options.put("fileName", file.getName());
+                options.put("filePath", file.getPath());
+                
+                // Create prompt for code enhancement
+                String prompt = "Enhance the following code to improve readability, performance, " +
+                        "and maintainability. Focus on adding proper documentation, optimizing algorithms, " +
+                        "and following Minecraft modding best practices:\n\n" + content;
+                
+                // Create system prompt for code enhancement
+                String systemPrompt = "You are an expert Minecraft mod developer and code optimizer. " +
+                        "Improve the provided code by adding comprehensive documentation, optimizing algorithms, " +
+                        "and applying best practices for Minecraft modding. " +
+                        "Make sure the enhanced code maintains the original functionality. " +
+                        "Only output the enhanced code, no explanations or markdown formatting.";
+                
+                options.put("systemPrompt", systemPrompt);
+                options.put("temperature", 0.1);
+                options.put("maxTokens", 2048);
+                
+                // Enhance code using AI service
+                String enhancedCode = aiServiceManager.generateChatCompletion(prompt, options)
+                        .get(DEFAULT_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+                
+                if (enhancedCode.equals(content)) {
+                    LOG.info("No enhancements made to file: " + file.getName());
+                    return false;
+                }
+                
+                // Update document
+                ApplicationManager.getApplication().invokeAndWait(() -> {
+                    WriteCommandAction.runWriteCommandAction(project, () -> {
+                        CommandProcessor.getInstance().executeCommand(project, () -> {
+                            document.setText(enhancedCode);
+                            
+                            // Save document
+                            FileDocumentManager.getInstance().saveDocument(document);
+                        }, "Enhance Code", null);
+                    });
+                });
+                
+                return true;
+            } catch (Exception e) {
+                LOG.error("Error enhancing file: " + file.getName(), e);
+                return false;
             }
+        });
+    }
+    
+    /**
+     * Parses issues from an API response.
+     * @param response The API response
+     * @param filePath The file path
+     * @return A list of issues
+     */
+    private List<CodeIssue> parseIssues(@NotNull String response, @NotNull String filePath) {
+        List<CodeIssue> issues = new ArrayList<>();
+        
+        try {
+            // Parse JSON response
+            // This is a simple extraction, in a real system we would use a JSON library
+            String jsonArray = response.trim();
             
-            switch (issue.getType()) {
-                case UNUSED_IMPORT:
-                    // Remove the entire line
-                    int lineStart = content.lastIndexOf('\n', issue.getPosition()) + 1;
-                    int lineEnd = content.indexOf('\n', issue.getPosition());
-                    if (lineEnd == -1) {
-                        lineEnd = content.length();
+            if (jsonArray.startsWith("[") && jsonArray.endsWith("]")) {
+                // Extract issues
+                String[] issueStrings = jsonArray.substring(1, jsonArray.length() - 1).split("\\},\\s*\\{");
+                
+                for (String issueString : issueStrings) {
+                    // Add braces if removed by split
+                    if (!issueString.startsWith("{")) {
+                        issueString = "{" + issueString;
+                    }
+                    if (!issueString.endsWith("}")) {
+                        issueString = issueString + "}";
                     }
                     
-                    return content.substring(0, lineStart) + content.substring(lineEnd);
+                    // Extract fields
+                    String message = extractJsonField(issueString, "message");
+                    int line = extractJsonIntField(issueString, "line");
+                    int column = extractJsonIntField(issueString, "column");
+                    String file = extractJsonField(issueString, "file");
+                    String code = extractJsonField(issueString, "code");
                     
-                case FIELD_COULD_BE_FINAL:
-                    // Add final modifier
-                    return addFinalModifier(content, issue.getPosition());
-                    
-                case VAR_COULD_BE_VAL:
-                    // Change var to val
-                    return content.substring(0, issue.getPosition()) + 
-                            content.substring(issue.getPosition()).replaceFirst("var", "val");
-                    
-                case LET_COULD_BE_CONST:
-                    // Change let to const
-                    return content.substring(0, issue.getPosition()) + 
-                            content.substring(issue.getPosition()).replaceFirst("let", "const");
-                    
-                case CONSOLE_LOG:
-                    // Remove the entire console.log statement
-                    return removeConsoleLog(content, issue.getPosition());
-                    
-                case MISSING_OVERRIDE:
-                    // Add @Override annotation
-                    return addOverrideAnnotation(content, issue.getPosition());
-                    
-                default:
-                    return content;
+                    if (message != null && !message.isEmpty() && code != null && !code.isEmpty()) {
+                        // Use filePath if file is empty
+                        if (file == null || file.isEmpty()) {
+                            file = filePath;
+                        }
+                        
+                        issues.add(new CodeIssue(message, line, column, file, code));
+                    }
+                }
             }
         } catch (Exception e) {
-            LOG.error("Error applying fix", e);
-            return content;
+            LOG.error("Error parsing issues from response: " + response, e);
         }
+        
+        return issues;
     }
     
     /**
-     * Adds a final modifier to a field.
-     * @param content The content
-     * @param position The position
-     * @return The updated content
+     * Extracts a string field from a JSON object string.
+     * @param json The JSON object string
+     * @param field The field name
+     * @return The field value
      */
-    @NotNull
-    private String addFinalModifier(@NotNull String content, int position) {
-        // Find the field declaration
-        int start = position;
-        while (start > 0 && !Character.isWhitespace(content.charAt(start - 1))) {
-            start--;
+    private String extractJsonField(@NotNull String json, @NotNull String field) {
+        Pattern pattern = Pattern.compile("\"" + field + "\"\\s*:\\s*\"([^\"]*)\"");
+        Matcher matcher = pattern.matcher(json);
+        
+        if (matcher.find()) {
+            return matcher.group(1);
         }
         
-        // Find modifiers
-        while (start > 0 && Character.isWhitespace(content.charAt(start - 1))) {
-            start--;
-        }
+        return null;
+    }
+    
+    /**
+     * Extracts an integer field from a JSON object string.
+     * @param json The JSON object string
+     * @param field The field name
+     * @return The field value
+     */
+    private int extractJsonIntField(@NotNull String json, @NotNull String field) {
+        Pattern pattern = Pattern.compile("\"" + field + "\"\\s*:\\s*(\\d+)");
+        Matcher matcher = pattern.matcher(json);
         
-        // Check for existing modifiers
-        String modifiers = "";
-        while (start > 0 && !Character.isWhitespace(content.charAt(start - 1)) && 
-                content.charAt(start - 1) != ';' && content.charAt(start - 1) != '{' && 
-                content.charAt(start - 1) != '}') {
-            start--;
-            
-            int tempStart = start;
-            while (tempStart > 0 && !Character.isWhitespace(content.charAt(tempStart - 1)) && 
-                    content.charAt(tempStart - 1) != ';' && content.charAt(tempStart - 1) != '{' && 
-                    content.charAt(tempStart - 1) != '}') {
-                tempStart--;
+        if (matcher.find()) {
+            try {
+                return Integer.parseInt(matcher.group(1));
+            } catch (NumberFormatException e) {
+                LOG.error("Error parsing integer field: " + field, e);
             }
-            
-            modifiers = content.substring(tempStart, start) + " " + modifiers;
         }
         
-        // Check if final is already present
-        if (modifiers.contains("final")) {
-            return content;
-        }
-        
-        // Add final modifier
-        String newModifiers = modifiers + "final ";
-        
-        return content.substring(0, start) + newModifiers + content.substring(start + modifiers.length());
-    }
-    
-    /**
-     * Removes a console.log statement.
-     * @param content The content
-     * @param position The position
-     * @return The updated content
-     */
-    @NotNull
-    private String removeConsoleLog(@NotNull String content, int position) {
-        // Find the start of the statement
-        int start = position;
-        while (start > 0 && content.charAt(start - 1) != ';' && content.charAt(start - 1) != '{' && 
-                content.charAt(start - 1) != '}' && content.charAt(start - 1) != '\n') {
-            start--;
-        }
-        
-        // Find the end of the statement
-        int end = position;
-        while (end < content.length()) {
-            if (content.charAt(end) == ';') {
-                end++;
-                break;
-            } else if (content.charAt(end) == '\n') {
-                break;
-            }
-            end++;
-        }
-        
-        // Remove any leading whitespace
-        while (start > 0 && Character.isWhitespace(content.charAt(start - 1))) {
-            start--;
-        }
-        
-        return content.substring(0, start) + content.substring(end);
-    }
-    
-    /**
-     * Adds an @Override annotation.
-     * @param content The content
-     * @param position The position
-     * @return The updated content
-     */
-    @NotNull
-    private String addOverrideAnnotation(@NotNull String content, int position) {
-        // Find the start of the method declaration
-        int start = position;
-        
-        // Find the beginning of the line
-        while (start > 0 && content.charAt(start - 1) != '\n') {
-            start--;
-        }
-        
-        // Get indentation
-        int indentEnd = start;
-        while (indentEnd < content.length() && Character.isWhitespace(content.charAt(indentEnd)) && 
-                content.charAt(indentEnd) != '\n') {
-            indentEnd++;
-        }
-        
-        String indentation = content.substring(start, indentEnd);
-        
-        // Add @Override annotation
-        return content.substring(0, start) + indentation + "@Override\n" + content.substring(start);
-    }
-    
-    /**
-     * Cleans up an AI response by removing code fences and extra whitespace.
-     * @param response The AI response
-     * @return The cleaned up response
-     */
-    @NotNull
-    private String cleanupAiResponse(@NotNull String response) {
-        // Remove code fences
-        String cleaned = response.replaceAll("```(?:java|kotlin|javascript|js|typescript|ts)?", "");
-        
-        // Trim whitespace
-        cleaned = cleaned.trim();
-        
-        return cleaned;
-    }
-    
-    /**
-     * Code issue type.
-     */
-    public enum CodeIssueType {
-        UNUSED_IMPORT,
-        MISSING_OVERRIDE,
-        FIELD_COULD_BE_FINAL,
-        VAR_COULD_BE_VAL,
-        LET_COULD_BE_CONST,
-        CONSOLE_LOG,
-        TODO_COMMENT,
-        LINE_TOO_LONG,
-        USING_DEPRECATED_API
-    }
-    
-    /**
-     * Code issue.
-     */
-    public static class CodeIssue {
-        private final CodeIssueType type;
-        private final String description;
-        private final int position;
-        private final boolean hasFix;
-        private final String fixDescription;
-        
-        /**
-         * Creates a new CodeIssue.
-         * @param type The issue type
-         * @param description The issue description
-         * @param position The issue position
-         * @param hasFix Whether the issue has a fix
-         * @param fixDescription The fix description
-         */
-        public CodeIssue(@NotNull CodeIssueType type, @NotNull String description, int position, 
-                        boolean hasFix, @NotNull String fixDescription) {
-            this.type = type;
-            this.description = description;
-            this.position = position;
-            this.hasFix = hasFix;
-            this.fixDescription = fixDescription;
-        }
-        
-        /**
-         * Gets the issue type.
-         * @return The issue type
-         */
-        @NotNull
-        public CodeIssueType getType() {
-            return type;
-        }
-        
-        /**
-         * Gets the issue description.
-         * @return The issue description
-         */
-        @NotNull
-        public String getDescription() {
-            return description;
-        }
-        
-        /**
-         * Gets the issue position.
-         * @return The issue position
-         */
-        public int getPosition() {
-            return position;
-        }
-        
-        /**
-         * Gets whether the issue has a fix.
-         * @return Whether the issue has a fix
-         */
-        public boolean hasFix() {
-            return hasFix;
-        }
-        
-        /**
-         * Gets the fix description.
-         * @return The fix description
-         */
-        @NotNull
-        public String getFixDescription() {
-            return fixDescription;
-        }
+        return 0;
     }
 }
