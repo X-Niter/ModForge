@@ -155,9 +155,9 @@ headers = {
     'Accept': 'application/vnd.github.v3+json'
 }
 
-# Import OpenAI
+# Import OpenAI with newer client library
 import openai
-openai.api_key = openai_api_key
+client = openai.OpenAI(api_key=openai_api_key)
 
 # Define command patterns
 COMMAND_PATTERNS = {
@@ -290,14 +290,14 @@ Your goal is to sound like a real developer helping out a colleague, not like an
     
     # Generate a response
     try:
-        response = openai.ChatCompletion.create(
+        response = client.chat.completions.create(
             model="gpt-4",
             messages=messages,
             temperature=0.8,  # Slightly higher for more natural human-like replies
             max_tokens=2000
         )
         
-        return response.choices[0].message['content']
+        return response.choices[0].message.content
     except Exception as e:
         print(f"Error generating response: {str(e)}")
         return f"Hit an error while processing this: {str(e)}\n\nTry again or ping me if it keeps happening."
@@ -488,7 +488,7 @@ Focus on code organization, design patterns, and maintainability. Provide the co
     
     # Generate modified code using OpenAI
     try:
-        response = openai.ChatCompletion.create(
+        response = client.chat.completions.create(
             model="gpt-4",
             messages=[
                 {"role": "system", "content": f"You are an expert Java developer working on a Minecraft mod and IntelliJ plugin project. Your task is to {cmd_type} code."},
@@ -498,7 +498,7 @@ Focus on code organization, design patterns, and maintainability. Provide the co
             max_tokens=4000
         )
         
-        modified_code = response.choices[0].message['content']
+        modified_code = response.choices[0].message.content
         
         # Extract code from markdown code block if present
         code_match = re.search(r'```(?:java)?\n(.*?)\n```', modified_code, re.DOTALL)
