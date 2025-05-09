@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react';
 import { Moon, Sun } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -6,10 +7,35 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { useTheme } from "@/context/theme-context";
+
+type Theme = "dark" | "light" | "system";
 
 export function ThemeToggle() {
-  const { theme, setTheme } = useTheme();
+  const [theme, setThemeState] = useState<Theme>(
+    () => (localStorage.getItem('theme') as Theme) || 'dark'
+  );
+
+  // Update the theme when the component mounts and when the theme changes
+  useEffect(() => {
+    const root = window.document.documentElement;
+    root.classList.remove("light", "dark");
+
+    if (theme === "system") {
+      const systemTheme = window.matchMedia("(prefers-color-scheme: dark)")
+        .matches
+        ? "dark"
+        : "light";
+      root.classList.add(systemTheme);
+      return;
+    }
+
+    root.classList.add(theme);
+  }, [theme]);
+
+  const setTheme = (theme: Theme) => {
+    localStorage.setItem('theme', theme);
+    setThemeState(theme);
+  };
 
   return (
     <DropdownMenu>
