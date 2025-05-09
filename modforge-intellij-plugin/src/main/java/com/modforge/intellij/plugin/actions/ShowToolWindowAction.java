@@ -9,9 +9,8 @@ import org.jetbrains.annotations.NotNull;
 
 /**
  * Action to show the ModForge tool window.
- * This action activates the ModForge tool window when invoked.
  */
-public final class ShowToolWindowAction extends AnAction {
+public class ShowToolWindowAction extends AnAction {
     private static final String TOOL_WINDOW_ID = "ModForge";
     
     @Override
@@ -22,22 +21,16 @@ public final class ShowToolWindowAction extends AnAction {
             return;
         }
         
-        // Get tool window manager
         ToolWindowManager toolWindowManager = ToolWindowManager.getInstance(project);
-        
-        // Find ModForge tool window
         ToolWindow toolWindow = toolWindowManager.getToolWindow(TOOL_WINDOW_ID);
         
         if (toolWindow != null) {
-            // Show tool window
             toolWindow.show();
         }
     }
     
     @Override
     public void update(@NotNull AnActionEvent e) {
-        // Enable action if project is open
-        Project project = e.getProject();
-        e.getPresentation().setEnabledAndVisible(project != null);
+        e.getPresentation().setEnabledAndVisible(e.getProject() != null);
     }
 }

@@ -1,61 +1,78 @@
 package com.modforge.intellij.plugin.ui.toolwindow;
 
-import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.wm.ToolWindow;
 import com.intellij.openapi.wm.ToolWindowFactory;
 import com.intellij.ui.content.Content;
 import com.intellij.ui.content.ContentFactory;
+import com.intellij.ui.content.ContentManager;
+import com.intellij.ui.tabs.TabInfo;
+import com.intellij.ui.tabs.impl.JBTabsImpl;
+import com.modforge.intellij.plugin.ai.PatternRecognitionService;
+import com.modforge.intellij.plugin.services.ContinuousDevelopmentService;
 import org.jetbrains.annotations.NotNull;
 
+import javax.swing.*;
+import java.awt.*;
+
 /**
- * Factory for the ModForge tool window.
- * This class creates the ModForge tool window with its tabs.
+ * Factory for creating the ModForge tool window.
  */
 public final class ModForgeToolWindowFactory implements ToolWindowFactory {
-    private static final Logger LOG = Logger.getInstance(ModForgeToolWindowFactory.class);
+    private static final String PANEL_AI_ASSIST = "AI Assist";
+    private static final String PANEL_METRICS = "Metrics";
+    private static final String PANEL_SETTINGS = "Settings";
+    
+    private AIAssistPanel aiAssistPanel;
+    private MetricsPanel metricsPanel;
+    private SettingsPanel settingsPanel;
     
     @Override
     public void createToolWindowContent(@NotNull Project project, @NotNull ToolWindow toolWindow) {
-        LOG.info("Creating ModForge tool window content");
+        createPanels(project);
         
-        // Create AI assist panel
-        AIAssistPanel aiAssistPanel = new AIAssistPanel(project);
-        
-        // Create metrics panel
-        MetricsPanel metricsPanel = new MetricsPanel(project);
-        
-        // Create settings panel
-        SettingsPanel settingsPanel = new SettingsPanel(project);
-        
-        // Create content factory
+        ContentManager contentManager = toolWindow.getContentManager();
         ContentFactory contentFactory = ContentFactory.getInstance();
         
-        // Create content for each panel
-        Content aiAssistContent = contentFactory.createContent(
-                aiAssistPanel.getContent(),
-                "AI Assist",
-                false
-        );
+        JBTabsImpl tabs = new JBTabsImpl(project);
         
-        Content metricsContent = contentFactory.createContent(
-                metricsPanel.getContent(),
-                "Metrics",
-                false
-        );
+        // Create AI Assist tab
+        TabInfo aiAssistTab = new TabInfo(aiAssistPanel);
+        aiAssistTab.setText(PANEL_AI_ASSIST);
+        tabs.addTab(aiAssistTab);
         
-        Content settingsContent = contentFactory.createContent(
-                settingsPanel.getContent(),
-                "Settings",
-                false
-        );
+        // Create Metrics tab
+        TabInfo metricsTab = new TabInfo(metricsPanel);
+        metricsTab.setText(PANEL_METRICS);
+        tabs.addTab(metricsTab);
         
-        // Add content to tool window
-        toolWindow.getContentManager().addContent(aiAssistContent);
-        toolWindow.getContentManager().addContent(metricsContent);
-        toolWindow.getContentManager().addContent(settingsContent);
+        // Create Settings tab
+        TabInfo settingsTab = new TabInfo(settingsPanel);
+        settingsTab.setText(PANEL_SETTINGS);
+        tabs.addTab(settingsTab);
         
-        // Set up tool window dispose actions
-        toolWindow.getContentManager().addContentManagerListener(new ToolWindowCleanupListener(metricsPanel));
+        Content content = contentFactory.createContent(tabs.getComponent(), "", false);
+        contentManager.addContent(content);
+    }
+    
+    /**
+     * Creates the panels for the tool window.
+     * @param project The project
+     */
+    private void createPanels(@NotNull Project project) {
+        aiAssistPanel = new AIAssistPanel(project);
+        metricsPanel = new MetricsPanel(project);
+        settingsPanel = new SettingsPanel(project);
+    }
+    
+    @Override
+    public void init(@NotNull ToolWindow toolWindow) {
+        toolWindow.setTitle("ModForge");
+        toolWindow.setStripeTitle("ModForge");
+    }
+    
+    @Override
+    public boolean shouldBeAvailable(@NotNull Project project) {
+        return true;
     }
 }

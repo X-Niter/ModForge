@@ -8,10 +8,9 @@ import com.modforge.intellij.plugin.settings.ModForgeSettingsConfigurable;
 import org.jetbrains.annotations.NotNull;
 
 /**
- * Action to open the ModForge settings.
- * This action opens the ModForge settings dialog when invoked.
+ * Action to open the ModForge settings dialog.
  */
-public final class OpenSettingsAction extends AnAction {
+public class OpenSettingsAction extends AnAction {
     @Override
     public void actionPerformed(@NotNull AnActionEvent e) {
         Project project = e.getProject();
@@ -20,14 +19,11 @@ public final class OpenSettingsAction extends AnAction {
             return;
         }
         
-        // Show settings dialog
         ShowSettingsUtil.getInstance().showSettingsDialog(project, ModForgeSettingsConfigurable.class);
     }
     
     @Override
     public void update(@NotNull AnActionEvent e) {
-        // Enable action if project is open
-        Project project = e.getProject();
-        e.getPresentation().setEnabledAndVisible(project != null);
+        e.getPresentation().setEnabledAndVisible(e.getProject() != null);
     }
 }
