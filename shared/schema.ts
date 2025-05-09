@@ -176,6 +176,48 @@ export const ideaPatterns = pgTable("idea_patterns", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
+export const ideaExpansionPatterns = pgTable("idea_expansion_patterns", {
+  id: serial("id").primaryKey(),
+  ideaTitle: text("idea_title").notNull(),
+  ideaDescription: text("idea_description").notNull(),
+  keyTerms: text("key_terms").array(), // Array of key terms extracted for matching
+  response: jsonb("response").notNull(), // The expanded idea
+  useCount: integer("use_count").default(0).notNull(),
+  successRate: integer("success_rate").default(100).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const featurePatterns = pgTable("feature_patterns", {
+  id: serial("id").primaryKey(),
+  modLoader: text("mod_loader").notNull(),
+  featureType: text("feature_type").notNull(), // e.g. "item", "block", "entity", "biome"
+  featureDescription: text("feature_description").notNull(),
+  keyTerms: text("key_terms").array(), // Array of key terms extracted for matching
+  inputFiles: jsonb("input_files").notNull(), // File structure of the mod before feature addition
+  outputFiles: jsonb("output_files").notNull(), // File structure after feature addition
+  explanation: text("explanation").notNull(),
+  useCount: integer("use_count").default(0).notNull(),
+  successRate: integer("success_rate").default(100).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const documentationPatterns = pgTable("documentation_patterns", {
+  id: serial("id").primaryKey(),
+  language: text("language").default("java").notNull(),
+  codeFingerprint: text("code_fingerprint").notNull(), // A hash/fingerprint of the code for quick matching
+  codeLength: integer("code_length").notNull(), // Length of the original code
+  codeType: text("code_type").notNull(), // "class", "method", "module", etc.
+  style: text("style").default("standard").notNull(), // Documentation style
+  inputCode: text("input_code").notNull(), // The original code
+  outputDocs: text("output_docs").notNull(), // The generated documentation
+  useCount: integer("use_count").default(0).notNull(),
+  successRate: integer("success_rate").default(100).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
 export const insertCodePatternSchema = createInsertSchema(codePatterns).omit({
   id: true,
   createdAt: true,
