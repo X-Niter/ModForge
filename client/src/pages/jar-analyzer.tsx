@@ -3,6 +3,59 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiRequest } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import { FaDatabase, FaUpload, FaSearch, FaDownload, FaCode, FaTrash } from 'react-icons/fa';
+
+// Define types for the data structures
+interface JarFile {
+  id: number;
+  fileName: string;
+  filePath: string;
+  modLoader: string;
+  mcVersion: string;
+  status: string;
+  extractedClassCount: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+interface ExtractedClass {
+  id: number;
+  jarId: number;
+  className: string;
+  packageName: string;
+  classType: string;
+  isPublic: boolean;
+  content: string;
+  methods: string[];
+  fields: string[];
+  createdAt: string;
+}
+
+interface ModrinthMod {
+  id: string;
+  name: string;
+  description: string;
+  author: string;
+  modLoader: string;
+  downloadUrl: string;
+  iconUrl?: string;
+}
+
+interface JarStats {
+  totalJars: number;
+  totalClasses: number;
+  status: {
+    completed: number;
+    processing: number;
+    pending: number;
+    error: number;
+  };
+  classTypes: {
+    [key: string]: number;
+  };
+  modLoaders: {
+    [key: string]: number;
+  };
+}
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -31,30 +84,36 @@ const JarAnalyzerPage: React.FC = () => {
   
   // Fetch all JAR files
   const {
-    data: jars,
+    data: jars = [],
     isLoading: jarsLoading,
     isError: jarsError
-  } = useQuery({
+  } = useQuery<JarFile[]>({
     queryKey: ['/api/jar-analyzer/jars'],
     retry: 1
   });
   
   // Fetch JAR analysis stats
   const {
-    data: stats,
+    data: stats = {
+      totalJars: 0,
+      totalClasses: 0,
+      status: { completed: 0, processing: 0, pending: 0, error: 0 },
+      classTypes: {},
+      modLoaders: {}
+    },
     isLoading: statsLoading,
     isError: statsError
-  } = useQuery({
+  } = useQuery<JarStats>({
     queryKey: ['/api/jar-analyzer/stats'],
     retry: 1
   });
   
   // Fetch classes for selected JAR
   const {
-    data: classes,
+    data: classes = [],
     isLoading: classesLoading,
     isError: classesError
-  } = useQuery({
+  } = useQuery<ExtractedClass[]>({
     queryKey: ['/api/jar-analyzer/jars', selectedJarId, 'classes'],
     enabled: !!selectedJarId,
     retry: 1
@@ -62,11 +121,11 @@ const JarAnalyzerPage: React.FC = () => {
   
   // Fetch search results from Modrinth
   const {
-    data: modrinthResults,
+    data: modrinthResults = [],
     isLoading: modrinthLoading,
     isError: modrinthError,
     refetch: searchModrinth
-  } = useQuery({
+  } = useQuery<ModrinthMod[]>({
     queryKey: ['/api/jar-analyzer/search/modrinth', searchQuery],
     enabled: false,
     retry: 1
@@ -260,7 +319,7 @@ const JarAnalyzerPage: React.FC = () => {
   };
   
   // Handle download from Modrinth
-  const handleDownloadFromModrinth = (mod: any) => {
+  const handleDownloadFromModrinth = (mod: ModrinthMod) => {
     // Get latest version from mod info
     downloadMutation.mutate({
       url: `https://api.modrinth.com/v2/project/${mod.id}/version`, // This is just placeholder URL, would need real URL
@@ -804,10 +863,10 @@ const JarAnalyzerPage: React.FC = () => {
                       <div>
                         <h4 className="font-medium mb-2">Class Types</h4>
                         <div className="space-y-2">
-                          {stats.classTypes.map((type: any) => (
-                            <div key={type.type} className="flex justify-between items-center">
-                              <span className="text-sm capitalize">{type.type}</span>
-                              <Badge variant="outline">{type.count}</Badge>
+                          {Object.entries(stats.classTypes).map(([type, count]) => (
+                            <div key={type} className="flex justify-between items-center">
+                              <span className="text-sm capitalize">{type}</span>
+                              <Badge variant="outline">{count}</Badge>
                             </div>
                           ))}
                         </div>
@@ -818,10 +877,10 @@ const JarAnalyzerPage: React.FC = () => {
                       <div>
                         <h4 className="font-medium mb-2">Mod Loaders</h4>
                         <div className="space-y-2">
-                          {stats.modLoaders.map((loader: any) => (
-                            <div key={loader.loader} className="flex justify-between items-center">
-                              <span className="text-sm capitalize">{loader.loader}</span>
-                              <Badge variant="outline">{loader.count}</Badge>
+                          {Object.entries(stats.modLoaders).map(([loader, count]) => (
+                            <div key={loader} className="flex justify-between items-center">
+                              <span className="text-sm capitalize">{loader}</span>
+                              <Badge variant="outline">{count}</Badge>
                             </div>
                           ))}
                         </div>

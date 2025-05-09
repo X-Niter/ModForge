@@ -19,6 +19,7 @@ import {
   Bug,
   Globe,
   Search,
+  Database,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -116,6 +117,11 @@ export function Layout({ children }: LayoutProps) {
       name: "Web Explorer",
       href: "/web-explorer",
       icon: <Globe className="w-5 h-5 mr-2" />,
+    },
+    {
+      name: "JAR Analyzer",
+      href: "/jar-analyzer",
+      icon: <Database className="w-5 h-5 mr-2" />,
     },
     {
       name: "GitHub Integration",
