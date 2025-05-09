@@ -17,6 +17,8 @@ import {
   BarChart3,
   Brain,
   Bug,
+  Globe,
+  Search,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -109,6 +111,11 @@ export function Layout({ children }: LayoutProps) {
       name: "Error Resolution",
       href: "/error-resolution",
       icon: <Brain className="w-5 h-5 mr-2" />,
+    },
+    {
+      name: "Web Explorer",
+      href: "/web-explorer",
+      icon: <Globe className="w-5 h-5 mr-2" />,
     },
     {
       name: "GitHub Integration",

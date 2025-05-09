@@ -17,6 +17,7 @@ import TermsOfService from "@/pages/terms";
 import LicensePage from "@/pages/license";
 import MetricsPage from "@/pages/metrics";
 import ErrorResolutionPage from "@/pages/error-resolution";
+import WebExplorerPage from "@/pages/web-explorer";
 
 function Router() {
   return (
@@ -32,6 +33,7 @@ function Router() {
       <Route path="/license" component={LicensePage}/>
       <Route path="/metrics" component={MetricsPage}/>
       <Route path="/error-resolution" component={ErrorResolutionPage}/>
+      <Route path="/web-explorer" component={WebExplorerPage}/>
       <Route component={NotFound} />
     </Switch>
   );

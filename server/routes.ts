@@ -23,6 +23,7 @@ import { z } from "zod";
 import { insertModSchema } from "@shared/schema";
 import { BuildStatus } from "@/types";
 import apiMetricsRouter from "./routes/api-metrics";
+import webExplorerRouter from "./routes/web-explorer-routes";
 import axios from "axios";
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -802,6 +803,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Mount the metrics API routes
   app.use('/api/metrics', apiMetricsRouter);
+  
+  // Mount the web explorer API routes
+  app.use('/api/web-explorer', webExplorerRouter);
 
   return httpServer;
 }
