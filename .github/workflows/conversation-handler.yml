@@ -713,12 +713,12 @@ Please review the PR and merge it if the implementation looks good."""
                   except Exception as e:
                       return f"Error creating new file for feature: {str(e)}"
     else:
-        # Modify existing file to add the feature
-        try:
-            with open(file_path, 'r', encoding='utf-8') as f:
-                content = f.read()
-                
-            prompt = f"""Add the following feature to this existing Java class: {feature}
+              # Modify existing file to add the feature
+              try:
+                  with open(file_path, 'r', encoding='utf-8') as f:
+                      content = f.read()
+                      
+                  prompt = f"""Add the following feature to this existing Java class: {feature}
 
 Current code:
 ```java
@@ -732,37 +732,37 @@ Make sure to:
 4. Make the changes seamlessly integrate with the existing code
 
 Provide the complete updated code."""
-            
-            response = client.chat.completions.create(
-                model="gpt-4",
-                messages=[
-                    {"role": "system", "content": "You are an expert Java developer working on a Minecraft mod and IntelliJ plugin project."},
-                    {"role": "user", "content": prompt}
-                ],
-                temperature=0.2,
-                max_tokens=3000
-            )
-            
-            modified_code = response.choices[0].message.content
-            
-            # Extract code from markdown code block if present
-            code_match = re.search(r'```(?:java)?\n(.*?)\n```', modified_code, re.DOTALL)
-            if code_match:
-                modified_code = code_match.group(1)
-            
-            # Write the modified code back to the file
-            with open(file_path, 'w', encoding='utf-8') as f:
-                f.write(modified_code)
-            
-            # Commit and push the changes
-            subprocess.run(['git', 'add', file_path], check=True)
-            subprocess.run(['git', 'commit', '-m', f"Add: {feature} to {os.path.basename(file_path)} [ModForge AI]"], check=True)
-            subprocess.run(['git', 'push', 'origin', branch_name], check=True)
-            
-            # Create a pull request
-            pr_data = {
-                'title': f"Add: {feature}",
-                'body': f"""This PR was created by ModForge AI in response to an /add command.
+                  
+                  response = client.chat.completions.create(
+                      model="gpt-4",
+                      messages=[
+                          {"role": "system", "content": "You are an expert Java developer working on a Minecraft mod and IntelliJ plugin project."},
+                          {"role": "user", "content": prompt}
+                      ],
+                      temperature=0.2,
+                      max_tokens=3000
+                  )
+                  
+                  modified_code = response.choices[0].message.content
+                  
+                  # Extract code from markdown code block if present
+                  code_match = re.search(r'```(?:java)?\n(.*?)\n```', modified_code, re.DOTALL)
+                  if code_match:
+                      modified_code = code_match.group(1)
+                  
+                  # Write the modified code back to the file
+                  with open(file_path, 'w', encoding='utf-8') as f:
+                      f.write(modified_code)
+                  
+                  # Commit and push the changes
+                  subprocess.run(['git', 'add', file_path], check=True)
+                  subprocess.run(['git', 'commit', '-m', f"Add: {feature} to {os.path.basename(file_path)} [ModForge AI]"], check=True)
+                  subprocess.run(['git', 'push', 'origin', branch_name], check=True)
+                  
+                  # Create a pull request
+                  pr_data = {
+                      'title': f"Add: {feature}",
+                      'body': f"""This PR was created by ModForge AI in response to an /add command.
 
 ## Feature Added
 Added "{feature}" to `{os.path.basename(file_path)}`
@@ -774,23 +774,23 @@ Please review these changes and provide feedback.
 
 _This PR was automatically created by the ModForge Autonomous System_
 """,
-                'head': branch_name,
-                'base': 'main',
-                'maintainer_can_modify': True
-            }
-            
-            response = requests.post(f"{api_url}/pulls", headers=headers, json=pr_data)
-            
-            if response.status_code == 201:
-                pr_url = response.json().get('html_url')
-                
-                # Generate a summary of what was added
-                old_lines = content.count('\n')
-                new_lines = modified_code.count('\n')
-                old_methods = len(re.findall(r'(?:public|private|protected)\s+\w+\s+\w+\s*\(', content))
-                new_methods = len(re.findall(r'(?:public|private|protected)\s+\w+\s+\w+\s*\(', modified_code))
-                
-                return f"""I've added the "{feature}" feature to `{os.path.basename(file_path)}`.
+                      'head': branch_name,
+                      'base': 'main',
+                      'maintainer_can_modify': True
+                  }
+                  
+                  response = requests.post(f"{api_url}/pulls", headers=headers, json=pr_data)
+                  
+                  if response.status_code == 201:
+                      pr_url = response.json().get('html_url')
+                      
+                      # Generate a summary of what was added
+                      old_lines = content.count('\n')
+                      new_lines = modified_code.count('\n')
+                      old_methods = len(re.findall(r'(?:public|private|protected)\s+\w+\s+\w+\s*\(', content))
+                      new_methods = len(re.findall(r'(?:public|private|protected)\s+\w+\s+\w+\s*\(', modified_code))
+                      
+                      return f"""I've added the "{feature}" feature to `{os.path.basename(file_path)}`.
 
 [View Pull Request]({pr_url})
 
@@ -800,11 +800,11 @@ The changes include:
 - Integrated with existing functionality
 
 Please review the PR and merge it if the implementation looks good."""
-            else:
-                return f"I've added the feature to the file, but couldn't create a PR. Error: {response.status_code} {response.text}"
-                
-        except Exception as e:
-            return f"Error adding feature to {file_path}: {str(e)}"
+                  else:
+                      return f"I've added the feature to the file, but couldn't create a PR. Error: {response.status_code} {response.text}"
+                      
+              except Exception as e:
+                  return f"Error adding feature to {file_path}: {str(e)}"
 
 def execute_code_analysis(target):
     """Perform deep analysis of code or components"""
