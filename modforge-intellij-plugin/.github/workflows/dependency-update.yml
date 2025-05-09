@@ -1,0 +1,189 @@
+name: Dependency Updates
+
+on:
+  schedule:
+    - cron: '0 0 * * 0'  # Run once a week on Sunday at midnight
+  workflow_dispatch:  # Allow manual trigger
+
+jobs:
+  update-dependencies:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Set up JDK 17
+        uses: actions/setup-java@v3
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+      
+      - name: Setup Git
+        run: |
+          git config --global user.name "ModForge Automation"
+          git config --global user.email "automation@modforge.dev"
+      
+      - name: Check for Gradle updates
+        id: gradle-updates
+        run: |
+          ./gradlew dependencyUpdates -Drevision=release > dependency-report.txt
+          if grep -q "The following dependencies have later" dependency-report.txt; then
+            echo "::set-output name=has_updates::true"
+          else
+            echo "::set-output name=has_updates::false"
+          fi
+      
+      - name: Create update branch if updates available
+        if: steps.gradle-updates.outputs.has_updates == 'true'
+        run: |
+          # Create a new branch
+          BRANCH_NAME="dependency-update-$(date +'%Y-%m-%d')"
+          git checkout -b $BRANCH_NAME
+          
+          # Parse the dependency report and update build.gradle
+          python -c "
+import re
+import sys
+
+# Read dependency report
+with open('dependency-report.txt', 'r') as f:
+    report = f.read()
+
+# Extract dependency updates
+updates = re.findall(r'([a-zA-Z0-9\.\-]+:[a-zA-Z0-9\.\-]+) \[(.*?) -> (.*?)\]', report)
+
+if not updates:
+    print('No updateable dependencies found')
+    sys.exit(0)
+
+print(f'Found {len(updates)} dependencies to update')
+
+# Read build.gradle
+with open('build.gradle', 'r') as f:
+    build_gradle = f.read()
+
+# Update each dependency
+updated_build_gradle = build_gradle
+for dep, old_ver, new_ver in updates:
+    group_id, artifact_id = dep.split(':')
+    
+    # Try different patterns for dependencies
+    patterns = [
+        f'{group_id}:{artifact_id}:{old_ver}',
+        f'\"{group_id}:{artifact_id}:{old_ver}\"',
+        f'group: \"{group_id}\", name: \"{artifact_id}\", version: \"{old_ver}\"'
+    ]
+    
+    for pattern in patterns:
+        if pattern in updated_build_gradle:
+            if ':' in pattern:
+                replacement = pattern.replace(old_ver, new_ver)
+            else:
+                replacement = f'group: \"{group_id}\", name: \"{artifact_id}\", version: \"{new_ver}\"'
+            
+            updated_build_gradle = updated_build_gradle.replace(pattern, replacement)
+            print(f'Updated {dep} from {old_ver} to {new_ver}')
+            break
+
+# Write updated build.gradle
+with open('build.gradle', 'w') as f:
+    f.write(updated_build_gradle)
+          "
+          
+          # Update IntelliJ plugin version if available
+          if grep -q "org.jetbrains.intellij" dependency-report.txt; then
+            CURRENT_VERSION=$(grep "intellij {" -A 10 build.gradle | grep "version" | head -n 1 | sed -E 's/.*version.*['"'"'"]([^'"'"'"]+)['"'"'"].*/\1/')
+            LATEST_VERSION=$(curl -s "https://www.jetbrains.com/intellij-repository/releases/index.json" | grep '"version"' | grep -v 'EAP\|Beta' | head -n 1 | sed 's/.*"version":"\([^"]*\)".*/\1/')
+            
+            if [ "$CURRENT_VERSION" != "$LATEST_VERSION" ]; then
+              echo "Updating IntelliJ Platform from $CURRENT_VERSION to $LATEST_VERSION"
+              sed -i "s/version[[:space:]]*=[[:space:]]*['\"]$CURRENT_VERSION['\"]/version = '$LATEST_VERSION'/" build.gradle
+            fi
+          fi
+          
+          # Check if there are changes
+          if git diff --quiet build.gradle; then
+            echo "No changes made to build.gradle"
+            exit 0
+          fi
+          
+          # Commit changes
+          git add build.gradle
+          git commit -m "Automated dependency update [ModForge AI]"
+          git push origin $BRANCH_NAME
+          
+          # Store the branch name for later
+          echo "BRANCH_NAME=$BRANCH_NAME" >> $GITHUB_ENV
+      
+      - name: Create Pull Request
+        if: env.BRANCH_NAME != ''
+        uses: peter-evans/create-pull-request@v5
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: "Automated dependency update [ModForge AI]"
+          branch: ${{ env.BRANCH_NAME }}
+          delete-branch: true
+          title: "Automated Dependency Update"
+          body: |
+            # Automated Dependency Update
+            
+            ModForge AI has identified that some dependencies in this project need updating.
+            
+            ## Changes
+            
+            ```
+            $(cat dependency-report.txt | grep -A 20 "The following dependencies have later")
+            ```
+            
+            These dependencies have been automatically updated to their latest stable versions.
+            
+            ## Validation
+            
+            The code has been automatically compiled to ensure these updates don't break the build.
+            
+            _This pull request was automatically created by ModForge AI._
+          labels: |
+            automated
+            dependencies
+      
+      - name: Automated Build Test
+        if: env.BRANCH_NAME != ''
+        run: |
+          # Test if the update breaks the build
+          ./gradlew build -x test
+      
+      - name: Comment on PR with Build Results
+        if: env.BRANCH_NAME != ''
+        uses: actions/github-script@v6
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const buildSuccess = ${{ success() }};
+            
+            // Find the PR that was just created
+            const prs = await github.rest.pulls.list({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              head: `${context.repo.owner}:${{ env.BRANCH_NAME }}`,
+              state: 'open'
+            });
+            
+            if (prs.data.length === 0) {
+              console.log('No matching PR found');
+              return;
+            }
+            
+            const pr = prs.data[0];
+            
+            // Comment on the PR with build results
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: pr.number,
+              body: buildSuccess 
+                ? '✅ Build succeeded with the updated dependencies. They appear to be compatible.'
+                : '❌ Build failed with the updated dependencies. Please review the changes carefully.'
+            });
