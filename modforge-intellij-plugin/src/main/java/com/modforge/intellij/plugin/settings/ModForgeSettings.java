@@ -2,6 +2,7 @@ package com.modforge.intellij.plugin.settings;
 
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.components.PersistentStateComponent;
+import com.intellij.openapi.components.Service;
 import com.intellij.openapi.components.State;
 import com.intellij.openapi.components.Storage;
 import com.intellij.util.xmlb.XmlSerializerUtil;
@@ -9,22 +10,36 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * Settings for the ModForge plugin.
- * This class is responsible for storing and retrieving plugin settings.
+ * Persistent settings for the ModForge plugin.
  */
+@Service
 @State(
         name = "ModForgeSettings",
-        storages = {@Storage("modforge.xml")}
+        storages = {
+                @Storage("modforge-settings.xml")
+        }
 )
 public final class ModForgeSettings implements PersistentStateComponent<ModForgeSettings> {
+    // OpenAI settings
     private String openAiApiKey = "";
     private String openAiModel = "gpt-4";
     private int maxTokens = 2048;
     private double temperature = 0.7;
-    private boolean usePatternRecognition = true;
-    private boolean syncWithWebEnabled = true;
-    private String webSyncUrl = "";
-    private String webSyncApiKey = "";
+    
+    // Feature toggles
+    private boolean continuousDevelopmentEnabled = false;
+    private boolean patternRecognitionEnabled = true;
+    
+    // Development settings
+    private long checkIntervalMs = 60_000L; // 1 minute
+    private boolean autoCompileEnabled = true;
+    private boolean autoFixEnabled = true;
+    private boolean autoDocumentEnabled = false;
+    
+    // Mod loader settings
+    private boolean forgeSupported = true;
+    private boolean fabricSupported = true;
+    private boolean quiltSupported = true;
     
     /**
      * Gets the instance of the settings.
@@ -34,9 +49,8 @@ public final class ModForgeSettings implements PersistentStateComponent<ModForge
         return ApplicationManager.getApplication().getService(ModForgeSettings.class);
     }
     
-    @Nullable
     @Override
-    public ModForgeSettings getState() {
+    public @Nullable ModForgeSettings getState() {
         return this;
     }
     
@@ -45,135 +59,115 @@ public final class ModForgeSettings implements PersistentStateComponent<ModForge
         XmlSerializerUtil.copyBean(state, this);
     }
     
-    /**
-     * Gets the OpenAI API key.
-     * @return The API key
-     */
-    @NotNull
+    // OpenAI settings
+    
     public String getOpenAiApiKey() {
         return openAiApiKey;
     }
     
-    /**
-     * Sets the OpenAI API key.
-     * @param openAiApiKey The API key
-     */
-    public void setOpenAiApiKey(@NotNull String openAiApiKey) {
+    public void setOpenAiApiKey(String openAiApiKey) {
         this.openAiApiKey = openAiApiKey;
     }
     
-    /**
-     * Gets the OpenAI model.
-     * @return The model
-     */
-    @NotNull
     public String getOpenAiModel() {
         return openAiModel;
     }
     
-    /**
-     * Sets the OpenAI model.
-     * @param openAiModel The model
-     */
-    public void setOpenAiModel(@NotNull String openAiModel) {
+    public void setOpenAiModel(String openAiModel) {
         this.openAiModel = openAiModel;
     }
     
-    /**
-     * Gets the maximum tokens.
-     * @return The maximum tokens
-     */
     public int getMaxTokens() {
         return maxTokens;
     }
     
-    /**
-     * Sets the maximum tokens.
-     * @param maxTokens The maximum tokens
-     */
     public void setMaxTokens(int maxTokens) {
         this.maxTokens = maxTokens;
     }
     
-    /**
-     * Gets the temperature.
-     * @return The temperature
-     */
     public double getTemperature() {
         return temperature;
     }
     
-    /**
-     * Sets the temperature.
-     * @param temperature The temperature
-     */
     public void setTemperature(double temperature) {
         this.temperature = temperature;
     }
     
-    /**
-     * Checks if pattern recognition is enabled.
-     * @return {@code true} if pattern recognition is enabled, {@code false} otherwise
-     */
-    public boolean isUsePatternRecognition() {
-        return usePatternRecognition;
+    // Feature toggles
+    
+    public boolean isContinuousDevelopmentEnabled() {
+        return continuousDevelopmentEnabled;
     }
     
-    /**
-     * Sets whether pattern recognition is enabled.
-     * @param usePatternRecognition {@code true} to enable pattern recognition, {@code false} to disable it
-     */
-    public void setUsePatternRecognition(boolean usePatternRecognition) {
-        this.usePatternRecognition = usePatternRecognition;
+    public void setContinuousDevelopmentEnabled(boolean continuousDevelopmentEnabled) {
+        this.continuousDevelopmentEnabled = continuousDevelopmentEnabled;
     }
     
-    /**
-     * Checks if sync with web is enabled.
-     * @return {@code true} if sync with web is enabled, {@code false} otherwise
-     */
-    public boolean isSyncWithWebEnabled() {
-        return syncWithWebEnabled;
+    public boolean isPatternRecognitionEnabled() {
+        return patternRecognitionEnabled;
     }
     
-    /**
-     * Sets whether sync with web is enabled.
-     * @param syncWithWebEnabled {@code true} to enable sync with web, {@code false} to disable it
-     */
-    public void setSyncWithWebEnabled(boolean syncWithWebEnabled) {
-        this.syncWithWebEnabled = syncWithWebEnabled;
+    public void setPatternRecognitionEnabled(boolean patternRecognitionEnabled) {
+        this.patternRecognitionEnabled = patternRecognitionEnabled;
     }
     
-    /**
-     * Gets the web sync URL.
-     * @return The web sync URL
-     */
-    @NotNull
-    public String getWebSyncUrl() {
-        return webSyncUrl;
+    // Development settings
+    
+    public long getCheckIntervalMs() {
+        return checkIntervalMs;
     }
     
-    /**
-     * Sets the web sync URL.
-     * @param webSyncUrl The web sync URL
-     */
-    public void setWebSyncUrl(@NotNull String webSyncUrl) {
-        this.webSyncUrl = webSyncUrl;
+    public void setCheckIntervalMs(long checkIntervalMs) {
+        this.checkIntervalMs = checkIntervalMs;
     }
     
-    /**
-     * Gets the web sync API key.
-     * @return The web sync API key
-     */
-    @NotNull
-    public String getWebSyncApiKey() {
-        return webSyncApiKey;
+    public boolean isAutoCompileEnabled() {
+        return autoCompileEnabled;
     }
     
-    /**
-     * Sets the web sync API key.
-     * @param webSyncApiKey The web sync API key
-     */
-    public void setWebSyncApiKey(@NotNull String webSyncApiKey) {
-        this.webSyncApiKey = webSyncApiKey;
+    public void setAutoCompileEnabled(boolean autoCompileEnabled) {
+        this.autoCompileEnabled = autoCompileEnabled;
+    }
+    
+    public boolean isAutoFixEnabled() {
+        return autoFixEnabled;
+    }
+    
+    public void setAutoFixEnabled(boolean autoFixEnabled) {
+        this.autoFixEnabled = autoFixEnabled;
+    }
+    
+    public boolean isAutoDocumentEnabled() {
+        return autoDocumentEnabled;
+    }
+    
+    public void setAutoDocumentEnabled(boolean autoDocumentEnabled) {
+        this.autoDocumentEnabled = autoDocumentEnabled;
+    }
+    
+    // Mod loader settings
+    
+    public boolean isForgeSupported() {
+        return forgeSupported;
+    }
+    
+    public void setForgeSupported(boolean forgeSupported) {
+        this.forgeSupported = forgeSupported;
+    }
+    
+    public boolean isFabricSupported() {
+        return fabricSupported;
+    }
+    
+    public void setFabricSupported(boolean fabricSupported) {
+        this.fabricSupported = fabricSupported;
+    }
+    
+    public boolean isQuiltSupported() {
+        return quiltSupported;
+    }
+    
+    public void setQuiltSupported(boolean quiltSupported) {
+        this.quiltSupported = quiltSupported;
     }
 }

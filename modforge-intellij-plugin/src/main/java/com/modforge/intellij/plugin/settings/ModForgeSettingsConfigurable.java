@@ -3,38 +3,37 @@ package com.modforge.intellij.plugin.settings;
 import com.intellij.openapi.options.Configurable;
 import com.intellij.openapi.options.ConfigurationException;
 import com.intellij.openapi.ui.ComboBox;
-import com.intellij.ui.DocumentAdapter;
-import com.intellij.ui.JBIntSpinner;
 import com.intellij.ui.components.JBCheckBox;
 import com.intellij.ui.components.JBLabel;
 import com.intellij.ui.components.JBPasswordField;
 import com.intellij.ui.components.JBTextField;
 import com.intellij.util.ui.FormBuilder;
-import com.intellij.util.ui.JBUI;
+import com.intellij.util.ui.UI;
 import org.jetbrains.annotations.Nls;
 import org.jetbrains.annotations.Nullable;
 
 import javax.swing.*;
-import javax.swing.event.DocumentEvent;
 import java.awt.*;
-import java.util.Objects;
 
 /**
- * Configurable for ModForge settings.
- * This class provides UI for editing ModForge settings.
+ * Settings panel for the ModForge plugin.
  */
 public final class ModForgeSettingsConfigurable implements Configurable {
+    // UI components
     private JPanel mainPanel;
     private JBPasswordField apiKeyField;
     private ComboBox<String> modelComboBox;
-    private JBIntSpinner maxTokensSpinner;
-    private JBIntSpinner temperatureSpinner;
-    private JBCheckBox usePatternRecognitionCheckBox;
-    private JBCheckBox syncWithWebEnabledCheckBox;
-    private JBTextField webSyncUrlField;
-    private JBPasswordField webSyncApiKeyField;
-    
-    private boolean isModified = false;
+    private JSpinner maxTokensSpinner;
+    private JSpinner temperatureSpinner;
+    private JBCheckBox continuousDevelopmentCheckbox;
+    private JBCheckBox patternRecognitionCheckbox;
+    private JSpinner checkIntervalSpinner;
+    private JBCheckBox autoCompileCheckbox;
+    private JBCheckBox autoFixCheckbox;
+    private JBCheckBox autoDocumentCheckbox;
+    private JBCheckBox forgeSupportCheckbox;
+    private JBCheckBox fabricSupportCheckbox;
+    private JBCheckBox quiltSupportCheckbox;
     
     @Nls(capitalization = Nls.Capitalization.Title)
     @Override
@@ -42,157 +41,169 @@ public final class ModForgeSettingsConfigurable implements Configurable {
         return "ModForge";
     }
     
-    @Nullable
     @Override
-    public JComponent createComponent() {
-        // Create API key field
-        apiKeyField = new JBPasswordField();
-        apiKeyField.getDocument().addDocumentListener(new DocumentAdapter() {
-            @Override
-            protected void textChanged(DocumentEvent e) {
-                isModified = true;
-            }
-        });
+    public @Nullable JComponent createComponent() {
+        // Initialize UI components
+        createUIComponents();
         
-        // Create model combo box
-        modelComboBox = new ComboBox<>(new String[] {
-                "gpt-4",
-                "gpt-4-32k",
-                "gpt-3.5-turbo",
-                "gpt-3.5-turbo-16k"
-        });
-        modelComboBox.addActionListener(e -> isModified = true);
+        // Create form
+        FormBuilder formBuilder = FormBuilder.createFormBuilder();
         
-        // Create max tokens spinner
-        maxTokensSpinner = new JBIntSpinner(2048, 100, 32000, 100);
-        maxTokensSpinner.addChangeListener(e -> isModified = true);
+        // OpenAI settings section
+        formBuilder.addComponent(new JBLabel("OpenAI Settings"));
+        formBuilder.addLabeledComponent("API Key:", apiKeyField);
+        formBuilder.addLabeledComponent("Model:", modelComboBox);
+        formBuilder.addLabeledComponent("Max Tokens:", maxTokensSpinner);
+        formBuilder.addLabeledComponent("Temperature:", temperatureSpinner);
+        formBuilder.addSeparator();
         
-        // Create temperature spinner (0.0 to 1.0 in 0.1 increments)
-        SpinnerNumberModel temperatureModel = new SpinnerNumberModel(0.7, 0.0, 1.0, 0.1);
-        temperatureSpinner = new JBIntSpinner(temperatureModel);
-        temperatureSpinner.addChangeListener(e -> isModified = true);
+        // Feature toggles section
+        formBuilder.addComponent(new JBLabel("Feature Toggles"));
+        formBuilder.addComponent(continuousDevelopmentCheckbox);
+        formBuilder.addComponent(patternRecognitionCheckbox);
+        formBuilder.addSeparator();
         
-        // Create pattern recognition checkbox
-        usePatternRecognitionCheckBox = new JBCheckBox("Use pattern recognition to reduce API usage");
-        usePatternRecognitionCheckBox.addActionListener(e -> isModified = true);
+        // Development settings section
+        formBuilder.addComponent(new JBLabel("Development Settings"));
+        formBuilder.addLabeledComponent("Check Interval (ms):", checkIntervalSpinner);
+        formBuilder.addComponent(autoCompileCheckbox);
+        formBuilder.addComponent(autoFixCheckbox);
+        formBuilder.addComponent(autoDocumentCheckbox);
+        formBuilder.addSeparator();
         
-        // Create sync with web enabled checkbox
-        syncWithWebEnabledCheckBox = new JBCheckBox("Enable synchronization with web platform");
-        syncWithWebEnabledCheckBox.addActionListener(e -> {
-            isModified = true;
-            updateWebSyncFields();
-        });
+        // Mod loader settings section
+        formBuilder.addComponent(new JBLabel("Mod Loader Support"));
+        formBuilder.addComponent(forgeSupportCheckbox);
+        formBuilder.addComponent(fabricSupportCheckbox);
+        formBuilder.addComponent(quiltSupportCheckbox);
         
-        // Create web sync URL field
-        webSyncUrlField = new JBTextField();
-        webSyncUrlField.getDocument().addDocumentListener(new DocumentAdapter() {
-            @Override
-            protected void textChanged(DocumentEvent e) {
-                isModified = true;
-            }
-        });
-        
-        // Create web sync API key field
-        webSyncApiKeyField = new JBPasswordField();
-        webSyncApiKeyField.getDocument().addDocumentListener(new DocumentAdapter() {
-            @Override
-            protected void textChanged(DocumentEvent e) {
-                isModified = true;
-            }
-        });
-        
-        // Create main panel
-        mainPanel = FormBuilder.createFormBuilder()
-                .addComponent(new JBLabel("OpenAI Settings"))
-                .addVerticalGap(5)
-                .addLabeledComponent("API Key:", apiKeyField)
-                .addLabeledComponent("Model:", modelComboBox)
-                .addLabeledComponent("Max Tokens:", maxTokensSpinner)
-                .addLabeledComponent("Temperature:", temperatureSpinner)
-                .addComponent(usePatternRecognitionCheckBox)
-                .addVerticalGap(20)
-                .addComponent(new JBLabel("Web Platform Integration"))
-                .addVerticalGap(5)
-                .addComponent(syncWithWebEnabledCheckBox)
-                .addLabeledComponent("URL:", webSyncUrlField)
-                .addLabeledComponent("API Key:", webSyncApiKeyField)
-                .addComponentFillVertically(new JPanel(), 0)
-                .getPanel();
-        
-        mainPanel.setBorder(JBUI.Borders.empty(10));
-        
-        // Load settings
-        reset();
+        // Add some spacing
+        mainPanel = formBuilder.addComponentFillVertically(new JPanel(), 0).getPanel();
         
         return mainPanel;
     }
     
+    /**
+     * Creates the UI components.
+     */
+    private void createUIComponents() {
+        // OpenAI settings
+        apiKeyField = new JBPasswordField();
+        
+        modelComboBox = new ComboBox<>(new String[] {
+                "gpt-4",
+                "gpt-4-turbo",
+                "gpt-3.5-turbo",
+                "gpt-3.5-turbo-16k"
+        });
+        
+        maxTokensSpinner = new JSpinner(new SpinnerNumberModel(2048, 16, 32768, 16));
+        
+        temperatureSpinner = new JSpinner(new SpinnerNumberModel(0.7, 0.0, 2.0, 0.1));
+        
+        // Feature toggles
+        continuousDevelopmentCheckbox = new JBCheckBox("Enable Continuous Development", false);
+        patternRecognitionCheckbox = new JBCheckBox("Enable Pattern Recognition", true);
+        
+        // Development settings
+        checkIntervalSpinner = new JSpinner(new SpinnerNumberModel(60000, 1000, 3600000, 1000));
+        
+        autoCompileCheckbox = new JBCheckBox("Auto-Compile", true);
+        autoFixCheckbox = new JBCheckBox("Auto-Fix Errors", true);
+        autoDocumentCheckbox = new JBCheckBox("Auto-Document Code", false);
+        
+        // Mod loader settings
+        forgeSupportCheckbox = new JBCheckBox("Forge", true);
+        fabricSupportCheckbox = new JBCheckBox("Fabric", true);
+        quiltSupportCheckbox = new JBCheckBox("Quilt", true);
+    }
+    
     @Override
     public boolean isModified() {
-        return isModified;
+        ModForgeSettings settings = ModForgeSettings.getInstance();
+        
+        // OpenAI settings
+        if (!settings.getOpenAiApiKey().equals(new String(apiKeyField.getPassword())) ||
+                !settings.getOpenAiModel().equals(modelComboBox.getItem()) ||
+                settings.getMaxTokens() != (int) maxTokensSpinner.getValue() ||
+                Math.abs(settings.getTemperature() - (double) temperatureSpinner.getValue()) > 0.001) {
+            return true;
+        }
+        
+        // Feature toggles
+        if (settings.isContinuousDevelopmentEnabled() != continuousDevelopmentCheckbox.isSelected() ||
+                settings.isPatternRecognitionEnabled() != patternRecognitionCheckbox.isSelected()) {
+            return true;
+        }
+        
+        // Development settings
+        if (settings.getCheckIntervalMs() != (long) (int) checkIntervalSpinner.getValue() ||
+                settings.isAutoCompileEnabled() != autoCompileCheckbox.isSelected() ||
+                settings.isAutoFixEnabled() != autoFixCheckbox.isSelected() ||
+                settings.isAutoDocumentEnabled() != autoDocumentCheckbox.isSelected()) {
+            return true;
+        }
+        
+        // Mod loader settings
+        if (settings.isForgeSupported() != forgeSupportCheckbox.isSelected() ||
+                settings.isFabricSupported() != fabricSupportCheckbox.isSelected() ||
+                settings.isQuiltSupported() != quiltSupportCheckbox.isSelected()) {
+            return true;
+        }
+        
+        return false;
     }
     
     @Override
     public void apply() throws ConfigurationException {
         ModForgeSettings settings = ModForgeSettings.getInstance();
         
-        // Validate and save settings
-        if (apiKeyField.getPassword().length == 0) {
-            throw new ConfigurationException("OpenAI API Key is required. Get one at https://platform.openai.com/api-keys", "Missing API Key");
-        }
+        // OpenAI settings
+        settings.setOpenAiApiKey(new String(apiKeyField.getPassword()));
+        settings.setOpenAiModel(modelComboBox.getItem());
+        settings.setMaxTokens((int) maxTokensSpinner.getValue());
+        settings.setTemperature((double) temperatureSpinner.getValue());
         
-        // Get values
-        String apiKey = new String(apiKeyField.getPassword());
-        String model = (String) modelComboBox.getSelectedItem();
-        int maxTokens = maxTokensSpinner.getNumber();
-        double temperature = ((Number) temperatureSpinner.getValue()).doubleValue();
-        boolean usePatternRecognition = usePatternRecognitionCheckBox.isSelected();
-        boolean syncWithWebEnabled = syncWithWebEnabledCheckBox.isSelected();
-        String webSyncUrl = webSyncUrlField.getText();
-        String webSyncApiKey = new String(webSyncApiKeyField.getPassword());
+        // Feature toggles
+        settings.setContinuousDevelopmentEnabled(continuousDevelopmentCheckbox.isSelected());
+        settings.setPatternRecognitionEnabled(patternRecognitionCheckbox.isSelected());
         
-        // Validate web sync settings if enabled
-        if (syncWithWebEnabled) {
-            if (webSyncUrl.isEmpty()) {
-                throw new ConfigurationException("Web Sync URL is required when synchronization is enabled", "Missing Web Sync URL");
-            }
-            
-            if (webSyncApiKey.isEmpty()) {
-                throw new ConfigurationException("Web Sync API Key is required when synchronization is enabled", "Missing Web Sync API Key");
-            }
-        }
+        // Development settings
+        settings.setCheckIntervalMs((long) (int) checkIntervalSpinner.getValue());
+        settings.setAutoCompileEnabled(autoCompileCheckbox.isSelected());
+        settings.setAutoFixEnabled(autoFixCheckbox.isSelected());
+        settings.setAutoDocumentEnabled(autoDocumentCheckbox.isSelected());
         
-        // Update settings
-        settings.setOpenAiApiKey(apiKey);
-        settings.setOpenAiModel(model);
-        settings.setMaxTokens(maxTokens);
-        settings.setTemperature(temperature);
-        settings.setUsePatternRecognition(usePatternRecognition);
-        settings.setSyncWithWebEnabled(syncWithWebEnabled);
-        settings.setWebSyncUrl(webSyncUrl);
-        settings.setWebSyncApiKey(webSyncApiKey);
-        
-        isModified = false;
+        // Mod loader settings
+        settings.setForgeSupported(forgeSupportCheckbox.isSelected());
+        settings.setFabricSupported(fabricSupportCheckbox.isSelected());
+        settings.setQuiltSupported(quiltSupportCheckbox.isSelected());
     }
     
     @Override
     public void reset() {
         ModForgeSettings settings = ModForgeSettings.getInstance();
         
-        // Load settings
+        // OpenAI settings
         apiKeyField.setText(settings.getOpenAiApiKey());
-        modelComboBox.setSelectedItem(settings.getOpenAiModel());
-        maxTokensSpinner.setNumber(settings.getMaxTokens());
+        modelComboBox.setItem(settings.getOpenAiModel());
+        maxTokensSpinner.setValue(settings.getMaxTokens());
         temperatureSpinner.setValue(settings.getTemperature());
-        usePatternRecognitionCheckBox.setSelected(settings.isUsePatternRecognition());
-        syncWithWebEnabledCheckBox.setSelected(settings.isSyncWithWebEnabled());
-        webSyncUrlField.setText(settings.getWebSyncUrl());
-        webSyncApiKeyField.setText(settings.getWebSyncApiKey());
         
-        // Update UI state
-        updateWebSyncFields();
+        // Feature toggles
+        continuousDevelopmentCheckbox.setSelected(settings.isContinuousDevelopmentEnabled());
+        patternRecognitionCheckbox.setSelected(settings.isPatternRecognitionEnabled());
         
-        isModified = false;
+        // Development settings
+        checkIntervalSpinner.setValue((int) settings.getCheckIntervalMs());
+        autoCompileCheckbox.setSelected(settings.isAutoCompileEnabled());
+        autoFixCheckbox.setSelected(settings.isAutoFixEnabled());
+        autoDocumentCheckbox.setSelected(settings.isAutoDocumentEnabled());
+        
+        // Mod loader settings
+        forgeSupportCheckbox.setSelected(settings.isForgeSupported());
+        fabricSupportCheckbox.setSelected(settings.isFabricSupported());
+        quiltSupportCheckbox.setSelected(settings.isQuiltSupported());
     }
     
     @Override
@@ -202,19 +213,14 @@ public final class ModForgeSettingsConfigurable implements Configurable {
         modelComboBox = null;
         maxTokensSpinner = null;
         temperatureSpinner = null;
-        usePatternRecognitionCheckBox = null;
-        syncWithWebEnabledCheckBox = null;
-        webSyncUrlField = null;
-        webSyncApiKeyField = null;
-    }
-    
-    /**
-     * Updates the web sync fields based on the enabled state.
-     */
-    private void updateWebSyncFields() {
-        boolean enabled = syncWithWebEnabledCheckBox.isSelected();
-        
-        webSyncUrlField.setEnabled(enabled);
-        webSyncApiKeyField.setEnabled(enabled);
+        continuousDevelopmentCheckbox = null;
+        patternRecognitionCheckbox = null;
+        checkIntervalSpinner = null;
+        autoCompileCheckbox = null;
+        autoFixCheckbox = null;
+        autoDocumentCheckbox = null;
+        forgeSupportCheckbox = null;
+        fabricSupportCheckbox = null;
+        quiltSupportCheckbox = null;
     }
 }

@@ -3,51 +3,31 @@ package com.modforge.intellij.plugin.ai;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.components.Service;
 import com.intellij.openapi.diagnostic.Logger;
+import com.intellij.util.io.HttpRequests;
+import com.intellij.util.io.JsonReader;
+import com.intellij.util.io.JsonUtil;
+import com.intellij.util.io.RequestBuilder;
 import com.modforge.intellij.plugin.settings.ModForgeSettings;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.io.IOException;
-import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
-import java.time.Duration;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.Executor;
-import java.util.concurrent.Executors;
 
 /**
- * Service that manages AI API requests.
- * This service is responsible for handling requests to the OpenAI API.
+ * Service for managing AI services.
+ * This service provides access to AI APIs for code generation, error fixing, and documentation.
  */
-@Service(Service.Level.APP)
+@Service
 public final class AIServiceManager {
     private static final Logger LOG = Logger.getInstance(AIServiceManager.class);
-    private static final int DEFAULT_TIMEOUT_SECONDS = 60;
     private static final String OPENAI_API_URL = "https://api.openai.com/v1/chat/completions";
-    private static final String DEFAULT_MODEL = "gpt-4o";
-    
-    private final HttpClient httpClient;
-    private final Executor executor;
     
     /**
-     * Creates a new AIServiceManager.
-     */
-    public AIServiceManager() {
-        this.httpClient = HttpClient.newBuilder()
-                .connectTimeout(Duration.ofSeconds(DEFAULT_TIMEOUT_SECONDS))
-                .build();
-        
-        this.executor = Executors.newCachedThreadPool();
-        
-        LOG.info("AI service manager created");
-    }
-    
-    /**
-     * Gets the AI service manager.
+     * Gets the instance of the service.
      * @return The AI service manager
      */
     public static AIServiceManager getInstance() {
@@ -55,233 +35,216 @@ public final class AIServiceManager {
     }
     
     /**
-     * Generates a chat completion using the OpenAI API.
+     * Generates code based on a prompt.
      * @param prompt The prompt
+     * @param language The programming language
      * @param options Additional options
-     * @return A future that completes with the response
+     * @return The generated code
+     * @throws IOException If an IO error occurs
      */
-    public CompletableFuture<String> generateChatCompletion(@NotNull String prompt, @Nullable Map<String, Object> options) {
-        LOG.info("Generating chat completion for prompt: " + prompt);
+    @NotNull
+    public String generateCode(@NotNull String prompt, @NotNull String language, @Nullable Map<String, Object> options) throws IOException {
+        // Create system prompt for code generation
+        String systemPrompt = "You are an expert " + language + " developer. " +
+                "You provide well-written, clean, and efficient code. " +
+                "Focus on generating code that solves the user's problem. " +
+                "Only respond with code without explanation or additional text.";
         
-        // Create options if null
-        Map<String, Object> requestOptions = options != null ? new HashMap<>(options) : new HashMap<>();
+        // Create full prompt
+        String fullPrompt = "Write " + language + " code for the following: " + prompt;
+        
+        // Make API request
+        return makeAiRequest(systemPrompt, fullPrompt);
+    }
+    
+    /**
+     * Fixes code errors.
+     * @param code The code to fix
+     * @param errorMessage The error message
+     * @param options Additional options
+     * @return The fixed code
+     * @throws IOException If an IO error occurs
+     */
+    @NotNull
+    public String fixCode(@NotNull String code, @Nullable String errorMessage, @Nullable Map<String, Object> options) throws IOException {
+        // Create system prompt for error fixing
+        String systemPrompt = "You are an expert developer. " +
+                "You fix code errors precisely without changing functionality. " +
+                "Only respond with the corrected code without explanation or additional text.";
+        
+        // Create full prompt
+        StringBuilder fullPrompt = new StringBuilder("Fix the following code:\n\n");
+        fullPrompt.append("```\n").append(code).append("\n```\n\n");
+        
+        if (errorMessage != null && !errorMessage.isEmpty()) {
+            fullPrompt.append("Error message: ").append(errorMessage).append("\n\n");
+        }
+        
+        fullPrompt.append("Return the complete fixed code.");
+        
+        // Make API request
+        return makeAiRequest(systemPrompt, fullPrompt.toString());
+    }
+    
+    /**
+     * Generates documentation for code.
+     * @param code The code to document
+     * @param options Additional options
+     * @return The documented code
+     * @throws IOException If an IO error occurs
+     */
+    @NotNull
+    public String generateDocumentation(@NotNull String code, @Nullable Map<String, Object> options) throws IOException {
+        // Create system prompt for documentation generation
+        String systemPrompt = "You are an expert developer. " +
+                "You add high-quality documentation to code. " +
+                "Add JavaDoc or appropriate documentation comments to classes, methods, and fields. " +
+                "Only respond with the documented code without explanation or additional text.";
+        
+        // Create full prompt
+        StringBuilder fullPrompt = new StringBuilder("Add documentation to the following code:\n\n");
+        fullPrompt.append("```\n").append(code).append("\n```\n\n");
+        fullPrompt.append("Return the complete documented code.");
+        
+        // Make API request
+        return makeAiRequest(systemPrompt, fullPrompt.toString());
+    }
+    
+    /**
+     * Explains code.
+     * @param code The code to explain
+     * @param options Additional options
+     * @return The explanation
+     * @throws IOException If an IO error occurs
+     */
+    @NotNull
+    public String explainCode(@NotNull String code, @Nullable Map<String, Object> options) throws IOException {
+        // Create system prompt for code explanation
+        String systemPrompt = "You are an expert developer. " +
+                "You explain code clearly and concisely. " +
+                "Focus on the purpose, structure, and functionality of the code.";
+        
+        // Create full prompt
+        StringBuilder fullPrompt = new StringBuilder("Explain the following code:\n\n");
+        fullPrompt.append("```\n").append(code).append("\n```\n\n");
+        fullPrompt.append("Provide a clear explanation of what this code does, how it works, and any notable patterns or techniques used.");
+        
+        // Make API request
+        return makeAiRequest(systemPrompt, fullPrompt.toString());
+    }
+    
+    /**
+     * Adds features to code.
+     * @param code The code to add features to
+     * @param featureDescription The feature description
+     * @param options Additional options
+     * @return The enhanced code
+     * @throws IOException If an IO error occurs
+     */
+    @NotNull
+    public String addFeatures(@NotNull String code, @NotNull String featureDescription, @Nullable Map<String, Object> options) throws IOException {
+        // Create system prompt for feature addition
+        String systemPrompt = "You are an expert developer. " +
+                "You add features to existing code while maintaining code style and structure. " +
+                "Only respond with the enhanced code without explanation or additional text.";
+        
+        // Create full prompt
+        StringBuilder fullPrompt = new StringBuilder("Add the following feature to this code:\n\n");
+        fullPrompt.append("Feature description: ").append(featureDescription).append("\n\n");
+        fullPrompt.append("Existing code:\n```\n").append(code).append("\n```\n\n");
+        fullPrompt.append("Return the complete enhanced code with the new feature implemented.");
+        
+        // Make API request
+        return makeAiRequest(systemPrompt, fullPrompt.toString());
+    }
+    
+    /**
+     * Makes an API request to the AI service.
+     * @param systemPrompt The system prompt
+     * @param userPrompt The user prompt
+     * @return The response
+     * @throws IOException If an IO error occurs
+     */
+    @NotNull
+    private String makeAiRequest(@NotNull String systemPrompt, @NotNull String userPrompt) throws IOException {
+        // Get settings
+        ModForgeSettings settings = ModForgeSettings.getInstance();
+        String apiKey = settings.getOpenAiApiKey();
+        String model = settings.getOpenAiModel();
+        int maxTokens = settings.getMaxTokens();
+        double temperature = settings.getTemperature();
+        
+        // Validate API key
+        if (apiKey.isEmpty()) {
+            throw new IOException("OpenAI API key is not configured. Please set it in the settings.");
+        }
         
         // Create request body
         Map<String, Object> requestBody = new HashMap<>();
-        
-        // Set model
-        String model = (String) requestOptions.getOrDefault("model", DEFAULT_MODEL);
         requestBody.put("model", model);
-        
-        // Set messages
-        Object systemPrompt = requestOptions.get("systemPrompt");
-        
-        if (systemPrompt != null) {
-            requestBody.put("messages", new Object[]{
-                    Map.of("role", "system", "content", systemPrompt),
-                    Map.of("role", "user", "content", prompt)
-            });
-        } else {
-            requestBody.put("messages", new Object[]{
-                    Map.of("role", "user", "content", prompt)
-            });
-        }
-        
-        // Set temperature
-        Object temperature = requestOptions.getOrDefault("temperature", 0.7);
         requestBody.put("temperature", temperature);
-        
-        // Set max tokens
-        Object maxTokens = requestOptions.getOrDefault("maxTokens", 2048);
         requestBody.put("max_tokens", maxTokens);
         
-        // Convert request body to JSON
-        String requestBodyJson = toJson(requestBody);
+        List<Map<String, String>> messages = new ArrayList<>();
         
-        // Create HTTP request
-        HttpRequest request = HttpRequest.newBuilder()
-                .uri(URI.create(OPENAI_API_URL))
-                .header("Content-Type", "application/json")
-                .header("Authorization", "Bearer " + getApiKey())
-                .POST(HttpRequest.BodyPublishers.ofString(requestBodyJson))
-                .build();
+        // Add system message
+        Map<String, String> systemMessage = new HashMap<>();
+        systemMessage.put("role", "system");
+        systemMessage.put("content", systemPrompt);
+        messages.add(systemMessage);
         
-        // Send request asynchronously
-        return CompletableFuture.supplyAsync(() -> {
-            try {
-                HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+        // Add user message
+        Map<String, String> userMessage = new HashMap<>();
+        userMessage.put("role", "user");
+        userMessage.put("content", userPrompt);
+        messages.add(userMessage);
+        
+        requestBody.put("messages", messages);
+        
+        // Create request
+        RequestBuilder request = HttpRequests.post(OPENAI_API_URL, "application/json")
+                .accept("application/json")
+                .productNameAsUserAgent()
+                .tuner(connection -> connection.setRequestProperty("Authorization", "Bearer " + apiKey));
+        
+        // Send request
+        LOG.info("Sending request to OpenAI API");
+        
+        String response = request.connect(connection -> {
+            // Write request body
+            connection.write(JsonUtil.writeToString(requestBody));
+            
+            // Read response
+            JsonReader reader = JsonReader.fromInputStream(connection.getInputStream());
+            Map<String, Object> responseMap = reader.readObject();
+            
+            // Parse response
+            List<Map<String, Object>> choices = (List<Map<String, Object>>) responseMap.get("choices");
+            
+            if (choices != null && !choices.isEmpty()) {
+                Map<String, Object> choice = choices.get(0);
+                Map<String, Object> message = (Map<String, Object>) choice.get("message");
                 
-                // Check if response is successful
-                if (response.statusCode() >= 200 && response.statusCode() < 300) {
-                    // Parse response
-                    String responseBody = response.body();
-                    
-                    // Extract content
-                    return extractContentFromResponse(responseBody);
-                } else {
-                    LOG.error("Error generating chat completion: " + response.statusCode() + " " + response.body());
-                    throw new IOException("Error generating chat completion: " + response.statusCode() + " " + response.body());
+                if (message != null) {
+                    return (String) message.get("content");
                 }
-            } catch (Exception e) {
-                LOG.error("Error generating chat completion", e);
-                throw new RuntimeException("Error generating chat completion", e);
-            }
-        }, executor);
-    }
-    
-    /**
-     * Gets the API key from settings.
-     * @return The API key
-     */
-    @NotNull
-    private String getApiKey() {
-        ModForgeSettings settings = ModForgeSettings.getInstance();
-        String apiKey = settings.getOpenAiApiKey();
-        
-        if (apiKey == null || apiKey.isEmpty()) {
-            throw new IllegalStateException("OpenAI API key is not set. Please set it in the ModForge settings.");
-        }
-        
-        return apiKey;
-    }
-    
-    /**
-     * Converts an object to JSON.
-     * @param object The object
-     * @return The JSON
-     */
-    @NotNull
-    private String toJson(@NotNull Object object) {
-        if (object instanceof Map) {
-            @SuppressWarnings("unchecked")
-            Map<String, Object> map = (Map<String, Object>) object;
-            
-            StringBuilder json = new StringBuilder();
-            json.append("{");
-            
-            boolean first = true;
-            
-            for (Map.Entry<String, Object> entry : map.entrySet()) {
-                if (!first) {
-                    json.append(",");
-                }
-                
-                json.append("\"").append(entry.getKey()).append("\":");
-                json.append(objectToJson(entry.getValue()));
-                
-                first = false;
             }
             
-            json.append("}");
-            
-            return json.toString();
-        } else {
-            return objectToJson(object).toString();
-        }
+            throw new IOException("Invalid response from OpenAI API");
+        });
+        
+        LOG.info("Received response from OpenAI API");
+        
+        return response != null ? response.trim() : "";
     }
     
     /**
-     * Converts an object to a JSON value.
-     * @param object The object
-     * @return The JSON value
+     * Constructs an OpenAI API URL for a specific endpoint.
+     * @param endpoint The endpoint
+     * @return The URL
      */
     @NotNull
-    private Object objectToJson(@Nullable Object object) {
-        if (object == null) {
-            return "null";
-        } else if (object instanceof String) {
-            return "\"" + ((String) object).replace("\"", "\\\"") + "\"";
-        } else if (object instanceof Number || object instanceof Boolean) {
-            return object.toString();
-        } else if (object instanceof Map) {
-            return toJson(object);
-        } else if (object instanceof Object[]) {
-            StringBuilder json = new StringBuilder();
-            json.append("[");
-            
-            Object[] array = (Object[]) object;
-            boolean first = true;
-            
-            for (Object item : array) {
-                if (!first) {
-                    json.append(",");
-                }
-                
-                json.append(objectToJson(item));
-                
-                first = false;
-            }
-            
-            json.append("]");
-            
-            return json.toString();
-        } else {
-            return "\"" + object.toString() + "\"";
-        }
-    }
-    
-    /**
-     * Extracts content from OpenAI API response.
-     * @param responseBody The response body
-     * @return The content
-     */
-    @NotNull
-    private String extractContentFromResponse(@NotNull String responseBody) {
-        // Simple JSON extraction for OpenAI API response
-        // In a real implementation, use a proper JSON library
-        
-        // Find choices array
-        int choicesStart = responseBody.indexOf("\"choices\"");
-        
-        if (choicesStart == -1) {
-            throw new IllegalArgumentException("Invalid response: no choices found");
-        }
-        
-        // Find first choice
-        int messageStart = responseBody.indexOf("\"message\"", choicesStart);
-        
-        if (messageStart == -1) {
-            throw new IllegalArgumentException("Invalid response: no message found");
-        }
-        
-        // Find content
-        int contentStart = responseBody.indexOf("\"content\"", messageStart);
-        
-        if (contentStart == -1) {
-            throw new IllegalArgumentException("Invalid response: no content found");
-        }
-        
-        // Find content value
-        int valueStart = responseBody.indexOf(":", contentStart) + 1;
-        
-        if (valueStart == 0) {
-            throw new IllegalArgumentException("Invalid response: no content value found");
-        }
-        
-        // Find content value start (after quotes)
-        int contentValueStart = responseBody.indexOf("\"", valueStart) + 1;
-        
-        if (contentValueStart == 0) {
-            throw new IllegalArgumentException("Invalid response: no content value start found");
-        }
-        
-        // Find content value end (before quotes)
-        int contentValueEnd = responseBody.indexOf("\"", contentValueStart);
-        
-        if (contentValueEnd == -1) {
-            throw new IllegalArgumentException("Invalid response: no content value end found");
-        }
-        
-        // Extract content value
-        String content = responseBody.substring(contentValueStart, contentValueEnd);
-        
-        // Unescape JSON
-        content = content.replace("\\\"", "\"")
-                .replace("\\\\", "\\")
-                .replace("\\n", "\n")
-                .replace("\\r", "\r")
-                .replace("\\t", "\t");
-        
-        return content;
+    private String getOpenAiUrl(@NotNull String endpoint) {
+        return "https://api.openai.com/v1/" + endpoint;
     }
 }
