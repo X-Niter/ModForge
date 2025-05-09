@@ -21,13 +21,12 @@
     <extensions defaultExtensionNs="com.intellij">
         <!-- Services -->
         <applicationService serviceImplementation="com.modforge.intellij.plugin.settings.ModForgeSettings"/>
-        <applicationService serviceImplementation="com.modforge.intellij.plugin.ai.AIServiceManager"/>
         <applicationService serviceImplementation="com.modforge.intellij.plugin.ai.PatternRecognitionService"/>
 
+        <projectService serviceImplementation="com.modforge.intellij.plugin.services.AutonomousCodeGenerationService"/>
         <projectService serviceImplementation="com.modforge.intellij.plugin.services.ContinuousDevelopmentService"/>
         <projectService serviceImplementation="com.modforge.intellij.plugin.services.ModForgeProjectService"/>
         <projectService serviceImplementation="com.modforge.intellij.plugin.listeners.ModForgeCompilationListener"/>
-        <projectService serviceImplementation="com.modforge.intellij.plugin.listeners.ModForgeFileListener"/>
 
         <!-- Tool Window -->
         <toolWindow id="ModForge" 
@@ -40,19 +39,15 @@
                                  instance="com.modforge.intellij.plugin.settings.ModForgeSettingsConfigurable" 
                                  id="com.modforge.intellij.plugin.settings.ModForgeSettingsConfigurable" 
                                  displayName="ModForge"/>
+                                 
+        <!-- Startup Activity -->
+        <postStartupActivity implementation="com.modforge.intellij.plugin.services.ModForgeProjectService$ProjectStartupActivity"/>
     </extensions>
-
-    <applicationListeners>
-        <!-- Project listeners -->
-    </applicationListeners>
 
     <projectListeners>
         <!-- Register compilation listener -->
         <listener class="com.modforge.intellij.plugin.listeners.ModForgeCompilationListener"
                   topic="com.intellij.openapi.compiler.CompilationStatusListener"/>
-        <!-- Register file listener -->
-        <listener class="com.modforge.intellij.plugin.listeners.ModForgeFileListener"
-                  topic="com.intellij.openapi.vfs.VirtualFileListener"/>
     </projectListeners>
 
     <actions>
@@ -114,6 +109,30 @@
                     class="com.modforge.intellij.plugin.actions.ExplainCodeAction" 
                     text="Explain Code" 
                     description="Explain code using AI"/>
+        </group>
+        
+        <!-- Toolbar Actions -->
+        <group id="ModForge.ToolbarActions" text="ModForge Toolbar Actions" description="ModForge toolbar actions">
+            <action id="ModForge.GenerateCodeToolbar" 
+                    class="com.modforge.intellij.plugin.actions.GenerateCodeAction" 
+                    text="Generate Code" 
+                    description="Generate code using AI"
+                    icon="AllIcons.Actions.AddFile"/>
+            <action id="ModForge.FixErrorsToolbar" 
+                    class="com.modforge.intellij.plugin.actions.FixErrorsAction" 
+                    text="Fix Errors" 
+                    description="Fix errors using AI"
+                    icon="AllIcons.Actions.QuickfixBulb"/>
+            <action id="ModForge.GenerateDocumentationToolbar" 
+                    class="com.modforge.intellij.plugin.actions.GenerateDocumentationAction" 
+                    text="Generate Documentation" 
+                    description="Generate documentation using AI"
+                    icon="AllIcons.Actions.Help"/>
+            <action id="ModForge.ToggleContinuousDevelopmentToolbar" 
+                    class="com.modforge.intellij.plugin.actions.ToggleContinuousDevelopmentAction" 
+                    text="Toggle Continuous Development" 
+                    description="Toggle continuous development"
+                    icon="AllIcons.Actions.Execute"/>
         </group>
     </actions>
 </idea-plugin>

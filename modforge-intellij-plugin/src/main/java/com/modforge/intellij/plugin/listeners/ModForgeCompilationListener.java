@@ -1,10 +1,10 @@
 package com.modforge.intellij.plugin.listeners;
 
+import com.intellij.compiler.CompilerMessageImpl;
+import com.intellij.compiler.ProblemsView;
 import com.intellij.openapi.compiler.CompilationStatusListener;
 import com.intellij.openapi.compiler.CompileContext;
-import com.intellij.openapi.compiler.CompilerManager;
 import com.intellij.openapi.compiler.CompilerMessage;
-import com.intellij.openapi.compiler.CompilerMessageCategory;
 import com.intellij.openapi.components.Service;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.project.Project;
@@ -13,186 +13,185 @@ import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
-import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Listener for compilation events.
- * This listener tracks compilation issues in the project.
  */
-@Service(Service.Level.PROJECT)
+@Service
 public final class ModForgeCompilationListener implements CompilationStatusListener {
     private static final Logger LOG = Logger.getInstance(ModForgeCompilationListener.class);
-    private static final int MAX_ISSUES = 100;
     
     private final Project project;
-    private final List<CompilationIssue> activeIssues = new CopyOnWriteArrayList<>();
-    private boolean isRegistered = false;
+    private final Map<String, List<CompilationIssue>> activeIssuesByFile = new ConcurrentHashMap<>();
     
     /**
-     * Creates a new ModForgeCompilationListener.
+     * Gets the instance of this listener for the specified project.
+     * @param project The project
+     * @return The listener instance
+     */
+    public static ModForgeCompilationListener getInstance(@NotNull Project project) {
+        return project.getService(ModForgeCompilationListener.class);
+    }
+    
+    /**
+     * Creates a new instance of this listener.
      * @param project The project
      */
-    public ModForgeCompilationListener(@NotNull Project project) {
+    public ModForgeCompilationListener(Project project) {
         this.project = project;
-    }
-    
-    /**
-     * Registers this listener with the compiler manager.
-     */
-    public void register() {
-        if (!isRegistered) {
-            CompilerManager.getInstance(project).addCompilationStatusListener(this);
-            isRegistered = true;
-            LOG.info("Compilation listener registered for project: " + project.getName());
-        }
-    }
-    
-    /**
-     * Unregisters this listener from the compiler manager.
-     */
-    public void unregister() {
-        if (isRegistered) {
-            CompilerManager.getInstance(project).removeCompilationStatusListener(this);
-            isRegistered = false;
-            LOG.info("Compilation listener unregistered for project: " + project.getName());
-        }
+        
+        // Register for compilation status events
+        project.getMessageBus().connect().subscribe(CompilationStatusListener.TOPIC, this);
+        
+        LOG.info("ModForge compilation listener initialized");
     }
     
     @Override
     public void compilationFinished(boolean aborted, int errors, int warnings, @NotNull CompileContext compileContext) {
-        // Clear active issues
-        activeIssues.clear();
+        LOG.info("Compilation finished: aborted=" + aborted + ", errors=" + errors + ", warnings=" + warnings);
         
-        // Process error messages
-        CompilerMessage[] errorMessages = compileContext.getMessages(CompilerMessageCategory.ERROR);
-        
-        if (errorMessages.length > 0) {
-            LOG.info("Compilation finished with " + errorMessages.length + " errors");
-            
-            for (int i = 0; i < Math.min(errorMessages.length, MAX_ISSUES); i++) {
-                CompilerMessage message = errorMessages[i];
-                
-                // Create issue
-                CompilationIssue issue = createIssueFromMessage(message);
-                
-                if (issue != null) {
-                    activeIssues.add(issue);
-                }
-            }
+        if (errors > 0) {
+            processCompilationErrors(compileContext);
         } else {
-            LOG.info("Compilation finished successfully");
+            // Clear active issues if compilation succeeded
+            activeIssuesByFile.clear();
         }
     }
     
     /**
-     * Gets the active compilation issues.
-     * @return The active compilation issues
+     * Processes compilation errors from the compile context.
+     * @param compileContext The compile context
      */
-    @NotNull
-    public List<CompilationIssue> getActiveIssues() {
-        return Collections.unmodifiableList(new ArrayList<>(activeIssues));
-    }
-    
-    /**
-     * Gets the active compilation issues for a file.
-     * @param file The file path
-     * @return The active compilation issues for the file
-     */
-    @NotNull
-    public List<CompilationIssue> getActiveIssuesForFile(@NotNull String file) {
-        List<CompilationIssue> issues = new ArrayList<>();
+    private void processCompilationErrors(@NotNull CompileContext compileContext) {
+        // Clear previous issues
+        activeIssuesByFile.clear();
         
-        for (CompilationIssue issue : activeIssues) {
-            if (file.equals(issue.getFile())) {
-                issues.add(issue);
-            }
-        }
+        // Get all messages
+        CompilerMessage[] messages = compileContext.getMessages(CompilerMessage.Kind.ERROR);
         
-        return issues;
-    }
-    
-    /**
-     * Clears all active issues.
-     */
-    public void clearActiveIssues() {
-        activeIssues.clear();
-    }
-    
-    /**
-     * Creates a compilation issue from a compiler message.
-     * @param message The compiler message
-     * @return The compilation issue
-     */
-    @Nullable
-    private CompilationIssue createIssueFromMessage(@NotNull CompilerMessage message) {
-        // Get file path
-        String filePath = null;
-        
-        if (message.getVirtualFile() != null) {
-            filePath = message.getVirtualFile().getPath();
+        for (CompilerMessage message : messages) {
+            String filePath = message.getVirtualFile() != null ? message.getVirtualFile().getPath() : null;
             
-            // Make path relative to project
-            String basePath = project.getBasePath();
-            
-            if (basePath != null && filePath.startsWith(basePath)) {
-                filePath = filePath.substring(basePath.length());
-                
-                // Remove leading slash
-                if (filePath.startsWith("/")) {
-                    filePath = filePath.substring(1);
-                }
+            if (filePath == null) {
+                continue;
             }
+            
+            // Normalize path
+            String normalizedPath = normalizeFilePath(filePath);
+            
+            // Create compilation issue
+            CompilationIssue issue = new CompilationIssue(
+                    normalizedPath,
+                    message.getMessage(),
+                    message.getLine(),
+                    message.getColumn()
+            );
+            
+            // Add to map
+            activeIssuesByFile.computeIfAbsent(normalizedPath, k -> new ArrayList<>()).add(issue);
+            
+            LOG.info("Added compilation issue: " + issue);
         }
-        
-        // Skip issues without a file
+    }
+    
+    /**
+     * Normalizes a file path by removing the project base path if present.
+     * @param filePath The file path to normalize
+     * @return The normalized file path
+     */
+    private String normalizeFilePath(String filePath) {
         if (filePath == null) {
-            return null;
+            return "";
         }
         
-        // Create issue
-        return new CompilationIssue(
-                message.getMessage(),
-                message.getLine(),
-                message.getColumn(),
-                filePath
-        );
+        String basePath = project.getBasePath();
+        
+        if (basePath != null && filePath.startsWith(basePath)) {
+            filePath = filePath.substring(basePath.length());
+            
+            // Remove leading slash
+            if (filePath.startsWith("/")) {
+                filePath = filePath.substring(1);
+            }
+        }
+        
+        return filePath;
+    }
+    
+    /**
+     * Gets all active issues for a specific file.
+     * @param filePath The file path
+     * @return The list of compilation issues for the file
+     */
+    public List<CompilationIssue> getActiveIssuesForFile(String filePath) {
+        if (filePath == null) {
+            return Collections.emptyList();
+        }
+        
+        String normalizedPath = normalizeFilePath(filePath);
+        
+        return activeIssuesByFile.getOrDefault(normalizedPath, Collections.emptyList());
+    }
+    
+    /**
+     * Gets all active issues across all files.
+     * @return The list of all compilation issues
+     */
+    public List<CompilationIssue> getAllActiveIssues() {
+        List<CompilationIssue> allIssues = new ArrayList<>();
+        
+        for (List<CompilationIssue> issues : activeIssuesByFile.values()) {
+            allIssues.addAll(issues);
+        }
+        
+        return allIssues;
     }
     
     /**
      * A compilation issue.
      */
-    public static final class CompilationIssue {
+    public static class CompilationIssue {
+        private final String filePath;
         private final String message;
         private final int line;
         private final int column;
-        private final String file;
         
         /**
-         * Creates a new CompilationIssue.
+         * Creates a new compilation issue.
+         * @param filePath The file path
          * @param message The error message
-         * @param line The line number
-         * @param column The column number
-         * @param file The file path
+         * @param line The line number (1-based)
+         * @param column The column number (1-based)
          */
-        public CompilationIssue(@NotNull String message, int line, int column, @NotNull String file) {
+        public CompilationIssue(String filePath, String message, int line, int column) {
+            this.filePath = filePath;
             this.message = message;
             this.line = line;
             this.column = column;
-            this.file = file;
+        }
+        
+        /**
+         * Gets the file path.
+         * @return The file path
+         */
+        public String getFilePath() {
+            return filePath;
         }
         
         /**
          * Gets the error message.
          * @return The error message
          */
-        @NotNull
         public String getMessage() {
             return message;
         }
         
         /**
-         * Gets the line number.
+         * Gets the line number (1-based).
          * @return The line number
          */
         public int getLine() {
@@ -200,25 +199,21 @@ public final class ModForgeCompilationListener implements CompilationStatusListe
         }
         
         /**
-         * Gets the column number.
+         * Gets the column number (1-based).
          * @return The column number
          */
         public int getColumn() {
             return column;
         }
         
-        /**
-         * Gets the file path.
-         * @return The file path
-         */
-        @NotNull
-        public String getFile() {
-            return file;
-        }
-        
         @Override
         public String toString() {
-            return message + " at " + file + ":" + line + ":" + column;
+            return "CompilationIssue{" +
+                    "filePath='" + filePath + '\'' +
+                    ", message='" + message + '\'' +
+                    ", line=" + line +
+                    ", column=" + column +
+                    '}';
         }
     }
 }
