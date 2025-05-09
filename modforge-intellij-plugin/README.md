@@ -11,20 +11,20 @@ An advanced AI-powered Minecraft mod development platform that leverages intelli
 - **Support for multiple mod loaders** (Forge, Fabric, Quilt)
 - **Cross-platform mod development** and compatibility tools
 
-## Continuous Development Setup
+## Autonomous Development Platform
 
-The ModForge project is designed to run autonomously with continuous development capabilities. The system can:
+ModForge is a fully autonomous software development platform. The system continuously operates to:
 
 1. **Fix errors automatically** - Detects and fixes compilation errors without human intervention
 2. **Improve code quality** - Refactors code to follow best practices
 3. **Generate documentation** - Adds comprehensive JavaDoc to classes and methods
 4. **Add new features** - Implements small features based on repo analysis
+5. **Process pull requests** - Reviews and improves submitted code changes
+6. **Visualize progress** - Dashboard with metrics and statistics on GitHub Pages
 
-### How to Use Continuous Development
+### Autonomous Workflows
 
-The project uses GitHub Actions for continuous development. Here's how to use it:
-
-#### Automatic Scheduled Development
+#### Continuous Development
 
 The system automatically runs every 6 hours to:
 - Check for compilation errors and fix them
@@ -33,7 +33,7 @@ The system automatically runs every 6 hours to:
 
 No action is required on your part - the system will commit changes automatically.
 
-#### Manual Trigger
+#### Manual Workflow Trigger
 
 You can manually trigger the development workflow:
 
@@ -60,6 +60,29 @@ Examples:
 - `/command document SettingsPanel.java`
 
 The system will process your command, make the changes, and comment on the issue when done.
+
+#### Pull Request Processing
+
+When you submit a pull request, the system will:
+
+1. Analyze the code changes
+2. Suggest improvements
+3. Automatically fix common issues
+4. Add documentation where needed
+
+All suggestions and changes will be provided as comments on your PR.
+
+#### Web Dashboard
+
+A detailed dashboard is automatically deployed to GitHub Pages, providing:
+
+1. **Project Metrics** - Code size, class count, documentation coverage
+2. **Automation Statistics** - AI-powered changes, fixes, improvements
+3. **Command Center** - Interface for sending commands to the system
+4. **Git History** - Timeline of project changes
+5. **Code Analytics** - Quality metrics and structural analysis
+
+Access it at `https://[your-username].github.io/[repo-name]/`
 
 ## Setting Up the Repository
 
