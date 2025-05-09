@@ -1,49 +1,38 @@
 package com.modforge.intellij.plugin.services;
 
-import com.intellij.analysis.AnalysisScope;
-import com.intellij.codeInsight.daemon.impl.HighlightInfo;
-import com.intellij.codeInsight.daemon.impl.HighlightInfoType;
-import com.intellij.codeInsight.intention.IntentionAction;
-import com.intellij.codeInspection.*;
-import com.intellij.codeInspection.ex.GlobalInspectionContextImpl;
-import com.intellij.codeInspection.ex.InspectionManagerEx;
-import com.intellij.codeInspection.ex.InspectionToolWrapper;
-import com.intellij.openapi.application.ApplicationManager;
-import com.intellij.openapi.command.WriteCommandAction;
 import com.intellij.openapi.components.Service;
 import com.intellij.openapi.diagnostic.Logger;
-import com.intellij.openapi.editor.Document;
-import com.intellij.openapi.editor.Editor;
-import com.intellij.openapi.editor.EditorFactory;
 import com.intellij.openapi.project.Project;
-import com.intellij.openapi.util.Computable;
-import com.intellij.openapi.util.TextRange;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.*;
+import com.intellij.psi.search.GlobalSearchScope;
+import com.intellij.psi.search.searches.ReferencesSearch;
+import com.intellij.psi.util.PsiTreeUtil;
 import com.intellij.util.concurrency.AppExecutorUtil;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutorService;
-import java.util.stream.Collectors;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
 
 /**
- * Service for automated code analysis and issue resolution.
- * This service allows ModForge to autonomously:
- * - Detect code issues
- * - Apply fixes for common problems
- * - Optimize code
- * - Ensure code quality standards
+ * Service for analyzing code structure and dependencies.
+ * This service provides static analysis capabilities that are used by other services
+ * to understand the code and make intelligent suggestions.
  */
 @Service(Service.Level.PROJECT)
 public final class CodeAnalysisService {
     private static final Logger LOG = Logger.getInstance(CodeAnalysisService.class);
     
     private final Project project;
-    private final ExecutorService executor = AppExecutorUtil.createBoundedApplicationPoolExecutor(
-            "ModForge.CodeAnalysis", 2);
+    
+    // Cache of analyzed files
+    private final Map<String, AnalysisResult> analysisCache = new ConcurrentHashMap<>();
     
     /**
      * Creates a new CodeAnalysisService.
@@ -51,6 +40,12 @@ public final class CodeAnalysisService {
      */
     public CodeAnalysisService(@NotNull Project project) {
         this.project = project;
+        
+        // Schedule periodic cache cleanup
+        AppExecutorUtil.getAppScheduledExecutorService().scheduleWithFixedDelay(
+                this::cleanupCache, 30, 30, TimeUnit.MINUTES);
+        
+        LOG.info("CodeAnalysisService initialized");
     }
     
     /**
@@ -63,436 +58,356 @@ public final class CodeAnalysisService {
     }
     
     /**
-     * Analyzes a file for issues.
-     * @param filePath The file path
-     * @return The list of issues found
+     * Analyzes a file's structure and dependencies.
+     * @param file The file to analyze
+     * @return A future that completes with the analysis result
      */
-    public CompletableFuture<List<CodeIssue>> analyzeFile(@NotNull String filePath) {
+    @NotNull
+    public CompletableFuture<AnalysisResult> analyzeFile(@NotNull VirtualFile file) {
         return CompletableFuture.supplyAsync(() -> {
             try {
-                LOG.info("Analyzing file: " + filePath);
+                // Check cache
+                String filePath = file.getPath();
+                AnalysisResult cachedResult = analysisCache.get(filePath);
                 
-                // Get the file
-                PsiFile psiFile = getPsiFile(filePath);
+                if (cachedResult != null && cachedResult.timestamp > file.getTimeStamp()) {
+                    return cachedResult;
+                }
+                
+                // Get PSI file
+                PsiFile psiFile = PsiManager.getInstance(project).findFile(file);
                 if (psiFile == null) {
-                    LOG.warn("File not found: " + filePath);
-                    return Collections.emptyList();
+                    return new AnalysisResult(filePath, file.getTimeStamp());
                 }
                 
-                List<CodeIssue> issues = new ArrayList<>();
+                // Create analysis result
+                AnalysisResult result = new AnalysisResult(filePath, file.getTimeStamp());
                 
-                // Run code inspections
-                ApplicationManager.getApplication().runReadAction(() -> {
-                    try {
-                        // Get document
-                        Document document = PsiDocumentManager.getInstance(project).getDocument(psiFile);
-                        if (document == null) {
-                            LOG.warn("Document not found for file: " + filePath);
-                            return;
-                        }
-                        
-                        // Create editor
-                        Editor editor = EditorFactory.getInstance().createEditor(document, project);
-                        
-                        try {
-                            // Get inspection tools
-                            List<LocalInspectionTool> inspectionTools = getInspectionTools();
-                            
-                            // Run inspections
-                            for (LocalInspectionTool tool : inspectionTools) {
-                                ProblemDescriptor[] problems = InspectionManager.getInstance(project)
-                                        .createInspectionContext()
-                                        .getManager()
-                                        .createProblemDescriptors(psiFile, tool);
-                                
-                                for (ProblemDescriptor problem : problems) {
-                                    PsiElement element = problem.getPsiElement();
-                                    if (element != null) {
-                                        TextRange range = element.getTextRange();
-                                        int line = document.getLineNumber(range.getStartOffset());
-                                        
-                                        issues.add(new CodeIssue(
-                                                filePath,
-                                                line + 1,
-                                                range.getStartOffset(),
-                                                range.getEndOffset(),
-                                                problem.getDescriptionTemplate(),
-                                                getToolName(tool),
-                                                hasQuickFix(problem)
-                                        ));
-                                    }
-                                }
-                            }
-                        } finally {
-                            // Release editor
-                            EditorFactory.getInstance().releaseEditor(editor);
-                        }
-                    } catch (Exception e) {
-                        LOG.error("Error analyzing file", e);
-                    }
-                });
+                // Analyze file
+                if (psiFile instanceof PsiJavaFile) {
+                    analyzeJavaFile((PsiJavaFile) psiFile, result);
+                }
                 
-                LOG.info("Found " + issues.size() + " issues in file: " + filePath);
-                return issues;
+                // Cache result
+                analysisCache.put(filePath, result);
+                
+                return result;
             } catch (Exception e) {
-                LOG.error("Error analyzing file", e);
-                return Collections.emptyList();
+                LOG.error("Error analyzing file: " + file.getPath(), e);
+                return new AnalysisResult(file.getPath(), file.getTimeStamp());
             }
-        }, executor);
+        }, AppExecutorUtil.getAppExecutorService());
     }
     
     /**
-     * Applies quick fixes to resolve issues in a file.
-     * @param filePath The file path
-     * @param autoFix Whether to automatically apply fixes without confirmation
-     * @return The list of applied fixes
+     * Analyzes a Java file.
+     * @param javaFile The Java file to analyze
+     * @param result The analysis result to update
      */
-    public CompletableFuture<List<AppliedFix>> applyQuickFixes(@NotNull String filePath, boolean autoFix) {
-        return CompletableFuture.supplyAsync(() -> {
-            try {
-                LOG.info("Applying quick fixes to file: " + filePath);
-                
-                // Get the file
-                PsiFile psiFile = getPsiFile(filePath);
-                if (psiFile == null) {
-                    LOG.warn("File not found: " + filePath);
-                    return Collections.emptyList();
-                }
-                
-                // First analyze the file
-                List<CodeIssue> issues = analyzeFile(filePath).get();
-                
-                // Filter issues with quick fixes
-                List<CodeIssue> fixableIssues = issues.stream()
-                        .filter(CodeIssue::hasQuickFix)
-                        .collect(Collectors.toList());
-                
-                LOG.info("Found " + fixableIssues.size() + " fixable issues in file: " + filePath);
-                
-                if (fixableIssues.isEmpty()) {
-                    return Collections.emptyList();
-                }
-                
-                List<AppliedFix> appliedFixes = new ArrayList<>();
-                
-                // Run code inspections
-                ApplicationManager.getApplication().runReadAction(() -> {
-                    try {
-                        // Get document
-                        Document document = PsiDocumentManager.getInstance(project).getDocument(psiFile);
-                        if (document == null) {
-                            LOG.warn("Document not found for file: " + filePath);
-                            return;
-                        }
-                        
-                        // Create editor
-                        Editor editor = EditorFactory.getInstance().createEditor(document, project);
-                        
-                        try {
-                            // Get inspection tools
-                            List<LocalInspectionTool> inspectionTools = getInspectionTools();
-                            
-                            // Run inspections and apply fixes
-                            for (LocalInspectionTool tool : inspectionTools) {
-                                ProblemDescriptor[] problems = InspectionManager.getInstance(project)
-                                        .createInspectionContext()
-                                        .getManager()
-                                        .createProblemDescriptors(psiFile, tool);
-                                
-                                for (ProblemDescriptor problem : problems) {
-                                    if (!hasQuickFix(problem)) {
-                                        continue;
-                                    }
-                                    
-                                    PsiElement element = problem.getPsiElement();
-                                    if (element != null) {
-                                        TextRange range = element.getTextRange();
-                                        int line = document.getLineNumber(range.getStartOffset());
-                                        
-                                        // Apply the fix
-                                        QuickFix[] fixes = problem.getFixes();
-                                        if (fixes != null && fixes.length > 0) {
-                                            QuickFix<?> fix = fixes[0]; // Take the first fix
-                                            
-                                            if (fix instanceof LocalQuickFix) {
-                                                LocalQuickFix localFix = (LocalQuickFix) fix;
-                                                
-                                                // Apply fix in write action
-                                                WriteCommandAction.runWriteCommandAction(project, () -> {
-                                                    try {
-                                                        // Apply the fix
-                                                        localFix.applyFix(project, problem);
-                                                        
-                                                        // Record applied fix
-                                                        appliedFixes.add(new AppliedFix(
-                                                                filePath,
-                                                                line + 1,
-                                                                range.getStartOffset(),
-                                                                range.getEndOffset(),
-                                                                problem.getDescriptionTemplate(),
-                                                                getToolName(tool),
-                                                                localFix.getName()
-                                                        ));
-                                                        
-                                                        LOG.info("Applied fix: " + localFix.getName() + " to line " + (line + 1));
-                                                    } catch (Exception e) {
-                                                        LOG.error("Error applying fix", e);
-                                                    }
-                                                });
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        } finally {
-                            // Release editor
-                            EditorFactory.getInstance().releaseEditor(editor);
-                        }
-                    } catch (Exception e) {
-                        LOG.error("Error applying quick fixes", e);
-                    }
-                });
-                
-                LOG.info("Applied " + appliedFixes.size() + " fixes to file: " + filePath);
-                return appliedFixes;
-            } catch (Exception e) {
-                LOG.error("Error applying quick fixes", e);
-                return Collections.emptyList();
-            }
-        }, executor);
-    }
-    
-    /**
-     * Analyzes patterns of code issues across the project.
-     * @return Statistics on the most common code issues
-     */
-    public CompletableFuture<CodeIssueStatistics> analyzeProjectCodeIssuePatterns() {
-        return CompletableFuture.supplyAsync(() -> {
-            try {
-                LOG.info("Analyzing project code issue patterns");
-                
-                // Get all Java files in the project
-                // This is a simplified approach - in a real implementation we'd use AnalysisScope
-                PsiDirectory baseDir = PsiManager.getInstance(project).findDirectory(project.getBaseDir());
-                if (baseDir == null) {
-                    LOG.warn("Project base directory not found");
-                    return new CodeIssueStatistics();
-                }
-                
-                List<PsiFile> javaFiles = new ArrayList<>();
-                collectJavaFiles(baseDir, javaFiles);
-                
-                LOG.info("Analyzing " + javaFiles.size() + " Java files for issue patterns");
-                
-                Map<String, Integer> issueTypeCounts = new HashMap<>();
-                Map<String, Integer> issueByFile = new HashMap<>();
-                Map<String, List<Integer>> issueLinesByType = new HashMap<>();
-                
-                // Analyze each file
-                for (PsiFile psiFile : javaFiles) {
-                    String filePath = psiFile.getVirtualFile().getPath();
-                    
-                    // Analyze file
-                    List<CodeIssue> issues = analyzeFile(filePath).get();
-                    
-                    // Record file count
-                    issueByFile.put(filePath, issues.size());
-                    
-                    // Record issue types
-                    for (CodeIssue issue : issues) {
-                        // Update issue type count
-                        issueTypeCounts.merge(issue.getIssueType(), 1, Integer::sum);
-                        
-                        // Update line numbers
-                        issueLinesByType.computeIfAbsent(issue.getIssueType(), k -> new ArrayList<>())
-                                .add(issue.getLine());
-                    }
-                }
-                
-                // Create statistics
-                CodeIssueStatistics statistics = new CodeIssueStatistics();
-                statistics.setTotalIssueCount(issueTypeCounts.values().stream().mapToInt(Integer::intValue).sum());
-                statistics.setFileCount(javaFiles.size());
-                statistics.setFilesWithIssues((int) issueByFile.values().stream().filter(count -> count > 0).count());
-                
-                // Sort issue types by count
-                List<Map.Entry<String, Integer>> sortedIssueTypes = issueTypeCounts.entrySet().stream()
-                        .sorted(Map.Entry.<String, Integer>comparingByValue().reversed())
-                        .collect(Collectors.toList());
-                
-                // Add top issue types
-                for (Map.Entry<String, Integer> entry : sortedIssueTypes) {
-                    statistics.addIssueTypeCount(entry.getKey(), entry.getValue());
-                }
-                
-                // Compute hot spots
-                Map<String, Double> hotspots = new HashMap<>();
-                for (Map.Entry<String, List<Integer>> entry : issueLinesByType.entrySet()) {
-                    // Calculate density of issues
-                    List<Integer> lines = entry.getValue();
-                    if (lines.size() >= 3) { // Only consider types with at least 3 occurrences
-                        // Group by file
-                        Map<String, List<Integer>> linesByFile = new HashMap<>();
-                        for (int i = 0; i < lines.size(); i++) {
-                            // Get file for this issue
-                            String file = getFileForIssueIndex(issues, i, entry.getKey());
-                            if (file != null) {
-                                linesByFile.computeIfAbsent(file, k -> new ArrayList<>()).add(lines.get(i));
-                            }
-                        }
-                        
-                        // Identify files with high density
-                        for (Map.Entry<String, List<Integer>> fileEntry : linesByFile.entrySet()) {
-                            if (fileEntry.getValue().size() >= 3) { // At least 3 issues of same type in file
-                                double density = (double) fileEntry.getValue().size() / 
-                                        (issueByFile.getOrDefault(fileEntry.getKey(), 1));
-                                hotspots.put(fileEntry.getKey() + " (" + entry.getKey() + ")", density);
-                            }
-                        }
-                    }
-                }
-                
-                // Add hotspots to statistics
-                hotspots.entrySet().stream()
-                        .sorted(Map.Entry.<String, Double>comparingByValue().reversed())
-                        .limit(5)
-                        .forEach(entry -> statistics.addHotspot(entry.getKey(), entry.getValue()));
-                
-                LOG.info("Completed project code issue pattern analysis");
-                return statistics;
-            } catch (Exception e) {
-                LOG.error("Error analyzing project code issue patterns", e);
-                return new CodeIssueStatistics();
-            }
-        }, executor);
-    }
-    
-    /**
-     * Gets the file for an issue with the given index and type.
-     * This is a helper method for the pattern analysis.
-     */
-    @Nullable
-    private String getFileForIssueIndex(List<CodeIssue> issues, int index, String issueType) {
-        // This is a simplified approach - in a real implementation we'd maintain better indexing
-        if (index < issues.size()) {
-            CodeIssue issue = issues.get(index);
-            if (issueType.equals(issue.getIssueType())) {
-                return issue.getFilePath();
-            }
-        }
-        return null;
-    }
-    
-    /**
-     * Recursively collects Java files from a directory.
-     * @param directory The directory to scan
-     * @param result The list to add Java files to
-     */
-    private void collectJavaFiles(@NotNull PsiDirectory directory, @NotNull List<PsiFile> result) {
-        // Add Java files in this directory
-        PsiFile[] files = directory.getFiles();
-        for (PsiFile file : files) {
-            if (file instanceof PsiJavaFile) {
-                result.add(file);
+    private void analyzeJavaFile(@NotNull PsiJavaFile javaFile, @NotNull AnalysisResult result) {
+        // Get package name
+        result.packageName = javaFile.getPackageName();
+        
+        // Analyze imports
+        for (PsiImportStatement importStatement : javaFile.getImportList().getImportStatements()) {
+            String importName = importStatement.getQualifiedName();
+            if (importName != null) {
+                result.imports.add(importName);
             }
         }
         
-        // Recursively process subdirectories
-        PsiDirectory[] subdirectories = directory.getSubdirectories();
-        for (PsiDirectory subdirectory : subdirectories) {
-            collectJavaFiles(subdirectory, result);
+        // Analyze classes
+        for (PsiClass psiClass : javaFile.getClasses()) {
+            ClassInfo classInfo = analyzeClass(psiClass);
+            result.classes.add(classInfo);
         }
     }
     
     /**
-     * Gets the name of an inspection tool.
-     * @param tool The inspection tool
-     * @return The tool name
+     * Analyzes a class.
+     * @param psiClass The class to analyze
+     * @return The class info
      */
     @NotNull
-    private String getToolName(@NotNull LocalInspectionTool tool) {
-        return tool.getShortName();
+    private ClassInfo analyzeClass(@NotNull PsiClass psiClass) {
+        ClassInfo classInfo = new ClassInfo();
+        
+        // Get class name
+        classInfo.name = psiClass.getName();
+        classInfo.qualifiedName = psiClass.getQualifiedName();
+        
+        // Get class type
+        if (psiClass.isInterface()) {
+            classInfo.type = "interface";
+        } else if (psiClass.isEnum()) {
+            classInfo.type = "enum";
+        } else if (psiClass.isAnnotationType()) {
+            classInfo.type = "annotation";
+        } else {
+            classInfo.type = "class";
+        }
+        
+        // Check if class is abstract
+        classInfo.isAbstract = psiClass.hasModifierProperty(PsiModifier.ABSTRACT);
+        
+        // Get super class
+        PsiClass superClass = psiClass.getSuperClass();
+        if (superClass != null && !superClass.getQualifiedName().equals("java.lang.Object")) {
+            classInfo.superClass = superClass.getQualifiedName();
+        }
+        
+        // Get interfaces
+        for (PsiClass anInterface : psiClass.getInterfaces()) {
+            String interfaceName = anInterface.getQualifiedName();
+            if (interfaceName != null) {
+                classInfo.interfaces.add(interfaceName);
+            }
+        }
+        
+        // Analyze fields
+        for (PsiField field : psiClass.getFields()) {
+            FieldInfo fieldInfo = analyzeField(field);
+            classInfo.fields.add(fieldInfo);
+        }
+        
+        // Analyze methods
+        for (PsiMethod method : psiClass.getMethods()) {
+            MethodInfo methodInfo = analyzeMethod(method);
+            classInfo.methods.add(methodInfo);
+        }
+        
+        // Analyze inner classes
+        for (PsiClass innerClass : psiClass.getInnerClasses()) {
+            ClassInfo innerClassInfo = analyzeClass(innerClass);
+            classInfo.innerClasses.add(innerClassInfo);
+        }
+        
+        return classInfo;
     }
     
     /**
-     * Checks if a problem has a quick fix.
-     * @param problem The problem descriptor
-     * @return Whether the problem has a quick fix
+     * Analyzes a field.
+     * @param field The field to analyze
+     * @return The field info
      */
-    private boolean hasQuickFix(@NotNull ProblemDescriptor problem) {
-        QuickFix<?>[] fixes = problem.getFixes();
-        return fixes != null && fixes.length > 0;
+    @NotNull
+    private FieldInfo analyzeField(@NotNull PsiField field) {
+        FieldInfo fieldInfo = new FieldInfo();
+        
+        // Get field name
+        fieldInfo.name = field.getName();
+        
+        // Get field type
+        fieldInfo.type = field.getType().getCanonicalText();
+        
+        // Get modifiers
+        fieldInfo.isStatic = field.hasModifierProperty(PsiModifier.STATIC);
+        fieldInfo.isFinal = field.hasModifierProperty(PsiModifier.FINAL);
+        fieldInfo.visibility = getVisibility(field);
+        
+        return fieldInfo;
     }
     
     /**
-     * Gets a PsiFile for a file path.
-     * @param filePath The file path
-     * @return The PsiFile, or null if not found
+     * Analyzes a method.
+     * @param method The method to analyze
+     * @return The method info
      */
-    @Nullable
-    private PsiFile getPsiFile(@NotNull String filePath) {
-        return ApplicationManager.getApplication().runReadAction((Computable<PsiFile>) () -> {
+    @NotNull
+    private MethodInfo analyzeMethod(@NotNull PsiMethod method) {
+        MethodInfo methodInfo = new MethodInfo();
+        
+        // Get method name
+        methodInfo.name = method.getName();
+        
+        // Get return type
+        PsiType returnType = method.getReturnType();
+        if (returnType != null) {
+            methodInfo.returnType = returnType.getCanonicalText();
+        } else {
+            methodInfo.returnType = "void";
+        }
+        
+        // Get parameters
+        for (PsiParameter parameter : method.getParameterList().getParameters()) {
+            ParameterInfo parameterInfo = new ParameterInfo();
+            parameterInfo.name = parameter.getName();
+            parameterInfo.type = parameter.getType().getCanonicalText();
+            
+            methodInfo.parameters.add(parameterInfo);
+        }
+        
+        // Get throws list
+        for (PsiClassType exceptionType : method.getThrowsList().getReferencedTypes()) {
+            methodInfo.exceptions.add(exceptionType.getCanonicalText());
+        }
+        
+        // Get modifiers
+        methodInfo.isStatic = method.hasModifierProperty(PsiModifier.STATIC);
+        methodInfo.isAbstract = method.hasModifierProperty(PsiModifier.ABSTRACT);
+        methodInfo.isFinal = method.hasModifierProperty(PsiModifier.FINAL);
+        methodInfo.visibility = getVisibility(method);
+        
+        // Check if method is a constructor
+        methodInfo.isConstructor = method.isConstructor();
+        
+        // Check if method is overriding
+        methodInfo.isOverride = isOverridingMethod(method);
+        
+        return methodInfo;
+    }
+    
+    /**
+     * Gets the visibility of a member.
+     * @param member The member
+     * @return The visibility
+     */
+    @NotNull
+    private String getVisibility(@NotNull PsiMember member) {
+        if (member.hasModifierProperty(PsiModifier.PUBLIC)) {
+            return "public";
+        } else if (member.hasModifierProperty(PsiModifier.PROTECTED)) {
+            return "protected";
+        } else if (member.hasModifierProperty(PsiModifier.PRIVATE)) {
+            return "private";
+        } else {
+            return "package-private";
+        }
+    }
+    
+    /**
+     * Checks if a method is overriding a method from a superclass or interface.
+     * @param method The method to check
+     * @return Whether the method is overriding
+     */
+    private boolean isOverridingMethod(@NotNull PsiMethod method) {
+        for (PsiAnnotation annotation : method.getAnnotations()) {
+            if (annotation.getQualifiedName().equals("java.lang.Override")) {
+                return true;
+            }
+        }
+        
+        PsiClass containingClass = method.getContainingClass();
+        if (containingClass == null) {
+            return false;
+        }
+        
+        PsiMethod[] superMethods = method.findSuperMethods();
+        return superMethods.length > 0;
+    }
+    
+    /**
+     * Finds references to a class.
+     * @param qualifiedName The class's qualified name
+     * @return A list of references
+     */
+    @NotNull
+    public CompletableFuture<List<PsiElement>> findReferences(@NotNull String qualifiedName) {
+        return CompletableFuture.supplyAsync(() -> {
             try {
-                VirtualFile virtualFile = project.getBaseDir().findFileByRelativePath(filePath);
-                if (virtualFile == null) {
-                    LOG.warn("Virtual file not found: " + filePath);
-                    return null;
+                List<PsiElement> references = new ArrayList<>();
+                
+                // Find class
+                JavaPsiFacade psiFacade = JavaPsiFacade.getInstance(project);
+                PsiClass psiClass = psiFacade.findClass(qualifiedName, GlobalSearchScope.projectScope(project));
+                
+                if (psiClass != null) {
+                    // Find references to the class
+                    ReferencesSearch.search(psiClass, GlobalSearchScope.projectScope(project))
+                            .forEach(reference -> references.add(reference.getElement()));
                 }
                 
-                return PsiManager.getInstance(project).findFile(virtualFile);
+                return references;
             } catch (Exception e) {
-                LOG.error("Error getting PSI file", e);
-                return null;
+                LOG.error("Error finding references to class: " + qualifiedName, e);
+                return new ArrayList<>();
             }
-        });
+        }, AppExecutorUtil.getAppExecutorService());
     }
     
     /**
-     * Gets the list of inspection tools to use for analysis.
-     * @return The list of inspection tools
+     * Finds references to a method.
+     * @param qualifiedClassName The class's qualified name
+     * @param methodName The method name
+     * @param parameterTypes The method parameter types
+     * @return A list of references
      */
     @NotNull
-    private List<LocalInspectionTool> getInspectionTools() {
-        // In a real implementation, we would get this from InspectionProfileManager
-        return Arrays.asList(
-                new UnusedDeclarationInspection(),
-                new UnusedImportInspection(),
-                new RedundantImportInspection()
-                // Add more inspections as needed
-        );
+    public CompletableFuture<List<PsiElement>> findMethodReferences(@NotNull String qualifiedClassName, 
+                                                                  @NotNull String methodName, 
+                                                                  @NotNull String[] parameterTypes) {
+        return CompletableFuture.supplyAsync(() -> {
+            try {
+                List<PsiElement> references = new ArrayList<>();
+                
+                // Find class
+                JavaPsiFacade psiFacade = JavaPsiFacade.getInstance(project);
+                PsiClass psiClass = psiFacade.findClass(qualifiedClassName, GlobalSearchScope.projectScope(project));
+                
+                if (psiClass != null) {
+                    // Find method
+                    PsiMethod[] methods = psiClass.findMethodsByName(methodName, false);
+                    
+                    for (PsiMethod method : methods) {
+                        PsiParameter[] parameters = method.getParameterList().getParameters();
+                        
+                        if (parameters.length != parameterTypes.length) {
+                            continue;
+                        }
+                        
+                        boolean match = true;
+                        for (int i = 0; i < parameters.length; i++) {
+                            String parameterType = parameters[i].getType().getCanonicalText();
+                            if (!parameterType.equals(parameterTypes[i])) {
+                                match = false;
+                                break;
+                            }
+                        }
+                        
+                        if (match) {
+                            // Find references to the method
+                            ReferencesSearch.search(method, GlobalSearchScope.projectScope(project))
+                                    .forEach(reference -> references.add(reference.getElement()));
+                        }
+                    }
+                }
+                
+                return references;
+            } catch (Exception e) {
+                LOG.error("Error finding references to method: " + qualifiedClassName + "." + methodName, e);
+                return new ArrayList<>();
+            }
+        }, AppExecutorUtil.getAppExecutorService());
     }
     
     /**
-     * Represents a code issue found in analysis.
+     * Cleans up the analysis cache.
      */
-    public static class CodeIssue {
+    private void cleanupCache() {
+        // Remove entries older than 1 hour
+        long cutoff = System.currentTimeMillis() - TimeUnit.HOURS.toMillis(1);
+        
+        analysisCache.entrySet().removeIf(entry -> entry.getValue().timestamp < cutoff);
+    }
+    
+    /**
+     * Analysis result.
+     */
+    public static class AnalysisResult {
         private final String filePath;
-        private final int line;
-        private final int startOffset;
-        private final int endOffset;
-        private final String description;
-        private final String issueType;
-        private final boolean hasQuickFix;
+        private final long timestamp;
+        private String packageName;
+        private final List<String> imports = new ArrayList<>();
+        private final List<ClassInfo> classes = new ArrayList<>();
         
         /**
-         * Creates a new CodeIssue.
+         * Creates a new AnalysisResult.
          * @param filePath The file path
-         * @param line The line number
-         * @param startOffset The start offset
-         * @param endOffset The end offset
-         * @param description The issue description
-         * @param issueType The issue type
-         * @param hasQuickFix Whether the issue has a quick fix
+         * @param timestamp The timestamp
          */
-        public CodeIssue(@NotNull String filePath, int line, int startOffset, int endOffset,
-                          @NotNull String description, @NotNull String issueType, boolean hasQuickFix) {
+        public AnalysisResult(@NotNull String filePath, long timestamp) {
             this.filePath = filePath;
-            this.line = line;
-            this.startOffset = startOffset;
-            this.endOffset = endOffset;
-            this.description = description;
-            this.issueType = issueType;
-            this.hasQuickFix = hasQuickFix;
+            this.timestamp = timestamp;
         }
         
         /**
@@ -505,274 +420,314 @@ public final class CodeAnalysisService {
         }
         
         /**
-         * Gets the line number.
-         * @return The line number
+         * Gets the timestamp.
+         * @return The timestamp
          */
-        public int getLine() {
-            return line;
+        public long getTimestamp() {
+            return timestamp;
         }
         
         /**
-         * Gets the start offset.
-         * @return The start offset
+         * Gets the package name.
+         * @return The package name
          */
-        public int getStartOffset() {
-            return startOffset;
+        @Nullable
+        public String getPackageName() {
+            return packageName;
         }
         
         /**
-         * Gets the end offset.
-         * @return The end offset
-         */
-        public int getEndOffset() {
-            return endOffset;
-        }
-        
-        /**
-         * Gets the issue description.
-         * @return The issue description
+         * Gets the imports.
+         * @return The imports
          */
         @NotNull
-        public String getDescription() {
-            return description;
+        public List<String> getImports() {
+            return imports;
         }
         
         /**
-         * Gets the issue type.
-         * @return The issue type
+         * Gets the classes.
+         * @return The classes
          */
         @NotNull
-        public String getIssueType() {
-            return issueType;
-        }
-        
-        /**
-         * Checks if the issue has a quick fix.
-         * @return Whether the issue has a quick fix
-         */
-        public boolean hasQuickFix() {
-            return hasQuickFix;
-        }
-        
-        @Override
-        public String toString() {
-            return "CodeIssue{" +
-                    "file='" + filePath + '\'' +
-                    ", line=" + line +
-                    ", description='" + description + '\'' +
-                    ", type='" + issueType + '\'' +
-                    ", hasQuickFix=" + hasQuickFix +
-                    '}';
+        public List<ClassInfo> getClasses() {
+            return classes;
         }
     }
     
     /**
-     * Represents a fix applied to a code issue.
+     * Class info.
      */
-    public static class AppliedFix {
-        private final String filePath;
-        private final int line;
-        private final int startOffset;
-        private final int endOffset;
-        private final String issueDescription;
-        private final String issueType;
-        private final String fixName;
+    public static class ClassInfo {
+        private String name;
+        private String qualifiedName;
+        private String type;
+        private boolean isAbstract;
+        private String superClass;
+        private final List<String> interfaces = new ArrayList<>();
+        private final List<FieldInfo> fields = new ArrayList<>();
+        private final List<MethodInfo> methods = new ArrayList<>();
+        private final List<ClassInfo> innerClasses = new ArrayList<>();
         
         /**
-         * Creates a new AppliedFix.
-         * @param filePath The file path
-         * @param line The line number
-         * @param startOffset The start offset
-         * @param endOffset The end offset
-         * @param issueDescription The issue description
-         * @param issueType The issue type
-         * @param fixName The name of the fix applied
+         * Gets the class name.
+         * @return The class name
          */
-        public AppliedFix(@NotNull String filePath, int line, int startOffset, int endOffset,
-                           @NotNull String issueDescription, @NotNull String issueType, @NotNull String fixName) {
-            this.filePath = filePath;
-            this.line = line;
-            this.startOffset = startOffset;
-            this.endOffset = endOffset;
-            this.issueDescription = issueDescription;
-            this.issueType = issueType;
-            this.fixName = fixName;
+        @Nullable
+        public String getName() {
+            return name;
         }
         
         /**
-         * Gets the file path.
-         * @return The file path
+         * Gets the qualified name.
+         * @return The qualified name
          */
-        @NotNull
-        public String getFilePath() {
-            return filePath;
+        @Nullable
+        public String getQualifiedName() {
+            return qualifiedName;
         }
         
         /**
-         * Gets the line number.
-         * @return The line number
+         * Gets the class type.
+         * @return The class type
          */
-        public int getLine() {
-            return line;
+        @Nullable
+        public String getType() {
+            return type;
         }
         
         /**
-         * Gets the start offset.
-         * @return The start offset
+         * Gets whether the class is abstract.
+         * @return Whether the class is abstract
          */
-        public int getStartOffset() {
-            return startOffset;
+        public boolean isAbstract() {
+            return isAbstract;
         }
         
         /**
-         * Gets the end offset.
-         * @return The end offset
+         * Gets the super class.
+         * @return The super class
          */
-        public int getEndOffset() {
-            return endOffset;
+        @Nullable
+        public String getSuperClass() {
+            return superClass;
         }
         
         /**
-         * Gets the issue description.
-         * @return The issue description
+         * Gets the interfaces.
+         * @return The interfaces
          */
         @NotNull
-        public String getIssueDescription() {
-            return issueDescription;
+        public List<String> getInterfaces() {
+            return interfaces;
         }
         
         /**
-         * Gets the issue type.
-         * @return The issue type
+         * Gets the fields.
+         * @return The fields
          */
         @NotNull
-        public String getIssueType() {
-            return issueType;
+        public List<FieldInfo> getFields() {
+            return fields;
         }
         
         /**
-         * Gets the name of the fix applied.
-         * @return The fix name
+         * Gets the methods.
+         * @return The methods
          */
         @NotNull
-        public String getFixName() {
-            return fixName;
+        public List<MethodInfo> getMethods() {
+            return methods;
         }
         
-        @Override
-        public String toString() {
-            return "AppliedFix{" +
-                    "file='" + filePath + '\'' +
-                    ", line=" + line +
-                    ", issueType='" + issueType + '\'' +
-                    ", fixName='" + fixName + '\'' +
-                    '}';
+        /**
+         * Gets the inner classes.
+         * @return The inner classes
+         */
+        @NotNull
+        public List<ClassInfo> getInnerClasses() {
+            return innerClasses;
         }
     }
     
     /**
-     * Statistics on code issues in a project.
+     * Field info.
      */
-    public static class CodeIssueStatistics {
-        private int totalIssueCount;
-        private int fileCount;
-        private int filesWithIssues;
-        private final Map<String, Integer> issueTypeCounts = new LinkedHashMap<>();
-        private final Map<String, Double> hotspots = new LinkedHashMap<>();
+    public static class FieldInfo {
+        private String name;
+        private String type;
+        private boolean isStatic;
+        private boolean isFinal;
+        private String visibility;
         
         /**
-         * Gets the total issue count.
-         * @return The total issue count
+         * Gets the field name.
+         * @return The field name
          */
-        public int getTotalIssueCount() {
-            return totalIssueCount;
+        @Nullable
+        public String getName() {
+            return name;
         }
         
         /**
-         * Sets the total issue count.
-         * @param totalIssueCount The total issue count
+         * Gets the field type.
+         * @return The field type
          */
-        public void setTotalIssueCount(int totalIssueCount) {
-            this.totalIssueCount = totalIssueCount;
+        @Nullable
+        public String getType() {
+            return type;
         }
         
         /**
-         * Gets the file count.
-         * @return The file count
+         * Gets whether the field is static.
+         * @return Whether the field is static
          */
-        public int getFileCount() {
-            return fileCount;
+        public boolean isStatic() {
+            return isStatic;
         }
         
         /**
-         * Sets the file count.
-         * @param fileCount The file count
+         * Gets whether the field is final.
+         * @return Whether the field is final
          */
-        public void setFileCount(int fileCount) {
-            this.fileCount = fileCount;
+        public boolean isFinal() {
+            return isFinal;
         }
         
         /**
-         * Gets the number of files with issues.
-         * @return The number of files with issues
+         * Gets the field visibility.
+         * @return The field visibility
          */
-        public int getFilesWithIssues() {
-            return filesWithIssues;
+        @Nullable
+        public String getVisibility() {
+            return visibility;
+        }
+    }
+    
+    /**
+     * Method info.
+     */
+    public static class MethodInfo {
+        private String name;
+        private String returnType;
+        private final List<ParameterInfo> parameters = new ArrayList<>();
+        private final List<String> exceptions = new ArrayList<>();
+        private boolean isStatic;
+        private boolean isAbstract;
+        private boolean isFinal;
+        private String visibility;
+        private boolean isConstructor;
+        private boolean isOverride;
+        
+        /**
+         * Gets the method name.
+         * @return The method name
+         */
+        @Nullable
+        public String getName() {
+            return name;
         }
         
         /**
-         * Sets the number of files with issues.
-         * @param filesWithIssues The number of files with issues
+         * Gets the return type.
+         * @return The return type
          */
-        public void setFilesWithIssues(int filesWithIssues) {
-            this.filesWithIssues = filesWithIssues;
+        @Nullable
+        public String getReturnType() {
+            return returnType;
         }
         
         /**
-         * Gets the issue type counts.
-         * @return The issue type counts
+         * Gets the parameters.
+         * @return The parameters
          */
         @NotNull
-        public Map<String, Integer> getIssueTypeCounts() {
-            return issueTypeCounts;
+        public List<ParameterInfo> getParameters() {
+            return parameters;
         }
         
         /**
-         * Adds an issue type count.
-         * @param issueType The issue type
-         * @param count The count
-         */
-        public void addIssueTypeCount(@NotNull String issueType, int count) {
-            issueTypeCounts.put(issueType, count);
-        }
-        
-        /**
-         * Gets the hotspots.
-         * @return The hotspots
+         * Gets the exceptions.
+         * @return The exceptions
          */
         @NotNull
-        public Map<String, Double> getHotspots() {
-            return hotspots;
+        public List<String> getExceptions() {
+            return exceptions;
         }
         
         /**
-         * Adds a hotspot.
-         * @param hotspot The hotspot description
-         * @param density The issue density
+         * Gets whether the method is static.
+         * @return Whether the method is static
          */
-        public void addHotspot(@NotNull String hotspot, double density) {
-            hotspots.put(hotspot, density);
+        public boolean isStatic() {
+            return isStatic;
         }
         
-        @Override
-        public String toString() {
-            return "CodeIssueStatistics{" +
-                    "totalIssueCount=" + totalIssueCount +
-                    ", fileCount=" + fileCount +
-                    ", filesWithIssues=" + filesWithIssues +
-                    ", issueTypeCounts=" + issueTypeCounts +
-                    ", hotspots=" + hotspots +
-                    '}';
+        /**
+         * Gets whether the method is abstract.
+         * @return Whether the method is abstract
+         */
+        public boolean isAbstract() {
+            return isAbstract;
+        }
+        
+        /**
+         * Gets whether the method is final.
+         * @return Whether the method is final
+         */
+        public boolean isFinal() {
+            return isFinal;
+        }
+        
+        /**
+         * Gets the method visibility.
+         * @return The method visibility
+         */
+        @Nullable
+        public String getVisibility() {
+            return visibility;
+        }
+        
+        /**
+         * Gets whether the method is a constructor.
+         * @return Whether the method is a constructor
+         */
+        public boolean isConstructor() {
+            return isConstructor;
+        }
+        
+        /**
+         * Gets whether the method is overriding.
+         * @return Whether the method is overriding
+         */
+        public boolean isOverride() {
+            return isOverride;
+        }
+    }
+    
+    /**
+     * Parameter info.
+     */
+    public static class ParameterInfo {
+        private String name;
+        private String type;
+        
+        /**
+         * Gets the parameter name.
+         * @return The parameter name
+         */
+        @Nullable
+        public String getName() {
+            return name;
+        }
+        
+        /**
+         * Gets the parameter type.
+         * @return The parameter type
+         */
+        @Nullable
+        public String getType() {
+            return type;
         }
     }
 }

@@ -6,8 +6,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * Represents an operation on a collaborative editor.
- * Operations are used to synchronize editor content between multiple participants.
+ * Operation for collaborative editing.
  */
 public class EditorOperation {
     // Operation types
@@ -15,21 +14,10 @@ public class EditorOperation {
     public static final String TYPE_DELETE = "delete";
     public static final String TYPE_REPLACE = "replace";
     
-    /** The operation type. */
-    @NotNull
     private final String type;
-    
-    /** The operation offset. */
     private final int offset;
-    
-    /** The operation length (for delete and replace operations). */
     private final int length;
-    
-    /** The operation text (for insert and replace operations). */
-    @NotNull
     private final String text;
-    
-    /** The timestamp when the operation was created. */
     private final long timestamp;
     
     /**
@@ -39,7 +27,7 @@ public class EditorOperation {
      * @param length The operation length
      * @param text The operation text
      */
-    private EditorOperation(@NotNull String type, int offset, int length, @NotNull String text) {
+    public EditorOperation(@NotNull String type, int offset, int length, @NotNull String text) {
         this.type = type;
         this.offset = offset;
         this.length = length;
@@ -48,8 +36,24 @@ public class EditorOperation {
     }
     
     /**
+     * Creates a new EditorOperation.
+     * @param type The operation type
+     * @param offset The operation offset
+     * @param length The operation length
+     * @param text The operation text
+     * @param timestamp The operation timestamp
+     */
+    public EditorOperation(@NotNull String type, int offset, int length, @NotNull String text, long timestamp) {
+        this.type = type;
+        this.offset = offset;
+        this.length = length;
+        this.text = text;
+        this.timestamp = timestamp;
+    }
+    
+    /**
      * Creates an insert operation.
-     * @param offset The offset at which to insert the text
+     * @param offset The offset to insert at
      * @param text The text to insert
      * @return The insert operation
      */
@@ -60,8 +64,8 @@ public class EditorOperation {
     
     /**
      * Creates a delete operation.
-     * @param offset The offset at which to delete text
-     * @param length The length of the text to delete
+     * @param offset The offset to delete from
+     * @param length The number of characters to delete
      * @return The delete operation
      */
     @NotNull
@@ -71,9 +75,9 @@ public class EditorOperation {
     
     /**
      * Creates a replace operation.
-     * @param offset The offset at which to replace text
-     * @param length The length of the text to replace
-     * @param text The replacement text
+     * @param offset The offset to replace at
+     * @param length The number of characters to replace
+     * @param text The text to replace with
      * @return The replace operation
      */
     @NotNull
@@ -125,36 +129,33 @@ public class EditorOperation {
     
     /**
      * Converts the operation to a map.
-     * @return The operation as a map
+     * @return The map representation of the operation
      */
     @NotNull
     public Map<String, Object> toMap() {
         Map<String, Object> map = new HashMap<>();
-        
         map.put("type", type);
         map.put("offset", offset);
-        
-        if (type.equals(TYPE_DELETE) || type.equals(TYPE_REPLACE)) {
-            map.put("length", length);
-        }
-        
-        if (type.equals(TYPE_INSERT) || type.equals(TYPE_REPLACE)) {
-            map.put("text", text);
-        }
-        
+        map.put("length", length);
+        map.put("text", text);
         map.put("timestamp", timestamp);
         
         return map;
     }
     
-    @Override
-    public String toString() {
-        return "EditorOperation{" +
-                "type='" + type + '\'' +
-                ", offset=" + offset +
-                ", length=" + length +
-                ", text='" + (text.length() > 20 ? text.substring(0, 20) + "..." : text) + '\'' +
-                ", timestamp=" + timestamp +
-                '}';
+    /**
+     * Creates an operation from a map.
+     * @param map The map to create the operation from
+     * @return The operation
+     */
+    @NotNull
+    public static EditorOperation fromMap(@NotNull Map<String, Object> map) {
+        String type = (String) map.get("type");
+        int offset = ((Number) map.get("offset")).intValue();
+        int length = ((Number) map.get("length")).intValue();
+        String text = (String) map.get("text");
+        long timestamp = ((Number) map.get("timestamp")).longValue();
+        
+        return new EditorOperation(type, offset, length, text, timestamp);
     }
 }

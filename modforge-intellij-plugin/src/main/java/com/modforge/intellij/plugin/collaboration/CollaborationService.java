@@ -1,55 +1,51 @@
 package com.modforge.intellij.plugin.collaboration;
 
+import com.intellij.notification.Notification;
+import com.intellij.notification.NotificationAction;
+import com.intellij.notification.NotificationType;
+import com.intellij.notification.Notifications;
+import com.intellij.openapi.actionSystem.AnActionEvent;
 import com.intellij.openapi.components.Service;
 import com.intellij.openapi.diagnostic.Logger;
+import com.intellij.openapi.fileEditor.FileEditorManager;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.util.concurrency.AppExecutorUtil;
-import com.modforge.intellij.plugin.collaboration.websocket.WebSocketClient;
-import com.modforge.intellij.plugin.collaboration.websocket.WebSocketMessage;
-import com.modforge.intellij.plugin.collaboration.websocket.WebSocketMessageListener;
+import com.modforge.intellij.plugin.settings.ModForgeSettings;
+import org.java_websocket.client.WebSocketClient;
+import org.java_websocket.handshake.ServerHandshake;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.util.*;
-import java.util.concurrent.*;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.TimeUnit;
 
 /**
- * Service for real-time collaboration features.
- * Allows multiple developers to work on the same mod simultaneously.
+ * Service for managing real-time collaboration with other users.
  */
 @Service(Service.Level.PROJECT)
 public final class CollaborationService {
     private static final Logger LOG = Logger.getInstance(CollaborationService.class);
     
-    // The project
     private final Project project;
-    
-    // Executor for background tasks
-    private final ExecutorService executor = AppExecutorUtil.createBoundedApplicationPoolExecutor(
-            "ModForge.Collaboration", 4);
-    
-    // WebSocket client
-    private final WebSocketClient webSocketClient = new WebSocketClient();
-    
-    // Session management
-    private String sessionId;
     private String userId;
-    private String username;
-    private boolean isHost;
-    private boolean isConnected;
+    private String sessionId;
+    private WebSocketClient webSocketClient;
+    private boolean connected = false;
+    private ScheduledFuture<?> pingTask;
     
-    // WebSocket server URL
-    private static final String WEBSOCKET_SERVER_URL = "wss://modforge.io/ws/collaboration";
+    // Maps file paths to editors
+    private final Map<String, CollaborativeEditor> editors = new ConcurrentHashMap<>();
     
-    // Maps file paths to their collaborative editors
-    private final Map<String, CollaborativeEditor> collaborativeEditors = new ConcurrentHashMap<>();
+    // Maps file paths to collaboration status
+    private final Map<String, Boolean> collaboratedFiles = new ConcurrentHashMap<>();
     
-    // List of participants in the session
-    private final List<Participant> participants = new CopyOnWriteArrayList<>();
-    
-    // Listeners
-    private final List<CollaborationListener> listeners = new CopyOnWriteArrayList<>();
+    // Currently active file
+    private VirtualFile activeFile;
     
     /**
      * Creates a new CollaborationService.
@@ -57,47 +53,9 @@ public final class CollaborationService {
      */
     public CollaborationService(@NotNull Project project) {
         this.project = project;
+        this.userId = UUID.randomUUID().toString(); // Generate a random user ID
         
-        // Initialize WebSocket handler
-        CollaborationWebSocketHandler handler = new CollaborationWebSocketHandler(this);
-        webSocketClient.addListener(handler);
-    }
-    
-    /**
-     * Adds a participant to the session.
-     * @param participant The participant to add
-     */
-    public void addParticipant(@NotNull Participant participant) {
-        // Check if participant already exists
-        if (participants.contains(participant)) {
-            return;
-        }
-        
-        // Add participant
-        participants.add(participant);
-        
-        // Notify listeners
-        notifyParticipantJoined(participant);
-    }
-    
-    /**
-     * Removes a participant from the session.
-     * @param userId The user ID of the participant to remove
-     */
-    public void removeParticipant(@NotNull String userId) {
-        // Find participant
-        Participant participant = participants.stream()
-                .filter(p -> p.userId.equals(userId))
-                .findFirst()
-                .orElse(null);
-        
-        if (participant != null) {
-            // Remove participant
-            participants.remove(participant);
-            
-            // Notify listeners
-            notifyParticipantLeft(participant);
-        }
+        LOG.info("CollaborationService initialized for project: " + project.getName());
     }
     
     /**
@@ -110,163 +68,24 @@ public final class CollaborationService {
     }
     
     /**
-     * Starts a new collaboration session.
-     * @param username The username
-     * @return The session ID
+     * Gets the user ID.
+     * @return The user ID
      */
     @NotNull
-    public CompletableFuture<String> startSession(@NotNull String username) {
-        return CompletableFuture.supplyAsync(() -> {
-            try {
-                this.username = username;
-                this.userId = UUID.randomUUID().toString();
-                this.sessionId = UUID.randomUUID().toString();
-                this.isHost = true;
-                
-                // Connect to WebSocket server
-                boolean connected = webSocketClient.connect(
-                        WEBSOCKET_SERVER_URL,
-                        sessionId,
-                        userId,
-                        username
-                );
-                
-                if (!connected) {
-                    throw new IllegalStateException("Failed to connect to WebSocket server");
-                }
-                
-                this.isConnected = true;
-                
-                // Add self as a participant
-                Participant self = new Participant(userId, username, true);
-                participants.add(self);
-                
-                // Send join message
-                Map<String, Object> joinData = new HashMap<>();
-                joinData.put("sessionId", sessionId);
-                joinData.put("userId", userId);
-                joinData.put("username", username);
-                joinData.put("isHost", true);
-                
-                webSocketClient.sendMessage(WebSocketMessage.TYPE_JOIN, joinData);
-                
-                // Notify listeners
-                notifySessionStarted(sessionId);
-                
-                LOG.info("Started collaboration session: " + sessionId);
-                return sessionId;
-            } catch (Exception e) {
-                LOG.error("Error starting collaboration session", e);
-                throw new CompletionException(e);
-            }
-        }, executor);
+    public String getUserId() {
+        return userId;
     }
     
     /**
-     * Joins an existing collaboration session.
-     * @param sessionId The session ID
-     * @param username The username
-     * @return Whether joining was successful
+     * Sets the user ID.
+     * @param userId The user ID
      */
-    @NotNull
-    public CompletableFuture<Boolean> joinSession(@NotNull String sessionId, @NotNull String username) {
-        return CompletableFuture.supplyAsync(() -> {
-            try {
-                this.sessionId = sessionId;
-                this.username = username;
-                this.userId = UUID.randomUUID().toString();
-                this.isHost = false;
-                
-                // Connect to WebSocket server
-                boolean connected = webSocketClient.connect(
-                        WEBSOCKET_SERVER_URL,
-                        sessionId,
-                        userId,
-                        username
-                );
-                
-                if (!connected) {
-                    throw new IllegalStateException("Failed to connect to WebSocket server");
-                }
-                
-                this.isConnected = true;
-                
-                // Add self as a participant
-                Participant self = new Participant(userId, username, false);
-                participants.add(self);
-                
-                // Send join message to notify other participants
-                Map<String, Object> joinData = new HashMap<>();
-                joinData.put("sessionId", sessionId);
-                joinData.put("userId", userId);
-                joinData.put("username", username);
-                joinData.put("isHost", false);
-                
-                webSocketClient.sendMessage(WebSocketMessage.TYPE_JOIN, joinData);
-                
-                // Notify listeners
-                notifySessionJoined(sessionId);
-                
-                LOG.info("Joined collaboration session: " + sessionId);
-                return true;
-            } catch (Exception e) {
-                LOG.error("Error joining collaboration session", e);
-                return false;
-            }
-        }, executor);
+    public void setUserId(@NotNull String userId) {
+        this.userId = userId;
     }
     
     /**
-     * Leaves the current collaboration session.
-     * @return Whether leaving was successful
-     */
-    @NotNull
-    public CompletableFuture<Boolean> leaveSession() {
-        return CompletableFuture.supplyAsync(() -> {
-            try {
-                if (!isConnected) {
-                    return false;
-                }
-                
-                String sessionIdToLeave = sessionId;
-                
-                // Send leave message to notify other participants
-                Map<String, Object> leaveData = new HashMap<>();
-                leaveData.put("sessionId", sessionId);
-                leaveData.put("userId", userId);
-                
-                webSocketClient.sendMessage(WebSocketMessage.TYPE_LEAVE, leaveData);
-                
-                // Disconnect from WebSocket server
-                webSocketClient.disconnect();
-                
-                // Clear session data
-                clearSessionData();
-                
-                // Notify listeners
-                notifySessionLeft(sessionIdToLeave);
-                
-                LOG.info("Left collaboration session: " + sessionIdToLeave);
-                return true;
-            } catch (Exception e) {
-                LOG.error("Error leaving collaboration session", e);
-                return false;
-            }
-        }, executor);
-    }
-    
-    /**
-     * Clears session data.
-     */
-    private void clearSessionData() {
-        sessionId = null;
-        isConnected = false;
-        collaborativeEditors.clear();
-        participants.clear();
-    }
-    
-    /**
-     * Gets the current collaboration session ID.
+     * Gets the session ID.
      * @return The session ID
      */
     @Nullable
@@ -275,249 +94,618 @@ public final class CollaborationService {
     }
     
     /**
-     * Gets whether this client is the host.
-     * @return Whether this client is the host
+     * Sets the active file.
+     * @param file The active file
      */
-    public boolean isHost() {
-        return isHost;
+    public void setActiveFile(@Nullable VirtualFile file) {
+        this.activeFile = file;
     }
     
     /**
-     * Gets whether this client is connected to a session.
-     * @return Whether this client is connected
+     * Starts a collaboration session.
+     * @param sessionId The session ID
      */
-    public boolean isConnected() {
-        return isConnected;
-    }
-    
-    /**
-     * Gets the current username.
-     * @return The username
-     */
-    @Nullable
-    public String getUsername() {
-        return username;
-    }
-    
-    /**
-     * Gets the current user ID.
-     * @return The user ID
-     */
-    @Nullable
-    public String getUserId() {
-        return userId;
-    }
-    
-    /**
-     * Gets the list of participants.
-     * @return The participants
-     */
-    @NotNull
-    public List<Participant> getParticipants() {
-        return new ArrayList<>(participants);
-    }
-    
-    /**
-     * Adds a collaboration listener.
-     * @param listener The listener
-     */
-    public void addListener(@NotNull CollaborationListener listener) {
-        listeners.add(listener);
-    }
-    
-    /**
-     * Removes a collaboration listener.
-     * @param listener The listener
-     */
-    public void removeListener(@NotNull CollaborationListener listener) {
-        listeners.remove(listener);
-    }
-    
-    /**
-     * Gets a collaborative editor for a file.
-     * @param file The file
-     * @return The collaborative editor
-     */
-    @NotNull
-    public CollaborativeEditor getCollaborativeEditor(@NotNull VirtualFile file) {
-        String filePath = file.getPath();
-        
-        // Create a new collaborative editor if one doesn't exist
-        return collaborativeEditors.computeIfAbsent(filePath, path -> {
-            CollaborativeEditor editor = new CollaborativeEditor(project, file, userId);
-            
-            // TODO: Synchronize editor state with other participants
-            
-            return editor;
-        });
-    }
-    
-    /**
-     * Applies an operation to a file.
-     * @param filePath The file path
-     * @param operation The operation
-     * @param sourceUserId The user ID that generated the operation
-     */
-    public void applyOperation(@NotNull String filePath, @NotNull EditorOperation operation, @NotNull String sourceUserId) {
-        // Find the collaborative editor
-        CollaborativeEditor editor = collaborativeEditors.get(filePath);
-        
-        if (editor != null) {
-            // Apply the operation
-            editor.applyOperation(operation, sourceUserId);
-        }
-    }
-    
-    /**
-     * Broadcasts a message to all participants.
-     * @param type The message type
-     * @param data The message data
-     */
-    public void broadcastMessage(@NotNull String type, @NotNull Map<String, Object> data) {
-        if (!isConnected) {
-            LOG.warn("Cannot broadcast message: Not connected to a session");
+    public void startSession(@NotNull String sessionId) {
+        if (connected) {
+            LOG.warn("Already connected to a session");
             return;
         }
         
-        // Add session and user information to the message
-        Map<String, Object> messageData = new HashMap<>(data);
-        messageData.put("sessionId", sessionId);
-        messageData.put("userId", userId);
+        this.sessionId = sessionId;
         
-        // Send the message through WebSocket
-        boolean sent = webSocketClient.sendMessage(type, messageData);
-        
-        if (sent) {
-            LOG.info("Broadcasted message: " + type);
+        try {
+            connectToServer();
+        } catch (Exception e) {
+            LOG.error("Error connecting to server", e);
             
-            // Log the recipients
-            for (Participant participant : participants) {
-                if (!participant.userId.equals(userId)) {
-                    LOG.info("  To: " + participant.username);
+            Notification notification = new Notification(
+                    "ModForge Notifications",
+                    "Collaboration Error",
+                    "Error connecting to collaboration server: " + e.getMessage(),
+                    NotificationType.ERROR
+            );
+            
+            notification.addAction(new NotificationAction("Try Again") {
+                @Override
+                public void actionPerformed(@NotNull AnActionEvent e, @NotNull Notification notification) {
+                    try {
+                        connectToServer();
+                        notification.expire();
+                    } catch (Exception ex) {
+                        LOG.error("Error connecting to server", ex);
+                        
+                        Notification errorNotification = new Notification(
+                                "ModForge Notifications",
+                                "Collaboration Error",
+                                "Error connecting to collaboration server: " + ex.getMessage(),
+                                NotificationType.ERROR
+                        );
+                        
+                        Notifications.Bus.notify(errorNotification, project);
+                    }
+                }
+            });
+            
+            Notifications.Bus.notify(notification, project);
+        }
+    }
+    
+    /**
+     * Connects to the WebSocket server.
+     * @throws URISyntaxException If the server URL is invalid
+     */
+    private void connectToServer() throws URISyntaxException {
+        if (connected) {
+            LOG.warn("Already connected to server");
+            return;
+        }
+        
+        String serverUrl = ModForgeSettings.getInstance().getCollaborationServerUrl();
+        if (serverUrl == null || serverUrl.isEmpty()) {
+            throw new IllegalStateException("Collaboration server URL is not set");
+        }
+        
+        URI serverUri = new URI(serverUrl);
+        webSocketClient = new WebSocketClient(serverUri) {
+            @Override
+            public void onOpen(ServerHandshake handshakedata) {
+                LOG.info("Connected to collaboration server");
+                connected = true;
+                
+                // Send join message
+                Map<String, Object> data = new HashMap<>();
+                data.put("sessionId", sessionId);
+                data.put("username", ModForgeSettings.getInstance().getUsername());
+                
+                sendMessage(WebSocketMessage.TYPE_JOIN, data);
+                
+                // Start ping task
+                startPingTask();
+                
+                // Notify user
+                Notification notification = new Notification(
+                        "ModForge Notifications",
+                        "Collaboration Started",
+                        "Connected to collaboration session: " + sessionId,
+                        NotificationType.INFORMATION
+                );
+                
+                Notifications.Bus.notify(notification, project);
+            }
+            
+            @Override
+            public void onMessage(String message) {
+                WebSocketMessage wsMessage = WebSocketMessage.fromJson(message);
+                if (wsMessage == null) {
+                    LOG.warn("Received invalid message from server");
+                    return;
+                }
+                
+                handleMessage(wsMessage);
+            }
+            
+            @Override
+            public void onClose(int code, String reason, boolean remote) {
+                LOG.info("Disconnected from collaboration server: " + reason);
+                connected = false;
+                
+                // Stop ping task
+                stopPingTask();
+                
+                // Clear collaboration state
+                synchronized (collaboratedFiles) {
+                    collaboratedFiles.clear();
+                }
+                
+                synchronized (editors) {
+                    editors.clear();
+                }
+                
+                // Notify user
+                if (remote) {
+                    Notification notification = new Notification(
+                            "ModForge Notifications",
+                            "Collaboration Ended",
+                            "Disconnected from collaboration session: " + reason,
+                            NotificationType.INFORMATION
+                    );
+                    
+                    notification.addAction(new NotificationAction("Reconnect") {
+                        @Override
+                        public void actionPerformed(@NotNull AnActionEvent e, @NotNull Notification notification) {
+                            try {
+                                connectToServer();
+                                notification.expire();
+                            } catch (Exception ex) {
+                                LOG.error("Error reconnecting to server", ex);
+                                
+                                Notification errorNotification = new Notification(
+                                        "ModForge Notifications",
+                                        "Collaboration Error",
+                                        "Error reconnecting to collaboration server: " + ex.getMessage(),
+                                        NotificationType.ERROR
+                                );
+                                
+                                Notifications.Bus.notify(errorNotification, project);
+                            }
+                        }
+                    });
+                    
+                    Notifications.Bus.notify(notification, project);
                 }
             }
-        } else {
-            LOG.error("Failed to broadcast message: " + type);
+            
+            @Override
+            public void onError(Exception ex) {
+                LOG.error("WebSocket error", ex);
+                
+                // Notify user
+                Notification notification = new Notification(
+                        "ModForge Notifications",
+                        "Collaboration Error",
+                        "WebSocket error: " + ex.getMessage(),
+                        NotificationType.ERROR
+                );
+                
+                Notifications.Bus.notify(notification, project);
+            }
+        };
+        
+        webSocketClient.connect();
+    }
+    
+    /**
+     * Handles a WebSocket message.
+     * @param message The message to handle
+     */
+    private void handleMessage(@NotNull WebSocketMessage message) {
+        LOG.debug("Received message: " + message.getType() + " from " + message.getUserId());
+        
+        switch (message.getType()) {
+            case WebSocketMessage.TYPE_PING:
+                // Respond with pong
+                sendMessage(WebSocketMessage.TYPE_PONG, null);
+                break;
+                
+            case WebSocketMessage.TYPE_JOIN:
+                // User joined session
+                handleJoinMessage(message);
+                break;
+                
+            case WebSocketMessage.TYPE_LEAVE:
+                // User left session
+                handleLeaveMessage(message);
+                break;
+                
+            case WebSocketMessage.TYPE_OPERATION:
+                // User performed an operation
+                handleOperationMessage(message);
+                break;
+                
+            case WebSocketMessage.TYPE_FILE_CONTENT:
+                // User sent file content
+                handleFileContentMessage(message);
+                break;
+                
+            case WebSocketMessage.TYPE_FILE_SYNC:
+                // User requested file sync
+                handleFileSyncMessage(message);
+                break;
+                
+            case WebSocketMessage.TYPE_ERROR:
+                // Error message from server
+                handleErrorMessage(message);
+                break;
+                
+            default:
+                LOG.warn("Received unknown message type: " + message.getType());
+                break;
         }
     }
     
     /**
-     * Sends a direct message to a specific participant.
-     * @param recipientUserId The recipient user ID
-     * @param type The message type
-     * @param data The message data
+     * Handles a join message.
+     * @param message The message to handle
      */
-    public void sendDirectMessage(@NotNull String recipientUserId, @NotNull String type, @NotNull Map<String, Object> data) {
-        if (!isConnected) {
-            LOG.warn("Cannot send direct message: Not connected to a session");
+    private void handleJoinMessage(@NotNull WebSocketMessage message) {
+        String username = (String) message.getData().get("username");
+        
+        LOG.info("User joined session: " + username + " (" + message.getUserId() + ")");
+        
+        // Notify user
+        Notification notification = new Notification(
+                "ModForge Notifications",
+                "User Joined",
+                username + " joined the collaboration session",
+                NotificationType.INFORMATION
+        );
+        
+        Notifications.Bus.notify(notification, project);
+        
+        // Send currently active file
+        if (activeFile != null) {
+            Map<String, Object> data = new HashMap<>();
+            data.put("filePath", activeFile.getPath());
+            data.put("fileName", activeFile.getName());
+            
+            sendMessage(WebSocketMessage.TYPE_FILE_SYNC, data);
+        }
+    }
+    
+    /**
+     * Handles a leave message.
+     * @param message The message to handle
+     */
+    private void handleLeaveMessage(@NotNull WebSocketMessage message) {
+        String username = (String) message.getData().get("username");
+        
+        LOG.info("User left session: " + username + " (" + message.getUserId() + ")");
+        
+        // Notify user
+        Notification notification = new Notification(
+                "ModForge Notifications",
+                "User Left",
+                username + " left the collaboration session",
+                NotificationType.INFORMATION
+        );
+        
+        Notifications.Bus.notify(notification, project);
+    }
+    
+    /**
+     * Handles an operation message.
+     * @param message The message to handle
+     */
+    private void handleOperationMessage(@NotNull WebSocketMessage message) {
+        String filePath = (String) message.getData().get("filePath");
+        if (filePath == null) {
+            LOG.warn("Received operation message without file path");
             return;
         }
         
-        // Find the recipient
-        Optional<Participant> recipient = participants.stream()
-                .filter(p -> p.userId.equals(recipientUserId))
-                .findFirst();
-        
-        if (recipient.isPresent()) {
-            // Add session, user, and recipient information to the message
-            Map<String, Object> messageData = new HashMap<>(data);
-            messageData.put("sessionId", sessionId);
-            messageData.put("userId", userId);
-            messageData.put("recipientId", recipientUserId);
-            
-            // Send the message through WebSocket
-            boolean sent = webSocketClient.sendMessage(type, messageData);
-            
-            if (sent) {
-                LOG.info("Sent direct message to " + recipient.get().username + ": " + type);
-            } else {
-                LOG.error("Failed to send direct message to " + recipient.get().username + ": " + type);
-            }
-        } else {
-            LOG.warn("Recipient not found: " + recipientUserId);
-        }
-    }
-    
-    /**
-     * Notifies listeners that a session has started.
-     * @param sessionId The session ID
-     */
-    private void notifySessionStarted(@NotNull String sessionId) {
-        for (CollaborationListener listener : listeners) {
-            try {
-                listener.onSessionStarted(sessionId);
-            } catch (Exception e) {
-                LOG.error("Error notifying listener of session start", e);
-            }
-        }
-    }
-    
-    /**
-     * Notifies listeners that a session has been joined.
-     * @param sessionId The session ID
-     */
-    private void notifySessionJoined(@NotNull String sessionId) {
-        for (CollaborationListener listener : listeners) {
-            try {
-                listener.onSessionJoined(sessionId);
-            } catch (Exception e) {
-                LOG.error("Error notifying listener of session join", e);
-            }
-        }
-    }
-    
-    /**
-     * Notifies listeners that a session has been left.
-     * @param sessionId The session ID
-     */
-    private void notifySessionLeft(@NotNull String sessionId) {
-        for (CollaborationListener listener : listeners) {
-            try {
-                listener.onSessionLeft(sessionId);
-            } catch (Exception e) {
-                LOG.error("Error notifying listener of session leave", e);
-            }
-        }
-    }
-    
-    /**
-     * Notifies listeners that a participant has joined.
-     * @param participant The participant
-     */
-    private void notifyParticipantJoined(@NotNull Participant participant) {
-        for (CollaborationListener listener : listeners) {
-            try {
-                listener.onParticipantJoined(participant);
-            } catch (Exception e) {
-                LOG.error("Error notifying listener of participant join", e);
-            }
-        }
-    }
-    
-    /**
-     * Notifies listeners that a participant has left.
-     * @param participant The participant
-     */
-    private void notifyParticipantLeft(@NotNull Participant participant) {
-        for (CollaborationListener listener : listeners) {
-            try {
-                listener.onParticipantLeft(participant);
-            } catch (Exception e) {
-                LOG.error("Error notifying listener of participant leave", e);
-            }
-        }
-    }
-    
-    /**
-     * Disposes the service.
-     */
-    public void dispose() {
-        // Leave the session if connected
-        if (isConnected) {
-            leaveSession();
+        @SuppressWarnings("unchecked")
+        Map<String, Object> operationMap = (Map<String, Object>) message.getData().get("operation");
+        if (operationMap == null) {
+            LOG.warn("Received operation message without operation");
+            return;
         }
         
-        // Shutdown the executor
-        executor.shutdownNow();
+        // Get the collaborative editor for the file
+        CollaborativeEditor editor = editors.get(filePath);
+        if (editor == null) {
+            LOG.warn("Received operation for unregistered file: " + filePath);
+            return;
+        }
+        
+        // Convert operation and apply it
+        EditorOperation operation = EditorOperation.fromMap(operationMap);
+        editor.applyOperation(operation, message.getUserId());
+    }
+    
+    /**
+     * Handles a file content message.
+     * @param message The message to handle
+     */
+    private void handleFileContentMessage(@NotNull WebSocketMessage message) {
+        String filePath = (String) message.getData().get("filePath");
+        if (filePath == null) {
+            LOG.warn("Received file content message without file path");
+            return;
+        }
+        
+        String content = (String) message.getData().get("content");
+        if (content == null) {
+            LOG.warn("Received file content message without content");
+            return;
+        }
+        
+        LOG.info("Received file content for: " + filePath);
+        
+        // Mark file as being collaborated on
+        synchronized (collaboratedFiles) {
+            collaboratedFiles.put(filePath, true);
+        }
+        
+        // Get the virtual file
+        VirtualFile file = findFileByPath(filePath);
+        if (file == null) {
+            LOG.warn("Could not find file: " + filePath);
+            return;
+        }
+        
+        // Open the file if it's not already open
+        if (!FileEditorManager.getInstance(project).isFileOpen(file)) {
+            FileEditorManager.getInstance(project).openFile(file, true);
+        }
+        
+        // Register editor for collaboration
+        registerEditor(file);
+        
+        // Get the collaborative editor
+        CollaborativeEditor editor = editors.get(filePath);
+        if (editor == null) {
+            LOG.warn("Could not get collaborative editor for file: " + filePath);
+            return;
+        }
+        
+        // TODO: Update file content
+    }
+    
+    /**
+     * Handles a file sync message.
+     * @param message The message to handle
+     */
+    private void handleFileSyncMessage(@NotNull WebSocketMessage message) {
+        String filePath = (String) message.getData().get("filePath");
+        if (filePath == null) {
+            LOG.warn("Received file sync message without file path");
+            return;
+        }
+        
+        String fileName = (String) message.getData().get("fileName");
+        if (fileName == null) {
+            LOG.warn("Received file sync message without file name");
+            return;
+        }
+        
+        LOG.info("Received file sync request for: " + filePath);
+        
+        // Mark file as being collaborated on
+        synchronized (collaboratedFiles) {
+            collaboratedFiles.put(filePath, true);
+        }
+        
+        // Get the virtual file
+        VirtualFile file = findFileByPath(filePath);
+        if (file == null) {
+            LOG.warn("Could not find file: " + filePath);
+            return;
+        }
+        
+        // If file is open, send its content
+        if (FileEditorManager.getInstance(project).isFileOpen(file)) {
+            CollaborativeEditor editor = editors.get(filePath);
+            if (editor != null) {
+                String content = editor.getDocument().getText();
+                
+                Map<String, Object> data = new HashMap<>();
+                data.put("filePath", filePath);
+                data.put("fileName", fileName);
+                data.put("content", content);
+                
+                sendMessage(WebSocketMessage.TYPE_FILE_CONTENT, data);
+            }
+        }
+    }
+    
+    /**
+     * Handles an error message.
+     * @param message The message to handle
+     */
+    private void handleErrorMessage(@NotNull WebSocketMessage message) {
+        String errorMessage = (String) message.getData().get("message");
+        if (errorMessage == null) {
+            LOG.warn("Received error message without error message");
+            return;
+        }
+        
+        LOG.error("Received error from server: " + errorMessage);
+        
+        // Notify user
+        Notification notification = new Notification(
+                "ModForge Notifications",
+                "Collaboration Error",
+                "Server error: " + errorMessage,
+                NotificationType.ERROR
+        );
+        
+        Notifications.Bus.notify(notification, project);
+    }
+    
+    /**
+     * Finds a file by path.
+     * @param path The path to find
+     * @return The file, or null if not found
+     */
+    @Nullable
+    private VirtualFile findFileByPath(@NotNull String path) {
+        return com.intellij.openapi.vfs.LocalFileSystem.getInstance().findFileByPath(path);
+    }
+    
+    /**
+     * Starts the ping task.
+     */
+    private void startPingTask() {
+        if (pingTask != null && !pingTask.isCancelled() && !pingTask.isDone()) {
+            LOG.warn("Ping task already running");
+            return;
+        }
+        
+        pingTask = AppExecutorUtil.getAppScheduledExecutorService().scheduleAtFixedRate(
+                this::sendPing,
+                30, 30, TimeUnit.SECONDS
+        );
+    }
+    
+    /**
+     * Stops the ping task.
+     */
+    private void stopPingTask() {
+        if (pingTask != null && !pingTask.isCancelled() && !pingTask.isDone()) {
+            pingTask.cancel(true);
+        }
+        
+        pingTask = null;
+    }
+    
+    /**
+     * Sends a ping message.
+     */
+    private void sendPing() {
+        try {
+            if (connected) {
+                sendMessage(WebSocketMessage.TYPE_PING, null);
+            }
+        } catch (Exception e) {
+            LOG.error("Error sending ping", e);
+        }
+    }
+    
+    /**
+     * Sends a message to the server.
+     * @param type The message type
+     * @param data The message data
+     */
+    public void sendMessage(@NotNull String type, @Nullable Map<String, Object> data) {
+        if (!connected) {
+            LOG.warn("Not connected to server");
+            return;
+        }
+        
+        WebSocketMessage message = new WebSocketMessage(type, userId, data);
+        webSocketClient.send(message.toJson());
+    }
+    
+    /**
+     * Broadcasts a message to all connected clients.
+     * @param type The message type
+     * @param data The message data
+     */
+    public void broadcastMessage(@NotNull String type, @Nullable Map<String, Object> data) {
+        sendMessage(type, data);
+    }
+    
+    /**
+     * Registers an editor for collaboration.
+     * @param file The file to register
+     */
+    public void registerEditor(@NotNull VirtualFile file) {
+        String filePath = file.getPath();
+        
+        if (editors.containsKey(filePath)) {
+            LOG.debug("Editor already registered for file: " + filePath);
+            return;
+        }
+        
+        // Create a new collaborative editor
+        CollaborativeEditor editor = new CollaborativeEditor(project, file, userId);
+        editors.put(filePath, editor);
+        
+        LOG.info("Registered editor for file: " + filePath);
+    }
+    
+    /**
+     * Unregisters an editor for collaboration.
+     * @param file The file to unregister
+     */
+    public void unregisterEditor(@NotNull VirtualFile file) {
+        String filePath = file.getPath();
+        
+        CollaborativeEditor editor = editors.remove(filePath);
+        if (editor != null) {
+            LOG.info("Unregistered editor for file: " + filePath);
+        }
+    }
+    
+    /**
+     * Checks if a file is being collaborated on.
+     * @param file The file to check
+     * @return Whether the file is being collaborated on
+     */
+    public boolean isFileCollaborated(@NotNull VirtualFile file) {
+        String filePath = file.getPath();
+        
+        synchronized (collaboratedFiles) {
+            return collaboratedFiles.getOrDefault(filePath, false);
+        }
+    }
+    
+    /**
+     * Ends the collaboration session.
+     */
+    public void endSession() {
+        if (!connected) {
+            LOG.warn("Not connected to a session");
+            return;
+        }
+        
+        try {
+            // Send leave message
+            Map<String, Object> data = new HashMap<>();
+            data.put("sessionId", sessionId);
+            data.put("username", ModForgeSettings.getInstance().getUsername());
+            
+            sendMessage(WebSocketMessage.TYPE_LEAVE, data);
+            
+            // Close connection
+            webSocketClient.close();
+            
+            // Reset state
+            connected = false;
+            sessionId = null;
+            
+            // Stop ping task
+            stopPingTask();
+            
+            // Clear collaboration state
+            synchronized (collaboratedFiles) {
+                collaboratedFiles.clear();
+            }
+            
+            synchronized (editors) {
+                editors.clear();
+            }
+            
+            LOG.info("Ended collaboration session");
+            
+            // Notify user
+            Notification notification = new Notification(
+                    "ModForge Notifications",
+                    "Collaboration Ended",
+                    "Disconnected from collaboration session",
+                    NotificationType.INFORMATION
+            );
+            
+            Notifications.Bus.notify(notification, project);
+        } catch (Exception e) {
+            LOG.error("Error ending collaboration session", e);
+            
+            Notification notification = new Notification(
+                    "ModForge Notifications",
+                    "Collaboration Error",
+                    "Error ending collaboration session: " + e.getMessage(),
+                    NotificationType.ERROR
+            );
+            
+            Notifications.Bus.notify(notification, project);
+        }
+    }
+    
+    /**
+     * Checks if connected to a collaboration session.
+     * @return Whether connected to a collaboration session
+     */
+    public boolean isConnected() {
+        return connected;
     }
 }

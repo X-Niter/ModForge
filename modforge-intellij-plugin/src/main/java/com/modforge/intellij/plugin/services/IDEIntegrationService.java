@@ -1,44 +1,49 @@
 package com.modforge.intellij.plugin.services;
 
+import com.intellij.ide.highlighter.JavaFileType;
+import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.components.Service;
 import com.intellij.openapi.diagnostic.Logger;
+import com.intellij.openapi.editor.Document;
+import com.intellij.openapi.editor.Editor;
+import com.intellij.openapi.fileEditor.FileEditorManager;
+import com.intellij.openapi.fileEditor.FileEditorManagerListener;
+import com.intellij.openapi.fileEditor.OpenFileDescriptor;
+import com.intellij.openapi.module.Module;
+import com.intellij.openapi.module.ModuleManager;
 import com.intellij.openapi.project.Project;
-import com.intellij.openapi.application.ApplicationManager;
+import com.intellij.openapi.project.ProjectUtil;
+import com.intellij.openapi.roots.ModuleRootManager;
+import com.intellij.openapi.roots.ProjectRootManager;
+import com.intellij.openapi.vfs.VfsUtil;
 import com.intellij.openapi.vfs.VirtualFile;
-import com.intellij.psi.PsiClass;
-import com.intellij.psi.PsiFile;
-import com.intellij.psi.PsiManager;
-import com.intellij.psi.PsiMethod;
-import com.intellij.psi.search.FilenameIndex;
+import com.intellij.psi.*;
+import com.intellij.psi.search.FileTypeIndex;
 import com.intellij.psi.search.GlobalSearchScope;
-import com.intellij.psi.search.PsiShortNamesCache;
 import com.intellij.psi.util.PsiTreeUtil;
-import com.intellij.util.concurrency.AppExecutorUtil;
+import com.intellij.util.messages.MessageBusConnection;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
-import java.util.Arrays;
+import java.util.Collection;
 import java.util.List;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutorService;
+import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
 /**
- * Service that integrates with IntelliJ IDE to enhance autonomous capabilities.
- * This service offers:
- * - Project structure analysis
- * - Code inspection
- * - Automated build and compilation
- * - Symbol resolution and navigation
+ * Service for integrating with IDE-specific functionality.
+ * This service provides methods for interacting with the IDE's project structure,
+ * file system, and editor functionality.
  */
 @Service(Service.Level.PROJECT)
 public final class IDEIntegrationService {
     private static final Logger LOG = Logger.getInstance(IDEIntegrationService.class);
     
     private final Project project;
-    private final ExecutorService executor = AppExecutorUtil.createBoundedApplicationPoolExecutor(
-            "ModForge.IDEIntegration", 4);
+    private final MessageBusConnection messageBusConnection;
     
     /**
      * Creates a new IDEIntegrationService.
@@ -46,6 +51,12 @@ public final class IDEIntegrationService {
      */
     public IDEIntegrationService(@NotNull Project project) {
         this.project = project;
+        this.messageBusConnection = project.getMessageBus().connect();
+        
+        LOG.info("IDEIntegrationService initialized for project: " + project.getName());
+        
+        // Register for file editor events
+        registerFileEditorListeners();
     }
     
     /**
@@ -58,462 +69,412 @@ public final class IDEIntegrationService {
     }
     
     /**
-     * Analyzes the project structure.
-     * @return A structure representing the project's modules, packages, and classes
+     * Registers for file editor events.
      */
-    @NotNull
-    public CompletableFuture<ProjectStructure> analyzeProjectStructure() {
-        return CompletableFuture.supplyAsync(() -> {
-            try {
-                LOG.info("Analyzing project structure");
-                
-                ProjectStructure structure = new ProjectStructure();
-                
-                // Get all source files
-                VirtualFile[] sourceFiles = FilenameIndex.getAllFilesByExt(project, "java", GlobalSearchScope.projectScope(project));
-                LOG.info("Found " + sourceFiles.length + " Java files");
-                
-                // Process each file
-                for (VirtualFile file : sourceFiles) {
-                    PsiFile psiFile = PsiManager.getInstance(project).findFile(file);
-                    if (psiFile != null) {
-                        // Find classes in the file
-                        PsiClass[] classes = PsiTreeUtil.getChildrenOfType(psiFile, PsiClass.class);
-                        if (classes != null) {
-                            for (PsiClass psiClass : classes) {
-                                // Add class to structure
-                                ClassInfo classInfo = new ClassInfo(
-                                        psiClass.getQualifiedName(),
-                                        psiClass.getName(),
-                                        file.getPath()
-                                );
-                                
-                                // Add methods to class
-                                PsiMethod[] methods = psiClass.getMethods();
-                                for (PsiMethod method : methods) {
-                                    MethodInfo methodInfo = new MethodInfo(
-                                            method.getName(),
-                                            method.getReturnType() != null ? method.getReturnType().getCanonicalText() : "void",
-                                            method.getParameterList().getParametersCount()
-                                    );
-                                    classInfo.addMethod(methodInfo);
-                                }
-                                
-                                structure.addClass(classInfo);
-                            }
-                        }
+    private void registerFileEditorListeners() {
+        messageBusConnection.subscribe(FileEditorManagerListener.FILE_EDITOR_MANAGER, 
+                new FileEditorManagerListener() {
+                    @Override
+                    public void fileOpened(@NotNull FileEditorManager source, @NotNull VirtualFile file) {
+                        // Handle file opened event
                     }
-                }
-                
-                LOG.info("Project structure analysis complete. Found " + structure.getClasses().size() + " classes.");
-                return structure;
-            } catch (Exception e) {
-                LOG.error("Error analyzing project structure", e);
-                throw new RuntimeException("Failed to analyze project structure", e);
-            }
-        }, executor);
-    }
-    
-    /**
-     * Finds all classes that implement a given interface.
-     * @param interfaceName The fully qualified interface name
-     * @return The list of classes implementing the interface
-     */
-    @NotNull
-    public CompletableFuture<List<ClassInfo>> findClassesImplementingInterface(@NotNull String interfaceName) {
-        return CompletableFuture.supplyAsync(() -> {
-            try {
-                LOG.info("Finding classes implementing interface: " + interfaceName);
-                
-                List<ClassInfo> implementingClasses = new ArrayList<>();
-                
-                // Find all classes
-                String[] classNames = PsiShortNamesCache.getInstance(project).getAllClassNames();
-                LOG.info("Processing " + classNames.length + " classes");
-                
-                for (String className : classNames) {
-                    PsiClass[] classes = PsiShortNamesCache.getInstance(project).getClassesByName(className, GlobalSearchScope.projectScope(project));
-                    for (PsiClass psiClass : classes) {
-                        // Check if the class implements the interface
-                        PsiClass[] interfaces = psiClass.getInterfaces();
-                        for (PsiClass iface : interfaces) {
-                            if (interfaceName.equals(iface.getQualifiedName())) {
-                                ClassInfo classInfo = new ClassInfo(
-                                        psiClass.getQualifiedName(),
-                                        psiClass.getName(),
-                                        psiClass.getContainingFile().getVirtualFile().getPath()
-                                );
-                                
-                                // Add methods to class
-                                PsiMethod[] methods = psiClass.getMethods();
-                                for (PsiMethod method : methods) {
-                                    MethodInfo methodInfo = new MethodInfo(
-                                            method.getName(),
-                                            method.getReturnType() != null ? method.getReturnType().getCanonicalText() : "void",
-                                            method.getParameterList().getParametersCount()
-                                    );
-                                    classInfo.addMethod(methodInfo);
-                                }
-                                
-                                implementingClasses.add(classInfo);
-                                break;
-                            }
-                        }
-                    }
-                }
-                
-                LOG.info("Found " + implementingClasses.size() + " classes implementing " + interfaceName);
-                return implementingClasses;
-            } catch (Exception e) {
-                LOG.error("Error finding classes implementing interface", e);
-                throw new RuntimeException("Failed to find classes implementing interface", e);
-            }
-        }, executor);
-    }
-    
-    /**
-     * Finds usages of a class.
-     * @param className The fully qualified class name
-     * @return List of files that use the class
-     */
-    @NotNull
-    public CompletableFuture<List<String>> findClassUsages(@NotNull String className) {
-        return CompletableFuture.supplyAsync(() -> {
-            try {
-                LOG.info("Finding usages of class: " + className);
-                
-                // Find the class
-                PsiClass[] classes = PsiShortNamesCache.getInstance(project).getClassesByName(
-                        className.substring(className.lastIndexOf('.') + 1),
-                        GlobalSearchScope.projectScope(project)
-                );
-                
-                List<String> usageFiles = new ArrayList<>();
-                
-                for (PsiClass psiClass : classes) {
-                    if (className.equals(psiClass.getQualifiedName())) {
-                        // Find usages - this is simplified, would need to use FindUsagesManager in practice
-                        // We'd need to run in read action to use FindUsagesManager properly
-                        
-                        // For demonstration, just return the containing file
-                        usageFiles.add(psiClass.getContainingFile().getVirtualFile().getPath());
-                        break;
-                    }
-                }
-                
-                LOG.info("Found " + usageFiles.size() + " usages of " + className);
-                return usageFiles;
-            } catch (Exception e) {
-                LOG.error("Error finding class usages", e);
-                throw new RuntimeException("Failed to find class usages", e);
-            }
-        }, executor);
-    }
-    
-    /**
-     * Analyzes dependencies between classes.
-     * @param classNames List of fully qualified class names
-     * @return A map of dependencies between classes
-     */
-    @NotNull
-    public CompletableFuture<List<ClassDependency>> analyzeDependencies(@NotNull List<String> classNames) {
-        return CompletableFuture.supplyAsync(() -> {
-            try {
-                LOG.info("Analyzing dependencies for " + classNames.size() + " classes");
-                
-                List<ClassDependency> dependencies = new ArrayList<>();
-                
-                for (String className : classNames) {
-                    // Find the class
-                    PsiClass[] classes = PsiShortNamesCache.getInstance(project).getClassesByName(
-                            className.substring(className.lastIndexOf('.') + 1),
-                            GlobalSearchScope.projectScope(project)
-                    );
                     
-                    for (PsiClass psiClass : classes) {
-                        if (className.equals(psiClass.getQualifiedName())) {
-                            // Analyze superclass
-                            PsiClass superClass = psiClass.getSuperClass();
-                            if (superClass != null && !superClass.getQualifiedName().startsWith("java.")) {
-                                dependencies.add(new ClassDependency(
-                                        className,
-                                        superClass.getQualifiedName(),
-                                        ClassDependency.Type.EXTENDS
-                                ));
-                            }
-                            
-                            // Analyze interfaces
-                            PsiClass[] interfaces = psiClass.getInterfaces();
-                            for (PsiClass iface : interfaces) {
-                                if (!iface.getQualifiedName().startsWith("java.")) {
-                                    dependencies.add(new ClassDependency(
-                                            className,
-                                            iface.getQualifiedName(),
-                                            ClassDependency.Type.IMPLEMENTS
-                                    ));
-                                }
-                            }
-                            
-                            // TODO: Analyze field dependencies and method parameter dependencies
-                            
-                            break;
+                    @Override
+                    public void fileClosed(@NotNull FileEditorManager source, @NotNull VirtualFile file) {
+                        // Handle file closed event
+                    }
+                });
+    }
+    
+    /**
+     * Gets the current editor.
+     * @return The current editor, or null if no editor is open
+     */
+    @Nullable
+    public Editor getCurrentEditor() {
+        return FileEditorManager.getInstance(project).getSelectedTextEditor();
+    }
+    
+    /**
+     * Gets the current file.
+     * @return The current file, or null if no file is open
+     */
+    @Nullable
+    public VirtualFile getCurrentFile() {
+        VirtualFile[] files = FileEditorManager.getInstance(project).getSelectedFiles();
+        return files.length > 0 ? files[0] : null;
+    }
+    
+    /**
+     * Gets the document for a file.
+     * @param file The file
+     * @return The document, or null if the file doesn't have a document
+     */
+    @Nullable
+    public Document getDocument(@NotNull VirtualFile file) {
+        return PsiDocumentManager.getInstance(project).getDocument(
+                PsiManager.getInstance(project).findFile(file));
+    }
+    
+    /**
+     * Gets the PSI file for a file.
+     * @param file The file
+     * @return The PSI file, or null if the file doesn't have a PSI file
+     */
+    @Nullable
+    public PsiFile getPsiFile(@NotNull VirtualFile file) {
+        return PsiManager.getInstance(project).findFile(file);
+    }
+    
+    /**
+     * Creates a new file.
+     * @param directory The directory to create the file in
+     * @param fileName The file name
+     * @param content The file content
+     * @return The created file, or null if the file couldn't be created
+     */
+    @Nullable
+    public VirtualFile createFile(@NotNull VirtualFile directory, @NotNull String fileName, 
+                                 @NotNull String content) {
+        try {
+            VirtualFile file = directory.findChild(fileName);
+            if (file == null) {
+                file = directory.createChildData(this, fileName);
+            }
+            
+            ApplicationManager.getApplication().runWriteAction(() -> {
+                try {
+                    file.setBinaryContent(content.getBytes(StandardCharsets.UTF_8));
+                } catch (IOException e) {
+                    LOG.error("Error writing to file: " + file.getPath(), e);
+                }
+            });
+            
+            return file;
+        } catch (IOException e) {
+            LOG.error("Error creating file: " + fileName, e);
+            return null;
+        }
+    }
+    
+    /**
+     * Opens a file in the editor.
+     * @param file The file to open
+     * @return Whether the file was opened successfully
+     */
+    public boolean openFile(@NotNull VirtualFile file) {
+        OpenFileDescriptor descriptor = new OpenFileDescriptor(project, file);
+        return !descriptor.canNavigate() || descriptor.navigate(true);
+    }
+    
+    /**
+     * Gets all source files in the project.
+     * @return The source files
+     */
+    @NotNull
+    public List<VirtualFile> getSourceFiles() {
+        List<VirtualFile> result = new ArrayList<>();
+        
+        // Get Java source files from all modules
+        Module[] modules = ModuleManager.getInstance(project).getModules();
+        for (Module module : modules) {
+            ModuleRootManager rootManager = ModuleRootManager.getInstance(module);
+            VirtualFile[] sourceRoots = rootManager.getSourceRoots(false);
+            
+            for (VirtualFile sourceRoot : sourceRoots) {
+                collectFilesRecursively(sourceRoot, file -> {
+                    if (!file.isDirectory() && "java".equals(file.getExtension())) {
+                        result.add(file);
+                    }
+                });
+            }
+        }
+        
+        return result;
+    }
+    
+    /**
+     * Gets all Java files in the project.
+     * @return The Java files
+     */
+    @NotNull
+    public List<VirtualFile> getJavaFiles() {
+        Collection<VirtualFile> files = FileTypeIndex.getFiles(
+                JavaFileType.INSTANCE, GlobalSearchScope.projectScope(project));
+        return new ArrayList<>(files);
+    }
+    
+    /**
+     * Gets all classes in the project.
+     * @return The classes
+     */
+    @NotNull
+    public List<PsiClass> getClasses() {
+        List<PsiClass> result = new ArrayList<>();
+        
+        // Get Java source files
+        List<VirtualFile> javaFiles = getJavaFiles();
+        
+        // Get classes from Java files
+        for (VirtualFile file : javaFiles) {
+            PsiFile psiFile = PsiManager.getInstance(project).findFile(file);
+            if (psiFile instanceof PsiJavaFile) {
+                PsiJavaFile javaFile = (PsiJavaFile) psiFile;
+                
+                for (PsiClass psiClass : javaFile.getClasses()) {
+                    result.add(psiClass);
+                }
+            }
+        }
+        
+        return result;
+    }
+    
+    /**
+     * Gets all methods in a class.
+     * @param psiClass The class
+     * @return The methods
+     */
+    @NotNull
+    public List<PsiMethod> getMethods(@NotNull PsiClass psiClass) {
+        PsiMethod[] methods = psiClass.getMethods();
+        List<PsiMethod> result = new ArrayList<>(methods.length);
+        
+        for (PsiMethod method : methods) {
+            result.add(method);
+        }
+        
+        return result;
+    }
+    
+    /**
+     * Gets all fields in a class.
+     * @param psiClass The class
+     * @return The fields
+     */
+    @NotNull
+    public List<PsiField> getFields(@NotNull PsiClass psiClass) {
+        PsiField[] fields = psiClass.getFields();
+        List<PsiField> result = new ArrayList<>(fields.length);
+        
+        for (PsiField field : fields) {
+            result.add(field);
+        }
+        
+        return result;
+    }
+    
+    /**
+     * Gets the source root for a file.
+     * @param file The file
+     * @return The source root, or null if the file doesn't have a source root
+     */
+    @Nullable
+    public VirtualFile getSourceRoot(@NotNull VirtualFile file) {
+        return ProjectRootManager.getInstance(project).getFileIndex().getSourceRootForFile(file);
+    }
+    
+    /**
+     * Gets the module for a file.
+     * @param file The file
+     * @return The module, or null if the file doesn't have a module
+     */
+    @Nullable
+    public Module getModule(@NotNull VirtualFile file) {
+        return ProjectRootManager.getInstance(project).getFileIndex().getModuleForFile(file);
+    }
+    
+    /**
+     * Gets the package for a file.
+     * @param file The file
+     * @return The package, or an empty string if the file doesn't have a package
+     */
+    @NotNull
+    public String getPackage(@NotNull VirtualFile file) {
+        PsiFile psiFile = PsiManager.getInstance(project).findFile(file);
+        if (psiFile instanceof PsiJavaFile) {
+            PsiJavaFile javaFile = (PsiJavaFile) psiFile;
+            return javaFile.getPackageName();
+        }
+        
+        return "";
+    }
+    
+    /**
+     * Collects files recursively.
+     * @param directory The directory to collect files from
+     * @param consumer The consumer to process each file
+     */
+    private void collectFilesRecursively(@NotNull VirtualFile directory, @NotNull Consumer<VirtualFile> consumer) {
+        // Process the directory itself
+        consumer.accept(directory);
+        
+        // Process children
+        VirtualFile[] children = directory.getChildren();
+        for (VirtualFile child : children) {
+            if (child.isDirectory()) {
+                collectFilesRecursively(child, consumer);
+            } else {
+                consumer.accept(child);
+            }
+        }
+    }
+    
+    /**
+     * Gets the project base directory.
+     * @return The project base directory
+     */
+    @Nullable
+    public VirtualFile getProjectBaseDir() {
+        return ProjectUtil.guessProjectDir(project);
+    }
+    
+    /**
+     * Detects the mod loader for a project.
+     * @return The detected mod loader, or null if no mod loader was detected
+     */
+    @Nullable
+    public String detectModLoader() {
+        // Check for mod loader specific files
+        VirtualFile baseDir = getProjectBaseDir();
+        if (baseDir == null) {
+            return null;
+        }
+        
+        // Check for build.gradle
+        VirtualFile buildGradle = baseDir.findChild("build.gradle");
+        if (buildGradle != null) {
+            try {
+                String content = new String(buildGradle.contentsToByteArray(), StandardCharsets.UTF_8);
+                
+                if (content.contains("net.minecraftforge") || content.contains("fg.deobf")) {
+                    return "Forge";
+                } else if (content.contains("fabric-loom") || content.contains("net.fabricmc")) {
+                    return "Fabric";
+                } else if (content.contains("architectury") || content.contains("dev.architectury")) {
+                    return "Architectury";
+                } else if (content.contains("quilt-loom") || content.contains("org.quiltmc")) {
+                    return "Quilt";
+                }
+            } catch (IOException e) {
+                LOG.error("Error reading build.gradle", e);
+            }
+        }
+        
+        // Check for mod loader specific dependencies in Java files
+        List<PsiClass> classes = getClasses();
+        for (PsiClass psiClass : classes) {
+            PsiFile containingFile = psiClass.getContainingFile();
+            if (containingFile instanceof PsiJavaFile) {
+                PsiJavaFile javaFile = (PsiJavaFile) containingFile;
+                
+                // Check imports
+                for (PsiImportStatement importStatement : javaFile.getImportList().getImportStatements()) {
+                    String importText = importStatement.getQualifiedName();
+                    
+                    if (importText != null) {
+                        if (importText.startsWith("net.minecraftforge")) {
+                            return "Forge";
+                        } else if (importText.startsWith("net.fabricmc")) {
+                            return "Fabric";
+                        } else if (importText.startsWith("dev.architectury")) {
+                            return "Architectury";
+                        } else if (importText.startsWith("org.quiltmc")) {
+                            return "Quilt";
                         }
                     }
                 }
                 
-                LOG.info("Found " + dependencies.size() + " dependencies");
-                return dependencies;
-            } catch (Exception e) {
-                LOG.error("Error analyzing dependencies", e);
-                throw new RuntimeException("Failed to analyze dependencies", e);
+                // Check annotations
+                PsiModifierList modifierList = psiClass.getModifierList();
+                if (modifierList != null) {
+                    for (PsiAnnotation annotation : modifierList.getAnnotations()) {
+                        String qualifiedName = annotation.getQualifiedName();
+                        
+                        if (qualifiedName != null) {
+                            if (qualifiedName.startsWith("net.minecraftforge")) {
+                                return "Forge";
+                            } else if (qualifiedName.startsWith("net.fabricmc")) {
+                                return "Fabric";
+                            } else if (qualifiedName.startsWith("dev.architectury")) {
+                                return "Architectury";
+                            } else if (qualifiedName.startsWith("org.quiltmc")) {
+                                return "Quilt";
+                            }
+                        }
+                    }
+                }
             }
-        }, executor);
+        }
+        
+        return null;
     }
     
     /**
-     * Class representing project structure.
+     * Finds Minecraft mod classes in the project.
+     * @return The mod classes
      */
-    public static class ProjectStructure {
-        private final List<ClassInfo> classes = new ArrayList<>();
+    @NotNull
+    public List<PsiClass> findModClasses() {
+        List<PsiClass> allClasses = getClasses();
+        List<PsiClass> modClasses = new ArrayList<>();
         
-        /**
-         * Adds a class to the project structure.
-         * @param classInfo The class info
-         */
-        public void addClass(@NotNull ClassInfo classInfo) {
-            classes.add(classInfo);
+        for (PsiClass psiClass : allClasses) {
+            if (isMinecraftModClass(psiClass)) {
+                modClasses.add(psiClass);
+            }
         }
         
-        /**
-         * Gets all classes in the project.
-         * @return The list of classes
-         */
-        @NotNull
-        public List<ClassInfo> getClasses() {
-            return classes;
-        }
-        
-        /**
-         * Gets classes in a specific package.
-         * @param packageName The package name
-         * @return The list of classes in the package
-         */
-        @NotNull
-        public List<ClassInfo> getClassesInPackage(@NotNull String packageName) {
-            return classes.stream()
-                    .filter(c -> c.qualifiedName != null && c.qualifiedName.startsWith(packageName + "."))
-                    .collect(Collectors.toList());
-        }
-        
-        /**
-         * Gets class by name.
-         * @param qualifiedName The fully qualified class name
-         * @return The class, or null if not found
-         */
-        @Nullable
-        public ClassInfo getClassByName(@NotNull String qualifiedName) {
-            return classes.stream()
-                    .filter(c -> qualifiedName.equals(c.qualifiedName))
-                    .findFirst()
-                    .orElse(null);
-        }
+        return modClasses;
     }
     
     /**
-     * Class representing information about a class.
+     * Checks if a class is a Minecraft mod class.
+     * @param psiClass The class to check
+     * @return Whether the class is a Minecraft mod class
      */
-    public static class ClassInfo {
-        private final String qualifiedName;
-        private final String simpleName;
-        private final String filePath;
-        private final List<MethodInfo> methods = new ArrayList<>();
-        
-        /**
-         * Creates a new ClassInfo.
-         * @param qualifiedName The fully qualified class name
-         * @param simpleName The simple class name
-         * @param filePath The file path
-         */
-        public ClassInfo(@Nullable String qualifiedName, @Nullable String simpleName, @NotNull String filePath) {
-            this.qualifiedName = qualifiedName;
-            this.simpleName = simpleName;
-            this.filePath = filePath;
+    private boolean isMinecraftModClass(@NotNull PsiClass psiClass) {
+        // Check for mod annotations
+        PsiModifierList modifierList = psiClass.getModifierList();
+        if (modifierList != null) {
+            for (PsiAnnotation annotation : modifierList.getAnnotations()) {
+                String qualifiedName = annotation.getQualifiedName();
+                
+                if (qualifiedName != null) {
+                    if (qualifiedName.contains("Mod") || 
+                            qualifiedName.contains("Plugin") || 
+                            qualifiedName.contains("ModInitializer")) {
+                        return true;
+                    }
+                }
+            }
         }
         
-        /**
-         * Adds a method to the class.
-         * @param methodInfo The method info
-         */
-        public void addMethod(@NotNull MethodInfo methodInfo) {
-            methods.add(methodInfo);
+        // Check for mod interfaces
+        for (PsiClassType implementsType : psiClass.getImplementsListTypes()) {
+            String implementsName = implementsType.getClassName();
+            
+            if (implementsName != null) {
+                if (implementsName.contains("ModInitializer") || 
+                        implementsName.contains("ClientModInitializer") || 
+                        implementsName.contains("DedicatedServerModInitializer")) {
+                    return true;
+                }
+            }
         }
         
-        /**
-         * Gets the fully qualified class name.
-         * @return The fully qualified class name
-         */
-        @Nullable
-        public String getQualifiedName() {
-            return qualifiedName;
+        // Check for mod base classes
+        PsiClassType extendsType = psiClass.getExtendsListType();
+        if (extendsType != null) {
+            String extendsName = extendsType.getClassName();
+            
+            if (extendsName != null) {
+                if (extendsName.contains("Mod") || extendsName.contains("Plugin")) {
+                    return true;
+                }
+            }
         }
         
-        /**
-         * Gets the simple class name.
-         * @return The simple class name
-         */
-        @Nullable
-        public String getSimpleName() {
-            return simpleName;
-        }
-        
-        /**
-         * Gets the file path.
-         * @return The file path
-         */
-        @NotNull
-        public String getFilePath() {
-            return filePath;
-        }
-        
-        /**
-         * Gets the methods in the class.
-         * @return The list of methods
-         */
-        @NotNull
-        public List<MethodInfo> getMethods() {
-            return methods;
-        }
-        
-        /**
-         * Gets method by name.
-         * @param methodName The method name
-         * @return The method, or null if not found
-         */
-        @Nullable
-        public MethodInfo getMethodByName(@NotNull String methodName) {
-            return methods.stream()
-                    .filter(m -> methodName.equals(m.name))
-                    .findFirst()
-                    .orElse(null);
-        }
-        
-        @Override
-        public String toString() {
-            return qualifiedName + " (" + methods.size() + " methods)";
-        }
-    }
-    
-    /**
-     * Class representing information about a method.
-     */
-    public static class MethodInfo {
-        private final String name;
-        private final String returnType;
-        private final int parameterCount;
-        
-        /**
-         * Creates a new MethodInfo.
-         * @param name The method name
-         * @param returnType The return type
-         * @param parameterCount The parameter count
-         */
-        public MethodInfo(@NotNull String name, @NotNull String returnType, int parameterCount) {
-            this.name = name;
-            this.returnType = returnType;
-            this.parameterCount = parameterCount;
-        }
-        
-        /**
-         * Gets the method name.
-         * @return The method name
-         */
-        @NotNull
-        public String getName() {
-            return name;
-        }
-        
-        /**
-         * Gets the return type.
-         * @return The return type
-         */
-        @NotNull
-        public String getReturnType() {
-            return returnType;
-        }
-        
-        /**
-         * Gets the parameter count.
-         * @return The parameter count
-         */
-        public int getParameterCount() {
-            return parameterCount;
-        }
-        
-        @Override
-        public String toString() {
-            return returnType + " " + name + "(" + parameterCount + " params)";
-        }
-    }
-    
-    /**
-     * Class representing a dependency between classes.
-     */
-    public static class ClassDependency {
-        /**
-         * Dependency type.
-         */
-        public enum Type {
-            EXTENDS,
-            IMPLEMENTS,
-            USES
-        }
-        
-        private final String sourceClass;
-        private final String targetClass;
-        private final Type type;
-        
-        /**
-         * Creates a new ClassDependency.
-         * @param sourceClass The source class
-         * @param targetClass The target class
-         * @param type The dependency type
-         */
-        public ClassDependency(@NotNull String sourceClass, @NotNull String targetClass, @NotNull Type type) {
-            this.sourceClass = sourceClass;
-            this.targetClass = targetClass;
-            this.type = type;
-        }
-        
-        /**
-         * Gets the source class.
-         * @return The source class
-         */
-        @NotNull
-        public String getSourceClass() {
-            return sourceClass;
-        }
-        
-        /**
-         * Gets the target class.
-         * @return The target class
-         */
-        @NotNull
-        public String getTargetClass() {
-            return targetClass;
-        }
-        
-        /**
-         * Gets the dependency type.
-         * @return The dependency type
-         */
-        @NotNull
-        public Type getType() {
-            return type;
-        }
-        
-        @Override
-        public String toString() {
-            return sourceClass + " " + type + " " + targetClass;
-        }
+        return false;
     }
 }
