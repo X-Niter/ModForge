@@ -124,24 +124,24 @@ jobs:
         run: |
           # Create a Python script to process the conversation
           cat > process_conversation.py << 'EOF'
-import os
-import sys
-import json
-import re
-import requests
-import subprocess
-import random
-import time
-import datetime
-from pathlib import Path
-
-# Get environment variables
-openai_api_key = os.environ.get('OPENAI_API_KEY')
-github_token = os.environ.get('GITHUB_TOKEN')
-conversation_type = os.environ.get('CONVERSATION_TYPE')
-conversation_id = os.environ.get('CONVERSATION_ID')
-is_stale = os.environ.get('IS_STALE', 'false').lower() == 'true'
-repo = os.environ.get('GITHUB_REPOSITORY')
+          import os
+          import sys
+          import json
+          import re
+          import requests
+          import subprocess
+          import random
+          import time
+          import datetime
+          from pathlib import Path
+          
+          # Get environment variables
+          openai_api_key = os.environ.get('OPENAI_API_KEY')
+          github_token = os.environ.get('GITHUB_TOKEN')
+          conversation_type = os.environ.get('CONVERSATION_TYPE')
+          conversation_id = os.environ.get('CONVERSATION_ID')
+          is_stale = os.environ.get('IS_STALE', 'false').lower() == 'true'
+          repo = os.environ.get('GITHUB_REPOSITORY')
 
 # Validate required environment variables
 if not all([openai_api_key, github_token, conversation_type, conversation_id, repo]):

@@ -620,126 +620,126 @@ EOF
         run: |
           # Create an issue asking for guidance
           cat > python_create_guidance_issue.py << 'EOF'
-import os
-import json
-import requests
-import random
+          import os
+          import json
+          import requests
+          import random
+          
+          # GitHub API setup
+          github_token = os.environ.get('GITHUB_TOKEN')
+          repo = os.environ.get('GITHUB_REPOSITORY')
+          api_url = f"https://api.github.com/repos/{repo}"
+          headers = {
+              'Authorization': f'token {github_token}',
+              'Accept': 'application/vnd.github.v3+json'
+          }
 
-# GitHub API setup
-github_token = os.environ.get('GITHUB_TOKEN')
-repo = os.environ.get('GITHUB_REPOSITORY')
-api_url = f"https://api.github.com/repos/{repo}"
-headers = {
-    'Authorization': f'token {github_token}',
-    'Accept': 'application/vnd.github.v3+json'
-}
+          def get_recent_activity():
+              """Get information about recent activity in the repo"""
+              try:
+                  # Get recent commits
+                  response = requests.get(f"{api_url}/commits?per_page=5", headers=headers)
+                  commits = response.json() if response.status_code == 200 else []
+                  
+                  # Get recent issues
+                  response = requests.get(f"{api_url}/issues?state=all&per_page=5", headers=headers)
+                  issues = response.json() if response.status_code == 200 else []
+                  
+                  # Get recent PRs
+                  response = requests.get(f"{api_url}/pulls?state=all&per_page=5", headers=headers)
+                  prs = response.json() if response.status_code == 200 else []
+                  
+                  return {
+                      'commits': [{'sha': c.get('sha')[:7], 'message': c.get('commit', {}).get('message', '').split('\n')[0]} for c in commits],
+                      'issues': [{'number': i.get('number'), 'title': i.get('title')} for i in issues],
+                      'prs': [{'number': p.get('number'), 'title': p.get('title')} for p in prs]
+                  }
+              except Exception as e:
+                  print(f"Error getting recent activity: {str(e)}")
+                  return {'commits': [], 'issues': [], 'prs': []}
 
-def get_recent_activity():
-    """Get information about recent activity in the repo"""
-    try:
-        # Get recent commits
-        response = requests.get(f"{api_url}/commits?per_page=5", headers=headers)
-        commits = response.json() if response.status_code == 200 else []
-        
-        # Get recent issues
-        response = requests.get(f"{api_url}/issues?state=all&per_page=5", headers=headers)
-        issues = response.json() if response.status_code == 200 else []
-        
-        # Get recent PRs
-        response = requests.get(f"{api_url}/pulls?state=all&per_page=5", headers=headers)
-        prs = response.json() if response.status_code == 200 else []
-        
-        return {
-            'commits': [{'sha': c.get('sha')[:7], 'message': c.get('commit', {}).get('message', '').split('\n')[0]} for c in commits],
-            'issues': [{'number': i.get('number'), 'title': i.get('title')} for i in issues],
-            'prs': [{'number': p.get('number'), 'title': p.get('title')} for p in prs]
-        }
-    except Exception as e:
-        print(f"Error getting recent activity: {str(e)}")
-        return {'commits': [], 'issues': [], 'prs': []}
+          def main():
+              # Get recent activity
+              activity = get_recent_activity()
+              
+              # Create a list of potential improvement ideas
+              ideas = [
+                  "Add more unit tests to improve code coverage",
+                  "Implement additional performance optimizations",
+                  "Enhance documentation with more detailed examples",
+                  "Improve error handling and user feedback",
+                  "Add new features to expand functionality",
+                  "Refactor code to increase maintainability",
+                  "Optimize memory usage in critical components"
+              ]
+              
+              # Randomly select a few ideas
+              selected_ideas = random.sample(ideas, min(3, len(ideas)))
+              
+              # Construct issue title and body
+              issue_title = "Status Update: All Tests Passing - What Next?"
+              
+              issue_body = """# Status Update: All Tests Passing
+          
+          ## System Status
+          ✅ **Compilation**: Successful
+          ✅ **Code Quality**: No issues detected
+          ✅ **AI Analysis**: No critical improvements identified
+          
+          ## Recent Activity
+          """
+          
+              # Add recent commits
+              issue_body += "\n### Recent Commits\n"
+              for commit in activity.get('commits', []):
+                  issue_body += f"- `{commit.get('sha')}`: {commit.get('message')}\n"
+              
+              # Add recent issues/PRs
+              issue_body += "\n### Recent Issues & PRs\n"
+              for issue in activity.get('issues', []):
+                  issue_body += f"- #{issue.get('number')}: {issue.get('title')}\n"
+              
+              # Add suggestions section
+              issue_body += """
+          ## What Next?
+          The autonomous system has completed its scan and found no immediate issues to address. 
+          Here are some potential areas for improvement:
+          
+          """
+              for i, idea in enumerate(selected_ideas, 1):
+                  issue_body += f"{i}. {idea}\n"
+          
+              issue_body += """
+          ## Request for Guidance
+          Would you like the system to focus on any specific areas? You can:
+          
+          1. **Request a deep dive**: `/analyze [component]` (e.g., `/analyze ui components`)
+          2. **Request a new feature**: `/add feature [description]`
+          3. **Request code refactoring**: `/refactor [target]`
+          4. **Request documentation improvements**: `/document [topic]`
+          
+          Or simply respond with your own instructions for what to work on next.
+          
+          _This status update was automatically created by the ModForge Autonomous System_
+          """
+          
+              # Create the issue
+              issue_data = {
+                  'title': issue_title,
+                  'body': issue_body,
+                  'labels': ['status-update', 'automated', 'guidance-needed']
+              }
+              
+              response = requests.post(f"{api_url}/issues", headers=headers, json=issue_data)
+              
+              if response.status_code == 201:
+                  print(f"Status update issue created successfully: {response.json().get('html_url')}")
+              else:
+                  print(f"Error creating status update issue: {response.status_code}")
+                  print(response.text)
 
-def main():
-    # Get recent activity
-    activity = get_recent_activity()
-    
-    # Create a list of potential improvement ideas
-    ideas = [
-        "Add more unit tests to improve code coverage",
-        "Implement additional performance optimizations",
-        "Enhance documentation with more detailed examples",
-        "Improve error handling and user feedback",
-        "Add new features to expand functionality",
-        "Refactor code to increase maintainability",
-        "Optimize memory usage in critical components"
-    ]
-    
-    # Randomly select a few ideas
-    selected_ideas = random.sample(ideas, min(3, len(ideas)))
-    
-    # Construct issue title and body
-    issue_title = "Status Update: All Tests Passing - What Next?"
-    
-    issue_body = """# Status Update: All Tests Passing
-
-## System Status
-✅ **Compilation**: Successful
-✅ **Code Quality**: No issues detected
-✅ **AI Analysis**: No critical improvements identified
-
-## Recent Activity
-"""
-
-    # Add recent commits
-    issue_body += "\n### Recent Commits\n"
-    for commit in activity.get('commits', []):
-        issue_body += f"- `{commit.get('sha')}`: {commit.get('message')}\n"
-    
-    # Add recent issues/PRs
-    issue_body += "\n### Recent Issues & PRs\n"
-    for issue in activity.get('issues', []):
-        issue_body += f"- #{issue.get('number')}: {issue.get('title')}\n"
-    
-    # Add suggestions section
-    issue_body += """
-## What Next?
-The autonomous system has completed its scan and found no immediate issues to address. 
-Here are some potential areas for improvement:
-
-"""
-    for i, idea in enumerate(selected_ideas, 1):
-        issue_body += f"{i}. {idea}\n"
-
-    issue_body += """
-## Request for Guidance
-Would you like the system to focus on any specific areas? You can:
-
-1. **Request a deep dive**: `/analyze [component]` (e.g., `/analyze ui components`)
-2. **Request a new feature**: `/add feature [description]`
-3. **Request code refactoring**: `/refactor [target]`
-4. **Request documentation improvements**: `/document [topic]`
-
-Or simply respond with your own instructions for what to work on next.
-
-_This status update was automatically created by the ModForge Autonomous System_
-"""
-
-    # Create the issue
-    issue_data = {
-        'title': issue_title,
-        'body': issue_body,
-        'labels': ['status-update', 'automated', 'guidance-needed']
-    }
-    
-    response = requests.post(f"{api_url}/issues", headers=headers, json=issue_data)
-    
-    if response.status_code == 201:
-        print(f"Status update issue created successfully: {response.json().get('html_url')}")
-    else:
-        print(f"Error creating status update issue: {response.status_code}")
-        print(response.text)
-
-if __name__ == "__main__":
-    main()
+          if __name__ == "__main__":
+              main()
 EOF
 
           # Create the status update issue
