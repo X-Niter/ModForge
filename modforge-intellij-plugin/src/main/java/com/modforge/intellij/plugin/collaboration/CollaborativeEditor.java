@@ -11,55 +11,29 @@ import com.intellij.openapi.editor.event.DocumentListener;
 import com.intellij.openapi.fileEditor.FileDocumentManager;
 import com.intellij.openapi.fileEditor.FileEditorManager;
 import com.intellij.openapi.project.Project;
+import com.intellij.openapi.util.Computable;
 import com.intellij.openapi.vfs.VirtualFile;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
- * Provides collaborative editing capabilities for a file.
+ * Class for collaborative editing of a file.
+ * Handles operations and transformations for real-time collaboration.
  */
-public class CollaborativeEditor implements DocumentListener {
+public class CollaborativeEditor {
     private static final Logger LOG = Logger.getInstance(CollaborativeEditor.class);
     
-    // The project
     private final Project project;
-    
-    // The file being edited
     private final VirtualFile file;
-    
-    // The document
-    private final Document document;
-    
-    // User ID of the local user
     private final String userId;
-    
-    // Reference to the collaboration service
-    private final CollaborationService collaborationService;
-    
-    // Set of operation IDs that have been processed
-    private final Set<String> processedOperationIds = ConcurrentHashMap.newKeySet();
-    
-    // Map of participant cursors and selections
-    private final Map<String, ParticipantCursor> participantCursors = new ConcurrentHashMap<>();
-    
-    /**
-     * Represents a participant's cursor and selection.
-     */
-    private static class ParticipantCursor {
-        int offset;
-        int selectionStart;
-        int selectionEnd;
-        
-        ParticipantCursor(int offset, int selectionStart, int selectionEnd) {
-            this.offset = offset;
-            this.selectionStart = selectionStart;
-            this.selectionEnd = selectionEnd;
-        }
-    }
+    private final Document document;
+    private final AtomicBoolean isApplyingOperation = new AtomicBoolean(false);
+    private final Set<String> operationsSeen = new HashSet<>();
     
     /**
      * Creates a new CollaborativeEditor.
@@ -67,234 +41,156 @@ public class CollaborativeEditor implements DocumentListener {
      * @param file The file
      * @param userId The user ID
      */
-    public CollaborativeEditor(
-            @NotNull Project project,
-            @NotNull VirtualFile file,
-            @NotNull String userId
-    ) {
+    public CollaborativeEditor(@NotNull Project project, @NotNull VirtualFile file, @NotNull String userId) {
         this.project = project;
         this.file = file;
         this.userId = userId;
-        this.collaborationService = CollaborationService.getInstance(project);
         
-        // Get the document for the file
-        this.document = FileDocumentManager.getInstance().getDocument(file);
+        // Get document
+        this.document = ApplicationManager.getApplication().runReadAction(
+                (Computable<Document>) () -> FileDocumentManager.getInstance().getDocument(file)
+        );
         
+        // Add document listener
         if (document != null) {
-            // Register document listener
-            document.addDocumentListener(this);
-            
-            // Register editor listeners for cursor and selection changes
-            registerEditorListeners();
-        } else {
-            LOG.error("Could not get document for file: " + file.getPath());
+            document.addDocumentListener(new DocumentChangeListener());
         }
+        
+        LOG.info("Created collaborative editor for file: " + file.getPath());
     }
     
     /**
-     * Registers editor listeners.
-     */
-    private void registerEditorListeners() {
-        // TODO: Register listeners for cursor and selection changes
-    }
-    
-    /**
-     * Gets the current editors for the file.
-     * @return The editors
-     */
-    @NotNull
-    private Editor[] getEditors() {
-        if (document != null) {
-            return EditorFactory.getInstance().getEditors(document, project);
-        }
-        return new Editor[0];
-    }
-    
-    /**
-     * Applies an operation to the document.
+     * Applies an operation from another user.
      * @param operation The operation
-     * @param sourceUserId The user ID that generated the operation
+     * @param sourceUserId The source user ID
      */
     public void applyOperation(@NotNull EditorOperation operation, @NotNull String sourceUserId) {
-        // Check if the operation has already been processed
-        if (processedOperationIds.contains(operation.getId())) {
+        if (document == null) {
+            LOG.warn("Cannot apply operation: Document is null");
             return;
         }
         
-        // Add to processed operations
-        processedOperationIds.add(operation.getId());
-        
-        // Handle different operation types
-        switch (operation.getType()) {
-            case EditorOperation.TYPE_CURSOR_MOVE:
-                handleCursorMove(operation, sourceUserId);
-                break;
-                
-            case EditorOperation.TYPE_SELECTION_CHANGE:
-                handleSelectionChange(operation, sourceUserId);
-                break;
-                
-            case EditorOperation.TYPE_INSERT:
-                handleInsert(operation, sourceUserId);
-                break;
-                
-            case EditorOperation.TYPE_DELETE:
-                handleDelete(operation, sourceUserId);
-                break;
-                
-            case EditorOperation.TYPE_REPLACE:
-                handleReplace(operation, sourceUserId);
-                break;
-                
-            default:
-                LOG.warn("Unknown operation type: " + operation.getType());
-        }
-    }
-    
-    /**
-     * Handles a cursor move operation.
-     * @param operation The operation
-     * @param sourceUserId The user ID
-     */
-    private void handleCursorMove(@NotNull EditorOperation operation, @NotNull String sourceUserId) {
-        // Update participant cursor
-        ParticipantCursor cursor = participantCursors.computeIfAbsent(sourceUserId, id -> new ParticipantCursor(0, 0, 0));
-        cursor.offset = operation.getOffset();
-        
-        // TODO: Update cursor visualization in the editor
-        LOG.info("Cursor moved for user " + sourceUserId + " to offset " + operation.getOffset());
-    }
-    
-    /**
-     * Handles a selection change operation.
-     * @param operation The operation
-     * @param sourceUserId The user ID
-     */
-    private void handleSelectionChange(@NotNull EditorOperation operation, @NotNull String sourceUserId) {
-        // Update participant cursor
-        ParticipantCursor cursor = participantCursors.computeIfAbsent(sourceUserId, id -> new ParticipantCursor(0, 0, 0));
-        cursor.offset = operation.getOffset();
-        cursor.selectionStart = operation.getOffset();
-        cursor.selectionEnd = operation.getOffset() + operation.getLength();
-        
-        // TODO: Update selection visualization in the editor
-        LOG.info("Selection changed for user " + sourceUserId + " to " + cursor.selectionStart + "-" + cursor.selectionEnd);
-    }
-    
-    /**
-     * Handles an insert operation.
-     * @param operation The operation
-     * @param sourceUserId The user ID
-     */
-    private void handleInsert(@NotNull EditorOperation operation, @NotNull String sourceUserId) {
-        if (document == null) return;
-        
-        // Apply the insert operation
-        ApplicationManager.getApplication().invokeLater(() -> {
-            ApplicationManager.getApplication().runWriteAction(() -> {
-                CommandProcessor.getInstance().executeCommand(project, () -> {
-                    try {
-                        document.insertString(operation.getOffset(), operation.getText());
-                        LOG.info("Inserted text from user " + sourceUserId + " at offset " + operation.getOffset());
-                    } catch (Exception e) {
-                        LOG.error("Error applying insert operation", e);
-                    }
-                }, "Collaborative Edit", null);
-            });
-        });
-    }
-    
-    /**
-     * Handles a delete operation.
-     * @param operation The operation
-     * @param sourceUserId The user ID
-     */
-    private void handleDelete(@NotNull EditorOperation operation, @NotNull String sourceUserId) {
-        if (document == null) return;
-        
-        // Apply the delete operation
-        ApplicationManager.getApplication().invokeLater(() -> {
-            ApplicationManager.getApplication().runWriteAction(() -> {
-                CommandProcessor.getInstance().executeCommand(project, () -> {
-                    try {
-                        document.deleteString(operation.getOffset(), operation.getOffset() + operation.getLength());
-                        LOG.info("Deleted text from user " + sourceUserId + " at offset " + operation.getOffset());
-                    } catch (Exception e) {
-                        LOG.error("Error applying delete operation", e);
-                    }
-                }, "Collaborative Edit", null);
-            });
-        });
-    }
-    
-    /**
-     * Handles a replace operation.
-     * @param operation The operation
-     * @param sourceUserId The user ID
-     */
-    private void handleReplace(@NotNull EditorOperation operation, @NotNull String sourceUserId) {
-        if (document == null) return;
-        
-        // Apply the replace operation
-        ApplicationManager.getApplication().invokeLater(() -> {
-            ApplicationManager.getApplication().runWriteAction(() -> {
-                CommandProcessor.getInstance().executeCommand(project, () -> {
-                    try {
-                        document.replaceString(
-                                operation.getOffset(),
-                                operation.getOffset() + operation.getLength(),
-                                operation.getText()
-                        );
-                        LOG.info("Replaced text from user " + sourceUserId + " at offset " + operation.getOffset());
-                    } catch (Exception e) {
-                        LOG.error("Error applying replace operation", e);
-                    }
-                }, "Collaborative Edit", null);
-            });
-        });
-    }
-    
-    // DocumentListener methods
-    
-    @Override
-    public void documentChanged(@NotNull DocumentEvent event) {
-        // Skip events generated by this editor
-        if (processedOperationIds.contains("local:" + event.getOffset() + ":" + event.getOldLength() + ":" + event.getNewLength())) {
+        // Skip operations from this user
+        if (sourceUserId.equals(userId)) {
+            LOG.debug("Skipping operation from self");
             return;
         }
         
-        // Create and broadcast the appropriate operation
-        EditorOperation operation;
-        String text = event.getNewFragment().toString();
-        int offset = event.getOffset();
-        
-        if (event.getOldLength() == 0 && event.getNewLength() > 0) {
-            // Insert operation
-            operation = EditorOperation.createInsert(userId, file.getPath(), offset, text);
-        } else if (event.getOldLength() > 0 && event.getNewLength() == 0) {
-            // Delete operation
-            operation = EditorOperation.createDelete(userId, file.getPath(), offset, event.getOldLength());
-        } else {
-            // Replace operation
-            operation = EditorOperation.createReplace(userId, file.getPath(), offset, text, event.getOldLength());
+        // Skip seen operations
+        String operationId = sourceUserId + ":" + operation.getTimestamp();
+        if (operationsSeen.contains(operationId)) {
+            LOG.debug("Skipping already seen operation: " + operationId);
+            return;
         }
         
-        // Broadcast the operation
-        Map<String, Object> data = new HashMap<>();
-        data.put("operation", operation);
-        collaborationService.broadcastMessage("operation", data);
+        operationsSeen.add(operationId);
         
-        // Mark the operation as processed
-        processedOperationIds.add(operation.getId());
-        processedOperationIds.add("local:" + offset + ":" + event.getOldLength() + ":" + event.getNewLength());
+        // Apply operation
+        ApplicationManager.getApplication().invokeLater(() -> {
+            try {
+                isApplyingOperation.set(true);
+                
+                ApplicationManager.getApplication().runWriteAction(() -> {
+                    CommandProcessor.getInstance().executeCommand(project, () -> {
+                        try {
+                            switch (operation.getType()) {
+                                case EditorOperation.TYPE_INSERT:
+                                    document.insertString(operation.getOffset(), operation.getText());
+                                    break;
+                                case EditorOperation.TYPE_DELETE:
+                                    document.deleteString(
+                                            operation.getOffset(),
+                                            operation.getOffset() + operation.getLength()
+                                    );
+                                    break;
+                                case EditorOperation.TYPE_REPLACE:
+                                    document.replaceString(
+                                            operation.getOffset(),
+                                            operation.getOffset() + operation.getLength(),
+                                            operation.getText()
+                                    );
+                                    break;
+                                default:
+                                    LOG.warn("Unknown operation type: " + operation.getType());
+                                    break;
+                            }
+                        } catch (Exception e) {
+                            LOG.error("Error applying operation", e);
+                        }
+                    }, "Apply Collaborative Edit", null);
+                });
+            } finally {
+                isApplyingOperation.set(false);
+            }
+        });
     }
     
     /**
-     * Disposes the collaborative editor.
+     * Gets the file.
+     * @return The file
      */
-    public void dispose() {
-        if (document != null) {
-            document.removeDocumentListener(this);
+    @NotNull
+    public VirtualFile getFile() {
+        return file;
+    }
+    
+    /**
+     * Gets the document.
+     * @return The document
+     */
+    public Document getDocument() {
+        return document;
+    }
+    
+    /**
+     * Document change listener to detect local changes.
+     */
+    private class DocumentChangeListener implements DocumentListener {
+        @Override
+        public void documentChanged(@NotNull DocumentEvent event) {
+            // Skip changes from other users
+            if (isApplyingOperation.get()) {
+                return;
+            }
+            
+            // Convert change to operation
+            EditorOperation operation = null;
+            
+            if (event.getNewLength() > 0 && event.getOldLength() == 0) {
+                // Insert
+                operation = EditorOperation.createInsertOperation(
+                        event.getOffset(),
+                        event.getNewFragment().toString()
+                );
+            } else if (event.getNewLength() == 0 && event.getOldLength() > 0) {
+                // Delete
+                operation = EditorOperation.createDeleteOperation(
+                        event.getOffset(),
+                        event.getOldLength()
+                );
+            } else if (event.getNewLength() > 0 && event.getOldLength() > 0) {
+                // Replace
+                operation = EditorOperation.createReplaceOperation(
+                        event.getOffset(),
+                        event.getOldLength(),
+                        event.getNewFragment().toString()
+                );
+            }
+            
+            if (operation != null) {
+                // Mark as seen
+                String operationId = userId + ":" + operation.getTimestamp();
+                operationsSeen.add(operationId);
+                
+                // Broadcast to other users
+                CollaborationService collaborationService = CollaborationService.getInstance(project);
+                
+                Map<String, Object> data = new HashMap<>();
+                data.put("filePath", file.getPath());
+                data.put("operation", operation.toMap());
+                
+                collaborationService.broadcastMessage(WebSocketMessage.TYPE_OPERATION, data);
+            }
         }
     }
 }
