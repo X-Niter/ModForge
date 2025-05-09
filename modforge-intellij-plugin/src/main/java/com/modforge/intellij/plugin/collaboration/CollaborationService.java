@@ -5,6 +5,9 @@ import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.util.concurrency.AppExecutorUtil;
+import com.modforge.intellij.plugin.collaboration.websocket.WebSocketClient;
+import com.modforge.intellij.plugin.collaboration.websocket.WebSocketMessage;
+import com.modforge.intellij.plugin.collaboration.websocket.WebSocketMessageListener;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -26,12 +29,18 @@ public final class CollaborationService {
     private final ExecutorService executor = AppExecutorUtil.createBoundedApplicationPoolExecutor(
             "ModForge.Collaboration", 4);
     
+    // WebSocket client
+    private final WebSocketClient webSocketClient = new WebSocketClient();
+    
     // Session management
     private String sessionId;
     private String userId;
     private String username;
     private boolean isHost;
     private boolean isConnected;
+    
+    // WebSocket server URL
+    private static final String WEBSOCKET_SERVER_URL = "wss://modforge.io/ws/collaboration";
     
     // Maps file paths to their collaborative editors
     private final Map<String, CollaborativeEditor> collaborativeEditors = new ConcurrentHashMap<>();
