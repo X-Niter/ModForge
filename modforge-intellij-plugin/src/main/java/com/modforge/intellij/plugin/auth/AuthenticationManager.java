@@ -206,7 +206,7 @@ public final class AuthenticationManager {
             connection.setConnectTimeout(TIMEOUT);
             connection.setReadTimeout(TIMEOUT);
             
-            // Set authorization header
+            // Set authorization header with token
             connection.setRequestProperty("Authorization", "Bearer " + settings.getAccessToken());
             
             // Get response code
@@ -215,13 +215,27 @@ public final class AuthenticationManager {
             // 200 OK means authentication is valid
             boolean isValid = responseCode == 200;
             
-            if (!isValid) {
+            if (isValid) {
+                // Read response to capture any additional info
+                StringBuilder response = new StringBuilder();
+                try (BufferedReader br = new BufferedReader(new InputStreamReader(connection.getInputStream(), StandardCharsets.UTF_8))) {
+                    String responseLine;
+                    while ((responseLine = br.readLine()) != null) {
+                        response.append(responseLine.trim());
+                    }
+                }
+                
+                // Log success
+                LOG.info("Successfully verified authentication with ModForge server");
+                return true;
+            } else {
                 // Clear authentication state
                 settings.setAuthenticated(false);
                 settings.setAccessToken("");
+                settings.setUserId("");
+                LOG.warn("Authentication is no longer valid with response code: " + responseCode);
+                return false;
             }
-            
-            return isValid;
         } catch (IOException e) {
             LOG.warn("Failed to verify authentication with ModForge server: " + e.getMessage());
             return false;
@@ -280,6 +294,7 @@ public final class AuthenticationManager {
             // Clear authentication state regardless of response
             settings.setAuthenticated(false);
             settings.setAccessToken("");
+            settings.setUserId("");
             
             // 200 OK means logout was successful
             return responseCode == 200;

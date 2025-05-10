@@ -314,18 +314,34 @@ export function setupAuth(app: Express) {
   });
   
   // Verification endpoint for IntelliJ plugin token authentication
-  app.get("/api/auth/verify", (req: Request, res: Response) => {
-    if (!req.isAuthenticated()) {
-      return res.status(401).json({ success: false, message: "Not authenticated" });
+  app.get("/api/auth/verify", (req: Request, res: Response, next: NextFunction) => {
+    // First check if authenticated via session
+    if (req.isAuthenticated()) {
+      return res.status(200).json({
+        success: true,
+        message: "Authentication valid (session)",
+        userId: req.user.id,
+        username: req.user.username
+      });
     }
     
-    // Return basic verification response
-    return res.status(200).json({
-      success: true,
-      message: "Authentication valid",
-      userId: req.user.id,
-      username: req.user.username
-    });
+    // If not session authenticated, try bearer token authentication
+    passport.authenticate('bearer', { session: false }, (err: Error | null, user: Express.User | false | null | undefined, info: any) => {
+      if (err) {
+        return next(err);
+      }
+      
+      if (!user) {
+        return res.status(401).json({ success: false, message: "Not authenticated" });
+      }
+      
+      return res.status(200).json({
+        success: true,
+        message: "Authentication valid (token)",
+        userId: user.id,
+        username: user.username
+      });
+    })(req, res, next);
   });
   
   // Verification endpoint that accepts username/password directly
