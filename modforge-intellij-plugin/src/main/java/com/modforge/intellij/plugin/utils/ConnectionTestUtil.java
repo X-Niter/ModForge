@@ -2,105 +2,53 @@ package com.modforge.intellij.plugin.utils;
 
 import com.intellij.openapi.diagnostic.Logger;
 
-import java.io.IOException;
 import java.net.HttpURLConnection;
 import java.net.URL;
 
 /**
- * Utility for testing connection to ModForge server.
+ * Utility for testing connection to the ModForge server.
+ * @deprecated Use TokenAuthConnectionUtil for authenticated requests. This only does basic connection testing.
  */
+@Deprecated
 public class ConnectionTestUtil {
     private static final Logger LOG = Logger.getInstance(ConnectionTestUtil.class);
-    private static final String HEALTH_CHECK_ENDPOINT = "/api/health";
-    private static final int TIMEOUT = 5000; // 5 seconds
+    private static final int TIMEOUT = 5000;
     
     /**
-     * Tests connection to the ModForge server.
-     * @param serverUrl Base URL of the server
-     * @return Whether the connection was successful
+     * Test connection to server.
+     * @param serverUrl Server URL
+     * @return Whether connection was successful
      */
     public static boolean testConnection(String serverUrl) {
-        HttpURLConnection connection = null;
-        
         try {
-            // Normalize the URL (add trailing slash if needed)
-            if (!serverUrl.endsWith("/")) {
-                serverUrl += "/";
+            // Normalize URL
+            String normalizedUrl = serverUrl;
+            if (!normalizedUrl.endsWith("/")) {
+                normalizedUrl += "/";
             }
             
             // Remove "api" if it's already in the URL to avoid duplication
-            if (serverUrl.endsWith("/api/")) {
-                serverUrl = serverUrl.substring(0, serverUrl.length() - 4);
+            if (normalizedUrl.endsWith("api/")) {
+                normalizedUrl = normalizedUrl.substring(0, normalizedUrl.length() - 4);
             }
             
-            URL url = new URL(serverUrl + HEALTH_CHECK_ENDPOINT.substring(1));
-            connection = (HttpURLConnection) url.openConnection();
+            // Use health endpoint which doesn't require auth
+            URL url = new URL(normalizedUrl + "api/health");
+            HttpURLConnection connection = (HttpURLConnection) url.openConnection();
             connection.setRequestMethod("GET");
             connection.setConnectTimeout(TIMEOUT);
             connection.setReadTimeout(TIMEOUT);
             
-            // Get response code
             int responseCode = connection.getResponseCode();
+            boolean connected = responseCode >= 200 && responseCode < 300;
             
-            // 200 OK means server is up and running
-            return responseCode == 200;
-        } catch (IOException e) {
-            LOG.warn("Failed to connect to ModForge server: " + e.getMessage());
+            LOG.info("Connection test to " + url + " returned " + responseCode);
+            
+            connection.disconnect();
+            return connected;
+        } catch (Exception e) {
+            LOG.warn("Connection test failed: " + e.getMessage(), e);
             return false;
-        } finally {
-            if (connection != null) {
-                connection.disconnect();
-            }
-        }
-    }
-    
-    /**
-     * Tests the authentication endpoint.
-     * @param serverUrl Base URL of the server
-     * @param username Username
-     * @param password Password
-     * @return Whether authentication was successful
-     */
-    public static boolean testAuthentication(String serverUrl, String username, String password) {
-        HttpURLConnection connection = null;
-        
-        try {
-            // Normalize the URL (add trailing slash if needed)
-            if (!serverUrl.endsWith("/")) {
-                serverUrl += "/";
-            }
-            
-            // Remove "api" if it's already in the URL to avoid duplication
-            if (serverUrl.endsWith("/api/")) {
-                serverUrl = serverUrl.substring(0, serverUrl.length() - 4);
-            }
-            
-            URL url = new URL(serverUrl + "api/auth/verify");
-            connection = (HttpURLConnection) url.openConnection();
-            connection.setRequestMethod("POST");
-            connection.setConnectTimeout(TIMEOUT);
-            connection.setReadTimeout(TIMEOUT);
-            connection.setDoOutput(true);
-            connection.setRequestProperty("Content-Type", "application/json");
-            
-            // Create JSON payload
-            String jsonPayload = "{\"username\":\"" + username + "\",\"password\":\"" + password + "\"}";
-            
-            // Write payload
-            connection.getOutputStream().write(jsonPayload.getBytes("UTF-8"));
-            
-            // Get response code
-            int responseCode = connection.getResponseCode();
-            
-            // 200 OK means authentication was successful
-            return responseCode == 200;
-        } catch (IOException e) {
-            LOG.warn("Failed to authenticate with ModForge server: " + e.getMessage());
-            return false;
-        } finally {
-            if (connection != null) {
-                connection.disconnect();
-            }
         }
     }
 }
