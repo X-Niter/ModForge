@@ -485,7 +485,10 @@ export function scheduleErrorRecovery(interval: number = 30 * 60 * 1000): () => 
     try {
       await performErrorRecovery();
     } catch (error) {
-      logger.error("Scheduled error recovery failed", { error });
+      logger.error("Scheduled error recovery failed", { 
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined
+      });
     }
   });
   
