@@ -5,6 +5,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { Link } from "wouter";
 import { LucideCode, LucideFileCheck, LucideGithub, LucideRefreshCw } from "lucide-react";
+import { DashboardOverview } from "@/components/dashboard-overview";
 
 export default function HomePage() {
   const { toast } = useToast();
@@ -54,6 +55,11 @@ export default function HomePage() {
         </div>
       </div>
 
+      {/* Dashboard Overview for logged-in users */}
+      <div className="mb-10">
+        <DashboardOverview />
+      </div>
+      
       <Tabs defaultValue="features" className="w-full mb-10">
         <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="features">Key Features</TabsTrigger>
