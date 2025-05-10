@@ -1,7 +1,5 @@
 package com.modforge.intellij.plugin.auth;
 
-import com.intellij.openapi.application.ApplicationManager;
-import com.intellij.openapi.components.Service;
 import com.intellij.openapi.diagnostic.Logger;
 import com.modforge.intellij.plugin.settings.ModForgeSettings;
 import com.modforge.intellij.plugin.utils.ConnectionTestUtil;
@@ -18,8 +16,7 @@ import java.nio.charset.StandardCharsets;
 /**
  * Manages authentication with the ModForge server.
  */
-@Service
-public final class AuthenticationManager {
+public class AuthenticationManager {
     private static final Logger LOG = Logger.getInstance(AuthenticationManager.class);
     private static final String AUTH_ENDPOINT = "/api/token";
     private static final String LOGOUT_ENDPOINT = "/api/logout";
@@ -30,22 +27,16 @@ public final class AuthenticationManager {
     private String password;
     
     /**
-     * Private constructor.
+     * Constructor.
      */
-    private AuthenticationManager() {
+    public AuthenticationManager() {
         // Load credentials from settings
         ModForgeSettings settings = ModForgeSettings.getInstance();
         username = settings.getUsername();
         password = settings.getPassword();
     }
     
-    /**
-     * Get instance of authentication manager.
-     * @return The authentication manager instance
-     */
-    public static AuthenticationManager getInstance() {
-        return ApplicationManager.getApplication().getService(AuthenticationManager.class);
-    }
+    // No longer a singleton service, instantiate directly
     
     /**
      * Set credentials.

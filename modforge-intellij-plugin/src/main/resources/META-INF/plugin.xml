@@ -24,7 +24,6 @@
         <!-- Services -->
         <applicationService serviceImplementation="com.modforge.intellij.plugin.settings.ModForgeSettings"/>
         <applicationService serviceImplementation="com.modforge.intellij.plugin.ai.PatternRecognitionService"/>
-        <applicationService serviceImplementation="com.modforge.intellij.plugin.auth.AuthenticationManager"/>
 
         <projectService serviceImplementation="com.modforge.intellij.plugin.services.AutonomousCodeGenerationService"/>
         <projectService serviceImplementation="com.modforge.intellij.plugin.services.ContinuousDevelopmentService"/>
@@ -41,6 +40,12 @@
             id="com.modforge.intellij.plugin.settings.ModForgeSettingsConfigurable" 
             displayName="ModForge" 
             nonDefaultProject="true"/>
+            
+        <!-- Notification Groups -->
+        <notificationGroup id="ModForge Notifications" 
+                          displayType="BALLOON" 
+                          toolWindowId="ModForge"
+                          isLogByDefault="true"/>
 
         <!-- Tool Window -->
         <toolWindow id="ModForge" 

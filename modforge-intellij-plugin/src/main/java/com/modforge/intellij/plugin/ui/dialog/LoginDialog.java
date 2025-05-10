@@ -153,7 +153,7 @@ public class LoginDialog extends DialogWrapper {
         }
         
         // Try to authenticate
-        AuthenticationManager authManager = AuthenticationManager.getInstance();
+        AuthenticationManager authManager = new AuthenticationManager();
         authManager.setCredentials(usernameField.getText().trim(), new String(passwordField.getPassword()));
         boolean success = authManager.authenticate();
         

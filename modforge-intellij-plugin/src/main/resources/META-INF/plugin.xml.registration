@@ -1,0 +1,8 @@
+<extensions defaultExtensionNs="com.intellij">
+    <!-- Notification Groups -->
+    <notificationGroup id="ModForge Notifications" 
+                      displayType="BALLOON" 
+                      toolWindowId="ModForge"
+                      isLogByDefault="true"
+                      key="notification.group.modforge"/>
+</extensions>

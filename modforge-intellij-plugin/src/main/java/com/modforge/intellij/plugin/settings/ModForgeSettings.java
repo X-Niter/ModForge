@@ -46,7 +46,38 @@ public class ModForgeSettings implements PersistentStateComponent<ModForgeSettin
     
     @Override
     public @Nullable ModForgeSettings getState() {
-        return this;
+        // Create a copy of the current state to save persistent settings
+        ModForgeSettings state = new ModForgeSettings();
+        state.serverUrl = this.serverUrl;
+        
+        // Only save sensitive data if rememberCredentials is true
+        if (rememberCredentials) {
+            state.username = this.username;
+            state.password = this.password;
+            state.accessToken = this.accessToken;
+            state.userId = this.userId;
+            state.authenticated = this.authenticated;
+            state.githubToken = this.githubToken;
+            state.githubUsername = this.githubUsername;
+        } else {
+            // Clear sensitive data
+            state.username = "";
+            state.password = "";
+            state.accessToken = "";
+            state.userId = "";
+            state.authenticated = false;
+            state.githubToken = "";
+            state.githubUsername = "";
+        }
+        
+        // Always save preferences
+        state.rememberCredentials = this.rememberCredentials;
+        state.enableContinuousDevelopment = this.enableContinuousDevelopment;
+        state.continuousDevelopmentFrequency = this.continuousDevelopmentFrequency;
+        state.enableAIGeneration = this.enableAIGeneration;
+        state.usePatternLearning = this.usePatternLearning;
+        
+        return state;
     }
     
     @Override
