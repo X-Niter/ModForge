@@ -91,9 +91,27 @@ class ContinuousService extends EventEmitter {
    * @param modId The mod ID to process
    */
   private async processMod(modId: number): Promise<void> {
-    // Track attempts to prevent infinite loops
+    // Circuit breaker pattern to prevent infinite loops
     const maxRetries = 3;
     let attempts = 0;
+    const circuitBreakerKey = `circuit_breaker_${modId}`;
+    
+    // Check if circuit breaker is tripped
+    const circuitBreakerCount = parseInt(process.env[circuitBreakerKey] || '0', 10);
+    if (circuitBreakerCount >= 5) {
+      console.warn(`Circuit breaker tripped for mod ${modId}. Too many failures in a short period.`);
+      // Wait for at least an hour before trying again
+      const lastTripTime = parseInt(process.env[`${circuitBreakerKey}_time`] || '0', 10);
+      const now = Date.now();
+      if (now - lastTripTime < 60 * 60 * 1000) {
+        console.warn(`Skipping processing for mod ${modId} until circuit breaker resets.`);
+        return;
+      } else {
+        // Reset circuit breaker
+        process.env[circuitBreakerKey] = '0';
+        delete process.env[`${circuitBreakerKey}_time`];
+      }
+    }
     
     try {
       // Get the mod
@@ -184,7 +202,9 @@ class ContinuousService extends EventEmitter {
             await storage.createModFile({
               modId: mod.id,
               path: file.path,
-              content: file.content
+              content: file.content,
+              contentType: file.path.endsWith('.java') ? 'text/x-java' : 'text/plain',
+              metadata: {}
             });
           }
         }
@@ -205,7 +225,7 @@ class ContinuousService extends EventEmitter {
           logs: currentLogs,
           errorCount: retryResult.errors.length,
           warningCount: retryResult.warnings.length,
-          downloadUrl: retryResult.downloadUrl
+          downloadUrl: retryResult.downloadUrl || undefined
         });
         
         // If we're using aggressive auto-fix and still have errors, try adding new features
@@ -241,7 +261,7 @@ class ContinuousService extends EventEmitter {
           logs: currentLogs,
           errorCount: compileResult.errors.length,
           warningCount: compileResult.warnings.length,
-          downloadUrl: compileResult.downloadUrl
+          downloadUrl: compileResult.downloadUrl || undefined
         });
         
         console.log(`Continuous development cycle for mod ${mod.name} completed with status: ${status}`);
@@ -256,6 +276,17 @@ class ContinuousService extends EventEmitter {
       }
     } catch (error) {
       console.error(`Error in continuous development cycle for mod ${modId}:`, error);
+      
+      // Increment circuit breaker count
+      const circuitBreakerKey = `circuit_breaker_${modId}`;
+      const currentCount = parseInt(process.env[circuitBreakerKey] || '0', 10);
+      process.env[circuitBreakerKey] = (currentCount + 1).toString();
+      
+      // If circuit breaker threshold reached, trip it
+      if (currentCount + 1 >= 5) {
+        process.env[`${circuitBreakerKey}_time`] = Date.now().toString();
+        console.warn(`Circuit breaker tripped for mod ${modId}.`);
+      }
       
       // Emit the error event
       this.emit('error', {
