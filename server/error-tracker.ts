@@ -418,13 +418,15 @@ export function trackError(
           }
         ).catch(notificationError => {
           logger.error("Failed to send high severity error notification", { 
-            error: notificationError,
+            error: notificationError instanceof Error ? notificationError.message : String(notificationError),
+            stack: notificationError instanceof Error ? notificationError.stack : undefined,
             originalErrorId: trackedError.id
           });
         });
       } catch (notificationError) {
         logger.error("Failed to send high severity error notification", { 
-          error: notificationError,
+          error: notificationError instanceof Error ? notificationError.message : String(notificationError),
+          stack: notificationError instanceof Error ? notificationError.stack : undefined,
           originalErrorId: trackedError.id
         });
       }
