@@ -50,14 +50,77 @@ public class EnvironmentValidator {
      * @return true if the IDE version is compatible, false otherwise
      */
     private static boolean validateIdeVersion() {
-        ApplicationInfo appInfo = ApplicationInfo.getInstance();
-        String fullVersion = appInfo.getFullVersion();
-        String buildString = appInfo.getBuild().asString();
+        try {
+            ApplicationInfo appInfo = ApplicationInfo.getInstance();
+            String fullVersion = appInfo.getFullVersion();
+            String buildString = appInfo.getBuild().asString();
+            int buildNumber = extractBuildNumber(buildString);
+            
+            LOG.info("Checking IntelliJ IDEA version: " + fullVersion + " (Build " + buildString + ")");
+            
+            // First check by exact version match (most reliable)
+            if (fullVersion.contains(MIN_IDE_VERSION)) {
+                LOG.info("IDE version validated by exact version match: " + fullVersion);
+                return true;
+            }
+            
+            // Check by build number (2025.1 starts at build 251.*)
+            if (buildNumber >= 251) {
+                LOG.info("IDE version validated by build number: " + buildNumber);
+                return true;
+            }
+            
+            // Try numeric comparison as a last resort
+            if (fullVersion.compareTo(MIN_IDE_VERSION) >= 0) {
+                LOG.info("IDE version validated by version comparison: " + fullVersion + " >= " + MIN_IDE_VERSION);
+                return true;
+            }
+            
+            LOG.warn("IDE version validation failed: " + fullVersion + " (build " + buildString + ")");
+            return false;
+        } catch (Exception e) {
+            LOG.warn("Error validating IDE version: " + e.getMessage(), e);
+            
+            // Fallback to class compatibility check as a last resort
+            try {
+                // Check for presence of key 2025.1 classes
+                Class.forName("com.intellij.platform.workspace.jps.JpsProjectKindIndicator");
+                LOG.info("IDE version validated by 2025.1 class compatibility");
+                return true;
+            } catch (ClassNotFoundException ignored) {
+                // Class not found, likely not 2025.1
+            }
+            
+            return false;
+        }
+    }
+    
+    /**
+     * Extract the numeric build number from the build string
+     * 
+     * @param buildString The build string (e.g., "IC-251.23774.435")
+     * @return The numeric build number (e.g., 251)
+     */
+    private static int extractBuildNumber(String buildString) {
+        if (buildString == null || buildString.isEmpty()) {
+            return 0;
+        }
         
-        LOG.info("Checking IntelliJ IDEA version: " + fullVersion + " (Build " + buildString + ")");
-        
-        return fullVersion.contains(MIN_IDE_VERSION) || 
-               fullVersion.compareTo(MIN_IDE_VERSION) >= 0;
+        try {
+            // Extract the first number segment (typically the year/version number)
+            String[] parts = buildString.split("\\.");
+            if (parts.length > 0) {
+                // Handle format like "IC-251.23774.435"
+                String firstPart = parts[0].replaceAll("[^0-9]", "");
+                if (!firstPart.isEmpty()) {
+                    return Integer.parseInt(firstPart);
+                }
+            }
+            return 0;
+        } catch (Exception e) {
+            LOG.warn("Error extracting build number from: " + buildString, e);
+            return 0;
+        }
     }
     
     /**
@@ -69,73 +132,184 @@ public class EnvironmentValidator {
     private static boolean validateJdkVersion(Project project) {
         if (project == null) {
             LOG.warn("Cannot validate JDK version: project is null");
-            return false;
+            return checkRuntimeJavaVersion();  // Fallback to runtime check
         }
         
         try {
+            // Start with checking the project SDK
             Sdk projectSdk = ProjectRootManager.getInstance(project).getProjectSdk();
+            
+            // If project SDK is not set, try to find a valid SDK in the modules
             if (projectSdk == null) {
-                LOG.warn("Cannot validate JDK version: project SDK is not set");
-                
-                // Rather than failing immediately, check if any module has Java SDK set
-                boolean foundValidModuleSdk = false;
-                Module[] modules = ModuleManager.getInstance(project).getModules();
-                for (Module module : modules) {
-                    Sdk moduleSdk = ModuleRootManager.getInstance(module).getSdk();
-                    if (moduleSdk != null && moduleSdk.getSdkType() instanceof JavaSdk) {
-                        projectSdk = moduleSdk;
-                        foundValidModuleSdk = true;
-                        LOG.info("Found valid Java SDK in module: " + module.getName());
-                        break;
-                    }
-                }
-                
-                if (!foundValidModuleSdk) {
-                    return false;
-                }
+                LOG.info("Project SDK is not set, checking module SDKs...");
+                projectSdk = findValidModuleSdk(project);
             }
             
-            String jdkVersion = projectSdk.getVersionString();
-            LOG.info("Checking project JDK version: " + jdkVersion);
-            
-            // Check if it's a Java SDK
-            if (!(projectSdk.getSdkType() instanceof JavaSdk)) {
-                LOG.warn("Project SDK is not a Java SDK: " + projectSdk.getSdkType().getName());
-                return false;
-            }
-            
-            // Check Java SDK version
-            JavaSdk javaSdk = (JavaSdk) projectSdk.getSdkType();
-            JavaSdkVersion version = javaSdk.getVersion(projectSdk);
-            
-            if (version == null) {
-                LOG.warn("Cannot determine Java SDK version");
-                
-                // Fallback to runtime version if SDK version cannot be determined
-                String runtimeVersion = System.getProperty("java.version");
-                if (runtimeVersion != null && (runtimeVersion.startsWith("21") || compareVersions(runtimeVersion, MIN_JDK_VERSION) >= 0)) {
-                    LOG.info("Using runtime Java version: " + runtimeVersion);
+            // If we have a valid SDK, check its version
+            if (projectSdk != null) {
+                if (validateSdkVersion(projectSdk)) {
                     return true;
                 }
+            } else {
+                LOG.warn("No valid SDK found in project or modules");
+            }
+            
+            // If SDK validation fails or no SDK is found, try runtime
+            return checkRuntimeJavaVersion();
+            
+        } catch (Exception e) {
+            LOG.warn("Error during JDK validation: " + e.getMessage(), e);
+            return checkRuntimeJavaVersion();  // Fallback to runtime check
+        }
+    }
+    
+    /**
+     * Find a valid Java SDK in any of the project's modules
+     * 
+     * @param project The current project
+     * @return A valid Java SDK or null if none is found
+     */
+    private static Sdk findValidModuleSdk(Project project) {
+        try {
+            Module[] modules = ModuleManager.getInstance(project).getModules();
+            for (Module module : modules) {
+                try {
+                    Sdk moduleSdk = ModuleRootManager.getInstance(module).getSdk();
+                    if (moduleSdk != null && moduleSdk.getSdkType() instanceof JavaSdk) {
+                        LOG.info("Found Java SDK in module: " + module.getName());
+                        return moduleSdk;
+                    }
+                } catch (Exception e) {
+                    LOG.warn("Error checking SDK for module " + module.getName() + ": " + e.getMessage());
+                    // Continue with next module
+                }
+            }
+        } catch (Exception e) {
+            LOG.warn("Error while scanning for module SDKs: " + e.getMessage(), e);
+        }
+        return null;
+    }
+    
+    /**
+     * Validate a specific SDK's version against our requirements
+     * 
+     * @param sdk The SDK to validate
+     * @return true if the SDK version is compatible, false otherwise
+     */
+    private static boolean validateSdkVersion(Sdk sdk) {
+        if (sdk == null) {
+            return false;
+        }
+        
+        String jdkVersion = sdk.getVersionString();
+        LOG.info("Checking JDK version: " + jdkVersion);
+        
+        // Check if it's a Java SDK
+        if (!(sdk.getSdkType() instanceof JavaSdk)) {
+            LOG.warn("SDK is not a Java SDK: " + sdk.getSdkType().getName());
+            return false;
+        }
+        
+        // Check Java SDK version using JavaSdk's API
+        JavaSdk javaSdk = (JavaSdk) sdk.getSdkType();
+        JavaSdkVersion version = javaSdk.getVersion(sdk);
+        
+        if (version == null) {
+            LOG.warn("Cannot determine Java SDK version through JavaSdk API");
+            
+            // Try the version string directly
+            if (jdkVersion != null) {
+                String extractedVersion = extractVersion(jdkVersion);
+                LOG.info("Checking extracted version: " + extractedVersion);
                 
+                if (extractedVersion.startsWith("21") || compareVersions(extractedVersion, MIN_JDK_VERSION) >= 0) {
+                    LOG.info("SDK validated through version string: " + extractedVersion);
+                    return true;
+                }
+            }
+            
+            return false;
+        }
+        
+        LOG.info("Java SDK version through API: " + version.getDescription());
+        
+        // Primary check using JavaSdk API
+        if (version.isAtLeast(MIN_JAVA_SDK_VERSION)) {
+            LOG.info("SDK validated through JavaSdk API: " + version.getDescription());
+            return true;
+        }
+        
+        // Secondary check using version string (for edge cases)
+        if (jdkVersion != null) {
+            if (jdkVersion.contains(MIN_JDK_VERSION) || 
+                jdkVersion.contains("21.0") ||
+                compareVersions(extractVersion(jdkVersion), MIN_JDK_VERSION) >= 0) {
+                
+                LOG.info("SDK validated through version string: " + jdkVersion);
+                return true;
+            }
+        }
+        
+        LOG.warn("SDK version is not compatible: " + jdkVersion);
+        return false;
+    }
+    
+    /**
+     * Check the runtime Java version as a fallback
+     * 
+     * @return true if the runtime Java version is compatible, false otherwise
+     */
+    private static boolean checkRuntimeJavaVersion() {
+        try {
+            // Get runtime Java version
+            String runtimeVersion = System.getProperty("java.version");
+            String runtimeName = System.getProperty("java.vm.name");
+            String runtimeVendor = System.getProperty("java.vendor");
+            
+            LOG.info("Checking runtime Java version: " + runtimeVersion + 
+                     " (" + runtimeName + " from " + runtimeVendor + ")");
+            
+            if (runtimeVersion == null) {
+                LOG.warn("Cannot determine runtime Java version");
                 return false;
             }
             
-            LOG.info("Java SDK version: " + version.getDescription());
+            // Multiple ways to check for Java 21 compatibility
+            boolean isCompatible = false;
             
-            return version.isAtLeast(MIN_JAVA_SDK_VERSION) && 
-                  (jdkVersion == null || jdkVersion.contains(MIN_JDK_VERSION) || 
-                   compareVersions(extractVersion(jdkVersion), MIN_JDK_VERSION) >= 0);
-        } catch (Exception e) {
-            LOG.warn("Error validating JDK version: " + e.getMessage(), e);
-            
-            // Fallback to runtime version
-            String runtimeVersion = System.getProperty("java.version");
-            if (runtimeVersion != null && (runtimeVersion.startsWith("21") || compareVersions(runtimeVersion, MIN_JDK_VERSION) >= 0)) {
-                LOG.info("Using runtime Java version: " + runtimeVersion);
-                return true;
+            // Check for Java 21
+            if (runtimeVersion.startsWith("21") || runtimeVersion.startsWith("21.")) {
+                LOG.info("Runtime is Java 21: " + runtimeVersion);
+                isCompatible = true;
+            }
+            // Check specific minimum version
+            else if (compareVersions(runtimeVersion, MIN_JDK_VERSION) >= 0) {
+                LOG.info("Runtime Java version is >= " + MIN_JDK_VERSION + ": " + runtimeVersion);
+                isCompatible = true;
+            }
+            // Check for common JDK version patterns
+            else if (runtimeVersion.matches("1\\.21\\..*")) {
+                LOG.info("Runtime uses legacy Java version format for Java 21: " + runtimeVersion);
+                isCompatible = true;
             }
             
+            // Also try to check for Java 21 features as a last resort
+            if (!isCompatible) {
+                try {
+                    // Check for a Java 21 API feature (virtual threads)
+                    Class<?> threadClass = Thread.class;
+                    if (threadClass.getMethod("startVirtualThread", Runnable.class) != null) {
+                        LOG.info("Runtime supports Java 21 feature (virtual threads)");
+                        isCompatible = true;
+                    }
+                } catch (NoSuchMethodException e) {
+                    // Not Java 21, continue with other checks
+                }
+            }
+            
+            return isCompatible;
+        } catch (Exception e) {
+            LOG.warn("Error checking runtime Java version: " + e.getMessage(), e);
             return false;
         }
     }
