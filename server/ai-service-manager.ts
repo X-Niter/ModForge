@@ -106,11 +106,17 @@ export async function smartGenerateDocumentation(
     console.log('No suitable documentation pattern found, using OpenAI API');
     recordApiFallback();
     
-    const result = await generateDocumentation(code, language, style);
+    // Convert style string to valid type
+    const validStyle: "javadoc" | "markdown" | "inline" = 
+      (style === "javadoc" || style === "markdown" || style === "inline") 
+        ? style 
+        : "javadoc";
+    
+    const result = await generateDocumentation(code, language, validStyle);
     
     // Store the successful generation for future use
     if (result.text) {
-      await storeDocumentationPattern(code, result.text, language, style);
+      await storeDocumentationPattern(code, result.text, language, validStyle);
     }
     
     return result;
@@ -150,7 +156,11 @@ export async function smartGenerateCode(
     console.log('No suitable code pattern found, using OpenAI API');
     recordApiFallback();
     
-    return await generateCode(prompt, language, context, complexity);
+    return await generateCode(prompt, {
+      language,
+      context,
+      complexity
+    });
   } catch (error) {
     console.error('Error in smartGenerateCode:', error);
     throw error;

@@ -30,6 +30,7 @@ import webExplorerRouter from "./routes/web-explorer-routes";
 import jarAnalyzerRouter from "./routes/jar-analyzer-routes";
 import patternLearningRouter from "./routes/pattern-learning-metrics";
 import githubRoutes from "./routes/github-routes";
+import errorMonitoringRouter from "./routes/error-monitoring";
 import axios from "axios";
 import rateLimit from "express-rate-limit";
 
@@ -1338,6 +1339,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/jar-analyzer", jarAnalyzerRouter);
   app.use("/api/pattern-learning", patternLearningRouter);
   app.use("/api/github", githubRoutes);
+  app.use("/api/error-monitoring", requireAuth, errorMonitoringRouter);
+  
+  // Register global error handler as the last middleware
+  app.use(errorHandlerMiddleware);
 
   return httpServer;
 }
