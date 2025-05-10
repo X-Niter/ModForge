@@ -1,6 +1,7 @@
 import React from 'react';
 import { GitHubAuth } from "@/components/github-auth";
 import { GitHubOAuthButton } from "@/components/github-oauth-button";
+import { GitHubAuthStatus } from "@/components/github-auth-status";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
@@ -111,6 +112,8 @@ export default function GitHubIntegration() {
         </div>
         
         <div className="space-y-6">
+          <GitHubAuthStatus />
+          
           <Card className="bg-surface shadow-lg">
             <CardHeader>
               <CardTitle className="text-white flex items-center gap-2">

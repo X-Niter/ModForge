@@ -527,13 +527,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Mod not found" });
       }
       
+      // Get token from request body if provided (legacy support)
       const { token } = req.body;
-      if (!token) {
-        return res.status(400).json({ message: "GitHub token is required" });
-      }
 
-      // Push to GitHub
-      const result = await pushModToGitHub(modId, token);
+      // Push to GitHub with both session authentication and token (if provided)
+      const result = await pushModToGitHub(modId, req, token);
       
       if (!result.success) {
         return res.status(400).json({ 
