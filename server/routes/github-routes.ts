@@ -61,6 +61,7 @@ router.post('/verify-token', async (req, res) => {
 });
 
 // Save a verified GitHub token to user account
+// This requires the user to be authenticated
 router.post('/save-token', async (req, res) => {
   const { token } = req.body;
   

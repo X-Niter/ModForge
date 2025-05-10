@@ -19,6 +19,7 @@ import { pushModToGitHub } from "./github";
 import { checkDatabaseHealth } from "./db-health";
 import { continuousService } from "./continuous-service";
 import { generateModIdeas, expandModIdea, ideaGenerationRequestSchema } from "./idea-generator-service";
+import { setupAuth } from "./auth";
 import { z } from "zod";
 import { insertModSchema } from "@shared/schema";
 import { BuildStatus } from "@/types";
@@ -173,6 +174,9 @@ async function compileModAsync(mod: any, build: any): Promise<void> {
 }
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Setup authentication system
+  const requireAuth = setupAuth(app);
+  
   // Create HTTP server
   const httpServer = createServer(app);
   
