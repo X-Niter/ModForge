@@ -222,6 +222,20 @@ export function setupAuth(app: Express) {
     const { password, ...userWithoutPassword } = req.user as Express.User;
     return res.status(200).json(userWithoutPassword);
   });
+  
+  // IntelliJ plugin specific auth endpoint
+  app.get("/api/auth/me", (req: Request, res: Response) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ success: false, message: "Not authenticated" });
+    }
+    
+    // Return user without password
+    const { password, ...userWithoutPassword } = req.user as Express.User;
+    return res.status(200).json({
+      success: true,
+      user: userWithoutPassword
+    });
+  });
 
   // Authentication check middleware
   return function requireAuth(req: Request, res: Response, next: NextFunction) {
