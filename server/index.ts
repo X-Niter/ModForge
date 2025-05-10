@@ -14,6 +14,16 @@ import { initializeNotifications } from "./notification-integration";
 import { scheduleErrorStoreCleanup } from "./error-tracker";
 import os from "os";
 
+// Add TypeScript declaration for global.gc if it's available
+// This is available when Node is run with --expose-gc flag
+declare global {
+  namespace NodeJS {
+    interface Global {
+      gc?: () => void;
+    }
+  }
+}
+
 const app = express();
 // Enable trust proxy to work correctly with express-rate-limit behind a proxy (like in Replit)
 app.set('trust proxy', 1);
@@ -162,7 +172,10 @@ function setupMemoryManagement() {
       memoryLogger.info('Application caches cleared');
       return true;
     } catch (err) {
-      memoryLogger.error('Failed to clear application caches', { error: err });
+      memoryLogger.error('Failed to clear application caches', { 
+        error: err instanceof Error ? err.message : String(err),
+        stack: err instanceof Error ? err.stack : undefined
+      });
       return false;
     }
   }
@@ -339,7 +352,10 @@ function setupMemoryManagement() {
         global.gc();
       }
     } catch (error) {
-      memoryLogger.error('Error in idle garbage collection', { error });
+      memoryLogger.error('Error in idle garbage collection', { 
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined
+      });
     }
   }, MEMORY_CHECK_INTERVAL * 4); // Run every 4x the normal check interval
   
