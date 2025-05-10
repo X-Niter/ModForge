@@ -981,7 +981,7 @@ export async function sendBackupStatusNotification(
     title: `Backup Status: ${status.toUpperCase()}`,
     message,
     details
-  });
+  }, false);
 }
 
 /**
@@ -1026,7 +1026,7 @@ export async function sendTrackedErrorNotification(
       count,
       ...details
     }
-  });
+  }, false);
 }
 
 /**
