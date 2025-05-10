@@ -23,7 +23,10 @@ const scheduleJob = (
     try {
       await jobFunction();
     } catch (error) {
-      logger.error("Error in scheduled job", { error });
+      logger.error("Error in scheduled job", { 
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined
+      });
     }
   }, interval);
   
@@ -214,7 +217,8 @@ async function recoverFromDatabaseConnectionIssues(): Promise<RecoveryResult> {
               logger.info("Database connection pool successfully restarted");
             } catch (restartError) {
               logger.error("Failed to restart database connection pool", {
-                error: restartError
+                error: restartError instanceof Error ? restartError.message : String(restartError),
+                stack: restartError instanceof Error ? restartError.stack : undefined
               });
             }
           }, 1000);
@@ -339,7 +343,10 @@ async function recoverFromMemoryIssues(): Promise<RecoveryResult> {
       }
     }
   } catch (error) {
-    logger.error("Failed to recover from memory issues", { error });
+    logger.error("Failed to recover from memory issues", { 
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined
+    });
     
     return {
       successful: false,
