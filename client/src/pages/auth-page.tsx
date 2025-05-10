@@ -1,306 +1,312 @@
-import React, { useState } from 'react';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { useState, useEffect } from "react";
+import { Link, useLocation } from "wouter";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useForm } from "react-hook-form";
+import { z } from "zod";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { GitHubOAuthButton } from "@/components/github-oauth-button";
-import { useToast } from "@/hooks/use-toast";
-import { apiRequest } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/use-auth";
-import { Redirect } from "wouter";
 import { Loader2 } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 
-const LoginForm = () => {
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
-  const [loading, setLoading] = useState(false);
-  const { toast } = useToast();
-  const { loginMutation } = useAuth();
+const loginSchema = z.object({
+  username: z.string().min(3, {
+    message: "Username must be at least 3 characters.",
+  }),
+  password: z.string().min(6, {
+    message: "Password must be at least 6 characters.",
+  }),
+});
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!username || !password) {
-      toast({
-        title: "Error",
-        description: "Please fill in all fields",
-        variant: "destructive"
-      });
-      return;
-    }
+const registerSchema = z.object({
+  username: z.string().min(3, {
+    message: "Username must be at least 3 characters.",
+  }),
+  email: z.string().email({
+    message: "Please enter a valid email address.",
+  }).optional(),
+  displayName: z.string().optional(),
+  password: z.string().min(6, {
+    message: "Password must be at least 6 characters.",
+  }),
+  confirmPassword: z.string().min(6, {
+    message: "Password must be at least 6 characters.",
+  }),
+}).refine((data) => data.password === data.confirmPassword, {
+  message: "Passwords do not match",
+  path: ["confirmPassword"],
+});
 
-    try {
-      setLoading(true);
-      await loginMutation.mutateAsync({ username, password });
-
-      toast({
-        title: "Success",
-        description: "Logged in successfully",
-      });
-    } catch (error) {
-      const errorMessage = error instanceof Error 
-        ? error.message 
-        : "Failed to login";
-      
-      toast({
-        title: "Login failed",
-        description: errorMessage,
-        variant: "destructive"
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      <div className="space-y-2">
-        <Label htmlFor="username">Username</Label>
-        <Input 
-          id="username" 
-          value={username} 
-          onChange={(e) => setUsername(e.target.value)}
-          placeholder="username" 
-          disabled={loading}
-        />
-      </div>
-      <div className="space-y-2">
-        <Label htmlFor="password">Password</Label>
-        <Input 
-          id="password" 
-          type="password" 
-          value={password} 
-          onChange={(e) => setPassword(e.target.value)}
-          placeholder="••••••••" 
-          disabled={loading}
-        />
-      </div>
-      <Button type="submit" className="w-full" disabled={loading}>
-        {loading ? (
-          <>
-            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            Logging in...
-          </>
-        ) : (
-          "Login"
-        )}
-      </Button>
-    </form>
-  );
-};
-
-const RegisterForm = () => {
-  const [formData, setFormData] = useState({
-    username: '',
-    password: '',
-    confirmPassword: '',
-    email: '',
-    displayName: ''
-  });
-  const [loading, setLoading] = useState(false);
-  const { toast } = useToast();
-  const { registerMutation } = useAuth();
-
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!formData.username || !formData.password || !formData.confirmPassword) {
-      toast({
-        title: "Error",
-        description: "Please fill in all required fields",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    if (formData.password !== formData.confirmPassword) {
-      toast({
-        title: "Error",
-        description: "Passwords do not match",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    try {
-      setLoading(true);
-      await registerMutation.mutateAsync(formData);
-
-      toast({
-        title: "Success",
-        description: "Account created successfully",
-      });
-    } catch (error) {
-      const errorMessage = error instanceof Error 
-        ? error.message 
-        : "Failed to create account";
-      
-      toast({
-        title: "Registration failed",
-        description: errorMessage,
-        variant: "destructive"
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      <div className="space-y-2">
-        <Label htmlFor="username">Username *</Label>
-        <Input 
-          id="username" 
-          name="username"
-          value={formData.username} 
-          onChange={handleChange}
-          placeholder="username" 
-          disabled={loading}
-          required
-        />
-      </div>
-      <div className="grid gap-4 grid-cols-1 md:grid-cols-2">
-        <div className="space-y-2">
-          <Label htmlFor="password">Password *</Label>
-          <Input 
-            id="password" 
-            name="password"
-            type="password" 
-            value={formData.password} 
-            onChange={handleChange}
-            placeholder="••••••••" 
-            disabled={loading}
-            required
-          />
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="confirmPassword">Confirm Password *</Label>
-          <Input 
-            id="confirmPassword" 
-            name="confirmPassword"
-            type="password" 
-            value={formData.confirmPassword} 
-            onChange={handleChange}
-            placeholder="••••••••" 
-            disabled={loading}
-            required
-          />
-        </div>
-      </div>
-      <div className="space-y-2">
-        <Label htmlFor="email">Email</Label>
-        <Input 
-          id="email" 
-          name="email"
-          type="email" 
-          value={formData.email} 
-          onChange={handleChange}
-          placeholder="your@email.com" 
-          disabled={loading}
-        />
-      </div>
-      <div className="space-y-2">
-        <Label htmlFor="displayName">Display Name</Label>
-        <Input 
-          id="displayName" 
-          name="displayName"
-          value={formData.displayName} 
-          onChange={handleChange}
-          placeholder="Your Name" 
-          disabled={loading}
-        />
-      </div>
-      <Button type="submit" className="w-full" disabled={loading}>
-        {loading ? (
-          <>
-            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            Creating Account...
-          </>
-        ) : (
-          "Create Account"
-        )}
-      </Button>
-    </form>
-  );
-};
+type LoginFormValues = z.infer<typeof loginSchema>;
+type RegisterFormValues = z.infer<typeof registerSchema>;
 
 export default function AuthPage() {
-  const { user, isLoading } = useAuth();
-  
-  // Redirect to home if already logged in
-  if (!isLoading && user) {
-    return <Redirect to="/" />;
+  const [activeTab, setActiveTab] = useState<string>("login");
+  const [location, navigate] = useLocation();
+  const { user, loginMutation, registerMutation } = useAuth();
+  const { toast } = useToast();
+
+  // If user is already logged in, redirect to home
+  useEffect(() => {
+    if (user) {
+      navigate("/");
+    }
+  }, [user, navigate]);
+
+  // Check if there's a tab parameter in the URL
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const tab = params.get("tab");
+    if (tab === "register") {
+      setActiveTab("register");
+    }
+  }, []);
+
+  const loginForm = useForm<LoginFormValues>({
+    resolver: zodResolver(loginSchema),
+    defaultValues: {
+      username: "",
+      password: "",
+    },
+  });
+
+  const registerForm = useForm<RegisterFormValues>({
+    resolver: zodResolver(registerSchema),
+    defaultValues: {
+      username: "",
+      email: "",
+      displayName: "",
+      password: "",
+      confirmPassword: "",
+    },
+  });
+
+  function onLoginSubmit(data: LoginFormValues) {
+    loginMutation.mutate(data);
+  }
+
+  function onRegisterSubmit(data: RegisterFormValues) {
+    // Remove confirmPassword field before submitting
+    const { confirmPassword, ...registerData } = data;
+    registerMutation.mutate(registerData);
+  }
+
+  if (loginMutation.isPending || registerMutation.isPending) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
   }
 
   return (
-    <div className="container flex h-screen w-screen flex-col items-center justify-center">
-      <div className="mx-auto flex w-full flex-col justify-center space-y-6 sm:w-[350px] md:w-[550px]">
+    <div className="container mx-auto grid min-h-screen items-center justify-center md:grid-cols-2 gap-6 py-8">
+      <div className="mx-auto flex w-full flex-col justify-center space-y-6 sm:w-[350px]">
         <div className="flex flex-col space-y-2 text-center">
           <h1 className="text-2xl font-semibold tracking-tight">
             Welcome to ModForge
           </h1>
           <p className="text-sm text-muted-foreground">
-            Sign in to your account or create a new one to get started
+            {activeTab === "login" 
+              ? "Sign in to access your account" 
+              : "Create an account to get started"}
           </p>
         </div>
 
-        <Tabs defaultValue="login" className="w-full">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="login">Login</TabsTrigger>
             <TabsTrigger value="register">Register</TabsTrigger>
           </TabsList>
           
-          <Card>
-            <TabsContent value="login" className="mt-0">
-              <CardHeader>
-                <CardTitle>Login</CardTitle>
-                <CardDescription>
-                  Enter your credentials to access your account
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <LoginForm />
-              </CardContent>
-              <CardFooter className="flex flex-col border-t pt-6">
-                <div className="mt-4 flex items-center">
-                  <div className="w-full border-t" />
-                  <div className="mx-4 text-xs text-gray-500">OR</div>
-                  <div className="w-full border-t" />
-                </div>
-                <div className="mt-4">
-                  <GitHubOAuthButton />
-                </div>
-              </CardFooter>
-            </TabsContent>
-            
-            <TabsContent value="register" className="mt-0">
-              <CardHeader>
-                <CardTitle>Create Account</CardTitle>
-                <CardDescription>
-                  Fill in your details to create a new account
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <RegisterForm />
-              </CardContent>
-              <CardFooter className="flex flex-col border-t pt-6">
-                <div className="mt-4 flex items-center">
-                  <div className="w-full border-t" />
-                  <div className="mx-4 text-xs text-gray-500">OR</div>
-                  <div className="w-full border-t" />
-                </div>
-                <div className="mt-4">
-                  <GitHubOAuthButton />
-                </div>
-              </CardFooter>
-            </TabsContent>
-          </Card>
+          <TabsContent value="login" className="space-y-4">
+            <Form {...loginForm}>
+              <form onSubmit={loginForm.handleSubmit(onLoginSubmit)} className="space-y-4">
+                <FormField
+                  control={loginForm.control}
+                  name="username"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Username</FormLabel>
+                      <FormControl>
+                        <Input placeholder="yourusername" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={loginForm.control}
+                  name="password"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Password</FormLabel>
+                      <FormControl>
+                        <Input type="password" placeholder="••••••••" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <Button 
+                  type="submit" 
+                  className="w-full" 
+                  disabled={loginMutation.isPending}
+                >
+                  {loginMutation.isPending ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Logging in...
+                    </>
+                  ) : (
+                    'Sign In'
+                  )}
+                </Button>
+              </form>
+            </Form>
+          </TabsContent>
+          
+          <TabsContent value="register" className="space-y-4">
+            <Form {...registerForm}>
+              <form onSubmit={registerForm.handleSubmit(onRegisterSubmit)} className="space-y-4">
+                <FormField
+                  control={registerForm.control}
+                  name="username"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Username</FormLabel>
+                      <FormControl>
+                        <Input placeholder="yourusername" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={registerForm.control}
+                  name="email"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Email (optional)</FormLabel>
+                      <FormControl>
+                        <Input type="email" placeholder="you@example.com" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={registerForm.control}
+                  name="displayName"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Display Name (optional)</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Your Name" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={registerForm.control}
+                  name="password"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Password</FormLabel>
+                      <FormControl>
+                        <Input type="password" placeholder="••••••••" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={registerForm.control}
+                  name="confirmPassword"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Confirm Password</FormLabel>
+                      <FormControl>
+                        <Input type="password" placeholder="••••••••" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <Button 
+                  type="submit" 
+                  className="w-full" 
+                  disabled={registerMutation.isPending}
+                >
+                  {registerMutation.isPending ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Creating account...
+                    </>
+                  ) : (
+                    'Create Account'
+                  )}
+                </Button>
+              </form>
+            </Form>
+          </TabsContent>
         </Tabs>
+
+        <div className="text-center text-sm text-muted-foreground">
+          By continuing, you agree to our{" "}
+          <Link href="/terms" className="underline underline-offset-4 hover:text-primary">
+            Terms of Service
+          </Link>{" "}
+          and{" "}
+          <Link href="/privacy" className="underline underline-offset-4 hover:text-primary">
+            Privacy Policy
+          </Link>
+          .
+        </div>
+      </div>
+
+      {/* Hero section */}
+      <div className="hidden bg-muted p-10 md:flex md:flex-col md:justify-center">
+        <div className="space-y-6">
+          <h1 className="text-3xl font-bold">AI-Powered Minecraft Mod Development</h1>
+          <p className="text-xl">
+            Create, test, and improve Minecraft mods with AI assistance. 
+            ModForge handles the complex details, letting you focus on creativity.
+          </p>
+          <ul className="grid gap-2">
+            <li className="flex items-center gap-2 text-primary-foreground">
+              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5 text-primary">
+                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                <polyline points="22 4 12 14.01 9 11.01"></polyline>
+              </svg>
+              <span>Automatic compilation error fixing</span>
+            </li>
+            <li className="flex items-center gap-2 text-primary-foreground">
+              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5 text-primary">
+                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                <polyline points="22 4 12 14.01 9 11.01"></polyline>
+              </svg>
+              <span>Support for multiple mod loaders</span>
+            </li>
+            <li className="flex items-center gap-2 text-primary-foreground">
+              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5 text-primary">
+                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                <polyline points="22 4 12 14.01 9 11.01"></polyline>
+              </svg>
+              <span>Continuous development with GitHub</span>
+            </li>
+            <li className="flex items-center gap-2 text-primary-foreground">
+              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5 text-primary">
+                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                <polyline points="22 4 12 14.01 9 11.01"></polyline>
+              </svg>
+              <span>24/7 autonomous development</span>
+            </li>
+          </ul>
+        </div>
       </div>
     </div>
   );
