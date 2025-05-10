@@ -106,11 +106,14 @@ export function Navbar() {
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="container flex h-14 items-center">
         <div className="mr-4 flex">
-          <Link href="/" className="mr-6 flex items-center space-x-2">
+          <div 
+            className="mr-6 flex items-center space-x-2 cursor-pointer" 
+            onClick={() => window.location.href = "/"}
+          >
             <span className="hidden font-bold sm:inline-block text-xl bg-gradient-to-r from-blue-600 to-violet-600 bg-clip-text text-transparent">
               ModForge
             </span>
-          </Link>
+          </div>
           
           {/* Desktop Navigation */}
           <NavigationMenu className="hidden md:flex">
@@ -139,19 +142,18 @@ export function Navbar() {
                       </NavigationMenuContent>
                     </>
                   ) : (
-                    <Link href={item.href}>
-                      <NavigationMenuLink
-                        className={cn(
-                          "group inline-flex h-10 w-max items-center justify-center rounded-md bg-background px-4 py-2 text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground focus:outline-none disabled:pointer-events-none disabled:opacity-50 data-[active]:bg-accent/50 data-[state=open]:bg-accent/50",
-                          location === item.href && "bg-accent/50"
-                        )}
-                      >
-                        <div className="flex items-center">
-                          {item.icon}
-                          {item.title}
-                        </div>
-                      </NavigationMenuLink>
-                    </Link>
+                    <NavigationMenuLink
+                      className={cn(
+                        "group inline-flex h-10 w-max items-center justify-center rounded-md bg-background px-4 py-2 text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground focus:outline-none disabled:pointer-events-none disabled:opacity-50 data-[active]:bg-accent/50 data-[state=open]:bg-accent/50",
+                        location === item.href && "bg-accent/50"
+                      )}
+                      onClick={() => window.location.href = item.href}
+                    >
+                      <div className="flex items-center">
+                        {item.icon}
+                        {item.title}
+                      </div>
+                    </NavigationMenuLink>
                   )}
                 </NavigationMenuItem>
               ))}
