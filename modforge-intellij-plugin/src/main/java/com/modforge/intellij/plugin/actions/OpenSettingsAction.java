@@ -9,7 +9,7 @@ import com.modforge.intellij.plugin.settings.ModForgeSettingsConfigurable;
 import org.jetbrains.annotations.NotNull;
 
 /**
- * Action to open ModForge settings.
+ * Action for opening ModForge settings.
  */
 public class OpenSettingsAction extends AnAction {
     private static final Logger LOG = Logger.getInstance(OpenSettingsAction.class);
@@ -18,20 +18,16 @@ public class OpenSettingsAction extends AnAction {
     public void actionPerformed(@NotNull AnActionEvent e) {
         Project project = e.getProject();
         
-        if (project == null) {
-            return;
+        try {
+            LOG.info("Opening ModForge settings");
+            
+            // Open settings dialog
+            ShowSettingsUtil.getInstance().showSettingsDialog(
+                    project,
+                    ModForgeSettingsConfigurable.class
+            );
+        } catch (Exception ex) {
+            LOG.error("Error opening settings", ex);
         }
-        
-        LOG.info("Opening ModForge settings");
-        
-        // Show settings dialog
-        ShowSettingsUtil.getInstance().showSettingsDialog(project, ModForgeSettingsConfigurable.class);
-    }
-    
-    @Override
-    public void update(@NotNull AnActionEvent e) {
-        // Only enable if we have a project
-        Project project = e.getProject();
-        e.getPresentation().setEnabledAndVisible(project != null);
     }
 }

@@ -6,86 +6,96 @@ import com.intellij.openapi.project.Project;
 import com.intellij.openapi.startup.StartupActivity;
 import com.modforge.intellij.plugin.auth.ModAuthenticationManager;
 import com.modforge.intellij.plugin.settings.ModForgeSettings;
+import org.jetbrains.annotations.NotNull;
+import org.json.simple.JSONObject;
 
 /**
- * Main project service for ModForge.
+ * Project service for ModForge.
  */
 @Service(Service.Level.PROJECT)
 public final class ModForgeProjectService {
     private static final Logger LOG = Logger.getInstance(ModForgeProjectService.class);
     
     private final Project project;
-    private boolean initialized = false;
     
+    /**
+     * Create a new ModForge project service.
+     * @param project The project
+     */
     public ModForgeProjectService(Project project) {
         this.project = project;
+        
+        LOG.info("ModForge project service created for project: " + project.getName());
+        
+        // Initialize services
+        initializeServices();
     }
     
     /**
-     * Initialize the service, checking authentication and settings.
+     * Initialize ModForge services.
      */
-    public void initialize() {
-        if (initialized) {
-            return;
-        }
-        
-        LOG.info("Initializing ModForge project service");
-        
-        // Check authentication
-        ModAuthenticationManager authManager = ModAuthenticationManager.getInstance();
-        if (authManager.isAuthenticated()) {
-            // Verify token
-            boolean valid = authManager.verifyAuthentication();
+    private void initializeServices() {
+        try {
+            LOG.info("Initializing ModForge services");
             
-            if (!valid) {
-                LOG.warn("Authentication token is invalid");
+            // Get settings
+            ModForgeSettings settings = ModForgeSettings.getInstance();
+            
+            // Check if continuous development is enabled
+            if (settings.isContinuousDevelopment()) {
+                LOG.info("Continuous development is enabled, starting service");
                 
-                // If credentials are saved, try to re-authenticate
-                ModForgeSettings settings = ModForgeSettings.getInstance();
-                if (!settings.getUsername().isEmpty() && !settings.getPassword().isEmpty()) {
-                    LOG.info("Trying to re-authenticate with saved credentials");
-                    authManager.login(settings.getUsername(), settings.getPassword());
+                // Start continuous development service
+                ContinuousDevelopmentService continuousService = project.getService(ContinuousDevelopmentService.class);
+                if (continuousService != null) {
+                    continuousService.start();
+                } else {
+                    LOG.error("ContinuousDevelopmentService is null");
                 }
-            } else {
-                LOG.info("Authentication token is valid");
             }
+        } catch (Exception e) {
+            LOG.error("Error initializing ModForge services", e);
         }
-        
-        // Check if continuous development is enabled
-        ModForgeSettings settings = ModForgeSettings.getInstance();
-        if (settings.isContinuousDevelopment()) {
-            LOG.info("Continuous development is enabled, starting service");
-            ContinuousDevelopmentService continuousService = project.getService(ContinuousDevelopmentService.class);
-            continuousService.start();
-        }
-        
-        initialized = true;
     }
     
     /**
-     * Check if the service is initialized.
-     * @return Whether the service is initialized
+     * Get project info.
+     * @return Project info as JSONObject
      */
-    public boolean isInitialized() {
-        return initialized;
-    }
-    
-    /**
-     * Get the project.
-     * @return Project
-     */
-    public Project getProject() {
-        return project;
+    public JSONObject getProjectInfo() {
+        try {
+            JSONObject info = new JSONObject();
+            
+            // Add project info
+            info.put("name", project.getName());
+            info.put("basePath", project.getBasePath());
+            info.put("isDefault", project.isDefault());
+            
+            // Add authentication info
+            ModAuthenticationManager authManager = ModAuthenticationManager.getInstance();
+            info.put("authenticated", authManager.isAuthenticated());
+            
+            if (authManager.isAuthenticated()) {
+                info.put("username", authManager.getUsername());
+            }
+            
+            return info;
+        } catch (Exception e) {
+            LOG.error("Error getting project info", e);
+            return new JSONObject();
+        }
     }
     
     /**
      * Startup activity for ModForge.
      */
-    public static class ProjectStartupActivity implements StartupActivity.DumbAware {
+    public static class ModForgeStartupActivity implements StartupActivity.DumbAware {
         @Override
-        public void runActivity(Project project) {
-            ModForgeProjectService service = project.getService(ModForgeProjectService.class);
-            service.initialize();
+        public void runActivity(@NotNull Project project) {
+            LOG.info("ModForge startup activity for project: " + project.getName());
+            
+            // Get project service (this will initialize it)
+            project.getService(ModForgeProjectService.class);
         }
     }
 }

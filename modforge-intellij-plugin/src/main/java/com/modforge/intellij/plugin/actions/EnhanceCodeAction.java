@@ -18,10 +18,10 @@ import org.jetbrains.annotations.NotNull;
 import org.json.simple.JSONObject;
 
 /**
- * Action for fixing code errors in the selected code.
+ * Action for enhancing selected code with AI assistance.
  */
-public class FixErrorsAction extends AnAction {
-    private static final Logger LOG = Logger.getInstance(FixErrorsAction.class);
+public class EnhanceCodeAction extends AnAction {
+    private static final Logger LOG = Logger.getInstance(EnhanceCodeAction.class);
     
     @Override
     public void actionPerformed(@NotNull AnActionEvent e) {
@@ -44,7 +44,7 @@ public class FixErrorsAction extends AnAction {
             if (selectedText == null || selectedText.isEmpty()) {
                 Messages.showErrorDialog(
                         project,
-                        "Please select the code that contains errors.",
+                        "Please select the code you want to enhance.",
                         "No Code Selected"
                 );
                 return;
@@ -59,19 +59,45 @@ public class FixErrorsAction extends AnAction {
             if (!authManager.isAuthenticated()) {
                 Messages.showErrorDialog(
                         project,
-                        "You must be logged in to ModForge to fix errors.",
+                        "You must be logged in to ModForge to enhance code.",
                         "Authentication Required"
                 );
                 return;
             }
             
-            // Create input data for error fixing
+            // Create input data for code enhancement
             JSONObject inputData = new JSONObject();
             inputData.put("code", selectedText);
             inputData.put("fileName", fileName);
             
-            // Run error fixing in background
-            ProgressManager.getInstance().run(new Task.Backgroundable(project, "Fixing Code Errors") {
+            // Ask for enhancement type
+            String[] enhancementTypes = new String[] {
+                    "Optimize Performance",
+                    "Improve Readability",
+                    "Add Documentation",
+                    "Refactor Code",
+                    "Fix Potential Bugs"
+            };
+            
+            int enhancementTypeIndex = Messages.showChooseDialog(
+                    project,
+                    "What type of enhancement would you like to perform?",
+                    "Select Enhancement Type",
+                    Messages.getQuestionIcon(),
+                    enhancementTypes,
+                    enhancementTypes[0]
+            );
+            
+            if (enhancementTypeIndex < 0) {
+                // User cancelled
+                return;
+            }
+            
+            String enhancementType = enhancementTypes[enhancementTypeIndex];
+            inputData.put("enhancementType", enhancementType);
+            
+            // Run enhancement in background
+            ProgressManager.getInstance().run(new Task.Backgroundable(project, "Enhancing Code") {
                 @Override
                 public void run(@NotNull ProgressIndicator indicator) {
                     try {
@@ -87,26 +113,26 @@ public class FixErrorsAction extends AnAction {
                         boolean usePatterns = settings.isPatternRecognition();
                         inputData.put("usePatterns", usePatterns);
                         
-                        // Call API to fix errors
-                        indicator.setText("Fixing errors...");
+                        // Call API to enhance code
+                        indicator.setText("Enhancing code with " + enhancementType.toLowerCase() + "...");
                         
-                        // TODO: Make actual API call to fix errors
+                        // TODO: Make actual API call to enhance code
                         // Display finished message in UI thread
                         // This would be replaced with actual API call when implemented
                     } catch (Exception ex) {
-                        LOG.error("Error fixing code", ex);
+                        LOG.error("Error enhancing code", ex);
                         
                         // Show error in UI thread
                         Messages.showErrorDialog(
                                 project,
-                                "An error occurred while fixing code: " + ex.getMessage(),
-                                "Error Fixing Code"
+                                "An error occurred while enhancing code: " + ex.getMessage(),
+                                "Error Enhancing Code"
                         );
                     }
                 }
             });
         } catch (Exception ex) {
-            LOG.error("Error in fix errors action", ex);
+            LOG.error("Error in enhance code action", ex);
             
             // Show error
             Messages.showErrorDialog(
