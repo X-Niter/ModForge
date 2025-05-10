@@ -249,7 +249,10 @@ async function recoverFromDatabaseConnectionIssues(): Promise<RecoveryResult> {
       timestamp: new Date().toISOString()
     };
   } catch (error) {
-    logger.error("Failed to recover from database connection issues", { error });
+    logger.error("Failed to recover from database connection issues", { 
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined 
+    });
     
     return {
       successful: false,
