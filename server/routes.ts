@@ -339,11 +339,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const build = await storage.createBuild({
         modId: mod.id,
         buildNumber: 1,
+        version: "0.1.0", // Default initial version
         status: "in_progress",
+        errors: [], // Required field
         errorCount: 0,
         warningCount: 0,
         logs: `Starting build #1 for ${mod.name}...\n`,
-        downloadUrl: null
+        downloadUrl: null,
+        metadata: {} // Required field
       });
 
       // Start generating code asynchronously
@@ -455,11 +458,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const build = await storage.createBuild({
         modId: mod.id,
         buildNumber,
+        version: `0.${buildNumber}.0`, // Incrementing version number
         status: "in_progress",
+        errors: [], // Required field
         errorCount: 0,
         warningCount: 0,
         logs: `Starting build #${buildNumber} for ${mod.name}...\n`,
-        downloadUrl: null
+        downloadUrl: null,
+        metadata: {} // Required field
       });
 
       // Start compilation asynchronously
