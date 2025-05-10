@@ -5,19 +5,63 @@
  * allowing administrators to customize notification preferences.
  */
 
-import { Router } from 'express';
+import { Router, Request, Response, NextFunction } from 'express';
 import { getLogger } from '../logging';
 import { 
   updateNotificationSettings, 
   getNotificationSettings, 
   NotificationChannel, 
   NotificationSeverity,
-  NotificationSettings
+  NotificationType,
+  NotificationSettings,
+  sendNotification
 } from '../notification-manager';
 import { z } from 'zod';
 
 const logger = getLogger('notification-routes');
 const router = Router();
+
+/**
+ * Sanitize config object by removing sensitive information
+ * @param config The configuration object to sanitize
+ * @returns Sanitized configuration object
+ */
+function sanitizeConfigObject(config: Record<string, any>): Record<string, any> {
+  // Handle empty/null configs
+  if (!config || typeof config !== 'object') {
+    return {};
+  }
+  
+  return Object.fromEntries(
+    Object.entries(config).filter(([key]) => 
+      // Filter out sensitive keys
+      !key.toLowerCase().includes('key') && 
+      !key.toLowerCase().includes('token') && 
+      !key.toLowerCase().includes('pass') && 
+      !key.toLowerCase().includes('secret')
+    ).map(([key, value]) => {
+      // Handle different value types
+      if (typeof value === 'string') {
+        // Redact URLs and endpoints
+        if (key.toLowerCase().includes('url') || key.toLowerCase().includes('endpoint')) {
+          return [key, '[REDACTED URL]'];
+        } 
+        return [key, value];
+      } else if (value && typeof value === 'object' && !Array.isArray(value)) {
+        // Recursively sanitize nested objects
+        return [key, sanitizeConfigObject(value)];
+      } else if (Array.isArray(value)) {
+        // Handle arrays by sanitizing each object in the array if needed
+        return [key, value.map(item => 
+          item && typeof item === 'object' ? sanitizeConfigObject(item) : item
+        )];
+      } else {
+        // Pass through other value types unchanged
+        return [key, value];
+      }
+    })
+  );
+}
 
 // Validation schema for notification settings
 const notificationChannelConfigSchema = z.object({
@@ -35,7 +79,14 @@ const notificationChannelConfigSchema = z.object({
     NotificationSeverity.ERROR,
     NotificationSeverity.CRITICAL
   ]),
-  config: z.record(z.string(), z.union([z.string(), z.number(), z.boolean(), z.null()]))
+  config: z.record(z.string(), z.union([
+    z.string(), 
+    z.number(), 
+    z.boolean(), 
+    z.null(),
+    z.record(z.string(), z.union([z.string(), z.number(), z.boolean(), z.null()])),
+    z.array(z.union([z.string(), z.number(), z.boolean(), z.null()]))
+  ]))
 });
 
 const updateNotificationSettingsSchema = z.object({
@@ -58,20 +109,7 @@ router.get('/settings', (req, res) => {
       ...settings,
       channels: settings.channels.map(channel => ({
         ...channel,
-        config: Object.fromEntries(
-          Object.entries(channel.config).filter(([key]) => 
-            !key.toLowerCase().includes('key') && 
-            !key.toLowerCase().includes('token') && 
-            !key.toLowerCase().includes('pass') && 
-            !key.toLowerCase().includes('secret')
-          ).map(([key, value]) => [
-            key, 
-            typeof value === 'string' && 
-            (key.toLowerCase().includes('url') || key.toLowerCase().includes('endpoint')) 
-              ? '[REDACTED URL]' 
-              : value
-          ])
-        )
+        config: sanitizeConfigObject(channel.config)
       }))
     };
     
@@ -173,8 +211,7 @@ router.post('/test', (req, res) => {
     const channel = result.data.channel || NotificationChannel.LOG;
     const severity = result.data.severity || NotificationSeverity.INFO;
     
-    // Import the sendNotification function
-    const { sendNotification, NotificationType } = require('../notification-manager');
+    // No need to re-import as we already imported at the top
     
     // Send a test notification
     sendNotification({
