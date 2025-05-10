@@ -173,11 +173,9 @@ export function Navbar() {
               <DropdownMenuContent align="end">
                 <DropdownMenuLabel>My Account</DropdownMenuLabel>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem asChild>
-                  <Link href="/settings">
-                    <LucideSettings className="mr-2 h-4 w-4" />
-                    <span>Settings</span>
-                  </Link>
+                <DropdownMenuItem onClick={() => window.location.href = "/settings"}>
+                  <LucideSettings className="mr-2 h-4 w-4" />
+                  <span>Settings</span>
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={logout}>
                   <LucideLogOut className="mr-2 h-4 w-4" />
@@ -211,11 +209,9 @@ export function Navbar() {
               </SheetHeader>
               <div className="grid gap-2 py-6">
                 {/* Flatten navigation for mobile */}
-                <SheetClose asChild>
-                  <Link href="/">
-                    <Button variant="ghost" className="w-full justify-start">Home</Button>
-                  </Link>
-                </SheetClose>
+                <Button variant="ghost" className="w-full justify-start" onClick={() => {
+                  window.location.href = "/";
+                }}>Home</Button>
                 
                 {navItems.map((item) => (
                   <div key={item.title}>
@@ -223,25 +219,30 @@ export function Navbar() {
                       <>
                         <div className="px-4 py-2 font-medium">{item.title}</div>
                         {item.items.map((subItem) => (
-                          <SheetClose key={subItem.title} asChild>
-                            <Link href={subItem.href}>
-                              <Button variant="ghost" className="w-full justify-start pl-8 mb-1">
-                                {subItem.icon}
-                                {subItem.title}
-                              </Button>
-                            </Link>
-                          </SheetClose>
+                          <Button 
+                            key={subItem.title}
+                            variant="ghost" 
+                            className="w-full justify-start pl-8 mb-1"
+                            onClick={() => {
+                              window.location.href = subItem.href;
+                            }}
+                          >
+                            {subItem.icon}
+                            {subItem.title}
+                          </Button>
                         ))}
                       </>
                     ) : (
-                      <SheetClose asChild>
-                        <Link href={item.href}>
-                          <Button variant="ghost" className="w-full justify-start">
-                            {item.icon}
-                            {item.title}
-                          </Button>
-                        </Link>
-                      </SheetClose>
+                      <Button 
+                        variant="ghost" 
+                        className="w-full justify-start"
+                        onClick={() => {
+                          window.location.href = item.href;
+                        }}
+                      >
+                        {item.icon}
+                        {item.title}
+                      </Button>
                     )}
                   </div>
                 ))}
@@ -253,14 +254,12 @@ export function Navbar() {
                       <div className="px-4 py-2 text-sm text-muted-foreground">
                         Signed in as <span className="font-medium">{user?.name}</span>
                       </div>
-                      <SheetClose asChild>
-                        <Link href="/settings">
-                          <Button variant="ghost" className="w-full justify-start">
-                            <LucideSettings className="mr-2 h-4 w-4" />
-                            Settings
-                          </Button>
-                        </Link>
-                      </SheetClose>
+                      <Button variant="ghost" className="w-full justify-start" onClick={() => {
+                          window.location.href = "/settings";
+                        }}>
+                        <LucideSettings className="mr-2 h-4 w-4" />
+                        Settings
+                      </Button>
                       <Button variant="ghost" className="w-full justify-start" onClick={logout}>
                         <LucideLogOut className="mr-2 h-4 w-4" />
                         Log out
@@ -291,20 +290,21 @@ const ListItem = ({ className, title, children, href, ...props }: {
 }) => {
   return (
     <li>
-      <Link href={href}>
-        <NavigationMenuLink
-          className={cn(
-            "block select-none space-y-1 rounded-md p-3 leading-none no-underline outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground",
-            className
-          )}
-          {...props}
-        >
-          <div className="text-sm font-medium leading-none">{title}</div>
-          <div className="line-clamp-2 text-sm leading-snug text-muted-foreground">
-            {children}
-          </div>
-        </NavigationMenuLink>
-      </Link>
+      <NavigationMenuLink
+        className={cn(
+          "block select-none space-y-1 rounded-md p-3 leading-none no-underline outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground",
+          className
+        )}
+        onClick={() => {
+          window.location.href = href;
+        }}
+        {...props}
+      >
+        <div className="text-sm font-medium leading-none">{title}</div>
+        <div className="line-clamp-2 text-sm leading-snug text-muted-foreground">
+          {children}
+        </div>
+      </NavigationMenuLink>
     </li>
   );
 };
