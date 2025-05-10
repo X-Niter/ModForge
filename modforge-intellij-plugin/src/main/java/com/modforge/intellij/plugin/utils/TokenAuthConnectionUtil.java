@@ -5,202 +5,195 @@ import org.json.simple.JSONObject;
 import org.json.simple.parser.JSONParser;
 import org.json.simple.parser.ParseException;
 
+import java.io.BufferedReader;
 import java.io.IOException;
-import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
-import java.util.Scanner;
 
 /**
- * Utility for making authenticated HTTP requests with token auth.
+ * Utility for making token-authenticated HTTP requests to the ModForge server.
  */
 public class TokenAuthConnectionUtil {
     private static final Logger LOG = Logger.getInstance(TokenAuthConnectionUtil.class);
     
     /**
-     * Make a GET request with token authentication.
-     *
-     * @param serverUrl Server URL
-     * @param path API path
+     * Make a GET request to the ModForge server with token authentication.
+     * @param serverUrl Base URL of the ModForge server
+     * @param endpoint API endpoint
      * @param token Authentication token
      * @return Response as JSONObject, or null if request failed
      */
-    public static JSONObject get(String serverUrl, String path, String token) {
+    public static JSONObject get(String serverUrl, String endpoint, String token) {
         try {
-            // Create connection
-            URL url = new URL(serverUrl + path);
-            HttpURLConnection connection = (HttpURLConnection) url.openConnection();
-            
-            // Set request method and headers
-            connection.setRequestMethod("GET");
-            connection.setRequestProperty("Accept", "application/json");
-            connection.setRequestProperty("Authorization", "Bearer " + token);
-            
-            // Check response
-            int responseCode = connection.getResponseCode();
-            
-            if (responseCode == HttpURLConnection.HTTP_OK) {
-                // Read response
-                return readResponse(connection);
-            } else {
-                // Request failed
-                LOG.info("GET request failed: " + path + ", response code: " + responseCode);
-                return null;
+            // Normalize URL
+            if (!serverUrl.endsWith("/")) {
+                serverUrl += "/";
             }
-        } catch (IOException e) {
-            LOG.error("Error making GET request", e);
+            
+            // Remove leading slash from endpoint if present
+            if (endpoint.startsWith("/")) {
+                endpoint = endpoint.substring(1);
+            }
+            
+            // Create URL
+            String url = serverUrl + endpoint;
+            
+            LOG.info("Making GET request to " + url);
+            
+            return makeRequest("GET", url, token, null);
+        } catch (Exception e) {
+            LOG.error("GET request failed", e);
             return null;
         }
     }
     
     /**
-     * Make a POST request with token authentication.
-     *
-     * @param serverUrl Server URL
-     * @param path API path
+     * Make a POST request to the ModForge server with token authentication.
+     * @param serverUrl Base URL of the ModForge server
+     * @param endpoint API endpoint
      * @param token Authentication token
-     * @param body Request body as JSONObject
+     * @param data Data to send in request body as JSONObject
      * @return Response as JSONObject, or null if request failed
      */
-    public static JSONObject post(String serverUrl, String path, String token, JSONObject body) {
+    public static JSONObject post(String serverUrl, String endpoint, String token, JSONObject data) {
         try {
-            // Create connection
-            URL url = new URL(serverUrl + path);
-            HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+            // Normalize URL
+            if (!serverUrl.endsWith("/")) {
+                serverUrl += "/";
+            }
             
-            // Set request method and headers
-            connection.setRequestMethod("POST");
-            connection.setRequestProperty("Content-Type", "application/json");
-            connection.setRequestProperty("Accept", "application/json");
+            // Remove leading slash from endpoint if present
+            if (endpoint.startsWith("/")) {
+                endpoint = endpoint.substring(1);
+            }
+            
+            // Create URL
+            String url = serverUrl + endpoint;
+            
+            LOG.info("Making POST request to " + url);
+            
+            return makeRequest("POST", url, token, data);
+        } catch (Exception e) {
+            LOG.error("POST request failed", e);
+            return null;
+        }
+    }
+    
+    /**
+     * Make a PUT request to the ModForge server with token authentication.
+     * @param serverUrl Base URL of the ModForge server
+     * @param endpoint API endpoint
+     * @param token Authentication token
+     * @param data Data to send in request body as JSONObject
+     * @return Response as JSONObject, or null if request failed
+     */
+    public static JSONObject put(String serverUrl, String endpoint, String token, JSONObject data) {
+        try {
+            // Normalize URL
+            if (!serverUrl.endsWith("/")) {
+                serverUrl += "/";
+            }
+            
+            // Remove leading slash from endpoint if present
+            if (endpoint.startsWith("/")) {
+                endpoint = endpoint.substring(1);
+            }
+            
+            // Create URL
+            String url = serverUrl + endpoint;
+            
+            LOG.info("Making PUT request to " + url);
+            
+            return makeRequest("PUT", url, token, data);
+        } catch (Exception e) {
+            LOG.error("PUT request failed", e);
+            return null;
+        }
+    }
+    
+    /**
+     * Make a DELETE request to the ModForge server with token authentication.
+     * @param serverUrl Base URL of the ModForge server
+     * @param endpoint API endpoint
+     * @param token Authentication token
+     * @return Response as JSONObject, or null if request failed
+     */
+    public static JSONObject delete(String serverUrl, String endpoint, String token) {
+        try {
+            // Normalize URL
+            if (!serverUrl.endsWith("/")) {
+                serverUrl += "/";
+            }
+            
+            // Remove leading slash from endpoint if present
+            if (endpoint.startsWith("/")) {
+                endpoint = endpoint.substring(1);
+            }
+            
+            // Create URL
+            String url = serverUrl + endpoint;
+            
+            LOG.info("Making DELETE request to " + url);
+            
+            return makeRequest("DELETE", url, token, null);
+        } catch (Exception e) {
+            LOG.error("DELETE request failed", e);
+            return null;
+        }
+    }
+    
+    /**
+     * Make an HTTP request with token authentication.
+     * @param method HTTP method (GET, POST, PUT, DELETE)
+     * @param urlString URL to make request to
+     * @param token Authentication token
+     * @param data Data to send in request body as JSONObject (for POST and PUT)
+     * @return Response as JSONObject, or null if request failed
+     * @throws IOException If connection fails
+     * @throws ParseException If JSON parsing fails
+     */
+    private static JSONObject makeRequest(String method, String urlString, String token, JSONObject data) 
+            throws IOException, ParseException {
+        URL url = new URL(urlString);
+        HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+        connection.setRequestMethod(method);
+        connection.setRequestProperty("Content-Type", "application/json");
+        
+        // Add token if provided
+        if (token != null && !token.isEmpty()) {
             connection.setRequestProperty("Authorization", "Bearer " + token);
+        }
+        
+        // Add request body for POST and PUT
+        if ((method.equals("POST") || method.equals("PUT")) && data != null) {
             connection.setDoOutput(true);
-            
-            // Write request body
             try (OutputStream os = connection.getOutputStream()) {
-                byte[] input = body.toJSONString().getBytes(StandardCharsets.UTF_8);
+                byte[] input = data.toJSONString().getBytes(StandardCharsets.UTF_8);
                 os.write(input, 0, input.length);
             }
-            
-            // Check response
-            int responseCode = connection.getResponseCode();
-            
-            if (responseCode == HttpURLConnection.HTTP_OK || responseCode == HttpURLConnection.HTTP_CREATED) {
-                // Read response
-                return readResponse(connection);
-            } else {
-                // Request failed
-                LOG.info("POST request failed: " + path + ", response code: " + responseCode);
-                return null;
-            }
-        } catch (IOException e) {
-            LOG.error("Error making POST request", e);
+        }
+        
+        int responseCode = connection.getResponseCode();
+        
+        if (responseCode >= 400) {
+            LOG.error(method + " request failed with response code " + responseCode);
             return null;
         }
-    }
-    
-    /**
-     * Make a PUT request with token authentication.
-     *
-     * @param serverUrl Server URL
-     * @param path API path
-     * @param token Authentication token
-     * @param body Request body as JSONObject
-     * @return Response as JSONObject, or null if request failed
-     */
-    public static JSONObject put(String serverUrl, String path, String token, JSONObject body) {
-        try {
-            // Create connection
-            URL url = new URL(serverUrl + path);
-            HttpURLConnection connection = (HttpURLConnection) url.openConnection();
-            
-            // Set request method and headers
-            connection.setRequestMethod("PUT");
-            connection.setRequestProperty("Content-Type", "application/json");
-            connection.setRequestProperty("Accept", "application/json");
-            connection.setRequestProperty("Authorization", "Bearer " + token);
-            connection.setDoOutput(true);
-            
-            // Write request body
-            try (OutputStream os = connection.getOutputStream()) {
-                byte[] input = body.toJSONString().getBytes(StandardCharsets.UTF_8);
-                os.write(input, 0, input.length);
+        
+        // Read response
+        StringBuilder response = new StringBuilder();
+        try (BufferedReader br = new BufferedReader(new InputStreamReader(connection.getInputStream(), StandardCharsets.UTF_8))) {
+            String responseLine;
+            while ((responseLine = br.readLine()) != null) {
+                response.append(responseLine.trim());
             }
-            
-            // Check response
-            int responseCode = connection.getResponseCode();
-            
-            if (responseCode == HttpURLConnection.HTTP_OK) {
-                // Read response
-                return readResponse(connection);
-            } else {
-                // Request failed
-                LOG.info("PUT request failed: " + path + ", response code: " + responseCode);
-                return null;
-            }
-        } catch (IOException e) {
-            LOG.error("Error making PUT request", e);
-            return null;
         }
-    }
-    
-    /**
-     * Make a DELETE request with token authentication.
-     *
-     * @param serverUrl Server URL
-     * @param path API path
-     * @param token Authentication token
-     * @return true if successful, false otherwise
-     */
-    public static boolean delete(String serverUrl, String path, String token) {
-        try {
-            // Create connection
-            URL url = new URL(serverUrl + path);
-            HttpURLConnection connection = (HttpURLConnection) url.openConnection();
-            
-            // Set request method and headers
-            connection.setRequestMethod("DELETE");
-            connection.setRequestProperty("Accept", "application/json");
-            connection.setRequestProperty("Authorization", "Bearer " + token);
-            
-            // Check response
-            int responseCode = connection.getResponseCode();
-            
-            if (responseCode == HttpURLConnection.HTTP_OK || responseCode == HttpURLConnection.HTTP_NO_CONTENT) {
-                // Delete successful
-                return true;
-            } else {
-                // Request failed
-                LOG.info("DELETE request failed: " + path + ", response code: " + responseCode);
-                return false;
-            }
-        } catch (IOException e) {
-            LOG.error("Error making DELETE request", e);
-            return false;
-        }
-    }
-    
-    /**
-     * Read response body as JSONObject.
-     *
-     * @param connection HTTP connection
-     * @return Response as JSONObject, or null if parsing failed
-     */
-    private static JSONObject readResponse(HttpURLConnection connection) {
-        try {
-            // Read response body
-            try (InputStream is = connection.getInputStream();
-                 Scanner scanner = new Scanner(is, StandardCharsets.UTF_8.name())) {
-                String response = scanner.useDelimiter("\\A").next();
-                
-                // Parse JSON
-                JSONParser parser = new JSONParser();
-                return (JSONObject) parser.parse(response);
-            }
-        } catch (IOException | ParseException e) {
-            LOG.error("Error reading response", e);
-            return null;
-        }
+        
+        // Parse response
+        JSONParser parser = new JSONParser();
+        return (JSONObject) parser.parse(response.toString());
     }
 }

@@ -1,52 +1,79 @@
 package com.modforge.intellij.plugin.services;
 
+import com.intellij.openapi.components.Service;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.project.Project;
+import com.intellij.util.concurrency.AppExecutorUtil;
+import com.modforge.intellij.plugin.auth.ModAuthenticationManager;
 import com.modforge.intellij.plugin.settings.ModForgeSettings;
-import org.jetbrains.annotations.NotNull;
+import com.modforge.intellij.plugin.utils.TokenAuthConnectionUtil;
+import org.json.simple.JSONObject;
+
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.TimeUnit;
 
 /**
- * Service for continuous development mode.
+ * Service that manages continuous mod development.
  */
-public class ContinuousDevelopmentService {
+@Service(Service.Level.PROJECT)
+public final class ContinuousDevelopmentService {
     private static final Logger LOG = Logger.getInstance(ContinuousDevelopmentService.class);
-    private final Project project;
-    private boolean isRunning = false;
     
-    /**
-     * Constructor.
-     * @param project The project
-     */
+    private final Project project;
+    private ScheduledFuture<?> scheduledTask;
+    private final ScheduledExecutorService executor;
+    private int taskCounter = 0;
+    
     public ContinuousDevelopmentService(Project project) {
         this.project = project;
-        LOG.info("ContinuousDevelopmentService created for project: " + project.getName());
+        this.executor = AppExecutorUtil.getAppScheduledExecutorService();
     }
     
     /**
      * Start continuous development.
      */
     public void start() {
-        LOG.info("Starting continuous development for project: " + project.getName());
-        
-        ModForgeSettings settings = ModForgeSettings.getInstance();
-        if (!settings.isEnableContinuousDevelopment()) {
-            LOG.info("Continuous development is disabled in settings");
+        if (scheduledTask != null && !scheduledTask.isDone()) {
+            LOG.info("Continuous development service is already running");
             return;
         }
         
-        isRunning = true;
+        LOG.info("Starting continuous development service");
         
-        // TODO: Implement continuous development
+        ModForgeSettings settings = ModForgeSettings.getInstance();
+        int interval = settings.getPollingInterval();
+        
+        if (interval < 1000) {
+            LOG.warn("Polling interval is too small, setting to 1 minute");
+            interval = 60 * 1000; // 1 minute
+        }
+        
+        scheduledTask = executor.scheduleWithFixedDelay(
+                this::runTask,
+                10000, // Initial delay of 10 seconds
+                interval,
+                TimeUnit.MILLISECONDS
+        );
     }
     
     /**
      * Stop continuous development.
      */
     public void stop() {
-        LOG.info("Stopping continuous development for project: " + project.getName());
-        isRunning = false;
-        
-        // TODO: Implement stopping continuous development
+        if (scheduledTask != null) {
+            LOG.info("Stopping continuous development service");
+            scheduledTask.cancel(false);
+            scheduledTask = null;
+        }
+    }
+    
+    /**
+     * Restart continuous development with current settings.
+     */
+    public void restart() {
+        stop();
+        start();
     }
     
     /**
@@ -54,20 +81,67 @@ public class ContinuousDevelopmentService {
      * @return Whether continuous development is running
      */
     public boolean isRunning() {
-        return isRunning;
+        return scheduledTask != null && !scheduledTask.isDone();
     }
     
     /**
-     * Toggle continuous development.
-     * @return Whether continuous development is running after toggling
+     * Run the continuous development task.
      */
-    public boolean toggle() {
-        if (isRunning) {
-            stop();
-        } else {
-            start();
+    private void runTask() {
+        LOG.info("Running continuous development task #" + (++taskCounter));
+        
+        // Check authentication
+        ModAuthenticationManager authManager = ModAuthenticationManager.getInstance();
+        if (!authManager.isAuthenticated()) {
+            LOG.warn("Not authenticated, skipping continuous development task");
+            return;
         }
         
-        return isRunning;
+        // Check connection
+        ModForgeSettings settings = ModForgeSettings.getInstance();
+        String serverUrl = settings.getServerUrl();
+        String token = settings.getAccessToken();
+        
+        try {
+            // Get mods from server
+            JSONObject response = TokenAuthConnectionUtil.get(serverUrl, "/api/mods", token);
+            
+            if (response == null) {
+                LOG.error("Failed to get mods from server");
+                return;
+            }
+            
+            // Process mods
+            processModsResponse(response);
+        } catch (Exception e) {
+            LOG.error("Error in continuous development task", e);
+        }
+    }
+    
+    /**
+     * Process mods response from server.
+     * @param response Response from server
+     */
+    private void processModsResponse(JSONObject response) {
+        // Check if we have pattern recognition enabled
+        ModForgeSettings settings = ModForgeSettings.getInstance();
+        boolean patternRecognition = settings.isPatternRecognition();
+        
+        // Record pattern activity
+        if (patternRecognition) {
+            // Get pattern recognition service
+            AutonomousCodeGenerationService automatedService = project.getService(AutonomousCodeGenerationService.class);
+            automatedService.processMods(response);
+        } else {
+            LOG.info("Pattern recognition is disabled, skipping patterns");
+        }
+    }
+    
+    /**
+     * Get the number of tasks that have been run.
+     * @return Task counter
+     */
+    public int getTaskCount() {
+        return taskCounter;
     }
 }

@@ -5,148 +5,106 @@ import com.intellij.openapi.diagnostic.Logger;
 import java.io.IOException;
 import java.net.HttpURLConnection;
 import java.net.URL;
-import java.util.concurrent.Callable;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 
 /**
- * Utility for testing connections to ModForge server.
+ * Utility for testing connections to the ModForge server.
  */
 public class ConnectionTestUtil {
     private static final Logger LOG = Logger.getInstance(ConnectionTestUtil.class);
-    private static final int CONNECTION_TIMEOUT_MS = 5000;
     
     /**
-     * Test connection to server.
-     *
-     * @param serverUrl Server URL
-     * @return Connection result (true if successful, false otherwise)
+     * Test connection to the ModForge server.
+     * @param serverUrl URL of the ModForge server
+     * @return Whether the connection was successful
      */
     public static boolean testConnection(String serverUrl) {
         try {
-            // Create a task to test the connection
-            Callable<Boolean> connectionTask = () -> {
-                try {
-                    // Create connection to health API
-                    URL url = new URL(serverUrl + "/api/health");
-                    HttpURLConnection connection = (HttpURLConnection) url.openConnection();
-                    
-                    // Set request method and timeout
-                    connection.setRequestMethod("GET");
-                    connection.setConnectTimeout(CONNECTION_TIMEOUT_MS);
-                    connection.setReadTimeout(CONNECTION_TIMEOUT_MS);
-                    
-                    // Check response
-                    int responseCode = connection.getResponseCode();
-                    
-                    if (responseCode == HttpURLConnection.HTTP_OK) {
-                        // Connection successful
-                        LOG.info("Connection successful to: " + serverUrl);
-                        return true;
-                    } else {
-                        // Connection failed
-                        LOG.info("Connection failed to: " + serverUrl + ", response code: " + responseCode);
-                        return false;
-                    }
-                } catch (IOException e) {
-                    LOG.error("Error testing connection", e);
-                    return false;
-                }
-            };
-            
-            // Execute the task with a timeout
-            ExecutorService executor = Executors.newSingleThreadExecutor();
-            Future<Boolean> future = executor.submit(connectionTask);
-            
-            try {
-                // Wait for the task to complete with timeout
-                boolean result = future.get(CONNECTION_TIMEOUT_MS, TimeUnit.MILLISECONDS);
-                return result;
-            } catch (TimeoutException e) {
-                // Connection timeout
-                LOG.error("Connection timeout to: " + serverUrl);
-                future.cancel(true);
-                return false;
-            } catch (Exception e) {
-                // Other error
-                LOG.error("Error testing connection", e);
-                return false;
-            } finally {
-                // Shutdown executor
-                executor.shutdownNow();
+            // Normalize URL
+            if (!serverUrl.endsWith("/")) {
+                serverUrl += "/";
             }
-        } catch (Exception e) {
-            LOG.error("Error testing connection", e);
+            
+            // Add API endpoint
+            String healthUrl = serverUrl + "api/health";
+            
+            LOG.info("Testing connection to " + healthUrl);
+            
+            URL url = new URL(healthUrl);
+            HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+            connection.setRequestMethod("GET");
+            connection.setConnectTimeout(5000);
+            connection.setReadTimeout(5000);
+            
+            int responseCode = connection.getResponseCode();
+            
+            LOG.info("Response code: " + responseCode);
+            
+            return responseCode == 200;
+        } catch (IOException e) {
+            LOG.error("Connection test failed", e);
             return false;
         }
     }
     
     /**
-     * Test connection to server with custom timeout.
-     *
-     * @param serverUrl Server URL
-     * @param timeoutMs Timeout in milliseconds
-     * @return Connection result (true if successful, false otherwise)
+     * Check if server is available.
+     * @param serverUrl URL of the ModForge server
+     * @return Whether the server is available
      */
-    public static boolean testConnection(String serverUrl, int timeoutMs) {
+    public static boolean isServerAvailable(String serverUrl) {
         try {
-            // Create a task to test the connection
-            Callable<Boolean> connectionTask = () -> {
-                try {
-                    // Create connection to health API
-                    URL url = new URL(serverUrl + "/api/health");
-                    HttpURLConnection connection = (HttpURLConnection) url.openConnection();
-                    
-                    // Set request method and timeout
-                    connection.setRequestMethod("GET");
-                    connection.setConnectTimeout(timeoutMs);
-                    connection.setReadTimeout(timeoutMs);
-                    
-                    // Check response
-                    int responseCode = connection.getResponseCode();
-                    
-                    if (responseCode == HttpURLConnection.HTTP_OK) {
-                        // Connection successful
-                        LOG.info("Connection successful to: " + serverUrl);
-                        return true;
-                    } else {
-                        // Connection failed
-                        LOG.info("Connection failed to: " + serverUrl + ", response code: " + responseCode);
-                        return false;
-                    }
-                } catch (IOException e) {
-                    LOG.error("Error testing connection", e);
-                    return false;
-                }
-            };
-            
-            // Execute the task with a timeout
-            ExecutorService executor = Executors.newSingleThreadExecutor();
-            Future<Boolean> future = executor.submit(connectionTask);
-            
-            try {
-                // Wait for the task to complete with timeout
-                boolean result = future.get(timeoutMs, TimeUnit.MILLISECONDS);
-                return result;
-            } catch (TimeoutException e) {
-                // Connection timeout
-                LOG.error("Connection timeout to: " + serverUrl);
-                future.cancel(true);
-                return false;
-            } catch (Exception e) {
-                // Other error
-                LOG.error("Error testing connection", e);
-                return false;
-            } finally {
-                // Shutdown executor
-                executor.shutdownNow();
+            // Normalize URL
+            if (!serverUrl.endsWith("/")) {
+                serverUrl += "/";
             }
-        } catch (Exception e) {
-            LOG.error("Error testing connection", e);
+            
+            URL url = new URL(serverUrl);
+            HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+            connection.setRequestMethod("HEAD");
+            connection.setConnectTimeout(2000);
+            
+            int responseCode = connection.getResponseCode();
+            
+            return responseCode < 400;
+        } catch (IOException e) {
             return false;
+        }
+    }
+    
+    /**
+     * Get health status from server.
+     * @param serverUrl URL of the ModForge server
+     * @return Health status as JSON string, or null if failed
+     */
+    public static String getHealthStatus(String serverUrl) {
+        try {
+            // Normalize URL
+            if (!serverUrl.endsWith("/")) {
+                serverUrl += "/";
+            }
+            
+            // Add API endpoint
+            String healthUrl = serverUrl + "api/health";
+            
+            URL url = new URL(healthUrl);
+            HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+            connection.setRequestMethod("GET");
+            connection.setConnectTimeout(5000);
+            connection.setReadTimeout(5000);
+            
+            int responseCode = connection.getResponseCode();
+            
+            if (responseCode != 200) {
+                return null;
+            }
+            
+            // Read response
+            java.util.Scanner scanner = new java.util.Scanner(connection.getInputStream())
+                .useDelimiter("\\A");
+            return scanner.hasNext() ? scanner.next() : "";
+        } catch (IOException e) {
+            LOG.error("Health check failed", e);
+            return null;
         }
     }
 }

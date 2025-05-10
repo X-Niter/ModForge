@@ -1,111 +1,222 @@
 package com.modforge.intellij.plugin.services;
 
+import com.intellij.openapi.components.Service;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.project.Project;
+import com.modforge.intellij.plugin.ai.PatternRecognitionService;
+import com.modforge.intellij.plugin.auth.ModAuthenticationManager;
 import com.modforge.intellij.plugin.settings.ModForgeSettings;
-import org.jetbrains.annotations.NotNull;
+import com.modforge.intellij.plugin.utils.TokenAuthConnectionUtil;
+import org.json.simple.JSONArray;
+import org.json.simple.JSONObject;
 
 /**
- * Service for autonomous code generation using AI.
+ * Service that manages autonomous code generation.
  */
-public class AutonomousCodeGenerationService {
+@Service(Service.Level.PROJECT)
+public final class AutonomousCodeGenerationService {
     private static final Logger LOG = Logger.getInstance(AutonomousCodeGenerationService.class);
-    private final Project project;
     
-    /**
-     * Constructor.
-     * @param project The project
-     */
+    private final Project project;
+    private int successfulPatternMatches = 0;
+    private int totalApiFallbacks = 0;
+    private int totalRequests = 0;
+    
     public AutonomousCodeGenerationService(Project project) {
         this.project = project;
-        LOG.info("AutonomousCodeGenerationService created for project: " + project.getName());
     }
     
     /**
-     * Generate code using AI.
-     * @param prompt The prompt to generate code from
-     * @return The generated code, or null if generation failed
+     * Process mods from server response.
+     * @param response Response from server
      */
-    public String generateCode(String prompt) {
-        LOG.info("Generating code for prompt: " + prompt);
-        
-        ModForgeSettings settings = ModForgeSettings.getInstance();
-        if (!settings.isEnableAIGeneration()) {
-            LOG.info("AI code generation is disabled in settings");
-            return null;
+    public void processMods(JSONObject response) {
+        if (response == null) {
+            LOG.error("Response is null");
+            return;
         }
         
-        // TODO: Implement AI code generation
+        if (!response.containsKey("mods")) {
+            LOG.error("Response doesn't contain mods");
+            return;
+        }
         
-        return "// TODO: Implement AI-generated code\n" +
-               "// This is a placeholder for generated code\n" +
-               "// Prompt: " + prompt;
+        try {
+            JSONArray mods = (JSONArray) response.get("mods");
+            
+            LOG.info("Processing " + mods.size() + " mods");
+            
+            for (Object modObj : mods) {
+                JSONObject mod = (JSONObject) modObj;
+                processMod(mod);
+            }
+        } catch (Exception e) {
+            LOG.error("Error processing mods", e);
+        }
     }
     
     /**
-     * Fix code using AI.
-     * @param code The code to fix
-     * @param errorMessage The error message to fix
-     * @return The fixed code, or null if fixing failed
+     * Process a single mod.
+     * @param mod Mod data
      */
-    public String fixCode(String code, String errorMessage) {
-        LOG.info("Fixing code with error: " + errorMessage);
+    private void processMod(JSONObject mod) {
+        long modId = (Long) mod.get("id");
+        LOG.info("Processing mod #" + modId);
         
-        ModForgeSettings settings = ModForgeSettings.getInstance();
-        if (!settings.isEnableAIGeneration()) {
-            LOG.info("AI code generation is disabled in settings");
-            return null;
+        // Check if development is needed
+        if (needsDevelopment(mod)) {
+            developMod(modId);
         }
-        
-        // TODO: Implement AI code fixing
-        
-        return "// TODO: Implement AI-fixed code\n" +
-               "// This is a placeholder for fixed code\n" +
-               "// Original code had error: " + errorMessage + "\n" +
-               code;
     }
     
     /**
-     * Generate documentation for code using AI.
-     * @param code The code to generate documentation for
-     * @return The generated documentation, or null if generation failed
+     * Check if a mod needs development.
+     * @param mod Mod data
+     * @return Whether the mod needs development
      */
-    public String generateDocumentation(String code) {
-        LOG.info("Generating documentation for code");
-        
-        ModForgeSettings settings = ModForgeSettings.getInstance();
-        if (!settings.isEnableAIGeneration()) {
-            LOG.info("AI code generation is disabled in settings");
-            return null;
+    private boolean needsDevelopment(JSONObject mod) {
+        // Check for compilation errors
+        if (mod.containsKey("hasErrors") && (Boolean) mod.get("hasErrors")) {
+            LOG.info("Mod has compilation errors, needs development");
+            return true;
         }
         
-        // TODO: Implement AI documentation generation
+        // Check if continuous development is requested
+        if (mod.containsKey("continuousDevelopment") && (Boolean) mod.get("continuousDevelopment")) {
+            LOG.info("Continuous development is requested for mod");
+            return true;
+        }
         
-        return "/**\n" +
-               " * TODO: Implement AI-generated documentation\n" +
-               " * This is a placeholder for generated documentation\n" +
-               " */";
+        return false;
     }
     
     /**
-     * Explain code using AI.
-     * @param code The code to explain
-     * @return The explanation, or null if explanation failed
+     * Request mod development from server.
+     * @param modId Mod ID
      */
-    public String explainCode(String code) {
-        LOG.info("Explaining code");
+    private void developMod(long modId) {
+        LOG.info("Requesting development for mod #" + modId);
         
-        ModForgeSettings settings = ModForgeSettings.getInstance();
-        if (!settings.isEnableAIGeneration()) {
-            LOG.info("AI code generation is disabled in settings");
-            return null;
+        totalRequests++;
+        
+        // Check authentication
+        ModAuthenticationManager authManager = ModAuthenticationManager.getInstance();
+        if (!authManager.isAuthenticated()) {
+            LOG.warn("Not authenticated, skipping development");
+            return;
         }
         
-        // TODO: Implement AI code explanation
+        // Check connection
+        ModForgeSettings settings = ModForgeSettings.getInstance();
+        String serverUrl = settings.getServerUrl();
+        String token = settings.getAccessToken();
         
-        return "This code appears to be a placeholder. Here's what it does:\n\n" +
-               "1. It's commented out with TODO markers\n" +
-               "2. It's a placeholder for actual functionality\n" +
-               "3. It should be replaced with real implementation";
+        // Check if pattern recognition is enabled
+        boolean usePatterns = settings.isPatternRecognition();
+        
+        // Get pattern recognition service if needed
+        PatternRecognitionService patternService = null;
+        if (usePatterns) {
+            patternService = project.getService(PatternRecognitionService.class);
+        }
+        
+        try {
+            // Create development request
+            JSONObject requestData = new JSONObject();
+            requestData.put("modId", modId);
+            requestData.put("usePatterns", usePatterns);
+            
+            // Send request to server
+            JSONObject response = TokenAuthConnectionUtil.post(serverUrl, "/api/mods/" + modId + "/develop", token, requestData);
+            
+            if (response == null) {
+                LOG.error("Failed to send development request to server");
+                return;
+            }
+            
+            // Process response
+            processDevelopmentResponse(response, patternService);
+        } catch (Exception e) {
+            LOG.error("Error requesting development", e);
+        }
+    }
+    
+    /**
+     * Process development response from server.
+     * @param response Response from server
+     * @param patternService Pattern recognition service
+     */
+    private void processDevelopmentResponse(JSONObject response, PatternRecognitionService patternService) {
+        if (response == null) {
+            return;
+        }
+        
+        // Check for success
+        if (response.containsKey("success") && (Boolean) response.get("success")) {
+            LOG.info("Development request was successful");
+            
+            // Check if pattern was used
+            if (response.containsKey("patternUsed") && (Boolean) response.get("patternUsed")) {
+                successfulPatternMatches++;
+                
+                if (patternService != null) {
+                    patternService.recordPatternSuccess((String) response.get("patternId"));
+                }
+            } else {
+                totalApiFallbacks++;
+                
+                // Record pattern failure if pattern recognition is enabled
+                if (patternService != null && response.containsKey("patternId")) {
+                    patternService.recordPatternFailure((String) response.get("patternId"));
+                }
+            }
+        } else {
+            LOG.error("Development request failed: " + response.get("message"));
+        }
+    }
+    
+    /**
+     * Get the number of successful pattern matches.
+     * @return Number of successful pattern matches
+     */
+    public int getSuccessfulPatternMatches() {
+        return successfulPatternMatches;
+    }
+    
+    /**
+     * Get the number of API fallbacks.
+     * @return Number of API fallbacks
+     */
+    public int getTotalApiFallbacks() {
+        return totalApiFallbacks;
+    }
+    
+    /**
+     * Get the total number of requests.
+     * @return Total number of requests
+     */
+    public int getTotalRequests() {
+        return totalRequests;
+    }
+    
+    /**
+     * Get the pattern success rate.
+     * @return Pattern success rate
+     */
+    public double getPatternSuccessRate() {
+        if (totalRequests == 0) {
+            return 0.0;
+        }
+        
+        return (double) successfulPatternMatches / totalRequests;
+    }
+    
+    /**
+     * Reset the metrics.
+     */
+    public void resetMetrics() {
+        successfulPatternMatches = 0;
+        totalApiFallbacks = 0;
+        totalRequests = 0;
     }
 }

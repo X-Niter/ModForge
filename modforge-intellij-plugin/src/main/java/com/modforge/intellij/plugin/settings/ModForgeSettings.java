@@ -2,6 +2,7 @@ package com.modforge.intellij.plugin.settings;
 
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.components.PersistentStateComponent;
+import com.intellij.openapi.components.Service;
 import com.intellij.openapi.components.State;
 import com.intellij.openapi.components.Storage;
 import com.intellij.util.xmlb.XmlSerializerUtil;
@@ -9,36 +10,29 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * Persistent settings for ModForge plugin.
+ * Persistent settings for ModForge.
  */
+@Service
 @State(
-    name = "ModForgeSettings",
-    storages = {@Storage("ModForgeSettings.xml")}
+        name = "ModForgeSettings",
+        storages = {
+                @Storage("modforge.xml")
+        }
 )
 public class ModForgeSettings implements PersistentStateComponent<ModForgeSettings> {
     private String serverUrl = "http://localhost:5000";
     private String username = "";
     private String password = "";
-    private boolean rememberCredentials = true;
-    private boolean authenticated = false;
     private String accessToken = "";
-    private String userId = "";
-    
-    // Settings for continuous development
-    private boolean enableContinuousDevelopment = true;
-    private int continuousDevelopmentFrequency = 5; // minutes
-    
-    // Settings for AI-assisted development
-    private boolean enableAIGeneration = true;
-    private boolean usePatternLearning = true;
-    
-    // GitHub integration
-    private String githubToken = "";
-    private String githubUsername = "";
+    private boolean authenticated = false;
+    private boolean rememberCredentials = true;
+    private boolean continuousDevelopment = false;
+    private boolean patternRecognition = true;
+    private int pollingInterval = 5 * 60 * 1000; // 5 minutes in milliseconds
     
     /**
-     * Get instance of settings.
-     * @return The settings instance
+     * Get instance.
+     * @return Instance
      */
     public static ModForgeSettings getInstance() {
         return ApplicationManager.getApplication().getService(ModForgeSettings.class);
@@ -46,156 +40,155 @@ public class ModForgeSettings implements PersistentStateComponent<ModForgeSettin
     
     @Override
     public @Nullable ModForgeSettings getState() {
-        // Create a copy of the current state to save persistent settings
-        ModForgeSettings state = new ModForgeSettings();
-        state.serverUrl = this.serverUrl;
-        
-        // Only save sensitive data if rememberCredentials is true
-        if (rememberCredentials) {
-            state.username = this.username;
-            state.password = this.password;
-            state.accessToken = this.accessToken;
-            state.userId = this.userId;
-            state.authenticated = this.authenticated;
-            state.githubToken = this.githubToken;
-            state.githubUsername = this.githubUsername;
-        } else {
-            // Clear sensitive data
-            state.username = "";
-            state.password = "";
-            state.accessToken = "";
-            state.userId = "";
-            state.authenticated = false;
-            state.githubToken = "";
-            state.githubUsername = "";
-        }
-        
-        // Always save preferences
-        state.rememberCredentials = this.rememberCredentials;
-        state.enableContinuousDevelopment = this.enableContinuousDevelopment;
-        state.continuousDevelopmentFrequency = this.continuousDevelopmentFrequency;
-        state.enableAIGeneration = this.enableAIGeneration;
-        state.usePatternLearning = this.usePatternLearning;
-        
-        return state;
+        return this;
     }
-    
+
     @Override
     public void loadState(@NotNull ModForgeSettings state) {
         XmlSerializerUtil.copyBean(state, this);
     }
-    
-    // Server settings
-    
+
+    /**
+     * Get server URL.
+     * @return Server URL
+     */
     public String getServerUrl() {
         return serverUrl;
     }
-    
+
+    /**
+     * Set server URL.
+     * @param serverUrl Server URL
+     */
     public void setServerUrl(String serverUrl) {
         this.serverUrl = serverUrl;
     }
-    
-    // Authentication settings
-    
+
+    /**
+     * Get username.
+     * @return Username
+     */
     public String getUsername() {
         return username;
     }
-    
+
+    /**
+     * Set username.
+     * @param username Username
+     */
     public void setUsername(String username) {
         this.username = username;
     }
-    
+
+    /**
+     * Get password.
+     * @return Password
+     */
     public String getPassword() {
         return password;
     }
-    
+
+    /**
+     * Set password.
+     * @param password Password
+     */
     public void setPassword(String password) {
         this.password = password;
     }
-    
-    public boolean isRememberCredentials() {
-        return rememberCredentials;
-    }
-    
-    public void setRememberCredentials(boolean rememberCredentials) {
-        this.rememberCredentials = rememberCredentials;
-    }
-    
-    public boolean isAuthenticated() {
-        return authenticated;
-    }
-    
-    public void setAuthenticated(boolean authenticated) {
-        this.authenticated = authenticated;
-    }
-    
+
+    /**
+     * Get access token.
+     * @return Access token
+     */
     public String getAccessToken() {
         return accessToken;
     }
-    
+
+    /**
+     * Set access token.
+     * @param accessToken Access token
+     */
     public void setAccessToken(String accessToken) {
         this.accessToken = accessToken;
     }
-    
-    public String getUserId() {
-        return userId;
+
+    /**
+     * Check if authenticated.
+     * @return Whether the user is authenticated
+     */
+    public boolean isAuthenticated() {
+        return authenticated;
     }
-    
-    public void setUserId(String userId) {
-        this.userId = userId;
+
+    /**
+     * Set authentication status.
+     * @param authenticated Whether the user is authenticated
+     */
+    public void setAuthenticated(boolean authenticated) {
+        this.authenticated = authenticated;
     }
-    
-    // Continuous development settings
-    
-    public boolean isEnableContinuousDevelopment() {
-        return enableContinuousDevelopment;
+
+    /**
+     * Check if credentials should be remembered.
+     * @return Whether credentials should be remembered
+     */
+    public boolean isRememberCredentials() {
+        return rememberCredentials;
     }
-    
-    public void setEnableContinuousDevelopment(boolean enableContinuousDevelopment) {
-        this.enableContinuousDevelopment = enableContinuousDevelopment;
+
+    /**
+     * Set whether credentials should be remembered.
+     * @param rememberCredentials Whether credentials should be remembered
+     */
+    public void setRememberCredentials(boolean rememberCredentials) {
+        this.rememberCredentials = rememberCredentials;
     }
-    
-    public int getContinuousDevelopmentFrequency() {
-        return continuousDevelopmentFrequency;
+
+    /**
+     * Check if continuous development is enabled.
+     * @return Whether continuous development is enabled
+     */
+    public boolean isContinuousDevelopment() {
+        return continuousDevelopment;
     }
-    
-    public void setContinuousDevelopmentFrequency(int continuousDevelopmentFrequency) {
-        this.continuousDevelopmentFrequency = continuousDevelopmentFrequency;
+
+    /**
+     * Set whether continuous development is enabled.
+     * @param continuousDevelopment Whether continuous development is enabled
+     */
+    public void setContinuousDevelopment(boolean continuousDevelopment) {
+        this.continuousDevelopment = continuousDevelopment;
     }
-    
-    // AI generation settings
-    
-    public boolean isEnableAIGeneration() {
-        return enableAIGeneration;
+
+    /**
+     * Check if pattern recognition is enabled.
+     * @return Whether pattern recognition is enabled
+     */
+    public boolean isPatternRecognition() {
+        return patternRecognition;
     }
-    
-    public void setEnableAIGeneration(boolean enableAIGeneration) {
-        this.enableAIGeneration = enableAIGeneration;
+
+    /**
+     * Set whether pattern recognition is enabled.
+     * @param patternRecognition Whether pattern recognition is enabled
+     */
+    public void setPatternRecognition(boolean patternRecognition) {
+        this.patternRecognition = patternRecognition;
     }
-    
-    public boolean isUsePatternLearning() {
-        return usePatternLearning;
+
+    /**
+     * Get polling interval.
+     * @return Polling interval in milliseconds
+     */
+    public int getPollingInterval() {
+        return pollingInterval;
     }
-    
-    public void setUsePatternLearning(boolean usePatternLearning) {
-        this.usePatternLearning = usePatternLearning;
-    }
-    
-    // GitHub integration
-    
-    public String getGithubToken() {
-        return githubToken;
-    }
-    
-    public void setGithubToken(String githubToken) {
-        this.githubToken = githubToken;
-    }
-    
-    public String getGithubUsername() {
-        return githubUsername;
-    }
-    
-    public void setGithubUsername(String githubUsername) {
-        this.githubUsername = githubUsername;
+
+    /**
+     * Set polling interval.
+     * @param pollingInterval Polling interval in milliseconds
+     */
+    public void setPollingInterval(int pollingInterval) {
+        this.pollingInterval = pollingInterval;
     }
 }
