@@ -1190,8 +1190,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         };
       });
       
-      // Get overall system metrics
-      const totalRunningMods = Array.from(continuousService.getHealthStatus().runningMods).length;
+      // Get overall system metrics from the health status
+      const healthStatus = continuousService.getHealthStatus();
+      const totalRunningMods = healthStatus.runningMods.length;
       const totalTrippedCircuitBreakers = circuitBreakerStats.filter(s => s.tripped).length;
       
       // Return comprehensive metrics

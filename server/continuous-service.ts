@@ -197,9 +197,11 @@ class ContinuousService extends EventEmitter {
   
   /**
    * Process a mod: compile, fix errors, and possibly add features
+   * Includes auto-retry logic for transient errors
    * @param modId The mod ID to process
+   * @param retryCount Current retry attempt (for internal use)
    */
-  private async processMod(modId: number): Promise<void> {
+  private async processMod(modId: number, retryCount: number = 0): Promise<void> {
     // Circuit breaker pattern to prevent infinite loops
     const maxRetries = 3;
     let attempts = 0;
@@ -404,7 +406,35 @@ class ContinuousService extends EventEmitter {
       const errorMessage = error instanceof Error ? error.message : String(error);
       logContinuous(modId, `Error in continuous development cycle: ${errorMessage}`, 'error');
       
-      // Increment circuit breaker count
+      // Implement retry for transient errors before incrementing circuit breaker
+      // Only retry for specific transient errors that might resolve themselves
+      const isTransientError = error instanceof Error && (
+        error.message.includes('ECONNREFUSED') ||
+        error.message.includes('ETIMEDOUT') ||
+        error.message.includes('network') ||
+        error.message.includes('temporary')
+      );
+      
+      // Retry logic for transient errors
+      if (isTransientError && retryCount < 2) {
+        const nextRetry = retryCount + 1;
+        const delayMs = nextRetry * 5000; // Exponential backoff: 5s, 10s
+        
+        logContinuous(modId, `Transient error detected. Retry ${nextRetry}/2 scheduled in ${delayMs/1000}s`, 'warn');
+        
+        // Schedule retry with delay
+        setTimeout(() => {
+          if (this.isRunning(modId)) {
+            this.processMod(modId, nextRetry).catch(retryError => {
+              logContinuous(modId, `Retry ${nextRetry} failed: ${retryError instanceof Error ? retryError.message : String(retryError)}`, 'error');
+            });
+          }
+        }, delayMs);
+        
+        return; // Exit to prevent duplicate processing
+      }
+      
+      // If all retries failed or it's not a transient error, increment circuit breaker
       const circuitBreakerKey = `circuit_breaker_${modId}`;
       const currentCount = parseInt(process.env[circuitBreakerKey] || '0', 10);
       process.env[circuitBreakerKey] = (currentCount + 1).toString();
