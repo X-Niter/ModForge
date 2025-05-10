@@ -139,7 +139,10 @@ async function createDatabaseBackup(metadata: Record<string, any> = {}): Promise
     
     return backupRecord;
   } catch (error) {
-    logger.error(`Database backup failed: ${backupId}`, { error });
+    logger.error(`Database backup failed: ${backupId}`, { 
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined
+    });
     
     backupRecord.status = BackupStatus.FAILED;
     backupRecord.error = error instanceof Error ? error.message : String(error);
@@ -204,7 +207,10 @@ async function createModFilesBackup(metadata: Record<string, any> = {}): Promise
     
     return backupRecord;
   } catch (error) {
-    logger.error(`Mod files backup failed: ${backupId}`, { error });
+    logger.error(`Mod files backup failed: ${backupId}`, { 
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined
+    });
     
     backupRecord.status = BackupStatus.FAILED;
     backupRecord.error = error instanceof Error ? error.message : String(error);
@@ -251,7 +257,10 @@ async function createConfigBackup(metadata: Record<string, any> = {}): Promise<B
         await fs.access(filePath);
         await fs.copyFile(filePath, path.join(tempDir, file));
       } catch (error) {
-        logger.warn(`Could not copy config file: ${file}`, { error });
+        logger.warn(`Could not copy config file: ${file}`, { 
+          error: error instanceof Error ? error.message : String(error),
+          stack: error instanceof Error ? error.stack : undefined
+        });
         // Continue with other files
       }
     }
@@ -278,7 +287,10 @@ async function createConfigBackup(metadata: Record<string, any> = {}): Promise<B
     
     return backupRecord;
   } catch (error) {
-    logger.error(`Config backup failed: ${backupId}`, { error });
+    logger.error(`Config backup failed: ${backupId}`, { 
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined
+    });
     
     backupRecord.status = BackupStatus.FAILED;
     backupRecord.error = error instanceof Error ? error.message : String(error);
@@ -343,7 +355,10 @@ async function createLogsBackup(metadata: Record<string, any> = {}): Promise<Bac
     
     return backupRecord;
   } catch (error) {
-    logger.error(`Logs backup failed: ${backupId}`, { error });
+    logger.error(`Logs backup failed: ${backupId}`, { 
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined
+    });
     
     backupRecord.status = BackupStatus.FAILED;
     backupRecord.error = error instanceof Error ? error.message : String(error);
