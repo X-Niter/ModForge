@@ -1,66 +1,76 @@
 package com.modforge.intellij.plugin.actions;
 
+import com.intellij.openapi.actionSystem.AnAction;
 import com.intellij.openapi.actionSystem.AnActionEvent;
-import com.intellij.openapi.actionSystem.ToggleAction;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.project.Project;
-import com.modforge.intellij.plugin.ai.PatternRecognitionService;
+import com.intellij.openapi.ui.Messages;
+import com.modforge.intellij.plugin.auth.ModAuthenticationManager;
 import com.modforge.intellij.plugin.settings.ModForgeSettings;
 import org.jetbrains.annotations.NotNull;
 
 /**
- * Action to toggle pattern recognition.
+ * Action for toggling AI pattern recognition.
  */
-public class TogglePatternRecognitionAction extends ToggleAction {
+public class TogglePatternRecognitionAction extends AnAction {
     private static final Logger LOG = Logger.getInstance(TogglePatternRecognitionAction.class);
     
     @Override
-    public boolean isSelected(@NotNull AnActionEvent e) {
+    public void actionPerformed(@NotNull AnActionEvent e) {
         Project project = e.getProject();
         
-        if (project == null) {
-            return false;
-        }
-        
-        ModForgeSettings settings = ModForgeSettings.getInstance();
-        return settings.isPatternRecognition();
-    }
-    
-    @Override
-    public void setSelected(@NotNull AnActionEvent e, boolean state) {
-        Project project = e.getProject();
-        
-        if (project == null) {
-            return;
-        }
-        
-        // Update settings
-        ModForgeSettings settings = ModForgeSettings.getInstance();
-        settings.setPatternRecognition(state);
-        
-        // Log the change
-        if (state) {
-            LOG.info("Enabling pattern recognition");
+        try {
+            // Get settings
+            ModForgeSettings settings = ModForgeSettings.getInstance();
+            boolean currentState = settings.isPatternRecognition();
             
-            // Get pattern recognition service and force a sync
-            PatternRecognitionService service = project.getService(PatternRecognitionService.class);
-            service.forceSyncMetrics();
-        } else {
-            LOG.info("Disabling pattern recognition");
+            // Toggle state
+            settings.setPatternRecognition(!currentState);
+            boolean newState = !currentState;
+            
+            // Log state change
+            LOG.info("Pattern recognition " + (newState ? "enabled" : "disabled"));
+            
+            // Show confirmation
+            if (newState) {
+                Messages.showInfoMessage(
+                        project,
+                        "Pattern recognition has been enabled.\n" +
+                        "ModForge will learn from previous AI interactions to improve performance.",
+                        "Pattern Recognition Enabled"
+                );
+            } else {
+                Messages.showInfoMessage(
+                        project,
+                        "Pattern recognition has been disabled.\n" +
+                        "ModForge will use direct API calls for all operations.",
+                        "Pattern Recognition Disabled"
+                );
+            }
+        } catch (Exception ex) {
+            LOG.error("Error toggling pattern recognition", ex);
+            
+            // Show error
+            Messages.showErrorDialog(
+                    project,
+                    "An error occurred while toggling pattern recognition: " + ex.getMessage(),
+                    "Toggle Error"
+            );
         }
-        
-        // Update presentation
-        String text = state ? "Disable Pattern Recognition" : "Enable Pattern Recognition";
-        e.getPresentation().setText(text);
     }
     
     @Override
     public void update(@NotNull AnActionEvent e) {
-        super.update(e);
+        // Only enable if authenticated
+        ModAuthenticationManager authManager = ModAuthenticationManager.getInstance();
+        e.getPresentation().setEnabled(authManager.isAuthenticated());
         
         // Update text based on current state
-        boolean selected = isSelected(e);
-        String text = selected ? "Disable Pattern Recognition" : "Enable Pattern Recognition";
-        e.getPresentation().setText(text);
+        ModForgeSettings settings = ModForgeSettings.getInstance();
+        boolean isEnabled = settings.isPatternRecognition();
+        
+        e.getPresentation().setText(isEnabled 
+                ? "Disable Pattern Recognition" 
+                : "Enable Pattern Recognition");
     }
 }

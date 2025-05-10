@@ -5,11 +5,11 @@ import com.intellij.openapi.actionSystem.AnActionEvent;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.project.Project;
 import com.modforge.intellij.plugin.auth.ModAuthenticationManager;
-import com.modforge.intellij.plugin.ui.dialog.LoginDialog;
+import com.modforge.intellij.plugin.ui.login.LoginDialog;
 import org.jetbrains.annotations.NotNull;
 
 /**
- * Action to login to ModForge server.
+ * Action for logging in to ModForge.
  */
 public class LoginAction extends AnAction {
     private static final Logger LOG = Logger.getInstance(LoginAction.class);
@@ -18,23 +18,27 @@ public class LoginAction extends AnAction {
     public void actionPerformed(@NotNull AnActionEvent e) {
         Project project = e.getProject();
         
-        LOG.info("Opening login dialog");
-        
-        // Show login dialog
-        LoginDialog dialog = new LoginDialog(project);
-        if (dialog.showAndGet()) {
-            LOG.info("Login successful");
-        } else {
-            LOG.info("Login cancelled");
+        try {
+            // Create a new login dialog
+            LoginDialog dialog = new LoginDialog(project);
+            
+            // Show dialog
+            boolean loggedIn = dialog.showAndGet();
+            
+            if (loggedIn) {
+                LOG.info("User logged in successfully");
+            }
+        } catch (Exception ex) {
+            LOG.error("Error during login action", ex);
         }
     }
     
     @Override
     public void update(@NotNull AnActionEvent e) {
-        Project project = e.getProject();
+        // Disable the action if already authenticated
         ModAuthenticationManager authManager = ModAuthenticationManager.getInstance();
         
-        // Only enable if we have a project and are not authenticated
-        e.getPresentation().setEnabledAndVisible(project != null && !authManager.isAuthenticated());
+        // Only enable if not authenticated
+        e.getPresentation().setEnabled(!authManager.isAuthenticated());
     }
 }

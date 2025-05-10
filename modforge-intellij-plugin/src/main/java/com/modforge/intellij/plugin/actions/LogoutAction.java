@@ -1,16 +1,15 @@
 package com.modforge.intellij.plugin.actions;
 
-import com.intellij.notification.NotificationGroupManager;
-import com.intellij.notification.NotificationType;
 import com.intellij.openapi.actionSystem.AnAction;
 import com.intellij.openapi.actionSystem.AnActionEvent;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.project.Project;
+import com.intellij.openapi.ui.Messages;
 import com.modforge.intellij.plugin.auth.ModAuthenticationManager;
 import org.jetbrains.annotations.NotNull;
 
 /**
- * Action to logout from ModForge server.
+ * Action for logging out from ModForge.
  */
 public class LogoutAction extends AnAction {
     private static final Logger LOG = Logger.getInstance(LogoutAction.class);
@@ -19,30 +18,45 @@ public class LogoutAction extends AnAction {
     public void actionPerformed(@NotNull AnActionEvent e) {
         Project project = e.getProject();
         
-        LOG.info("Logging out from ModForge server");
-        
-        // Log out using authentication manager
-        ModAuthenticationManager authManager = ModAuthenticationManager.getInstance();
-        authManager.logout();
-        
-        // Notify user
-        NotificationGroupManager.getInstance()
-                .getNotificationGroup("ModForge Notifications")
-                .createNotification(
-                        "Logout",
-                        "Successfully logged out from ModForge server",
-                        NotificationType.INFORMATION)
-                .notify(project);
-        
-        LOG.info("Logout successful");
+        try {
+            // Confirm logout
+            int result = Messages.showYesNoDialog(
+                    project,
+                    "Are you sure you want to log out from ModForge?",
+                    "Confirm Logout",
+                    Messages.getQuestionIcon()
+            );
+            
+            if (result == Messages.YES) {
+                // Log out
+                ModAuthenticationManager authManager = ModAuthenticationManager.getInstance();
+                authManager.logout();
+                
+                LOG.info("User logged out successfully");
+                
+                // Show confirmation
+                Messages.showInfoMessage(
+                        project,
+                        "You have been logged out from ModForge.",
+                        "Logged Out"
+                );
+            }
+        } catch (Exception ex) {
+            LOG.error("Error during logout action", ex);
+            
+            // Show error
+            Messages.showErrorDialog(
+                    project,
+                    "An error occurred while logging out: " + ex.getMessage(),
+                    "Logout Error"
+            );
+        }
     }
     
     @Override
     public void update(@NotNull AnActionEvent e) {
-        Project project = e.getProject();
+        // Only enable if authenticated
         ModAuthenticationManager authManager = ModAuthenticationManager.getInstance();
-        
-        // Only enable if we have a project and are authenticated
-        e.getPresentation().setEnabledAndVisible(project != null && authManager.isAuthenticated());
+        e.getPresentation().setEnabled(authManager.isAuthenticated());
     }
 }
