@@ -472,40 +472,60 @@ public final class GitHubIntegrationService {
     }
     
     /**
-     * Execute an operation with retry logic
+     * Execute an operation with retry logic, exponential backoff, and circuit breaker protection
      * 
-     * @param <T> The return type
+     * @param <T> The return type of the operation
      * @param operation The operation to execute
-     * @param operationKey The operation key for failure tracking
-     * @param maxRetries The maximum number of retries
+     * @param operationKey A key to identify the operation for logging and circuit breaking
+     * @param maxRetries Maximum number of retry attempts
      * @return The operation result or null if all retries fail
      */
     private <T> T executeWithRetry(ThrowingSupplier<T> operation, String operationKey, int maxRetries) {
         int retryCount = 0;
         Exception lastException = null;
+        long operationStart = System.currentTimeMillis();
+        
+        // Set a hard timeout limit for the entire operation
+        final long OPERATION_TIMEOUT_MS = TimeUnit.MINUTES.toMillis(2);
         
         while (retryCount <= maxRetries) {
             try {
+                // Check if operation has timed out
+                if (System.currentTimeMillis() - operationStart > OPERATION_TIMEOUT_MS) {
+                    LOG.warn("Operation " + operationKey + " exceeded timeout limit of " + OPERATION_TIMEOUT_MS + "ms");
+                    break;
+                }
+                
                 if (retryCount > 0) {
                     LOG.info("Retry " + retryCount + "/" + maxRetries + " for operation: " + operationKey);
                     
-                    // Exponential backoff with jitter to avoid thundering herd
+                    // Improved exponential backoff with jitter to avoid thundering herd
+                    // Using full jitter algorithm for better distribution
                     long baseDelay = RETRY_DELAY_BASE_MS * (long) Math.pow(2, retryCount - 1);
-                    long jitter = (long) (baseDelay * 0.2 * Math.random()); // 20% jitter
-                    long delay = baseDelay + jitter;
+                    long jitter = (long) (baseDelay * Math.random()); // Full jitter (0-100%)
+                    long delay = Math.min(TimeUnit.SECONDS.toMillis(30), baseDelay + jitter); // Cap at 30 seconds
                     
                     // Log detailed retry information for debugging
                     if (retryCount > 1) {
                         LOG.info("Retry details - Base delay: " + baseDelay + "ms, Jitter: " + jitter + 
                                 "ms, Total delay: " + delay + "ms, Last error: " + 
-                                (lastException != null ? lastException.getClass().getSimpleName() : "unknown"));
+                                (lastException != null ? lastException.getClass().getSimpleName() + ": " + lastException.getMessage() : "unknown"));
                     }
                     
                     Thread.sleep(delay);
                 }
                 
+                // Capture start time for this attempt
+                long attemptStart = System.currentTimeMillis();
+                
                 // Execute the operation
                 T result = operation.get();
+                
+                // Log response time metrics for performance monitoring
+                long responseTime = System.currentTimeMillis() - attemptStart;
+                if (responseTime > 1000) {
+                    LOG.info("Operation " + operationKey + " took " + responseTime + "ms to complete");
+                }
                 
                 // Handle null results - some GitHub API calls may return null on failure
                 if (result != null) {
@@ -525,20 +545,60 @@ public final class GitHubIntegrationService {
             } catch (GHFileNotFoundException e) {
                 // This is often expected for getFileContent, so don't retry
                 throw e;
+            } catch (RateLimitExceededException e) {
+                // Special handling for rate limit exceptions
+                lastException = e;
+                LOG.warn("Rate limit exceeded for operation " + operationKey + ": " + e.getMessage());
+                
+                try {
+                    // Get rate limit info if available
+                    GHRateLimit rateLimit = e.getRateLimit();
+                    if (rateLimit != null) {
+                        Instant reset = rateLimit.getResetDate().toInstant();
+                        long sleepTime = Duration.between(Instant.now(), reset).toMillis() + 1000; // Add 1 second buffer
+                        
+                        if (sleepTime > 0 && sleepTime < TimeUnit.MINUTES.toMillis(5)) {
+                            LOG.info("Rate limit will reset in " + (sleepTime / 1000) + " seconds, waiting...");
+                            Thread.sleep(sleepTime);
+                            // Don't increment retry count since this is a known limitation
+                            continue;
+                        }
+                    }
+                } catch (Exception nested) {
+                    LOG.warn("Error while handling rate limit: " + nested.getMessage());
+                }
+                
+                // Apply standard backoff if we can't determine reset time
+                try {
+                    Thread.sleep(RETRY_DELAY_BASE_MS * 10); // Longer backoff for rate limits
+                } catch (InterruptedException ie) {
+                    Thread.currentThread().interrupt();
+                    return null;
+                }
             } catch (IOException e) {
                 lastException = e;
                 LOG.warn("IO error during operation " + operationKey + " (retry " + retryCount + "/" + maxRetries + "): " + e.getMessage());
                 
-                // Check if we should retry based on the type of IOException
-                if (e.getMessage() != null && (
-                    e.getMessage().contains("rate limit") || 
-                    e.getMessage().contains("429") || 
-                    e.getMessage().contains("500") || 
-                    e.getMessage().contains("503"))) {
-                    LOG.info("Rate limit or server error detected, applying longer backoff");
-                    // Apply longer backoff for rate limits
+                // Enhanced error categorization for better retry handling
+                boolean isTransient = false;
+                if (e.getMessage() != null) {
+                    isTransient = e.getMessage().contains("rate limit") || 
+                                 e.getMessage().contains("429") || // Too Many Requests
+                                 e.getMessage().contains("500") || // Internal Server Error
+                                 e.getMessage().contains("502") || // Bad Gateway
+                                 e.getMessage().contains("503") || // Service Unavailable
+                                 e.getMessage().contains("504") || // Gateway Timeout
+                                 e.getMessage().contains("network") ||
+                                 e.getMessage().contains("timeout") ||
+                                 e.getMessage().contains("connection");
+                }
+                
+                if (isTransient) {
+                    LOG.info("Transient error detected, applying appropriate backoff");
                     try {
-                        Thread.sleep(RETRY_DELAY_BASE_MS * 5);
+                        // Progressive backoff based on retry count
+                        long backoff = RETRY_DELAY_BASE_MS * (long)Math.pow(2, Math.min(retryCount, 5));
+                        Thread.sleep(backoff);
                     } catch (InterruptedException ie) {
                         Thread.currentThread().interrupt();
                         return null;
@@ -548,6 +608,10 @@ public final class GitHubIntegrationService {
                 Thread.currentThread().interrupt();
                 LOG.warn("Operation " + operationKey + " was interrupted");
                 return null;
+            } catch (AlreadyDisposedException e) {
+                // Handle plugin/project disposal
+                LOG.info("Cannot complete operation " + operationKey + ": project or component already disposed");
+                return null;
             } catch (Exception e) {
                 lastException = e;
                 LOG.warn("Error during operation " + operationKey + " (retry " + retryCount + "/" + maxRetries + "): " + e.getMessage(), e);
@@ -556,8 +620,33 @@ public final class GitHubIntegrationService {
             retryCount++;
         }
         
-        LOG.error("Operation " + operationKey + " failed after " + maxRetries + " retries. Last error: " + 
-                (lastException != null ? lastException.getClass().getName() + ": " + lastException.getMessage() : "unknown"));
+        // Send detailed error notification for persistent failures
+        if (lastException != null) {
+            String errorDetails = lastException.getClass().getName() + ": " + lastException.getMessage();
+            LOG.error("Operation " + operationKey + " failed after " + maxRetries + " retries. Last error: " + errorDetails, lastException);
+            
+            // Record failure in circuit breaker for future operations
+            incrementFailureCount(operationKey);
+            
+            // Send notification only for significant operations (not routine checks)
+            if (!operationKey.startsWith("get") && retryCount > 1) {
+                try {
+                    Notification notification = new Notification(
+                        "ModForge Notifications",
+                        "GitHub Operation Failed",
+                        "Operation " + operationKey + " failed after " + retryCount + " attempts: " + 
+                            lastException.getMessage(),
+                        NotificationType.WARNING
+                    );
+                    Notifications.Bus.notify(notification, project);
+                } catch (Exception ignore) {
+                    // Don't let notification failures cause further issues
+                }
+            }
+        } else {
+            LOG.error("Operation " + operationKey + " failed after " + maxRetries + " retries without specific error");
+        }
+        
         return null;
     }
     
