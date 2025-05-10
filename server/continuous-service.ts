@@ -278,6 +278,9 @@ class ContinuousService extends EventEmitter {
    * @param retryCount Current retry attempt (for internal use)
    */
   private async processMod(modId: number, retryCount: number = 0): Promise<void> {
+    // Update the activity timestamp for watchdog monitoring
+    this.lastActivityTimestamps.set(modId, Date.now());
+    
     // Circuit breaker pattern to prevent infinite loops
     const maxRetries = 3;
     let attempts = 0;
@@ -592,16 +595,44 @@ class ContinuousService extends EventEmitter {
       }
     });
     
+    // Get mods with tripped circuit breakers
     const trippedCircuitBreakers = Object.keys(process.env)
       .filter(key => key.startsWith('circuit_breaker_') && !key.includes('_time'))
       .filter(key => parseInt(process.env[key] || '0', 10) >= 5)
       .map(key => parseInt(key.replace('circuit_breaker_', ''), 10));
+    
+    // Calculate watchdog statistics
+    const now = Date.now();
+    const inactiveThreshold = 30 * 60 * 1000; // 30 minutes
+    
+    // Get activity timestamps for all running mods
+    const activityStatus = runningMods.map(modId => {
+      const lastActivityTime = this.lastActivityTimestamps.get(modId) || 0;
+      const inactiveMs = lastActivityTime > 0 ? now - lastActivityTime : 0;
+      
+      return {
+        modId,
+        lastActivityTime: lastActivityTime > 0 ? new Date(lastActivityTime).toISOString() : null,
+        inactiveMinutes: Math.floor(inactiveMs / (60 * 1000)),
+        status: inactiveMs > inactiveThreshold ? 'warning' : 'active'
+      };
+    });
+    
+    // Find mods that might be stalled based on inactivity
+    const potentiallyStalled = activityStatus.filter(status => 
+      status.status === 'warning' && status.lastActivityTime !== null
+    );
     
     return {
       status: 'healthy',
       runningMods,
       trippedCircuitBreakers,
       activeJobs: runningMods.length,
+      watchdogStatus: {
+        enabled: this.watchdogInterval !== null,
+        potentiallyStalled: potentiallyStalled.map(s => s.modId),
+        activityStatus
+      },
       timestamp: new Date().toISOString()
     };
   }
@@ -617,6 +648,12 @@ class ContinuousService extends EventEmitter {
       this.circuitBreakerMaintenanceInterval = null;
     }
     
+    // Clear the watchdog interval
+    if (this.watchdogInterval) {
+      clearInterval(this.watchdogInterval);
+      this.watchdogInterval = null;
+    }
+    
     // Shutdown all continuous development processes
     this.shutdownAll("Application shutting down");
     
@@ -625,6 +662,9 @@ class ContinuousService extends EventEmitter {
       clearInterval(interval);
       this.intervals.delete(modId);
     });
+    
+    // Clear activity timestamps
+    this.lastActivityTimestamps.clear();
     
     console.log("[ContinuousService] Cleanup complete - all resources released");
   }
