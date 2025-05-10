@@ -21,6 +21,7 @@ import { checkDatabaseHealth } from "./db-health";
 import { continuousService } from "./continuous-service";
 import { generateModIdeas, expandModIdea, ideaGenerationRequestSchema } from "./idea-generator-service";
 import { setupAuth } from "./auth"; // This function returns a requireAuth middleware
+import { errorHandlerMiddleware } from "./error-handler";
 import { z } from "zod";
 import { insertModSchema } from "@shared/schema";
 import { BuildStatus } from "@shared/schemas/core/builds";

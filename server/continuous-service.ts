@@ -2,6 +2,11 @@ import { storage } from './storage';
 import { compileMod } from './compiler';
 import { fixCompilationErrors, addModFeatures } from './ai-service';
 import { EventEmitter } from 'events';
+import { 
+  recordError, 
+  ErrorCategory, 
+  ErrorSeverity 
+} from './error-handler';
 
 // Map client-side BuildStatus enum to string values expected by the database
 enum BuildStatus {
@@ -483,7 +488,22 @@ class ContinuousService extends EventEmitter {
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
+      
+      // Log to continuous service log
       logContinuous(modId, `Error in continuous development cycle: ${errorMessage}`, 'error');
+      
+      // Record structured error in central error tracking system
+      recordError(
+        error instanceof Error ? error : new Error(errorMessage),
+        ErrorCategory.CONTINUOUS_DEVELOPMENT,
+        ErrorSeverity.MEDIUM,
+        false, // Will determine retryability below
+        { 
+          modId,
+          buildCount: this.buildCounts.get(modId) || 0,
+          retryCount
+        }
+      );
       
       // Implement retry for transient errors before incrementing circuit breaker
       // Only retry for specific transient errors that might resolve themselves
