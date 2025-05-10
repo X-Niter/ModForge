@@ -737,4 +737,462 @@ public final class ModTemplateService {
                 "  }\n" +
                 "}\n";
     }
+    
+    /**
+     * Get the Quilt Gradle template.
+     *
+     * @return The template
+     */
+    @NotNull
+    private String getQuiltGradleTemplate() {
+        return "plugins {\n" +
+                "    id 'org.quiltmc.loom' version '1.0.+'\n" +
+                "}\n" +
+                "\n" +
+                "group = '${group}'\n" +
+                "version = '${version}'\n" +
+                "archivesBaseName = '${modid}'\n" +
+                "\n" +
+                "repositories {\n" +
+                "    mavenCentral()\n" +
+                "    maven { url = 'https://maven.quiltmc.org/repository/release' }\n" +
+                "}\n" +
+                "\n" +
+                "dependencies {\n" +
+                "    minecraft 'com.mojang:minecraft:${minecraft_version}'\n" +
+                "    mappings 'org.quiltmc:quilt-mappings:${minecraft_version}+build.1:v2'\n" +
+                "    modImplementation 'org.quiltmc:quilt-loader:${quilt_version}'\n" +
+                "    modImplementation 'org.quiltmc.quilted-fabric-api:quilted-fabric-api:${quilt_version}'\n" +
+                "}\n" +
+                "\n" +
+                "java {\n" +
+                "    sourceCompatibility = JavaVersion.VERSION_17\n" +
+                "    targetCompatibility = JavaVersion.VERSION_17\n" +
+                "}\n" +
+                "\n" +
+                "tasks.withType(JavaCompile).configureEach {\n" +
+                "    options.encoding = 'UTF-8'\n" +
+                "    options.release = 17\n" +
+                "}\n";
+    }
+    
+    /**
+     * Get the Quilt main class template.
+     *
+     * @return The template
+     */
+    @NotNull
+    private String getQuiltMainClassTemplate() {
+        return "package ${group}.${modid};\n" +
+                "\n" +
+                "import org.slf4j.Logger;\n" +
+                "import org.slf4j.LoggerFactory;\n" +
+                "\n" +
+                "public class ExampleMod {\n" +
+                "    public static final String MOD_ID = \"${modid}\";\n" +
+                "    public static final Logger LOGGER = LoggerFactory.getLogger(\"${modid}\");\n" +
+                "\n" +
+                "    public static void init() {\n" +
+                "        LOGGER.info(\"Initializing ${name} mod\");\n" +
+                "    }\n" +
+                "}\n";
+    }
+    
+    /**
+     * Get the Quilt mod.json template.
+     *
+     * @return The template
+     */
+    @NotNull
+    private String getQuiltModJsonTemplate() {
+        return "{\n" +
+                "  \"schema_version\": 1,\n" +
+                "  \"quilt_loader\": {\n" +
+                "    \"group\": \"${group}\",\n" +
+                "    \"id\": \"${modid}\",\n" +
+                "    \"version\": \"${version}\",\n" +
+                "    \"name\": \"${name}\",\n" +
+                "    \"description\": \"${description}\",\n" +
+                "    \"authors\": [\n" +
+                "      \"${author}\"\n" +
+                "    ],\n" +
+                "    \"contact\": {},\n" +
+                "    \"license\": \"All Rights Reserved\",\n" +
+                "    \"environment\": \"*\",\n" +
+                "    \"entrypoints\": {\n" +
+                "      \"init\": [\n" +
+                "        \"${group}.${modid}.ExampleMod::init\"\n" +
+                "      ]\n" +
+                "    },\n" +
+                "    \"depends\": [\n" +
+                "      {\n" +
+                "        \"id\": \"quilt_loader\",\n" +
+                "        \"versions\": \">=0.17.0-\"\n" +
+                "      },\n" +
+                "      {\n" +
+                "        \"id\": \"quilted_fabric_api\",\n" +
+                "        \"versions\": \">=5.0.0-\"\n" +
+                "      },\n" +
+                "      {\n" +
+                "        \"id\": \"minecraft\",\n" +
+                "        \"versions\": \"~1.19\"\n" +
+                "      }\n" +
+                "    ]\n" +
+                "  }\n" +
+                "}\n";
+    }
+    
+    /**
+     * Get the Architectury settings.gradle template.
+     *
+     * @return The template
+     */
+    @NotNull
+    private String getArchitecturySettingsGradleTemplate() {
+        return "pluginManagement {\n" +
+                "    repositories {\n" +
+                "        gradlePluginPortal()\n" +
+                "        maven { url = 'https://maven.minecraftforge.net/' }\n" +
+                "        maven { url = 'https://maven.fabricmc.net/' }\n" +
+                "    }\n" +
+                "}\n" +
+                "\n" +
+                "rootProject.name = '${modid}'\n" +
+                "include 'common', 'fabric', 'forge'\n";
+    }
+    
+    /**
+     * Get the Architectury root build.gradle template.
+     *
+     * @return The template
+     */
+    @NotNull
+    private String getArchitecturyRootGradleTemplate() {
+        return "plugins {\n" +
+                "    id 'architectury-plugin' version '3.4-SNAPSHOT'\n" +
+                "    id 'dev.architectury.loom' version '1.0-SNAPSHOT' apply false\n" +
+                "}\n" +
+                "\n" +
+                "architectury {\n" +
+                "    minecraft = '${minecraft_version}'\n" +
+                "}\n" +
+                "\n" +
+                "subprojects {\n" +
+                "    apply plugin: 'java'\n" +
+                "    apply plugin: 'architectury-plugin'\n" +
+                "    apply plugin: 'maven-publish'\n" +
+                "\n" +
+                "    group = '${group}'\n" +
+                "    version = '${version}'\n" +
+                "    \n" +
+                "    repositories {\n" +
+                "        mavenCentral()\n" +
+                "        maven { url = 'https://maven.architectury.dev/' }\n" +
+                "        maven { url = 'https://maven.minecraftforge.net/' }\n" +
+                "        maven { url = 'https://maven.fabricmc.net/' }\n" +
+                "    }\n" +
+                "    \n" +
+                "    java {\n" +
+                "        sourceCompatibility = JavaVersion.VERSION_17\n" +
+                "        targetCompatibility = JavaVersion.VERSION_17\n" +
+                "    }\n" +
+                "    \n" +
+                "    tasks.withType(JavaCompile) {\n" +
+                "        options.encoding = 'UTF-8'\n" +
+                "        options.release = 17\n" +
+                "    }\n" +
+                "}\n";
+    }
+    
+    /**
+     * Get the Architectury common build.gradle template.
+     *
+     * @return The template
+     */
+    @NotNull
+    private String getArchitecturyCommonGradleTemplate() {
+        return "plugins {\n" +
+                "    id 'dev.architectury.loom'\n" +
+                "}\n" +
+                "\n" +
+                "architectury {\n" +
+                "    common('forge', 'fabric')\n" +
+                "}\n" +
+                "\n" +
+                "dependencies {\n" +
+                "    minecraft \"com.mojang:minecraft:${minecraft_version}\"\n" +
+                "    // Common implementation\n" +
+                "    modImplementation \"dev.architectury:architectury:${architectury_version}\"\n" +
+                "}\n";
+    }
+    
+    /**
+     * Get the Architectury Fabric build.gradle template.
+     *
+     * @return The template
+     */
+    @NotNull
+    private String getArchitecturyFabricGradleTemplate() {
+        return "plugins {\n" +
+                "    id 'dev.architectury.loom'\n" +
+                "}\n" +
+                "\n" +
+                "architectury {\n" +
+                "    platformSetupLoomIde()\n" +
+                "}\n" +
+                "\n" +
+                "dependencies {\n" +
+                "    minecraft \"com.mojang:minecraft:${minecraft_version}\"\n" +
+                "    mappings \"net.fabricmc:yarn:${minecraft_version}+build.1:v2\"\n" +
+                "    modImplementation \"net.fabricmc:fabric-loader:0.14.9\"\n" +
+                "    modImplementation \"net.fabricmc.fabric-api:fabric-api:${fabric_version}\"\n" +
+                "    modImplementation \"dev.architectury:architectury-fabric:${architectury_version}\"\n" +
+                "    \n" +
+                "    implementation project(\":common\")\n" +
+                "}\n";
+    }
+    
+    /**
+     * Get the Architectury Forge build.gradle template.
+     *
+     * @return The template
+     */
+    @NotNull
+    private String getArchitecturyForgeGradleTemplate() {
+        return "plugins {\n" +
+                "    id 'dev.architectury.loom'\n" +
+                "    id 'net.minecraftforge.gradle'\n" +
+                "}\n" +
+                "\n" +
+                "architectury {\n" +
+                "    platformSetupLoomIde()\n" +
+                "}\n" +
+                "\n" +
+                "dependencies {\n" +
+                "    minecraft \"com.mojang:minecraft:${minecraft_version}\"\n" +
+                "    forge \"net.minecraftforge:forge:${minecraft_version}-${forge_version}\"\n" +
+                "    modImplementation \"dev.architectury:architectury-forge:${architectury_version}\"\n" +
+                "    \n" +
+                "    implementation project(\":common\")\n" +
+                "}\n";
+    }
+    
+    /**
+     * Get the Architectury common main class template.
+     *
+     * @return The template
+     */
+    @NotNull
+    private String getArchitecturyCommonMainClassTemplate() {
+        return "package ${group}.${modid};\n" +
+                "\n" +
+                "import dev.architectury.platform.Platform;\n" +
+                "\n" +
+                "public class ExampleMod {\n" +
+                "    public static final String MOD_ID = \"${modid}\";\n" +
+                "    \n" +
+                "    public static void init() {\n" +
+                "        System.out.println(\"Hello from common platform: \" + Platform.getEnv());\n" +
+                "    }\n" +
+                "}\n";
+    }
+    
+    /**
+     * Get the Architectury Fabric main class template.
+     *
+     * @return The template
+     */
+    @NotNull
+    private String getArchitecturyFabricMainClassTemplate() {
+        return "package ${group}.${modid}.fabric;\n" +
+                "\n" +
+                "import ${group}.${modid}.ExampleMod;\n" +
+                "import net.fabricmc.api.ModInitializer;\n" +
+                "\n" +
+                "public class ExampleModFabric implements ModInitializer {\n" +
+                "    @Override\n" +
+                "    public void onInitialize() {\n" +
+                "        ExampleMod.init();\n" +
+                "    }\n" +
+                "}\n";
+    }
+    
+    /**
+     * Get the Architectury Forge main class template.
+     *
+     * @return The template
+     */
+    @NotNull
+    private String getArchitecturyForgeMainClassTemplate() {
+        return "package ${group}.${modid}.forge;\n" +
+                "\n" +
+                "import ${group}.${modid}.ExampleMod;\n" +
+                "import net.minecraftforge.fml.common.Mod;\n" +
+                "import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;\n" +
+                "\n" +
+                "@Mod(ExampleMod.MOD_ID)\n" +
+                "public class ExampleModForge {\n" +
+                "    public ExampleModForge() {\n" +
+                "        ExampleMod.init();\n" +
+                "    }\n" +
+                "}\n";
+    }
+    
+    /**
+     * Get the Architectury Fabric mod.json template.
+     *
+     * @return The template
+     */
+    @NotNull
+    private String getArchitecturyFabricModJsonTemplate() {
+        return "{\n" +
+                "  \"schemaVersion\": 1,\n" +
+                "  \"id\": \"${modid}\",\n" +
+                "  \"version\": \"${version}\",\n" +
+                "  \"name\": \"${name}\",\n" +
+                "  \"description\": \"${description}\",\n" +
+                "  \"authors\": [\n" +
+                "    \"${author}\"\n" +
+                "  ],\n" +
+                "  \"contact\": {},\n" +
+                "  \"license\": \"All Rights Reserved\",\n" +
+                "  \"environment\": \"*\",\n" +
+                "  \"entrypoints\": {\n" +
+                "    \"main\": [\n" +
+                "      \"${group}.${modid}.fabric.ExampleModFabric\"\n" +
+                "    ]\n" +
+                "  },\n" +
+                "  \"depends\": {\n" +
+                "    \"fabricloader\": \">=0.14.9\",\n" +
+                "    \"fabric\": \"*\",\n" +
+                "    \"minecraft\": \"~1.19\",\n" +
+                "    \"java\": \">=17\",\n" +
+                "    \"architectury\": \">=5.0.0\"\n" +
+                "  }\n" +
+                "}\n";
+    }
+    
+    /**
+     * Get the Architectury Forge mods.toml template.
+     *
+     * @return The template
+     */
+    @NotNull
+    private String getArchitecturyForgeModsTomlTemplate() {
+        return "modLoader=\"javafml\"\n" +
+                "loaderVersion=\"[41,)\"\n" +
+                "license=\"All Rights Reserved\"\n" +
+                "\n" +
+                "[[mods]]\n" +
+                "modId=\"${modid}\"\n" +
+                "version=\"${version}\"\n" +
+                "displayName=\"${name}\"\n" +
+                "authors=\"${author}\"\n" +
+                "description='''${description}'''\n" +
+                "\n" +
+                "[[dependencies.${modid}]]\n" +
+                "    modId=\"forge\"\n" +
+                "    mandatory=true\n" +
+                "    versionRange=\"[41,)\"\n" +
+                "    ordering=\"NONE\"\n" +
+                "    side=\"BOTH\"\n" +
+                "\n" +
+                "[[dependencies.${modid}]]\n" +
+                "    modId=\"minecraft\"\n" +
+                "    mandatory=true\n" +
+                "    versionRange=\"[1.19,1.20)\"\n" +
+                "    ordering=\"NONE\"\n" +
+                "    side=\"BOTH\"\n" +
+                "    \n" +
+                "[[dependencies.${modid}]]\n" +
+                "    modId=\"architectury\"\n" +
+                "    mandatory=true\n" +
+                "    versionRange=\"[5.0.0,)\"\n" +
+                "    ordering=\"AFTER\"\n" +
+                "    side=\"BOTH\"\n";
+    }
+    
+    /**
+     * Extract the loader ID from a template ID.
+     *
+     * @param templateId The template ID
+     * @return The loader ID, or the original template ID if no delimiter is found
+     */
+    @NotNull
+    private String getLoaderIdFromTemplateId(@NotNull String templateId) {
+        int dashIndex = templateId.indexOf('-');
+        if (dashIndex > 0) {
+            return templateId.substring(0, dashIndex);
+        }
+        return templateId;
+    }
+    
+    /**
+     * Set up template files and variables based on the mod loader.
+     *
+     * @param loaderId  The mod loader ID
+     * @param files     The files map to populate
+     * @param variables The variables map to populate
+     */
+    private void setupTemplateForLoader(
+            @NotNull String loaderId,
+            @NotNull Map<String, String> files,
+            @NotNull Map<String, String> variables
+    ) {
+        // Set common variables first
+        variables.put("name", "Example Mod");
+        variables.put("modid", "examplemod");
+        variables.put("version", "1.0.0");
+        variables.put("group", "com.example");
+        variables.put("package", "com/example/examplemod");
+        variables.put("description", "An example mod");
+        variables.put("author", "ExampleAuthor");
+        variables.put("minecraft_version", "1.19.2");
+        
+        // Then set up loader-specific files and variables
+        switch (loaderId) {
+            case "forge":
+                files.put("build.gradle", getForgeGradleTemplate());
+                files.put("src/main/java/${package}/ExampleMod.java", getForgeMainClassTemplate());
+                files.put("src/main/resources/META-INF/mods.toml", getForgeModsTomlTemplate());
+                variables.put("forge_version", "43.1.7");
+                break;
+                
+            case "fabric":
+                files.put("build.gradle", getFabricGradleTemplate());
+                files.put("src/main/java/${package}/ExampleMod.java", getFabricMainClassTemplate());
+                files.put("src/main/resources/fabric.mod.json", getFabricModJsonTemplate());
+                variables.put("fabric_version", "0.76.0+1.19.2");
+                break;
+                
+            case "quilt":
+                // For Quilt, we'll use a modified version of the Fabric templates
+                files.put("build.gradle", getQuiltGradleTemplate());
+                files.put("src/main/java/${package}/ExampleMod.java", getQuiltMainClassTemplate());
+                files.put("src/main/resources/quilt.mod.json", getQuiltModJsonTemplate());
+                variables.put("quilt_version", "0.19.0-beta.18+1.19.2");
+                break;
+                
+            case "architectury":
+                // For Architectury, we need a multi-project structure
+                files.put("settings.gradle", getArchitecturySettingsGradleTemplate());
+                files.put("build.gradle", getArchitecturyRootGradleTemplate());
+                files.put("common/build.gradle", getArchitecturyCommonGradleTemplate());
+                files.put("fabric/build.gradle", getArchitecturyFabricGradleTemplate());
+                files.put("forge/build.gradle", getArchitecturyForgeGradleTemplate());
+                files.put("common/src/main/java/${package}/ExampleMod.java", getArchitecturyCommonMainClassTemplate());
+                files.put("fabric/src/main/java/${package}/fabric/ExampleModFabric.java", getArchitecturyFabricMainClassTemplate());
+                files.put("forge/src/main/java/${package}/forge/ExampleModForge.java", getArchitecturyForgeMainClassTemplate());
+                files.put("fabric/src/main/resources/fabric.mod.json", getArchitecturyFabricModJsonTemplate());
+                files.put("forge/src/main/resources/META-INF/mods.toml", getArchitecturyForgeModsTomlTemplate());
+                variables.put("architectury_version", "6.5.69");
+                variables.put("fabric_version", "0.76.0+1.19.2");
+                variables.put("forge_version", "43.1.7");
+                break;
+                
+            default:
+                LOG.warn("Unknown loader ID: " + loaderId);
+                break;
+        }
+    }
 }
