@@ -997,6 +997,102 @@ export async function sendTrackedErrorNotification(
 /**
  * Initialize the notification system
  */
+// Track pending notification attempts for retry
+interface PendingNotification {
+  message: NotificationMessage;
+  attempts: number;
+  lastAttempt: Date;
+  maxAttempts: number;
+  retryIntervalMs: number;
+}
+
+// Queue of failed notifications for retry
+const failedNotificationsQueue: PendingNotification[] = [];
+
+// Retry intervals with exponential backoff (in ms)
+const RETRY_INTERVALS = [
+  30 * 1000,      // 30 seconds
+  2 * 60 * 1000,  // 2 minutes
+  10 * 60 * 1000, // 10 minutes
+  30 * 60 * 1000  // 30 minutes
+];
+
+// Maximum retry attempts for notifications
+const MAX_RETRY_ATTEMPTS = 4;
+
+/**
+ * Process the failed notifications queue, retrying with backoff
+ */
+async function processFailedNotificationsQueue(): Promise<void> {
+  if (failedNotificationsQueue.length === 0) {
+    return;
+  }
+  
+  logger.debug(`Processing failed notifications queue (${failedNotificationsQueue.length} items)`);
+  
+  const now = new Date();
+  const notificationsToRetry = failedNotificationsQueue.filter(item => {
+    const timeSinceLastAttempt = now.getTime() - item.lastAttempt.getTime();
+    return timeSinceLastAttempt >= item.retryIntervalMs;
+  });
+  
+  if (notificationsToRetry.length === 0) {
+    return;
+  }
+  
+  logger.info(`Retrying ${notificationsToRetry.length} failed notifications`);
+  
+  // Process each notification ready for retry
+  for (const item of notificationsToRetry) {
+    try {
+      // Update attempt tracking
+      item.attempts++;
+      item.lastAttempt = new Date();
+      
+      // Calculate next retry interval (with exponential backoff)
+      const nextRetryIndex = Math.min(item.attempts, RETRY_INTERVALS.length - 1);
+      item.retryIntervalMs = RETRY_INTERVALS[nextRetryIndex];
+      
+      logger.info(`Retry attempt ${item.attempts}/${item.maxAttempts} for notification`, {
+        type: item.message.type,
+        severity: item.message.severity,
+        title: item.message.title
+      });
+      
+      // Attempt to send the notification
+      await sendNotification(item.message, true);
+      
+      // If successful, remove from the queue
+      const index = failedNotificationsQueue.indexOf(item);
+      if (index !== -1) {
+        failedNotificationsQueue.splice(index, 1);
+      }
+      
+      logger.info('Successfully resent notification on retry');
+    } catch (error) {
+      logger.warn(`Failed to resend notification (attempt ${item.attempts}/${item.maxAttempts})`, {
+        error,
+        type: item.message.type,
+        severity: item.message.severity
+      });
+      
+      // If we've reached max attempts, log and remove from queue
+      if (item.attempts >= item.maxAttempts) {
+        logger.error(`Giving up on notification after ${item.maxAttempts} failed attempts`, {
+          title: item.message.title,
+          type: item.message.type,
+          severity: item.message.severity
+        });
+        
+        const index = failedNotificationsQueue.indexOf(item);
+        if (index !== -1) {
+          failedNotificationsQueue.splice(index, 1);
+        }
+      }
+    }
+  }
+}
+
 export function initializeNotificationSystem(): () => void {
   logger.info('Initializing notification system');
   
@@ -1018,11 +1114,35 @@ export function initializeNotificationSystem(): () => void {
     });
   }
   
+  if (process.env.WEBHOOK_URL) {
+    availableChannels.push('webhook');
+    logger.info('Webhook notifications enabled', {
+      url: process.env.WEBHOOK_URL
+    });
+  }
+  
+  if (process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN && process.env.TWILIO_PHONE_NUMBER) {
+    availableChannels.push('sms');
+    logger.info('SMS notifications enabled');
+  }
+  
+  // Always have log notifications
+  availableChannels.push('log');
+  
   logger.info('Notification system ready', {
-    channels: availableChannels.length > 0 ? availableChannels.join(', ') : 'log only',
+    channels: availableChannels.join(', '),
     batchingSeconds: currentSettings.batchingSeconds,
     throttlingEnabled: currentSettings.throttling.enabled
   });
+  
+  // Set up retry mechanism for failed notifications
+  const retryInterval = setInterval(async () => {
+    try {
+      await processFailedNotificationsQueue();
+    } catch (error) {
+      logger.error('Error processing failed notifications queue', { error });
+    }
+  }, 60 * 1000); // Check every minute
   
   // Send a startup notification
   sendSystemStatusNotification('up', 'ModForge system has started successfully', {
@@ -1030,11 +1150,16 @@ export function initializeNotificationSystem(): () => void {
     environment: process.env.NODE_ENV || 'development'
   }).catch(error => {
     logger.error('Failed to send startup notification', { error });
+    
+    // Even if this fails, it will be added to the retry queue by the sendNotification function
   });
   
   // Return cleanup function
   return () => {
     logger.info('Shutting down notification system');
+    
+    // Clear retry interval
+    clearInterval(retryInterval);
     
     // Process any remaining batched notifications
     Object.keys(notificationState.batchedNotifications).forEach(key => {
@@ -1045,5 +1170,26 @@ export function initializeNotificationSystem(): () => void {
         });
       });
     });
+    
+    // Process any critical notifications in the retry queue one last time
+    const criticalNotifications = failedNotificationsQueue.filter(
+      item => item.message.severity === NotificationSeverity.CRITICAL
+    );
+    
+    if (criticalNotifications.length > 0) {
+      logger.info(`Attempting to send ${criticalNotifications.length} critical notifications before shutdown`);
+      
+      for (const item of criticalNotifications) {
+        try {
+          // Try to send synchronously as we're shutting down
+          // We're intentionally not using await here as we don't want to block shutdown
+          sendNotification(item.message, true)
+            .then(() => logger.info('Successfully sent critical notification during shutdown'))
+            .catch(e => logger.error('Failed to send critical notification during shutdown', { error: e }));
+        } catch (error) {
+          logger.error('Error attempting to send critical notification during shutdown', { error });
+        }
+      }
+    }
   };
 }
