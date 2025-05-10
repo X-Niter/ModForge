@@ -301,7 +301,7 @@ export function setupAuth(app: Express) {
         }
         
         // Generate a JSON Web Token for API access
-        const token = jwt.sign(
+        const token = signJwt(
           { sub: user.id.toString(), username: user.username },
           process.env.JWT_SECRET || "fallback-secret-change-in-production",
           { expiresIn: '30d' }
