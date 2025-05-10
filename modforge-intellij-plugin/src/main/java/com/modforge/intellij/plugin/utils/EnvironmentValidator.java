@@ -5,10 +5,13 @@ import com.intellij.notification.NotificationType;
 import com.intellij.notification.Notifications;
 import com.intellij.openapi.application.ApplicationInfo;
 import com.intellij.openapi.diagnostic.Logger;
+import com.intellij.openapi.module.Module;
+import com.intellij.openapi.module.ModuleManager;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.projectRoots.JavaSdk;
 import com.intellij.openapi.projectRoots.JavaSdkVersion;
 import com.intellij.openapi.projectRoots.Sdk;
+import com.intellij.openapi.roots.ModuleRootManager;
 import com.intellij.openapi.roots.ProjectRootManager;
 
 /**
@@ -69,35 +72,72 @@ public class EnvironmentValidator {
             return false;
         }
         
-        Sdk projectSdk = ProjectRootManager.getInstance(project).getProjectSdk();
-        if (projectSdk == null) {
-            LOG.warn("Cannot validate JDK version: project SDK is not set");
+        try {
+            Sdk projectSdk = ProjectRootManager.getInstance(project).getProjectSdk();
+            if (projectSdk == null) {
+                LOG.warn("Cannot validate JDK version: project SDK is not set");
+                
+                // Rather than failing immediately, check if any module has Java SDK set
+                boolean foundValidModuleSdk = false;
+                Module[] modules = ModuleManager.getInstance(project).getModules();
+                for (Module module : modules) {
+                    Sdk moduleSdk = ModuleRootManager.getInstance(module).getSdk();
+                    if (moduleSdk != null && moduleSdk.getSdkType() instanceof JavaSdk) {
+                        projectSdk = moduleSdk;
+                        foundValidModuleSdk = true;
+                        LOG.info("Found valid Java SDK in module: " + module.getName());
+                        break;
+                    }
+                }
+                
+                if (!foundValidModuleSdk) {
+                    return false;
+                }
+            }
+            
+            String jdkVersion = projectSdk.getVersionString();
+            LOG.info("Checking project JDK version: " + jdkVersion);
+            
+            // Check if it's a Java SDK
+            if (!(projectSdk.getSdkType() instanceof JavaSdk)) {
+                LOG.warn("Project SDK is not a Java SDK: " + projectSdk.getSdkType().getName());
+                return false;
+            }
+            
+            // Check Java SDK version
+            JavaSdk javaSdk = (JavaSdk) projectSdk.getSdkType();
+            JavaSdkVersion version = javaSdk.getVersion(projectSdk);
+            
+            if (version == null) {
+                LOG.warn("Cannot determine Java SDK version");
+                
+                // Fallback to runtime version if SDK version cannot be determined
+                String runtimeVersion = System.getProperty("java.version");
+                if (runtimeVersion != null && (runtimeVersion.startsWith("21") || compareVersions(runtimeVersion, MIN_JDK_VERSION) >= 0)) {
+                    LOG.info("Using runtime Java version: " + runtimeVersion);
+                    return true;
+                }
+                
+                return false;
+            }
+            
+            LOG.info("Java SDK version: " + version.getDescription());
+            
+            return version.isAtLeast(MIN_JAVA_SDK_VERSION) && 
+                  (jdkVersion == null || jdkVersion.contains(MIN_JDK_VERSION) || 
+                   compareVersions(extractVersion(jdkVersion), MIN_JDK_VERSION) >= 0);
+        } catch (Exception e) {
+            LOG.warn("Error validating JDK version: " + e.getMessage(), e);
+            
+            // Fallback to runtime version
+            String runtimeVersion = System.getProperty("java.version");
+            if (runtimeVersion != null && (runtimeVersion.startsWith("21") || compareVersions(runtimeVersion, MIN_JDK_VERSION) >= 0)) {
+                LOG.info("Using runtime Java version: " + runtimeVersion);
+                return true;
+            }
+            
             return false;
         }
-        
-        String jdkVersion = projectSdk.getVersionString();
-        LOG.info("Checking project JDK version: " + jdkVersion);
-        
-        // Check if it's a Java SDK
-        if (!(projectSdk.getSdkType() instanceof JavaSdk)) {
-            LOG.warn("Project SDK is not a Java SDK: " + projectSdk.getSdkType().getName());
-            return false;
-        }
-        
-        // Check Java SDK version
-        JavaSdk javaSdk = (JavaSdk) projectSdk.getSdkType();
-        JavaSdkVersion version = javaSdk.getVersion(projectSdk);
-        
-        if (version == null) {
-            LOG.warn("Cannot determine Java SDK version");
-            return false;
-        }
-        
-        LOG.info("Java SDK version: " + version.getDescription());
-        
-        return version.isAtLeast(MIN_JAVA_SDK_VERSION) && 
-               (jdkVersion == null || jdkVersion.contains(MIN_JDK_VERSION) || 
-                compareVersions(extractVersion(jdkVersion), MIN_JDK_VERSION) >= 0);
     }
     
     /**

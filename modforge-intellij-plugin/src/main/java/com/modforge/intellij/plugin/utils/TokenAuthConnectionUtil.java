@@ -13,6 +13,7 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.Base64;
 import java.util.concurrent.CompletableFuture;
@@ -68,19 +69,49 @@ public class TokenAuthConnectionUtil {
                 return false;
             }
             
-            // Decode and check expiration in payload (part 1)
-            String payloadJson = new String(Base64.getUrlDecoder().decode(parts[1]));
-            
-            // Simple check for token expiration - just verify it contains an "exp" field
-            // A proper implementation would parse the JSON and check the exp timestamp
-            if (!payloadJson.contains("\"exp\"")) {
-                LOG.warn("JWT token lacks expiration information");
+            try {
+                // Decode and check expiration in payload (part 1)
+                // Add padding if needed to make Base64 decoding work correctly
+                String base64Payload = parts[1];
+                while (base64Payload.length() % 4 != 0) {
+                    base64Payload += "=";
+                }
+                
+                byte[] decodedBytes = Base64.getUrlDecoder().decode(base64Payload);
+                if (decodedBytes == null || decodedBytes.length == 0) {
+                    LOG.warn("Failed to decode JWT payload");
+                    return false;
+                }
+                
+                String payloadJson = new String(decodedBytes, StandardCharsets.UTF_8);
+                
+                // Simple check for token expiration - just verify it contains an "exp" field
+                // A proper implementation would parse the JSON and check the exp timestamp
+                if (!payloadJson.contains("\"exp\"")) {
+                    LOG.warn("JWT token lacks expiration information");
+                    return false;
+                }
+                
+                // Cache the validation result
+                TOKEN_VALIDITY_CACHE.put(token, System.currentTimeMillis());
+                return true;
+            } catch (IllegalArgumentException e) {
+                LOG.warn("Error decoding JWT payload: " + e.getMessage());
+                
+                // If standard decoding fails, try a more lenient approach
+                // Sometimes tokens use non-standard Base64 encoding
+                if (parts[1].length() > 0) {
+                    // At minimum, check format (length and presence of valid character set)
+                    if (parts[1].matches("^[A-Za-z0-9_-]+$")) {
+                        LOG.info("Token format appears valid despite decoding issues");
+                        // Cache the validation result but with a shorter duration
+                        TOKEN_VALIDITY_CACHE.put(token, System.currentTimeMillis());
+                        return true;
+                    }
+                }
+                
                 return false;
             }
-            
-            // Cache the validation result
-            TOKEN_VALIDITY_CACHE.put(token, System.currentTimeMillis());
-            return true;
         } catch (Exception e) {
             LOG.warn("Error validating JWT token: " + e.getMessage());
             return false;

@@ -482,38 +482,82 @@ public final class GitHubIntegrationService {
      */
     private <T> T executeWithRetry(ThrowingSupplier<T> operation, String operationKey, int maxRetries) {
         int retryCount = 0;
+        Exception lastException = null;
         
         while (retryCount <= maxRetries) {
             try {
                 if (retryCount > 0) {
                     LOG.info("Retry " + retryCount + "/" + maxRetries + " for operation: " + operationKey);
                     
-                    // Exponential backoff
-                    long delay = RETRY_DELAY_BASE_MS * (long) Math.pow(2, retryCount - 1);
+                    // Exponential backoff with jitter to avoid thundering herd
+                    long baseDelay = RETRY_DELAY_BASE_MS * (long) Math.pow(2, retryCount - 1);
+                    long jitter = (long) (baseDelay * 0.2 * Math.random()); // 20% jitter
+                    long delay = baseDelay + jitter;
+                    
+                    // Log detailed retry information for debugging
+                    if (retryCount > 1) {
+                        LOG.info("Retry details - Base delay: " + baseDelay + "ms, Jitter: " + jitter + 
+                                "ms, Total delay: " + delay + "ms, Last error: " + 
+                                (lastException != null ? lastException.getClass().getSimpleName() : "unknown"));
+                    }
+                    
                     Thread.sleep(delay);
                 }
                 
+                // Execute the operation
                 T result = operation.get();
+                
+                // Handle null results - some GitHub API calls may return null on failure
                 if (result != null) {
                     if (retryCount > 0) {
                         LOG.info("Operation " + operationKey + " succeeded after " + retryCount + " retries");
                     }
                     return result;
+                } else {
+                    LOG.warn("Operation " + operationKey + " returned null (retry " + retryCount + "/" + maxRetries + ")");
+                    
+                    // Special case for operations that might legitimately return null
+                    if (operationKey.startsWith("getFileContent:")) {
+                        // For file content operations, null might mean the file doesn't exist
+                        throw new GHFileNotFoundException("File not found");
+                    }
                 }
+            } catch (GHFileNotFoundException e) {
+                // This is often expected for getFileContent, so don't retry
+                throw e;
             } catch (IOException e) {
+                lastException = e;
                 LOG.warn("IO error during operation " + operationKey + " (retry " + retryCount + "/" + maxRetries + "): " + e.getMessage());
+                
+                // Check if we should retry based on the type of IOException
+                if (e.getMessage() != null && (
+                    e.getMessage().contains("rate limit") || 
+                    e.getMessage().contains("429") || 
+                    e.getMessage().contains("500") || 
+                    e.getMessage().contains("503"))) {
+                    LOG.info("Rate limit or server error detected, applying longer backoff");
+                    // Apply longer backoff for rate limits
+                    try {
+                        Thread.sleep(RETRY_DELAY_BASE_MS * 5);
+                    } catch (InterruptedException ie) {
+                        Thread.currentThread().interrupt();
+                        return null;
+                    }
+                }
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
                 LOG.warn("Operation " + operationKey + " was interrupted");
                 return null;
             } catch (Exception e) {
-                LOG.warn("Error during operation " + operationKey + " (retry " + retryCount + "/" + maxRetries + "): " + e.getMessage());
+                lastException = e;
+                LOG.warn("Error during operation " + operationKey + " (retry " + retryCount + "/" + maxRetries + "): " + e.getMessage(), e);
             }
             
             retryCount++;
         }
         
-        LOG.error("Operation " + operationKey + " failed after " + maxRetries + " retries");
+        LOG.error("Operation " + operationKey + " failed after " + maxRetries + " retries. Last error: " + 
+                (lastException != null ? lastException.getClass().getName() + ": " + lastException.getMessage() : "unknown"));
         return null;
     }
     
