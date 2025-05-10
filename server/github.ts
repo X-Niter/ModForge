@@ -11,6 +11,30 @@ class GitHubClient {
     this.token = token;
   }
   
+  /**
+   * Create a GitHubClient from the user's session if available
+   * @param req Express request with session
+   * @returns GitHubClient instance or null if no token available
+   */
+  static async fromSession(req: any): Promise<GitHubClient | null> {
+    // Check if there's a session with a logged in user
+    if (req.session && req.session.userId) {
+      try {
+        // Get the user from storage
+        const user = await storage.getUser(req.session.userId);
+        
+        // If user exists and has a GitHub token, create a client
+        if (user && user.githubToken) {
+          return new GitHubClient(user.githubToken);
+        }
+      } catch (error) {
+        console.error('Error creating GitHub client from session:', error);
+      }
+    }
+    
+    return null;
+  }
+  
   // Generic request method
   private async request<T>(method: string, endpoint: string, data?: any): Promise<T> {
     try {
@@ -100,6 +124,7 @@ class GitHubClient {
 // Function to push a mod to GitHub
 export async function pushModToGitHub(
   modId: number,
+  req?: any,
   githubToken?: string
 ): Promise<{
   success: boolean;
@@ -122,20 +147,31 @@ export async function pushModToGitHub(
       throw new Error(`Mod with ID ${modId} not found`);
     }
     
-    // Check for GitHub token
-    const token = githubToken || process.env.GITHUB_TOKEN;
-    if (!token) {
-      return {
-        success: false,
-        error: "GitHub token not provided. Please add a GitHub token to your settings.",
-        logs
-      };
+    // Try to create GitHub client from session first
+    let github: GitHubClient | null = null;
+    
+    if (req) {
+      github = await GitHubClient.fromSession(req);
+      if (github) {
+        addLog('Using GitHub authentication from your account');
+      }
+    }
+    
+    // Fall back to token if session doesn't have one
+    if (!github) {
+      const token = githubToken || process.env.GITHUB_TOKEN;
+      if (!token) {
+        return {
+          success: false,
+          error: "GitHub authentication failed. Please log in with GitHub or provide a GitHub token.",
+          logs
+        };
+      }
+      
+      github = new GitHubClient(token);
     }
     
     addLog(`Starting GitHub integration for mod: ${mod.name}`);
-    
-    // Create GitHub client
-    const github = new GitHubClient(token);
     
     // Get authenticated user
     addLog('Authenticating with GitHub...');

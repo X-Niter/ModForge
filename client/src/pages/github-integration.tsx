@@ -1,6 +1,9 @@
 import React from 'react';
 import { GitHubAuth } from "@/components/github-auth";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { GitHubOAuthButton } from "@/components/github-oauth-button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { useToast } from "@/hooks/use-toast";
 import { useModContext } from "@/context/mod-context";
 
 export default function GitHubIntegration() {
@@ -16,8 +19,95 @@ export default function GitHubIntegration() {
       </div>
       
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="md:col-span-2">
-          <GitHubAuth />
+        <div className="md:col-span-2 space-y-6">
+          <Card className="bg-surface shadow-lg">
+            <CardHeader>
+              <CardTitle className="text-white flex items-center gap-2">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  className="text-primary"
+                  width="20" 
+                  height="20"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"></path>
+                </svg>
+                GitHub Authentication
+              </CardTitle>
+              <CardDescription>
+                Connect your ModForge account to GitHub
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <Alert className="bg-amber-950/30 border-amber-700 text-amber-500">
+                <svg 
+                  xmlns="http://www.w3.org/2000/svg" 
+                  width="16" 
+                  height="16" 
+                  viewBox="0 0 24 24" 
+                  fill="none" 
+                  stroke="currentColor" 
+                  strokeWidth="2" 
+                  strokeLinecap="round" 
+                  strokeLinejoin="round" 
+                  className="mr-2"
+                >
+                  <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"></path>
+                  <path d="M12 9v4"></path>
+                  <path d="M12 17h.01"></path>
+                </svg>
+                <AlertTitle>New Authentication Method Available</AlertTitle>
+                <AlertDescription>
+                  You can now authenticate directly with GitHub instead of using a token. Try the new method below for a more secure experience.
+                </AlertDescription>
+              </Alert>
+              
+              <div className="bg-slate-800/50 rounded-lg p-4 border border-slate-700">
+                <h3 className="text-white font-medium mb-3">OAuth Authentication (Recommended)</h3>
+                <p className="text-gray-400 text-sm mb-4">
+                  Securely connect to GitHub with one click - no need to create or manage tokens.
+                </p>
+                <GitHubOAuthButton />
+              </div>
+            </CardContent>
+            <CardFooter>
+              <p className="text-gray-500 text-xs">Your GitHub account permissions will only be used for pushing mods and accessing repositories.</p>
+            </CardFooter>
+          </Card>
+          
+          <Card className="bg-surface shadow-lg">
+            <CardHeader>
+              <CardTitle className="text-white flex items-center gap-2">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  className="text-primary"
+                  width="20" 
+                  height="20"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <rect width="18" height="11" x="3" y="11" rx="2" ry="2"></rect>
+                  <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+                </svg>
+                Legacy Token Authentication
+              </CardTitle>
+              <CardDescription>
+                Use a personal access token for GitHub authentication
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <GitHubAuth />
+            </CardContent>
+          </Card>
         </div>
         
         <div className="space-y-6">

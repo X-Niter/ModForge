@@ -12,8 +12,20 @@ export function GitHubOAuthButton({ onSuccess, className }: GitHubOAuthButtonPro
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
   
+  // Define interface for auth data
+  interface AuthData {
+    authenticated: boolean;
+    user?: {
+      id: number;
+      username: string;
+      email?: string;
+      avatarUrl?: string;
+      githubId?: string;
+    };
+  }
+  
   // Check if user is already authenticated
-  const { data: authData, isLoading: isAuthCheckLoading } = useQuery({
+  const { data: authData, isLoading: isAuthCheckLoading } = useQuery<AuthData>({
     queryKey: ['/api/auth/me'],
     staleTime: 10 * 60 * 1000, // 10 minutes
   });
@@ -34,9 +46,9 @@ export function GitHubOAuthButton({ onSuccess, className }: GitHubOAuthButtonPro
   
   return (
     <div className={className}>
-      {authData?.authenticated ? (
+      {authData && authData.authenticated ? (
         <div className="flex items-center space-x-2">
-          {authData.user?.avatarUrl && (
+          {authData.user && authData.user.avatarUrl && (
             <img 
               src={authData.user.avatarUrl} 
               alt="GitHub Avatar" 
