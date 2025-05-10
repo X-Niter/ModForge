@@ -1,35 +1,46 @@
-import React from "react";
-import { useModContext } from "@/context/mod-context";
-import { useModGeneration } from "@/hooks/use-mod-generation";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { modLoaders } from "@shared/schema";
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectLabel,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
 
-export function ModLoaderSelect() {
-  const { currentMod } = useModContext();
-  const { updateMod, isLoading } = useModGeneration();
+interface ModLoaderSelectProps {
+  value: string;
+  onChange: (value: string) => void;
+  label?: string;
+  disabled?: boolean;
+}
 
-  const handleModLoaderChange = (value: string) => {
-    if (currentMod) {
-      updateMod(currentMod.id, { modLoader: value as any });
-    }
-  };
-
+export function ModLoaderSelect({
+  value,
+  onChange,
+  label = "Mod Loader",
+  disabled = false,
+}: ModLoaderSelectProps) {
   return (
-    <div className="relative">
+    <div className="space-y-2">
+      <Label htmlFor="mod-loader">{label}</Label>
       <Select
-        defaultValue={currentMod?.modLoader || "Forge"}
-        onValueChange={handleModLoaderChange}
-        disabled={isLoading || !currentMod}
+        value={value}
+        onValueChange={onChange}
+        disabled={disabled}
       >
-        <SelectTrigger className="w-full bg-background border border-gray-700 rounded py-1 px-2 text-sm">
+        <SelectTrigger id="mod-loader" className="w-full">
           <SelectValue placeholder="Select mod loader" />
         </SelectTrigger>
         <SelectContent>
-          {modLoaders.map((loader) => (
-            <SelectItem key={loader} value={loader}>
-              {loader} 1.19.2
-            </SelectItem>
-          ))}
+          <SelectGroup>
+            <SelectLabel>Mod Loaders</SelectLabel>
+            <SelectItem value="forge">Forge</SelectItem>
+            <SelectItem value="fabric">Fabric</SelectItem>
+            <SelectItem value="quilt">Quilt</SelectItem>
+            <SelectItem value="architectury">Architectury (Cross-loader)</SelectItem>
+          </SelectGroup>
         </SelectContent>
       </Select>
     </div>
