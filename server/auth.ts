@@ -363,9 +363,7 @@ export function setupAuth(app: Express) {
       jit: true,
       iat: Math.floor(Date.now() / 1000)
     };
-    const options: JwtSignOptions = { expiresIn: '1h' };
-    
-    return jwt.sign(payload, jwtSecret, options);
+    return signJwt(payload, jwtSecret, { expiresIn: '1h' });
   }
 
   // Token generation endpoint for IDE plugin
