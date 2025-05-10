@@ -64,7 +64,8 @@ export function scheduleJob(
     } catch (error) {
       job.failCount++;
       logger.error(`Scheduled job ${name} failed`, { 
-        error, 
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
         failCount: job.failCount 
       });
       
