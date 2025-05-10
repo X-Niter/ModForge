@@ -14,6 +14,52 @@ export interface IdeaGenerationParams {
   keywords?: string[];
 }
 
+export interface UsageMetrics {
+  totalRequests: number;
+  patternMatches: number;
+  apiCalls: number;
+  estimatedTokensSaved: number;
+  estimatedCostSaved: number;
+  patternMatchRate?: string;
+  apiCallRate?: string;
+}
+
+export interface TypeMetrics {
+  patterns: number;
+  matches: number;
+  uses: number;
+  successRate: number;
+  avgConfidence: number;
+}
+
+export interface PatternMetrics {
+  overall: {
+    totalPatterns: number;
+    totalUses: number;
+    totalSuccesses: number;
+    averageSuccessRate: number;
+    estimatedTokensSaved: number;
+    estimatedCostSaved: number;
+  };
+  ideas: TypeMetrics;
+  code: TypeMetrics;
+  fixes: TypeMetrics;
+  features: TypeMetrics;
+  documentation: TypeMetrics;
+}
+
+export interface SystemHealth {
+  status: "healthy" | "unhealthy" | "error";
+  message: string;
+  databaseInfo?: {
+    version?: string;
+    connection?: string;
+    uptime?: number;
+  };
+  timestamp?: string;
+  error?: string;
+}
+
 export interface IdeaExpansionParams {
   title: string;
   description: string;
@@ -117,7 +163,7 @@ export async function pushToGitHub(modId: number, token: string) {
 }
 
 // Metrics
-export async function getUsageMetrics() {
+export async function getUsageMetrics(): Promise<UsageMetrics> {
   const response = await apiRequest("GET", "/api/metrics/usage", null);
   if (!response.ok) {
     throw new Error("Failed to fetch usage metrics");
@@ -125,7 +171,7 @@ export async function getUsageMetrics() {
   return response.json();
 }
 
-export async function getPatternLearningMetrics() {
+export async function getPatternLearningMetrics(): Promise<PatternMetrics> {
   const response = await apiRequest("GET", "/api/pattern-learning/metrics", null);
   if (!response.ok) {
     throw new Error("Failed to fetch pattern learning metrics");
@@ -134,7 +180,7 @@ export async function getPatternLearningMetrics() {
 }
 
 // Health Check
-export async function getSystemHealth() {
+export async function getSystemHealth(): Promise<SystemHealth> {
   const response = await apiRequest("GET", "/api/health", null);
   return response.json();
 }

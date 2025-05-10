@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { getUsageMetrics, getSystemHealth } from "@/lib/api";
+import { getUsageMetrics, getSystemHealth, UsageMetrics, SystemHealth } from "@/lib/api";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Progress } from "@/components/ui/progress";
@@ -7,23 +7,6 @@ import { Link } from "wouter";
 import { CheckCircle, AlertTriangle, ServerCrash, Activity, BrainCircuit, Cpu, Code, Workflow } from "lucide-react";
 
 export function DashboardOverview() {
-  // Define types for API responses
-  interface UsageMetrics {
-    totalRequests: number;
-    patternMatches: number;
-    apiCalls: number;
-    estimatedTokensSaved: number;
-    estimatedCostSaved: number;
-  }
-
-  interface SystemHealth {
-    status: "healthy" | "unhealthy" | "error";
-    message: string;
-    database?: any;
-    ai?: any;
-    server?: any;
-  }
-
   // Get usage metrics
   const usageQuery = useQuery<UsageMetrics>({
     queryKey: ["/api/metrics/usage"],

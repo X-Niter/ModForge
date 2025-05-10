@@ -29,10 +29,8 @@ export async function generateModIdeas(params: {
 }) {
   try {
     // Call our server API endpoint instead of OpenAI directly
-    return apiRequest("/api/ai/generate-ideas", {
-      method: "POST",
-      data: params
-    });
+    const response = await apiRequest("POST", "/api/ai/generate-ideas", params);
+    return response.json();
   } catch (error) {
     console.error("Error in generateModIdeas:", error);
     throw error;

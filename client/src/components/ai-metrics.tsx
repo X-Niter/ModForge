@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { getUsageMetrics, getPatternLearningMetrics } from "@/lib/api";
+import { getUsageMetrics, getPatternLearningMetrics, UsageMetrics, PatternMetrics } from "@/lib/api";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
@@ -10,13 +10,13 @@ export function AIMetrics() {
   const [activeTab, setActiveTab] = useState("usage");
 
   // Fetch usage metrics
-  const usageQuery = useQuery({
+  const usageQuery = useQuery<UsageMetrics>({
     queryKey: ["/api/metrics/usage"],
     refetchInterval: 60000, // Refresh every minute
   });
 
   // Fetch pattern learning metrics
-  const patternQuery = useQuery({
+  const patternQuery = useQuery<PatternMetrics>({
     queryKey: ["/api/pattern-learning/metrics"],
     refetchInterval: 60000, // Refresh every minute
   });
