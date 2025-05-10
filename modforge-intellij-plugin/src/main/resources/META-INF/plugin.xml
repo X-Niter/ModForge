@@ -3,6 +3,8 @@
     <id>com.modforge.intellij.plugin</id>
     <name>ModForge</name>
     <vendor email="support@modforge.dev" url="https://modforge.dev">ModForge</vendor>
+    <name>ModForge</name>
+    <vendor email="support@modforge.dev" url="https://modforge.dev">ModForge</vendor>
     <description><![CDATA[
         <p>ModForge is an AI-powered development platform for Minecraft mods.</p>
         <p>Features:</p>
