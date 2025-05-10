@@ -4,6 +4,8 @@ import { setupVite, serveStatic, log } from "./vite";
 import helmet from "helmet";
 
 const app = express();
+// Enable trust proxy to work correctly with express-rate-limit behind a proxy (like in Replit)
+app.set('trust proxy', 1);
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 

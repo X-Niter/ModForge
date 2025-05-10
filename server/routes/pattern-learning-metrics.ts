@@ -29,13 +29,69 @@ patternLearningRouter.get('/metrics', async (req, res) => {
     // Get the usage metrics tracked by the AI service manager
     const usageMetrics = getUsageMetrics();
     
-    // Get pattern counts from database
-    const codePatterns = await db.select().from(schema.codePatterns);
-    const errorPatterns = await db.select().from(schema.errorPatterns);
-    const ideaPatterns = await db.select().from(schema.ideaPatterns);
-    const expansionPatterns = await db.select().from(schema.ideaExpansionPatterns);
-    const featurePatterns = await db.select().from(schema.featurePatterns);
-    const docPatterns = await db.select().from(schema.documentationPatterns);
+    // Get pattern counts from database with error handling
+    let codePatterns = [], errorPatterns = [], ideaPatterns = [];
+    let expansionPatterns = [], featurePatterns = [], docPatterns = [];
+    
+    try {
+      codePatterns = await db.select({
+        id: schema.codePatterns.id,
+        useCount: schema.codePatterns.useCount,
+        successRate: schema.codePatterns.successRate
+      }).from(schema.codePatterns);
+    } catch (error) {
+      console.log('Code patterns table not available:', error.message);
+    }
+    
+    try {
+      errorPatterns = await db.select({
+        id: schema.errorPatterns.id,
+        successCount: schema.errorPatterns.successCount,
+        failureCount: schema.errorPatterns.failureCount
+      }).from(schema.errorPatterns);
+    } catch (error) {
+      console.log('Error patterns table not available:', error.message);
+    }
+    
+    try {
+      ideaPatterns = await db.select({
+        id: schema.ideaPatterns.id,
+        useCount: schema.ideaPatterns.useCount,
+        successRate: schema.ideaPatterns.successRate
+      }).from(schema.ideaPatterns);
+    } catch (error) {
+      console.log('Idea patterns table not available:', error.message);
+    }
+    
+    try {
+      expansionPatterns = await db.select({
+        id: schema.ideaExpansionPatterns.id,
+        useCount: schema.ideaExpansionPatterns.useCount,
+        successRate: schema.ideaExpansionPatterns.successRate
+      }).from(schema.ideaExpansionPatterns);
+    } catch (error) {
+      console.log('Expansion patterns table not available:', error.message);
+    }
+    
+    try {
+      featurePatterns = await db.select({
+        id: schema.featurePatterns.id,
+        useCount: schema.featurePatterns.useCount,
+        successRate: schema.featurePatterns.successRate
+      }).from(schema.featurePatterns);
+    } catch (error) {
+      console.log('Feature patterns table not available:', error.message);
+    }
+    
+    try {
+      docPatterns = await db.select({
+        id: schema.documentationPatterns.id,
+        useCount: schema.documentationPatterns.useCount,
+        successRate: schema.documentationPatterns.successRate
+      }).from(schema.documentationPatterns);
+    } catch (error) {
+      console.log('Documentation patterns table not available:', error.message);
+    }
     
     // Calculate total patterns
     const totalPatterns = 
@@ -145,33 +201,105 @@ patternLearningRouter.get('/patterns/:type', async (req, res) => {
     
     switch (type) {
       case 'code':
-        const codePatterns = await db.select().from(schema.codePatterns).limit(limit);
-        res.json(codePatterns);
+        try {
+          const patterns = await db.select({
+            id: schema.codePatterns.id,
+            patternType: schema.codePatterns.patternType,
+            modLoader: schema.codePatterns.modLoader,
+            minecraftVersion: schema.codePatterns.minecraftVersion,
+            useCount: schema.codePatterns.useCount,
+            successRate: schema.codePatterns.successRate,
+            createdAt: schema.codePatterns.createdAt
+          }).from(schema.codePatterns).limit(limit);
+          res.json(patterns);
+        } catch (error) {
+          console.error('Error querying code patterns:', error.message);
+          res.json([]);
+        }
         break;
         
       case 'error':
-        const errorPatterns = await db.select().from(schema.errorPatterns).limit(limit);
-        res.json(errorPatterns);
+        try {
+          const patterns = await db.select({
+            id: schema.errorPatterns.id,
+            errorType: schema.errorPatterns.errorType,
+            modLoader: schema.errorPatterns.modLoader,
+            successCount: schema.errorPatterns.successCount,
+            failureCount: schema.errorPatterns.failureCount,
+            createdAt: schema.errorPatterns.createdAt
+          }).from(schema.errorPatterns).limit(limit);
+          res.json(patterns);
+        } catch (error) {
+          console.error('Error querying error patterns:', error.message);
+          res.json([]);
+        }
         break;
         
       case 'idea':
-        const ideaPatterns = await db.select().from(schema.ideaPatterns).limit(limit);
-        res.json(ideaPatterns);
+        try {
+          const patterns = await db.select({
+            id: schema.ideaPatterns.id,
+            category: schema.ideaPatterns.category,
+            useCount: schema.ideaPatterns.useCount,
+            successRate: schema.ideaPatterns.successRate,
+            createdAt: schema.ideaPatterns.createdAt
+          }).from(schema.ideaPatterns).limit(limit);
+          res.json(patterns);
+        } catch (error) {
+          console.error('Error querying idea patterns:', error.message);
+          res.json([]);
+        }
         break;
         
       case 'expansion':
-        const expansionPatterns = await db.select().from(schema.ideaExpansionPatterns).limit(limit);
-        res.json(expansionPatterns);
+        try {
+          const patterns = await db.select({
+            id: schema.ideaExpansionPatterns.id,
+            originalIdeaTitle: schema.ideaExpansionPatterns.originalIdeaTitle,
+            useCount: schema.ideaExpansionPatterns.useCount,
+            successRate: schema.ideaExpansionPatterns.successRate,
+            createdAt: schema.ideaExpansionPatterns.createdAt
+          }).from(schema.ideaExpansionPatterns).limit(limit);
+          res.json(patterns);
+        } catch (error) {
+          console.error('Error querying expansion patterns:', error.message);
+          res.json([]);
+        }
         break;
         
       case 'feature':
-        const featurePatterns = await db.select().from(schema.featurePatterns).limit(limit);
-        res.json(featurePatterns);
+        try {
+          const patterns = await db.select({
+            id: schema.featurePatterns.id,
+            featureType: schema.featurePatterns.featureType,
+            modLoader: schema.featurePatterns.modLoader,
+            useCount: schema.featurePatterns.useCount,
+            successRate: schema.featurePatterns.successRate,
+            createdAt: schema.featurePatterns.createdAt
+          }).from(schema.featurePatterns).limit(limit);
+          res.json(patterns);
+        } catch (error) {
+          console.error('Error querying feature patterns:', error.message);
+          res.json([]);
+        }
         break;
         
       case 'documentation':
-        const docPatterns = await db.select().from(schema.documentationPatterns).limit(limit);
-        res.json(docPatterns);
+        try {
+          const patterns = await db.select({
+            id: schema.documentationPatterns.id,
+            codeType: schema.documentationPatterns.codeType,
+            language: schema.documentationPatterns.language,
+            style: schema.documentationPatterns.style,
+            useCount: schema.documentationPatterns.useCount,
+            successRate: schema.documentationPatterns.successRate,
+            createdAt: schema.documentationPatterns.createdAt
+          }).from(schema.documentationPatterns).limit(limit);
+          res.json(patterns);
+        } catch (error) {
+          console.error('Error querying documentation patterns:', error.message);
+          res.json([]);
+        }
         break;
         
       default:

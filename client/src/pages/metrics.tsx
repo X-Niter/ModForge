@@ -6,13 +6,41 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Progress } from "@/components/ui/progress";
 import { AlertTriangle, BarChart, BrainCircuit, CheckCircle, TrendingUp } from "lucide-react";
 
+// Define types for API responses
+interface ApiMetrics {
+  totalRequests: number;
+  patternMatches: number;
+  apiCalls: number;
+  estimatedTokensSaved: number;
+  estimatedCostSaved: number;
+  patternMatchRate: string;
+  apiCallRate: string;
+}
+
+interface TypeMetrics {
+  patterns: number;
+  uses: number;
+  successRate: number;
+}
+
+interface PatternMetrics {
+  overall: {
+    totalPatterns: number;
+    totalUses: number;
+    successRate: number;
+    estimatedTokensSaved: number;
+    estimatedCostSaved: number;
+  };
+  byType: Record<string, TypeMetrics>;
+}
+
 export default function MetricsPage() {
-  const { data: apiMetrics, isLoading: isLoadingApiMetrics } = useQuery({
+  const { data: apiMetrics, isLoading: isLoadingApiMetrics } = useQuery<ApiMetrics>({
     queryKey: ['/api/metrics/usage'],
     staleTime: 1000 * 60, // 1 minute
   });
 
-  const { data: patternMetrics, isLoading: isLoadingPatternMetrics } = useQuery({
+  const { data: patternMetrics, isLoading: isLoadingPatternMetrics } = useQuery<PatternMetrics>({
     queryKey: ['/api/pattern-learning/metrics'],
     staleTime: 1000 * 60, // 1 minute
   });
