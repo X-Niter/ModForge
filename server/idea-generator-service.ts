@@ -182,12 +182,12 @@ export async function expandModIdea(title: string, description: string): Promise
     suggestedImplementationApproach: string;
   }
 }> {
-  console.log(`${getTimestamp()} Expanding mod idea: ${ideaTitle}`);
+  console.log(`${getTimestamp()} Expanding mod idea: ${title}`);
   
   try {
     const systemPrompt = `You are an expert Minecraft mod developer with extensive knowledge of mod implementation, Java coding for Minecraft, and game design principles.
     
-A user has requested more detailed information about their mod idea titled "${ideaTitle}" with the following description: "${ideaDescription}"
+A user has requested more detailed information about their mod idea titled "${title}" with the following description: "${description}"
 
 Expand this idea into a detailed mod concept. Include:
 
@@ -225,7 +225,7 @@ Format your response as a JSON object with the following structure:
       model: "gpt-4o", // the newest OpenAI model is "gpt-4o" which was released May 13, 2024. do not change this unless explicitly requested by the user
       messages: [
         { role: "system", content: systemPrompt },
-        { role: "user", content: `Please expand the mod idea "${ideaTitle}" with the description "${ideaDescription}" into a detailed mod concept.` }
+        { role: "user", content: `Please expand the mod idea "${title}" with the description "${description}" into a detailed mod concept.` }
       ],
       response_format: { type: "json_object" },
       temperature: 0.7,
@@ -233,7 +233,7 @@ Format your response as a JSON object with the following structure:
 
     // Parse and return the response
     const responseContent = completion.choices[0].message.content;
-    console.log(`${getTimestamp()} Successfully expanded mod idea: ${ideaTitle}`);
+    console.log(`${getTimestamp()} Successfully expanded mod idea: ${title}`);
     
     if (!responseContent) {
       throw new Error("Received empty response from OpenAI");
