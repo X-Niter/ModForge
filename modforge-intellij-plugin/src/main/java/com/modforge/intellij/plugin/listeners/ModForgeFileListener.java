@@ -4,155 +4,150 @@ import com.intellij.openapi.components.Service;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vfs.VirtualFile;
+import com.intellij.openapi.vfs.VirtualFileCopyEvent;
 import com.intellij.openapi.vfs.VirtualFileEvent;
 import com.intellij.openapi.vfs.VirtualFileListener;
-import com.intellij.openapi.vfs.VirtualFileManagerListener;
-import com.intellij.psi.PsiFile;
-import com.intellij.psi.PsiJavaFile;
-import com.intellij.psi.PsiManager;
+import com.intellij.openapi.vfs.VirtualFileMoveEvent;
+import com.intellij.openapi.vfs.VirtualFilePropertyEvent;
+import com.modforge.intellij.plugin.services.ContinuousDevelopmentService;
 import com.modforge.intellij.plugin.settings.ModForgeSettings;
 import org.jetbrains.annotations.NotNull;
 
+import java.util.HashSet;
+import java.util.Set;
+
 /**
- * Service that listens for file changes.
- * This service is used to detect changes to files and trigger appropriate actions.
+ * Listener for file events.
  */
-@Service(Service.Level.PROJECT)
+@Service
 public final class ModForgeFileListener implements VirtualFileListener {
     private static final Logger LOG = Logger.getInstance(ModForgeFileListener.class);
     
     private final Project project;
+    private final Set<String> trackedExtensions = new HashSet<>();
     
     /**
-     * Creates a new ModForgeFileListener.
+     * Gets the instance of this listener for the specified project.
      * @param project The project
-     */
-    public ModForgeFileListener(@NotNull Project project) {
-        this.project = project;
-        
-        // Register listener
-        project.getBaseDir().getFileSystem().addVirtualFileListener(this);
-        
-        LOG.info("File listener created for project: " + project.getName());
-    }
-    
-    /**
-     * Gets the ModForgeFileListener for a project.
-     * @param project The project
-     * @return The ModForgeFileListener
+     * @return The listener instance
      */
     public static ModForgeFileListener getInstance(@NotNull Project project) {
         return project.getService(ModForgeFileListener.class);
     }
     
-    @Override
-    public void fileCreated(@NotNull VirtualFileEvent event) {
-        VirtualFile file = event.getFile();
+    /**
+     * Creates a new instance of this listener.
+     * @param project The project
+     */
+    public ModForgeFileListener(Project project) {
+        this.project = project;
         
-        if (!shouldProcessFile(file)) {
-            return;
-        }
+        // Initialize tracked extensions
+        trackedExtensions.add("java");
+        trackedExtensions.add("kt");
+        trackedExtensions.add("gradle");
+        trackedExtensions.add("properties");
+        trackedExtensions.add("json");
+        trackedExtensions.add("toml");
         
-        LOG.info("File created: " + file.getPath());
-    }
-    
-    @Override
-    public void fileDeleted(@NotNull VirtualFileEvent event) {
-        VirtualFile file = event.getFile();
-        
-        if (!shouldProcessFile(file)) {
-            return;
-        }
-        
-        LOG.info("File deleted: " + file.getPath());
+        LOG.info("ModForge file listener initialized");
     }
     
     @Override
     public void contentsChanged(@NotNull VirtualFileEvent event) {
-        VirtualFile file = event.getFile();
-        
-        if (!shouldProcessFile(file)) {
+        if (!isTrackedFile(event.getFile())) {
             return;
         }
         
-        LOG.info("File changed: " + file.getPath());
+        LOG.info("File contents changed: " + event.getFile().getPath());
         
-        // Get PSI file
-        PsiFile psiFile = PsiManager.getInstance(project).findFile(file);
-        
-        if (psiFile == null) {
+        // Check if continuous development is enabled
+        ModForgeSettings settings = ModForgeSettings.getInstance();
+        if (!settings.isContinuousDevelopmentEnabled()) {
             return;
         }
         
-        // Process file
-        processFileChange(psiFile);
-    }
-    
-    /**
-     * Processes a file change.
-     * @param psiFile The PSI file
-     */
-    private void processFileChange(@NotNull PsiFile psiFile) {
-        // Check if the file is a Java file
-        if (psiFile instanceof PsiJavaFile) {
-            LOG.info("Processing Java file change: " + psiFile.getName());
-            processJavaFileChange((PsiJavaFile) psiFile);
+        // Get service
+        ContinuousDevelopmentService service = ContinuousDevelopmentService.getInstance(project);
+        
+        if (service == null) {
+            LOG.warn("Continuous development service not available");
+            return;
+        }
+        
+        // If service is running, this will eventually trigger a check
+        if (service.isRunning()) {
+            LOG.info("Continuous development is running, changes will be processed");
         }
     }
     
-    /**
-     * Processes a Java file change.
-     * @param javaFile The Java file
-     */
-    private void processJavaFileChange(@NotNull PsiJavaFile javaFile) {
-        // Extract package name
-        String packageName = javaFile.getPackageName();
-        LOG.info("Java file package: " + packageName);
-        
-        // Extract class names
-        String[] classNames = javaFile.getClasses().stream()
-                .map(psiClass -> psiClass.getName())
-                .toArray(String[]::new);
-        
-        if (classNames.length > 0) {
-            LOG.info("Java file classes: " + String.join(", ", classNames));
+    @Override
+    public void fileCreated(@NotNull VirtualFileEvent event) {
+        if (!isTrackedFile(event.getFile())) {
+            return;
         }
+        
+        LOG.info("File created: " + event.getFile().getPath());
+    }
+    
+    @Override
+    public void fileDeleted(@NotNull VirtualFileEvent event) {
+        if (!isTrackedFile(event.getFile())) {
+            return;
+        }
+        
+        LOG.info("File deleted: " + event.getFile().getPath());
+    }
+    
+    @Override
+    public void fileMoved(@NotNull VirtualFileMoveEvent event) {
+        if (!isTrackedFile(event.getFile())) {
+            return;
+        }
+        
+        LOG.info("File moved: " + event.getFile().getPath() + " -> " + event.getNewParent().getPath());
+    }
+    
+    @Override
+    public void fileCopied(@NotNull VirtualFileCopyEvent event) {
+        if (!isTrackedFile(event.getFile())) {
+            return;
+        }
+        
+        LOG.info("File copied: " + event.getOriginalFile().getPath() + " -> " + event.getFile().getPath());
+    }
+    
+    @Override
+    public void propertyChanged(@NotNull VirtualFilePropertyEvent event) {
+        if (!isTrackedFile(event.getFile())) {
+            return;
+        }
+        
+        LOG.info("File property changed: " + event.getFile().getPath() + " - " + event.getPropertyName());
     }
     
     /**
-     * Checks if a file should be processed.
-     * @param file The file
-     * @return True if the file should be processed, false otherwise
+     * Checks if a file is tracked by this listener.
+     * @param file The file to check
+     * @return True if the file is tracked, false otherwise
      */
-    private boolean shouldProcessFile(@NotNull VirtualFile file) {
-        // Check if file exists
-        if (!file.exists()) {
+    private boolean isTrackedFile(VirtualFile file) {
+        if (file == null || !file.isValid() || file.isDirectory()) {
             return false;
         }
         
         // Check if file is in project
-        if (!file.getPath().startsWith(project.getBasePath())) {
+        String projectBasePath = project.getBasePath();
+        if (projectBasePath != null && !file.getPath().startsWith(projectBasePath)) {
             return false;
         }
         
-        // Check if file is a source file
+        // Check if file has a tracked extension
         String extension = file.getExtension();
-        return extension != null && (
-                extension.equals("java") ||
-                extension.equals("kt") ||
-                extension.equals("gradle") ||
-                extension.equals("gradle.kts") ||
-                extension.equals("xml")
-        );
-    }
-    
-    /**
-     * Disposes the listener.
-     */
-    public void dispose() {
-        LOG.info("Disposing file listener for project: " + project.getName());
+        if (extension == null) {
+            return false;
+        }
         
-        // Unregister listener
-        project.getBaseDir().getFileSystem().removeVirtualFileListener(this);
+        return trackedExtensions.contains(extension.toLowerCase());
     }
 }
