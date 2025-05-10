@@ -1,8 +1,11 @@
 import { pgTable, text, serial, integer, timestamp, jsonb } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
-import { relations } from "drizzle-orm";
-import { mods } from "./mods";
+
+// Forward reference for mods table
+const mods = pgTable("mods", {
+  id: serial("id").primaryKey(),
+});
 
 /**
  * ModFiles schema
@@ -18,17 +21,6 @@ export const modFiles = pgTable("mod_files", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
-
-/**
- * Define relations for the modFiles table
- */
-export const modFilesRelations = relations(modFiles, ({ one }) => ({
-  // A file belongs to one mod
-  mod: one(mods, {
-    fields: [modFiles.modId],
-    references: [mods.id],
-  }),
-}));
 
 /**
  * Schema for modFile insertion validation

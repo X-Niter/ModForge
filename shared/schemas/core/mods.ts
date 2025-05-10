@@ -1,7 +1,6 @@
 import { pgTable, text, serial, integer, jsonb, timestamp } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
-import { relations } from "drizzle-orm";
 import { ModLoader } from "./types";
 
 // Forward references to avoid circular dependencies
@@ -27,21 +26,6 @@ export const mods = pgTable("mods", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
-
-/**
- * Define relations for the mods table
- */
-export const modsRelations = relations(mods, ({ one, many }) => ({
-  // A mod belongs to one user
-  user: one("users", {
-    fields: [mods.userId],
-    references: [(users as any).id],
-  }),
-  // A mod can have many builds
-  builds: many("builds"),
-  // A mod can have many files
-  files: many("mod_files"),
-}));
 
 /**
  * ModStatus enum

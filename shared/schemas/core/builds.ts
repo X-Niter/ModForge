@@ -1,8 +1,6 @@
 import { pgTable, text, serial, integer, jsonb, timestamp, boolean } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
-import { relations } from "drizzle-orm";
-import { mods } from "./mods";
 
 /**
  * BuildStatus enum
@@ -14,6 +12,11 @@ export enum BuildStatus {
   Success = "succeeded",
   Failed = "failed"
 }
+
+// Forward reference for mods table
+const mods = pgTable("mods", {
+  id: serial("id").primaryKey(),
+});
 
 /**
  * Builds schema
@@ -36,17 +39,6 @@ export const builds = pgTable("builds", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
   completedAt: timestamp("completed_at"),
 });
-
-/**
- * Define relations for the builds table
- */
-export const buildsRelations = relations(builds, ({ one }) => ({
-  // A build belongs to one mod
-  mod: one(mods, {
-    fields: [builds.modId],
-    references: [mods.id],
-  }),
-}));
 
 /**
  * Schema for build insertion validation

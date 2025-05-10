@@ -1,5 +1,6 @@
 import winston from 'winston';
 import path from 'path';
+import fs from 'fs';
 
 // Define log levels
 const levels = {
@@ -43,13 +44,23 @@ const fileFormat = winston.format.combine(
   winston.format.json(),
 );
 
-// Define transports
-const transports = [
-  // Console transport for all environments
+// Make sure logs directory exists in production
+if (process.env.NODE_ENV === 'production') {
+  const logDir = path.join(process.cwd(), 'logs');
+  if (!fs.existsSync(logDir)) {
+    fs.mkdirSync(logDir, { recursive: true });
+  }
+}
+
+// Define transports array with explicit type annotation to avoid TypeScript errors
+const transports = [] as winston.transport[];
+
+// Add console transport separately to avoid TypeScript errors
+transports.push(
   new winston.transports.Console({
     format: consoleFormat,
-  })
-];
+  }) as winston.transport
+);
 
 // Add file transports in production
 if (process.env.NODE_ENV === 'production') {
@@ -64,7 +75,7 @@ if (process.env.NODE_ENV === 'production') {
       format: fileFormat,
       maxsize: 5242880, // 5MB
       maxFiles: 5,
-    })
+    }) as winston.transport
   );
   
   // Add combined log file
@@ -74,7 +85,7 @@ if (process.env.NODE_ENV === 'production') {
       format: fileFormat,
       maxsize: 5242880, // 5MB
       maxFiles: 5,
-    })
+    }) as winston.transport
   );
 }
 

@@ -1,8 +1,6 @@
 import { pgTable, text, serial, boolean, timestamp } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
-import { relations } from "drizzle-orm";
-import { mods } from "./mods";
 
 /**
  * Users schema
@@ -21,14 +19,6 @@ export const users = pgTable("users", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
-
-/**
- * Define relations for the users table
- */
-export const usersRelations = relations(users, ({ many }) => ({
-  // A user can have many mods
-  mods: many(mods),
-}));
 
 /**
  * Schema for user insertion validation
