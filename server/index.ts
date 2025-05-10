@@ -8,6 +8,7 @@ import connectPgSimple from "connect-pg-simple";
 import authRoutes from "./routes/auth-routes";
 import { scheduleMaintenanceTasks } from "./maintenance-tasks";
 import { rootLogger, getLogger } from "./logging";
+import { initializeErrorRecovery, cleanupScheduledJobs } from "./index-error-recovery";
 
 const app = express();
 // Enable trust proxy to work correctly with express-rate-limit behind a proxy (like in Replit)
@@ -179,11 +180,16 @@ process.on('unhandledRejection', (reason, promise) => {
 });
 
 (async () => {
+  rootLogger.info("Initializing ModForge server with 24/7 reliability features");
+  
   // Setup memory management system for 24/7 operation
   const cleanupMemoryManagement = setupMemoryManagement();
   
   // Setup periodic maintenance tasks for 24/7 operation
   const cleanupMaintenanceTasks = scheduleMaintenanceTasks();
+  
+  // Initialize error recovery system
+  const cleanupErrorRecovery = initializeErrorRecovery();
   
   const server = await registerRoutes(app);
 
@@ -237,6 +243,14 @@ process.on('unhandledRejection', (reason, promise) => {
     // Clean up maintenance tasks
     shutdownLogger.info('Shutting down maintenance tasks...');
     cleanupMaintenanceTasks();
+    
+    // Clean up error recovery and scheduled jobs
+    shutdownLogger.info('Shutting down error recovery system...');
+    cleanupErrorRecovery();
+    
+    // Clean up all scheduled jobs
+    shutdownLogger.info('Shutting down scheduled jobs...');
+    cleanupScheduledJobs();
     
     // Import the continuousService to clean it up
     const { continuousService } = await import('./continuous-service');
