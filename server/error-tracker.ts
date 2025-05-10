@@ -381,7 +381,8 @@ export function trackError(
           }
         ).catch(notificationError => {
           logger.error("Failed to send critical error notification", { 
-            error: notificationError,
+            error: notificationError instanceof Error ? notificationError.message : String(notificationError),
+            stack: notificationError instanceof Error ? notificationError.stack : undefined,
             originalErrorId: trackedError.id
           });
         });
@@ -753,7 +754,10 @@ export function scheduleErrorStoreCleanup(
       const purged = purgeResolvedErrors(olderThan);
       logger.debug(`Scheduled cleanup of resolved errors complete`, { purged });
     } catch (err) {
-      logger.error('Error in scheduled resolved errors cleanup', { error: err });
+      logger.error('Error in scheduled resolved errors cleanup', { 
+        error: err instanceof Error ? err.message : String(err),
+        stack: err instanceof Error ? err.stack : undefined
+      });
     }
   }, resolvedInterval);
   
@@ -764,7 +768,10 @@ export function scheduleErrorStoreCleanup(
       const purged = purgeAllOldErrors(olderThan);
       logger.debug(`Scheduled cleanup of old errors complete`, { purged });
     } catch (err) {
-      logger.error('Error in scheduled old errors cleanup', { error: err });
+      logger.error('Error in scheduled old errors cleanup', { 
+        error: err instanceof Error ? err.message : String(err),
+        stack: err instanceof Error ? err.stack : undefined
+      });
     }
   }, oldInterval);
   
@@ -776,7 +783,10 @@ export function scheduleErrorStoreCleanup(
         logger.debug(`Error store size limited`, { purged, newSize: errorStore.size });
       }
     } catch (err) {
-      logger.error('Error in error store size limiting', { error: err });
+      logger.error('Error in error store size limiting', { 
+        error: err instanceof Error ? err.message : String(err),
+        stack: err instanceof Error ? err.stack : undefined
+      });
     }
   }, limitInterval);
   
