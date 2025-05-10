@@ -29,7 +29,7 @@ const notificationChannelConfigSchema = z.object({
     NotificationSeverity.ERROR,
     NotificationSeverity.CRITICAL
   ]),
-  config: z.record(z.string(), z.any())
+  config: z.record(z.string(), z.union([z.string(), z.number(), z.boolean(), z.null()]))
 });
 
 const updateNotificationSettingsSchema = z.object({
@@ -90,7 +90,15 @@ router.post('/settings', (req, res) => {
     }
     
     // Transform to proper format for updateNotificationSettings
-    const settingsToUpdate: any = {};
+    const settingsToUpdate: {
+      channels?: typeof result.data.channels;
+      batchingSeconds?: number;
+      throttling?: {
+        enabled?: boolean;
+        maxPerHour?: number;
+        maxPerDay?: number;
+      };
+    } = {};
     
     if (result.data.channels) {
       settingsToUpdate.channels = result.data.channels;
