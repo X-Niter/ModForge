@@ -30,8 +30,8 @@ app.use(session({
   }
 }));
 
-// Register authentication routes
-app.use('/api/auth', authRoutes);
+// We'll use our new auth implementation instead of the old routes
+// app.use('/api/auth', authRoutes);
 
 // Set security headers with helmet
 app.use(helmet({
