@@ -15,9 +15,10 @@ ModForge IntelliJ Plugin is an AI-powered assistant for Minecraft mod developmen
 
 ## System Requirements
 
-- IntelliJ IDEA 2023.2 or later (Community or Ultimate edition)
-- Java Development Kit (JDK) 17 or later
+- IntelliJ IDEA 2025.1 (Build #IC-251.23774.435) or compatible version (Community or Ultimate edition)
+- Java Development Kit (JDK) 21.0.6 or later (compatible with JBR runtime 21.0.6+9-b895.109)
 - Internet connection for API access
+- Compatible with Minecraft Development plugin (v2025.1-1.8.4)
 
 ## Installation
 
