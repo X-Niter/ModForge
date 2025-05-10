@@ -7,6 +7,7 @@ import {
   ErrorCategory, 
   ErrorSeverity 
 } from './error-handler';
+import { trackError } from './error-tracker';
 
 // Map client-side BuildStatus enum to string values expected by the database
 enum BuildStatus {
@@ -140,6 +141,16 @@ class ContinuousService extends EventEmitter {
         // Don't let maintenance errors crash the service
         console.error("Error in circuit breaker maintenance:", 
           error instanceof Error ? error.message : String(error));
+          
+        // Log to error tracking system
+        trackError(
+          error instanceof Error ? error : new Error(String(error)),
+          { operation: 'circuitBreakerMaintenance' },
+          { 
+            category: ErrorCategory.CONTINUOUS_DEVELOPMENT,
+            severity: ErrorSeverity.MEDIUM 
+          }
+        );
       }
     }, 15 * 60 * 1000);
   }
@@ -574,14 +585,32 @@ class ContinuousService extends EventEmitter {
       }
       
       // If all retries failed or it's not a transient error, increment circuit breaker
-      const circuitBreakerKey = `circuit_breaker_${modId}`;
-      const currentCount = parseInt(process.env[circuitBreakerKey] || '0', 10);
-      process.env[circuitBreakerKey] = (currentCount + 1).toString();
-      
-      // If circuit breaker threshold reached, trip it
-      if (currentCount + 1 >= 5) {
-        process.env[`${circuitBreakerKey}_time`] = Date.now().toString();
-        logContinuous(modId, `Circuit breaker tripped after ${currentCount + 1} consecutive failures.`, 'warn');
+      try {
+        const circuitBreakerKey = `circuit_breaker_${modId}`;
+        const currentCount = parseInt(process.env[circuitBreakerKey] || '0', 10);
+        
+        // Handle potential NaN
+        const safeCount = isNaN(currentCount) ? 0 : currentCount;
+        process.env[circuitBreakerKey] = (safeCount + 1).toString();
+        
+        // If circuit breaker threshold reached, trip it
+        if (safeCount + 1 >= 5) {
+          process.env[`${circuitBreakerKey}_time`] = Date.now().toString();
+          logContinuous(modId, `Circuit breaker tripped after ${safeCount + 1} consecutive failures.`, 'warn');
+          
+          // Record error in error tracking system
+          trackError(
+            new Error(`Circuit breaker tripped for mod ${modId}`),
+            { modId, failureCount: safeCount + 1 },
+            { 
+              category: ErrorCategory.CONTINUOUS_DEVELOPMENT,
+              severity: ErrorSeverity.HIGH
+            }
+          );
+        }
+      } catch (cbError) {
+        // Don't let circuit breaker errors prevent operation
+        logContinuous(modId, `Error in circuit breaker logic: ${cbError instanceof Error ? cbError.message : String(cbError)}`, 'error');
         
         try {
           // Update any ongoing builds to failed status
