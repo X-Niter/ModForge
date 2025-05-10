@@ -10,7 +10,7 @@ import com.modforge.intellij.plugin.settings.ModForgeSettings;
 import org.jetbrains.annotations.NotNull;
 
 /**
- * Action for toggling AI pattern recognition.
+ * Action for toggling pattern recognition.
  */
 public class TogglePatternRecognitionAction extends AnAction {
     private static final Logger LOG = Logger.getInstance(TogglePatternRecognitionAction.class);
@@ -19,42 +19,44 @@ public class TogglePatternRecognitionAction extends AnAction {
     public void actionPerformed(@NotNull AnActionEvent e) {
         Project project = e.getProject();
         
+        if (project == null) {
+            LOG.warn("Project is null");
+            return;
+        }
+        
         try {
+            // Check if authenticated
+            ModAuthenticationManager authManager = ModAuthenticationManager.getInstance();
+            if (!authManager.isAuthenticated()) {
+                Messages.showErrorDialog(
+                        project,
+                        "You must be logged in to toggle pattern recognition.",
+                        "Authentication Required"
+                );
+                return;
+            }
+            
             // Get settings
             ModForgeSettings settings = ModForgeSettings.getInstance();
-            boolean currentState = settings.isPatternRecognition();
+            boolean patternRecognition = settings.isPatternRecognition();
             
-            // Toggle state
-            settings.setPatternRecognition(!currentState);
-            boolean newState = !currentState;
+            // Toggle pattern recognition
+            boolean newValue = !patternRecognition;
+            settings.setPatternRecognition(newValue);
             
-            // Log state change
-            LOG.info("Pattern recognition " + (newState ? "enabled" : "disabled"));
-            
-            // Show confirmation
-            if (newState) {
-                Messages.showInfoMessage(
-                        project,
-                        "Pattern recognition has been enabled.\n" +
-                        "ModForge will learn from previous AI interactions to improve performance.",
-                        "Pattern Recognition Enabled"
-                );
-            } else {
-                Messages.showInfoMessage(
-                        project,
-                        "Pattern recognition has been disabled.\n" +
-                        "ModForge will use direct API calls for all operations.",
-                        "Pattern Recognition Disabled"
-                );
-            }
+            // Show message
+            Messages.showInfoMessage(
+                    project,
+                    "Pattern recognition " + (newValue ? "enabled" : "disabled"),
+                    "Pattern Recognition"
+            );
         } catch (Exception ex) {
-            LOG.error("Error toggling pattern recognition", ex);
+            LOG.error("Error in toggle pattern recognition action", ex);
             
-            // Show error
             Messages.showErrorDialog(
                     project,
-                    "An error occurred while toggling pattern recognition: " + ex.getMessage(),
-                    "Toggle Error"
+                    "An error occurred: " + ex.getMessage(),
+                    "Error"
             );
         }
     }
@@ -63,14 +65,16 @@ public class TogglePatternRecognitionAction extends AnAction {
     public void update(@NotNull AnActionEvent e) {
         // Only enable if authenticated
         ModAuthenticationManager authManager = ModAuthenticationManager.getInstance();
-        e.getPresentation().setEnabled(authManager.isAuthenticated());
         
-        // Update text based on current state
-        ModForgeSettings settings = ModForgeSettings.getInstance();
-        boolean isEnabled = settings.isPatternRecognition();
+        e.getPresentation().setEnabled(authManager.isAuthenticated() && e.getProject() != null);
         
-        e.getPresentation().setText(isEnabled 
-                ? "Disable Pattern Recognition" 
-                : "Enable Pattern Recognition");
+        // Update text
+        Project project = e.getProject();
+        if (project != null) {
+            ModForgeSettings settings = ModForgeSettings.getInstance();
+            boolean patternRecognition = settings.isPatternRecognition();
+            
+            e.getPresentation().setText(patternRecognition ? "Disable Pattern Recognition" : "Enable Pattern Recognition");
+        }
     }
 }

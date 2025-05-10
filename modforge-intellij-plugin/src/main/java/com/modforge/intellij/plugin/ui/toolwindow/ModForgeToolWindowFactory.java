@@ -9,7 +9,7 @@ import com.intellij.ui.content.ContentFactory;
 import org.jetbrains.annotations.NotNull;
 
 /**
- * Factory for creating ModForge tool window.
+ * Factory for ModForge tool window.
  */
 public class ModForgeToolWindowFactory implements ToolWindowFactory {
     private static final Logger LOG = Logger.getInstance(ModForgeToolWindowFactory.class);
@@ -17,17 +17,23 @@ public class ModForgeToolWindowFactory implements ToolWindowFactory {
     @Override
     public void createToolWindowContent(@NotNull Project project, @NotNull ToolWindow toolWindow) {
         try {
-            LOG.info("Creating ModForge tool window content");
+            ModForgeToolWindowContent toolWindowContent = new ModForgeToolWindowContent(project, toolWindow);
             
-            // Create tool window content
-            ModForgeToolWindowContent content = new ModForgeToolWindowContent(project, toolWindow);
-            
-            // Add content to tool window
             ContentFactory contentFactory = ContentFactory.getInstance();
-            Content toolWindowContent = contentFactory.createContent(content.getComponent(), "", false);
-            toolWindow.getContentManager().addContent(toolWindowContent);
+            Content content = contentFactory.createContent(toolWindowContent.getComponent(), "", false);
+            toolWindow.getContentManager().addContent(content);
         } catch (Exception e) {
             LOG.error("Error creating ModForge tool window content", e);
         }
+    }
+    
+    @Override
+    public void init(@NotNull ToolWindow toolWindow) {
+        toolWindow.setTitle("ModForge");
+    }
+    
+    @Override
+    public boolean shouldBeAvailable(@NotNull Project project) {
+        return true;
     }
 }

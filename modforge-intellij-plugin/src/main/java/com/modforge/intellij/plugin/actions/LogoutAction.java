@@ -18,37 +18,51 @@ public class LogoutAction extends AnAction {
     public void actionPerformed(@NotNull AnActionEvent e) {
         Project project = e.getProject();
         
+        if (project == null) {
+            LOG.warn("Project is null");
+            return;
+        }
+        
         try {
+            // Check if authenticated
+            ModAuthenticationManager authManager = ModAuthenticationManager.getInstance();
+            if (!authManager.isAuthenticated()) {
+                Messages.showInfoMessage(
+                        project,
+                        "You are not logged in.",
+                        "Not Logged In"
+                );
+                return;
+            }
+            
             // Confirm logout
-            int result = Messages.showYesNoDialog(
+            int option = Messages.showYesNoDialog(
                     project,
-                    "Are you sure you want to log out from ModForge?",
+                    "Are you sure you want to log out?",
                     "Confirm Logout",
                     Messages.getQuestionIcon()
             );
             
-            if (result == Messages.YES) {
-                // Log out
-                ModAuthenticationManager authManager = ModAuthenticationManager.getInstance();
-                authManager.logout();
-                
-                LOG.info("User logged out successfully");
-                
-                // Show confirmation
-                Messages.showInfoMessage(
-                        project,
-                        "You have been logged out from ModForge.",
-                        "Logged Out"
-                );
+            if (option != Messages.YES) {
+                return;
             }
-        } catch (Exception ex) {
-            LOG.error("Error during logout action", ex);
             
-            // Show error
+            // Logout
+            String username = authManager.getUsername();
+            authManager.logout();
+            
+            Messages.showInfoMessage(
+                    project,
+                    "Successfully logged out" + (username != null ? " from " + username : ""),
+                    "Logout Successful"
+            );
+        } catch (Exception ex) {
+            LOG.error("Error in logout action", ex);
+            
             Messages.showErrorDialog(
                     project,
-                    "An error occurred while logging out: " + ex.getMessage(),
-                    "Logout Error"
+                    "An error occurred: " + ex.getMessage(),
+                    "Error"
             );
         }
     }
@@ -57,6 +71,7 @@ public class LogoutAction extends AnAction {
     public void update(@NotNull AnActionEvent e) {
         // Only enable if authenticated
         ModAuthenticationManager authManager = ModAuthenticationManager.getInstance();
+        
         e.getPresentation().setEnabled(authManager.isAuthenticated());
     }
 }

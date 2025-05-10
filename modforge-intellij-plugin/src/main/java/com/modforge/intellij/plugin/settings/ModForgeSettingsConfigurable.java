@@ -1,9 +1,13 @@
 package com.modforge.intellij.plugin.settings;
 
-import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.options.Configurable;
-import com.intellij.openapi.options.ConfigurationException;
-import com.intellij.openapi.util.NlsContexts;
+import com.intellij.openapi.project.Project;
+import com.intellij.openapi.project.ProjectManager;
+import com.intellij.openapi.ui.Messages;
+import com.modforge.intellij.plugin.auth.ModAuthenticationManager;
+import com.modforge.intellij.plugin.services.ContinuousDevelopmentService;
+import com.modforge.intellij.plugin.utils.ConnectionTestUtil;
+import org.jetbrains.annotations.Nls;
 import org.jetbrains.annotations.Nullable;
 
 import javax.swing.*;
@@ -12,79 +16,103 @@ import javax.swing.*;
  * Configurable for ModForge settings.
  */
 public class ModForgeSettingsConfigurable implements Configurable {
-    private static final Logger LOG = Logger.getInstance(ModForgeSettingsConfigurable.class);
+    private ModForgeSettingsComponent mySettingsComponent;
     
-    private ModForgeSettingsComponent settingsComponent;
-    
+    @Nls(capitalization = Nls.Capitalization.Title)
     @Override
-    public @NlsContexts.ConfigurableName String getDisplayName() {
+    public String getDisplayName() {
         return "ModForge";
     }
-
+    
     @Override
     public JComponent getPreferredFocusedComponent() {
-        return settingsComponent.getPreferredFocusedComponent();
+        return mySettingsComponent.getPreferredFocusedComponent();
     }
-
+    
+    @Nullable
     @Override
-    public @Nullable JComponent createComponent() {
-        settingsComponent = new ModForgeSettingsComponent();
-        return settingsComponent.getPanel();
+    public JComponent createComponent() {
+        mySettingsComponent = new ModForgeSettingsComponent();
+        return mySettingsComponent.getPanel();
     }
-
+    
     @Override
     public boolean isModified() {
-        try {
-            ModForgeSettings settings = ModForgeSettings.getInstance();
-            
-            // Check if any settings have been modified
-            return !settingsComponent.getServerUrl().equals(settings.getServerUrl())
-                    || settingsComponent.isContinuousDevelopment() != settings.isContinuousDevelopment()
-                    || settingsComponent.isPatternRecognition() != settings.isPatternRecognition()
-                    || settingsComponent.getPollingInterval() != settings.getPollingInterval();
-        } catch (Exception e) {
-            LOG.error("Error checking if settings are modified", e);
-            return false;
-        }
+        ModForgeSettings settings = ModForgeSettings.getInstance();
+        
+        return !mySettingsComponent.getServerUrl().equals(settings.getServerUrl()) ||
+               mySettingsComponent.getContinuousDevelopment() != settings.isContinuousDevelopment() ||
+               mySettingsComponent.getPatternRecognition() != settings.isPatternRecognition();
     }
-
+    
     @Override
-    public void apply() throws ConfigurationException {
-        try {
-            ModForgeSettings settings = ModForgeSettings.getInstance();
+    public void apply() {
+        ModForgeSettings settings = ModForgeSettings.getInstance();
+        
+        // Get current values
+        String oldServerUrl = settings.getServerUrl();
+        boolean oldContinuousDevelopment = settings.isContinuousDevelopment();
+        
+        // Apply new values
+        settings.setServerUrl(mySettingsComponent.getServerUrl());
+        settings.setContinuousDevelopment(mySettingsComponent.getContinuousDevelopment());
+        settings.setPatternRecognition(mySettingsComponent.getPatternRecognition());
+        
+        // Test connection if server URL changed
+        if (!oldServerUrl.equals(mySettingsComponent.getServerUrl())) {
+            boolean connected = ConnectionTestUtil.testConnection(mySettingsComponent.getServerUrl());
             
-            // Apply settings
-            settings.setServerUrl(settingsComponent.getServerUrl());
-            settings.setContinuousDevelopment(settingsComponent.isContinuousDevelopment());
-            settings.setPatternRecognition(settingsComponent.isPatternRecognition());
-            settings.setPollingInterval(settingsComponent.getPollingInterval());
+            if (!connected) {
+                Messages.showWarningDialog(
+                        "Could not connect to server. Please check the server URL.",
+                        "Connection Warning"
+                );
+            }
             
-            LOG.info("Applied ModForge settings");
-        } catch (Exception e) {
-            LOG.error("Error applying settings", e);
-            throw new ConfigurationException("Failed to apply settings: " + e.getMessage(), "Settings Error");
+            // Try to verify token
+            ModAuthenticationManager authManager = ModAuthenticationManager.getInstance();
+            if (authManager.isAuthenticated()) {
+                if (!authManager.verifyAuthentication()) {
+                    Messages.showWarningDialog(
+                            "Could not verify authentication with new server URL. Please log in again.",
+                            "Authentication Warning"
+                    );
+                    
+                    // Logout
+                    authManager.logout();
+                }
+            }
+        }
+        
+        // Update continuous development service if changed
+        if (oldContinuousDevelopment != mySettingsComponent.getContinuousDevelopment()) {
+            Project[] projects = ProjectManager.getInstance().getOpenProjects();
+            
+            for (Project project : projects) {
+                ContinuousDevelopmentService service = project.getService(ContinuousDevelopmentService.class);
+                
+                if (service != null) {
+                    if (mySettingsComponent.getContinuousDevelopment()) {
+                        service.start();
+                    } else {
+                        service.stop();
+                    }
+                }
+            }
         }
     }
-
+    
     @Override
     public void reset() {
-        try {
-            ModForgeSettings settings = ModForgeSettings.getInstance();
-            
-            // Reset component with current settings
-            settingsComponent.setServerUrl(settings.getServerUrl());
-            settingsComponent.setContinuousDevelopment(settings.isContinuousDevelopment());
-            settingsComponent.setPatternRecognition(settings.isPatternRecognition());
-            settingsComponent.setPollingInterval(settings.getPollingInterval());
-            
-            LOG.info("Reset ModForge settings");
-        } catch (Exception e) {
-            LOG.error("Error resetting settings", e);
-        }
+        ModForgeSettings settings = ModForgeSettings.getInstance();
+        
+        mySettingsComponent.setServerUrl(settings.getServerUrl());
+        mySettingsComponent.setContinuousDevelopment(settings.isContinuousDevelopment());
+        mySettingsComponent.setPatternRecognition(settings.isPatternRecognition());
     }
-
+    
     @Override
     public void disposeUIResources() {
-        settingsComponent = null;
+        mySettingsComponent = null;
     }
 }
