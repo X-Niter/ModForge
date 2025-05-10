@@ -8,6 +8,8 @@
 import { scheduleBackups, BackupStatus, BackupResult, runFullBackup, BackupType, createBackup } from './backup-manager';
 import { getLogger } from './logging';
 import { notifyBackupResult } from './notification-integration';
+import { trackError } from './error-tracker';
+import { ErrorCategory, ErrorSeverity } from './error-types';
 
 const logger = getLogger('backup-integration');
 
@@ -84,6 +86,21 @@ export async function createBackupWithNotification(
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     logger.error(`Failed to create ${type} backup`, { error });
+    
+    // Track error in the centralized error tracking system
+    trackError(
+      error instanceof Error ? error : new Error(errorMessage),
+      { 
+        backupType: type, 
+        metadata,
+        operation: 'createBackup'
+      },
+      {
+        category: ErrorCategory.SYSTEM,
+        severity: ErrorSeverity.HIGH
+      }
+    );
+    
     const failedResult: BackupResult = {
       id: `failed-${Date.now()}`,
       type,
@@ -114,6 +131,20 @@ export async function runFullBackupWithNotification(
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     logger.error('Failed to run full backup', { error });
+    
+    // Track error in the centralized error tracking system
+    trackError(
+      error instanceof Error ? error : new Error(errorMessage),
+      { 
+        operation: 'runFullBackup',
+        metadata
+      },
+      {
+        category: ErrorCategory.SYSTEM,
+        severity: ErrorSeverity.CRITICAL // Full backup failure is critical
+      }
+    );
+    
     // Create a failed result for each backup type
     const failedResults: BackupResult[] = Object.values(BackupType)
       .filter(type => typeof type === 'number')
