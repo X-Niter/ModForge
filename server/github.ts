@@ -12,23 +12,70 @@ class GitHubClient {
   }
   
   /**
+   * Create a GitHubClient from various authentication sources with fallbacks:
+   * 1. Session authentication (if req provided)
+   * 2. Token from request (if provided)
+   * 3. Environment variable (fallback)
+   * 
+   * @param req Express request with session
+   * @param explicitToken Token explicitly provided
+   * @returns GitHubClient instance or null if no authentication available
+   */
+  static async fromAnyAuth(req?: any, explicitToken?: string): Promise<GitHubClient | null> {
+    let token: string | null = null;
+    
+    // Try session authentication first (most secure)
+    if (req?.session?.userId) {
+      try {
+        const user = await storage.getUser(req.session.userId);
+        if (user?.githubToken) {
+          token = user.githubToken;
+          githubLogger.info('Using GitHub token from user session');
+        }
+      } catch (error) {
+        githubLogger.error('Error retrieving GitHub token from session:', error);
+      }
+    }
+    
+    // Fall back to explicit token
+    if (!token && explicitToken) {
+      token = explicitToken;
+      githubLogger.info('Using explicitly provided GitHub token');
+    }
+    
+    // Fall back to environment variable
+    if (!token && process.env.GITHUB_TOKEN) {
+      token = process.env.GITHUB_TOKEN;
+      githubLogger.info('Using GitHub token from environment variable');
+    }
+    
+    // Return client if we have a token
+    if (token) {
+      return new GitHubClient(token);
+    }
+    
+    githubLogger.warn('No GitHub token available from any source');
+    return null;
+  }
+  
+  /**
    * Create a GitHubClient from the user's session if available
    * @param req Express request with session
    * @returns GitHubClient instance or null if no token available
    */
   static async fromSession(req: any): Promise<GitHubClient | null> {
     // Check if there's a session with a logged in user
-    if (req.session && req.session.userId) {
+    if (req?.session?.userId) {
       try {
         // Get the user from storage
         const user = await storage.getUser(req.session.userId);
         
         // If user exists and has a GitHub token, create a client
-        if (user && user.githubToken) {
+        if (user?.githubToken) {
           return new GitHubClient(user.githubToken);
         }
       } catch (error) {
-        console.error('Error creating GitHub client from session:', error);
+        githubLogger.error('Error creating GitHub client from session:', error);
       }
     }
     

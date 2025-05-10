@@ -78,8 +78,7 @@ export function GitHubTokenInput({ onSuccess, className }: GitHubTokenInputProps
       if (response.ok) {
         toast({
           title: "Token Saved",
-          description: "Your GitHub token has been securely stored",
-          variant: "success",
+          description: "Your GitHub token has been securely stored"
         });
         
         if (onSuccess) {

@@ -2,6 +2,7 @@ import React from 'react';
 import { GitHubAuth } from "@/components/github-auth";
 import { GitHubOAuthButton } from "@/components/github-oauth-button";
 import { GitHubAuthStatus } from "@/components/github-auth-status";
+import { GitHubTokenInput } from "@/components/github-token-input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
@@ -68,12 +69,28 @@ export default function GitHubIntegration() {
                 </AlertDescription>
               </Alert>
               
-              <div className="bg-slate-800/50 rounded-lg p-4 border border-slate-700">
-                <h3 className="text-white font-medium mb-3">OAuth Authentication (Recommended)</h3>
-                <p className="text-gray-400 text-sm mb-4">
-                  Securely connect to GitHub with one click - no need to create or manage tokens.
-                </p>
-                <GitHubOAuthButton />
+              <div className="space-y-6">
+                <div className="bg-slate-800/50 rounded-lg p-4 border border-slate-700">
+                  <h3 className="text-white font-medium mb-3">OAuth Authentication (Recommended)</h3>
+                  <p className="text-gray-400 text-sm mb-4">
+                    Securely connect to GitHub with one click - no need to create or manage tokens.
+                  </p>
+                  <GitHubOAuthButton />
+                </div>
+                
+                <div className="flex items-center gap-4 my-4">
+                  <div className="flex-1 h-px bg-slate-700"></div>
+                  <div className="text-slate-500 text-xs font-medium">OR</div>
+                  <div className="flex-1 h-px bg-slate-700"></div>
+                </div>
+                
+                <div className="bg-slate-800/50 rounded-lg p-4 border border-slate-700">
+                  <h3 className="text-white font-medium mb-3">Personal Access Token</h3>
+                  <p className="text-gray-400 text-sm mb-4">
+                    For local development, IDE plugin use, or when OAuth is not available.
+                  </p>
+                  <GitHubTokenInput />
+                </div>
               </div>
             </CardContent>
             <CardFooter>
