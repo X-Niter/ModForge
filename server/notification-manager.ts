@@ -152,6 +152,31 @@ const defaultSettings: NotificationSettings = {
       }
     },
     {
+      enabled: process.env.WEBHOOK_URL !== undefined,
+      channel: NotificationChannel.WEBHOOK,
+      minSeverity: NotificationSeverity.ERROR,
+      config: {
+        url: process.env.WEBHOOK_URL,
+        method: process.env.WEBHOOK_METHOD || 'POST',
+        headers: { 
+          'Authorization': process.env.WEBHOOK_AUTH_TOKEN ? 
+            `Bearer ${process.env.WEBHOOK_AUTH_TOKEN}` : undefined
+        }
+      }
+    },
+    {
+      enabled: process.env.TWILIO_ACCOUNT_SID !== undefined && 
+               process.env.TWILIO_AUTH_TOKEN !== undefined &&
+               process.env.TWILIO_PHONE_NUMBER !== undefined,
+      channel: NotificationChannel.SMS,
+      minSeverity: NotificationSeverity.CRITICAL,
+      config: {
+        to: (process.env.ADMIN_PHONE_NUMBERS || '').split(','),
+        serviceProvider: 'twilio',
+        apiKey: process.env.TWILIO_AUTH_TOKEN
+      }
+    },
+    {
       enabled: true,
       channel: NotificationChannel.LOG,
       minSeverity: NotificationSeverity.INFO,
@@ -454,6 +479,94 @@ async function sendWebhookNotification(
 }
 
 /**
+ * Send an SMS notification
+ */
+async function sendSmsNotification(
+  message: NotificationMessage,
+  config: NotificationConfigType
+): Promise<boolean> {
+  // Type guard to check if config is an SmsNotificationConfig
+  function isSmsConfig(cfg: NotificationConfigType): cfg is SmsNotificationConfig {
+    return 'to' in cfg && 'serviceProvider' in cfg;
+  }
+  
+  // Validate config is SMS config
+  if (!isSmsConfig(config)) {
+    logger.error('Invalid SMS notification config', { config });
+    return false;
+  }
+  
+  try {
+    const { to, serviceProvider, apiKey } = config;
+    
+    if (!to || !to.length) {
+      logger.warn('No recipients for SMS notification', { config });
+      return false;
+    }
+    
+    if (!apiKey) {
+      logger.warn('Missing SMS API key', { serviceProvider });
+      return false;
+    }
+    
+    // Format a concise message for SMS (keeping it short)
+    const smsContent = `${message.severity.toUpperCase()}: ${message.title}`;
+    
+    // This is a generalized implementation that would need to be customized
+    // based on the specific SMS service provider being used
+    switch (serviceProvider.toLowerCase()) {
+      case 'twilio':
+        // Example implementation for Twilio
+        if (!process.env.TWILIO_ACCOUNT_SID) {
+          logger.error('Missing TWILIO_ACCOUNT_SID environment variable');
+          return false;
+        }
+        
+        if (!process.env.TWILIO_PHONE_NUMBER) {
+          logger.error('Missing TWILIO_PHONE_NUMBER environment variable');
+          return false;
+        }
+        
+        const accountSid = process.env.TWILIO_ACCOUNT_SID;
+        
+        for (const recipient of to) {
+          try {
+            await axios.post(
+              `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`,
+              new URLSearchParams({
+                'To': recipient,
+                'From': process.env.TWILIO_PHONE_NUMBER,
+                'Body': smsContent
+              }),
+              {
+                auth: {
+                  username: accountSid,
+                  password: apiKey
+                }
+              }
+            );
+            logger.debug('SMS sent successfully', { to: recipient });
+          } catch (err) {
+            logger.error('Failed to send SMS to recipient', { recipient, error: err });
+            // Continue with other recipients even if one fails
+          }
+        }
+        break;
+        
+      default:
+        logger.warn(`Unsupported SMS provider: ${serviceProvider}`);
+        return false;
+    }
+    
+    logger.info('SMS notifications sent', { recipients: to.length, provider: serviceProvider });
+    return true;
+  } catch (error) {
+    logger.error('Failed to send SMS notification', { error });
+    return false;
+  }
+}
+
+/**
  * Send a log notification
  */
 function sendLogNotification(
@@ -672,6 +785,9 @@ async function sendNotificationToAllChannels(message: NotificationMessage): Prom
           break;
         case NotificationChannel.WEBHOOK:
           success = await sendWebhookNotification(message, channelConfig.config);
+          break;
+        case NotificationChannel.SMS:
+          success = await sendSmsNotification(message, channelConfig.config);
           break;
         case NotificationChannel.LOG:
           success = sendLogNotification(message, channelConfig.config);

@@ -143,13 +143,60 @@ router.post('/settings', (req, res) => {
 
 // Test notification endpoint
 router.post('/test', (req, res) => {
-  // Create a test notification here
-  // This would be implemented in a real system but is omitted for this sample
-  
-  res.json({ 
-    message: 'Test notification sent',
-    timestamp: new Date().toISOString()
-  });
+  try {
+    // Validate request
+    const testSchema = z.object({
+      channel: z.enum([
+        NotificationChannel.EMAIL,
+        NotificationChannel.SLACK,
+        NotificationChannel.WEBHOOK,
+        NotificationChannel.SMS,
+        NotificationChannel.LOG
+      ]).optional(),
+      severity: z.enum([
+        NotificationSeverity.INFO,
+        NotificationSeverity.WARNING,
+        NotificationSeverity.ERROR,
+        NotificationSeverity.CRITICAL
+      ]).optional()
+    });
+    
+    const result = testSchema.safeParse(req.body);
+    if (!result.success) {
+      return res.status(400).json({ 
+        error: 'Invalid test notification parameters', 
+        details: result.error.issues 
+      });
+    }
+    
+    // Default to LOG channel and INFO severity if not specified
+    const channel = result.data.channel || NotificationChannel.LOG;
+    const severity = result.data.severity || NotificationSeverity.INFO;
+    
+    // Import the sendNotification function
+    const { sendNotification, NotificationType } = require('../notification-manager');
+    
+    // Send a test notification
+    sendNotification({
+      type: NotificationType.SYSTEM_STATUS,
+      severity: severity,
+      title: 'Test Notification',
+      message: `This is a test notification sent to the ${channel} channel with ${severity} severity.`,
+      details: {
+        isTest: true,
+        requestedBy: req.user?.username || 'anonymous',
+        timestamp: new Date().toISOString()
+      }
+    });
+    
+    res.json({ 
+      message: `Test notification sent to ${channel} channel with ${severity} severity`,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    logger.error('Failed to send test notification', { error });
+    res.status(500).json({ error: 'Failed to send test notification' });
+  }
 });
 
 export default router;
