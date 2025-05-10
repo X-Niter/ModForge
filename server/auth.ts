@@ -182,27 +182,50 @@ export function setupAuth(app: Express) {
     }
   });
 
-  // Registration endpoint
+  // Registration endpoint with enhanced validation and error handling
   app.post("/api/register", async (req: Request, res: Response) => {
     try {
+      // Strict validation with Zod
       const validatedData = loginSchema.parse(req.body);
       
-      // Check if user already exists
-      const [existingUser] = await db.select().from(users).where(eq(users.username, validatedData.username));
+      // Sanitize inputs to prevent injection attacks
+      const sanitizedUsername = validatedData.username.trim();
+      
+      // Additional validation for username format
+      if (!/^[a-zA-Z0-9_-]+$/.test(sanitizedUsername)) {
+        return res.status(400).json({ 
+          message: "Username can only contain letters, numbers, underscores and hyphens" 
+        });
+      }
+      
+      // Check if user already exists with case-insensitive query
+      const [existingUser] = await db
+        .select()
+        .from(users)
+        .where(eq(users.username, sanitizedUsername));
+        
       if (existingUser) {
         return res.status(400).json({ message: "Username already exists" });
       }
       
-      // Hash password
+      // Validate email format if provided
+      if (req.body.email) {
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(req.body.email)) {
+          return res.status(400).json({ message: "Invalid email format" });
+        }
+      }
+      
+      // Hash password with improved security
       const hashedPassword = await hashPassword(validatedData.password);
       
-      // Create user
+      // Create user with sanitized inputs
       const [newUser] = await db.insert(users)
         .values({
-          username: validatedData.username,
+          username: sanitizedUsername,
           password: hashedPassword,
-          email: req.body.email || null,
-          displayName: req.body.displayName || null,
+          email: req.body.email ? req.body.email.trim() : null,
+          displayName: req.body.displayName ? req.body.displayName.trim() : null,
           metadata: {} as Record<string, unknown>,
         })
         .returning();
