@@ -1,79 +1,132 @@
 package com.modforge.intellij.plugin.services;
 
-import com.intellij.openapi.components.Service;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.project.Project;
+import com.intellij.openapi.startup.StartupActivity;
+import com.intellij.openapi.components.Service;
+import com.intellij.openapi.project.DumbAware;
+import com.intellij.openapi.project.ProjectManager;
+import com.intellij.openapi.vfs.VirtualFile;
+import com.intellij.openapi.vfs.VirtualFileManager;
+import com.intellij.openapi.vfs.newvfs.BulkFileListener;
+import com.intellij.openapi.vfs.newvfs.events.VFileEvent;
 import com.intellij.util.concurrency.AppExecutorUtil;
+import com.intellij.util.messages.MessageBusConnection;
 import com.modforge.intellij.plugin.auth.ModAuthenticationManager;
 import com.modforge.intellij.plugin.settings.ModForgeSettings;
-import com.modforge.intellij.plugin.utils.TokenAuthConnectionUtil;
+import org.jetbrains.annotations.NotNull;
 import org.json.simple.JSONObject;
 
+import java.util.List;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
- * Service that manages continuous mod development.
+ * Service for continuous development of mods.
  */
 @Service(Service.Level.PROJECT)
 public final class ContinuousDevelopmentService {
     private static final Logger LOG = Logger.getInstance(ContinuousDevelopmentService.class);
     
-    private final Project project;
-    private ScheduledFuture<?> scheduledTask;
-    private final ScheduledExecutorService executor;
-    private int taskCounter = 0;
+    // Default interval between continuous development checks in milliseconds (5 minutes)
+    private static final long DEFAULT_INTERVAL_MS = 5 * 60 * 1000;
     
+    // Minimum interval between continuous development checks in milliseconds (1 minute)
+    private static final long MIN_INTERVAL_MS = 60 * 1000;
+    
+    private final Project project;
+    private final ScheduledExecutorService scheduler;
+    private ScheduledFuture<?> scheduledTask;
+    private MessageBusConnection connection;
+    
+    // Metrics
+    private final AtomicInteger taskCount = new AtomicInteger(0);
+    
+    /**
+     * Create ContinuousDevelopmentService.
+     * @param project Project
+     */
     public ContinuousDevelopmentService(Project project) {
         this.project = project;
-        this.executor = AppExecutorUtil.getAppScheduledExecutorService();
+        this.scheduler = AppExecutorUtil.createBoundedScheduledExecutorService("ModForge Continuous Development", 1);
+        
+        // Subscribe to file change events
+        subscribeToFileChanges();
+        
+        // Start continuous development if enabled
+        startIfEnabled();
     }
     
     /**
-     * Start continuous development.
+     * Subscribe to file change events.
      */
-    public void start() {
-        if (scheduledTask != null && !scheduledTask.isDone()) {
-            LOG.info("Continuous development service is already running");
-            return;
+    private void subscribeToFileChanges() {
+        connection = project.getMessageBus().connect();
+        
+        connection.subscribe(VirtualFileManager.VFS_CHANGES, new BulkFileListener() {
+            @Override
+            public void after(@NotNull List<? extends VFileEvent> events) {
+                // Process file changes if continuous development is enabled
+                if (isEnabled()) {
+                    for (VFileEvent event : events) {
+                        VirtualFile file = event.getFile();
+                        
+                        // Skip if file is null
+                        if (file == null) {
+                            continue;
+                        }
+                        
+                        // Skip if file is not a source file
+                        String fileName = file.getName();
+                        if (!isSourceFile(fileName)) {
+                            continue;
+                        }
+                        
+                        // Skip if file is not in project
+                        if (!file.getPath().contains(project.getBasePath())) {
+                            continue;
+                        }
+                        
+                        // File change detected, schedule a task
+                        scheduleTask(5000); // 5 seconds delay to allow for multiple changes
+                        break;
+                    }
+                }
+            }
+        });
+    }
+    
+    /**
+     * Check if file is a source file.
+     * @param fileName File name
+     * @return Whether file is a source file
+     */
+    private boolean isSourceFile(String fileName) {
+        return fileName.endsWith(".java") || 
+               fileName.endsWith(".kt") || 
+               fileName.endsWith(".groovy") || 
+               fileName.endsWith(".scala") || 
+               fileName.endsWith(".json");
+    }
+    
+    /**
+     * Start continuous development if enabled.
+     */
+    private void startIfEnabled() {
+        if (isEnabled()) {
+            start();
         }
-        
-        LOG.info("Starting continuous development service");
-        
+    }
+    
+    /**
+     * Check if continuous development is enabled.
+     * @return Whether continuous development is enabled
+     */
+    public boolean isEnabled() {
         ModForgeSettings settings = ModForgeSettings.getInstance();
-        int interval = settings.getPollingInterval();
-        
-        if (interval < 1000) {
-            LOG.warn("Polling interval is too small, setting to 1 minute");
-            interval = 60 * 1000; // 1 minute
-        }
-        
-        scheduledTask = executor.scheduleWithFixedDelay(
-                this::runTask,
-                10000, // Initial delay of 10 seconds
-                interval,
-                TimeUnit.MILLISECONDS
-        );
-    }
-    
-    /**
-     * Stop continuous development.
-     */
-    public void stop() {
-        if (scheduledTask != null) {
-            LOG.info("Stopping continuous development service");
-            scheduledTask.cancel(false);
-            scheduledTask = null;
-        }
-    }
-    
-    /**
-     * Restart continuous development with current settings.
-     */
-    public void restart() {
-        stop();
-        start();
+        return settings.isContinuousDevelopment();
     }
     
     /**
@@ -81,80 +134,147 @@ public final class ContinuousDevelopmentService {
      * @return Whether continuous development is running
      */
     public boolean isRunning() {
-        return scheduledTask != null && !scheduledTask.isDone();
+        return scheduledTask != null && !scheduledTask.isCancelled();
     }
     
     /**
-     * Run the continuous development task.
+     * Start continuous development.
      */
-    private void runTask() {
-        LOG.info("Running continuous development task #" + (++taskCounter));
+    public void start() {
+        if (isRunning()) {
+            stop();
+        }
         
-        // Check authentication
-        ModAuthenticationManager authManager = ModAuthenticationManager.getInstance();
-        if (!authManager.isAuthenticated()) {
-            LOG.warn("Not authenticated, skipping continuous development task");
+        long intervalMs = DEFAULT_INTERVAL_MS;
+        
+        // Schedule task
+        scheduledTask = scheduler.scheduleWithFixedDelay(
+            () -> performContinuousDevelopment(),
+            10000, // 10 seconds initial delay
+            intervalMs,
+            TimeUnit.MILLISECONDS
+        );
+        
+        LOG.info("Continuous development started");
+    }
+    
+    /**
+     * Stop continuous development.
+     */
+    public void stop() {
+        if (scheduledTask != null) {
+            scheduledTask.cancel(false);
+            scheduledTask = null;
+            
+            LOG.info("Continuous development stopped");
+        }
+    }
+    
+    /**
+     * Schedule a continuous development task with delay.
+     * @param delayMs Delay in milliseconds
+     */
+    public void scheduleTask(long delayMs) {
+        if (!isEnabled() || !isRunning()) {
             return;
         }
         
-        // Check connection
-        ModForgeSettings settings = ModForgeSettings.getInstance();
-        String serverUrl = settings.getServerUrl();
-        String token = settings.getAccessToken();
+        // Cancel existing task
+        if (scheduledTask != null) {
+            scheduledTask.cancel(false);
+        }
         
+        // Schedule new task with delay
+        scheduledTask = scheduler.schedule(
+            () -> {
+                performContinuousDevelopment();
+                
+                // Reschedule with fixed delay
+                scheduledTask = scheduler.scheduleWithFixedDelay(
+                    () -> performContinuousDevelopment(),
+                    DEFAULT_INTERVAL_MS,
+                    DEFAULT_INTERVAL_MS,
+                    TimeUnit.MILLISECONDS
+                );
+            },
+            delayMs,
+            TimeUnit.MILLISECONDS
+        );
+        
+        LOG.info("Continuous development task scheduled with delay " + delayMs + "ms");
+    }
+    
+    /**
+     * Perform continuous development.
+     */
+    private void performContinuousDevelopment() {
         try {
-            // Get mods from server
-            JSONObject response = TokenAuthConnectionUtil.get(serverUrl, "/api/mods", token);
-            
-            if (response == null) {
-                LOG.error("Failed to get mods from server");
+            // Skip if project is disposed
+            if (project.isDisposed()) {
                 return;
             }
             
-            // Process mods
-            processModsResponse(response);
-        } catch (Exception e) {
-            LOG.error("Error in continuous development task", e);
-        }
-    }
-    
-    /**
-     * Process mods response from server.
-     * @param response Response from server
-     */
-    private void processModsResponse(JSONObject response) {
-        if (response == null) {
-            LOG.error("Cannot process null response");
-            return;
-        }
-        
-        try {
-            // Check if we have pattern recognition enabled
-            ModForgeSettings settings = ModForgeSettings.getInstance();
-            boolean patternRecognition = settings.isPatternRecognition();
-            
-            // Record pattern activity
-            if (patternRecognition) {
-                // Get pattern recognition service
-                AutonomousCodeGenerationService automatedService = project.getService(AutonomousCodeGenerationService.class);
-                if (automatedService != null) {
-                    automatedService.processMods(response);
-                } else {
-                    LOG.error("AutonomousCodeGenerationService is null");
-                }
-            } else {
-                LOG.info("Pattern recognition is disabled, skipping patterns");
+            // Skip if not authenticated
+            ModAuthenticationManager authManager = ModAuthenticationManager.getInstance();
+            if (!authManager.isAuthenticated()) {
+                LOG.warn("Skipping continuous development because not authenticated");
+                return;
             }
+            
+            LOG.info("Performing continuous development");
+            
+            // TODO: Implement continuous development
+            // This would involve:
+            // 1. Getting all source files in the project
+            // 2. Checking for compilation errors
+            // 3. Fixing compilation errors
+            // 4. Enhancing code
+            
+            // Increment task count
+            taskCount.incrementAndGet();
         } catch (Exception e) {
-            LOG.error("Error processing mods response", e);
+            LOG.error("Error performing continuous development", e);
         }
     }
     
     /**
-     * Get the number of tasks that have been run.
-     * @return Task counter
+     * Get task count.
+     * @return Task count
      */
     public int getTaskCount() {
-        return taskCounter;
+        return taskCount.get();
+    }
+    
+    /**
+     * Dispose service.
+     */
+    public void dispose() {
+        // Stop continuous development
+        stop();
+        
+        // Disconnect from message bus
+        if (connection != null) {
+            connection.disconnect();
+            connection = null;
+        }
+        
+        // Shutdown scheduler
+        scheduler.shutdownNow();
+    }
+    
+    /**
+     * Startup activity to initialize continuous development service.
+     */
+    public static class ContinuousDevelopmentStartupActivity implements StartupActivity, DumbAware {
+        @Override
+        public void runActivity(@NotNull Project project) {
+            // Get continuous development service
+            ContinuousDevelopmentService service = project.getService(ContinuousDevelopmentService.class);
+            
+            // Start if enabled
+            if (service.isEnabled() && !service.isRunning()) {
+                service.start();
+            }
+        }
     }
 }

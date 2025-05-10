@@ -1,85 +1,180 @@
 package com.modforge.intellij.plugin.utils;
 
 import com.intellij.openapi.diagnostic.Logger;
+import org.json.simple.JSONObject;
 
-import java.io.IOException;
+import java.io.*;
 import java.net.HttpURLConnection;
 import java.net.URL;
-import java.net.URLConnection;
+import java.nio.charset.StandardCharsets;
 
 /**
- * Utility for testing server connections.
+ * Utility class for testing connections to the ModForge server.
  */
 public class ConnectionTestUtil {
     private static final Logger LOG = Logger.getInstance(ConnectionTestUtil.class);
-    private static final int CONNECTION_TIMEOUT = 5000; // 5 seconds
+    
+    // Connection timeout in milliseconds (10 seconds)
+    private static final int CONNECTION_TIMEOUT = 10000;
+    
+    // Read timeout in milliseconds (30 seconds)
+    private static final int READ_TIMEOUT = 30000;
     
     /**
-     * Test if a server is available.
-     * @param serverUrl Server URL to test
-     * @return Whether the server is available
+     * Create an HTTP connection to the specified URL with the specified method.
+     * @param urlString URL string
+     * @param method HTTP method (GET, POST, etc.)
+     * @return HttpURLConnection
+     */
+    public static HttpURLConnection createConnection(String urlString, String method) {
+        try {
+            URL url = new URL(urlString);
+            HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+            
+            // Set request method
+            connection.setRequestMethod(method);
+            
+            // Set timeouts
+            connection.setConnectTimeout(CONNECTION_TIMEOUT);
+            connection.setReadTimeout(READ_TIMEOUT);
+            
+            // Set common properties
+            connection.setUseCaches(false);
+            connection.setDoInput(true);
+            
+            if ("POST".equals(method) || "PUT".equals(method)) {
+                connection.setDoOutput(true);
+            }
+            
+            return connection;
+        } catch (IOException e) {
+            LOG.error("Error creating connection to " + urlString, e);
+            return null;
+        }
+    }
+    
+    /**
+     * Write JSON data to an HTTP connection.
+     * @param connection HttpURLConnection
+     * @param jsonData JSON data
+     * @throws IOException If an I/O error occurs
+     */
+    public static void writeJsonToConnection(HttpURLConnection connection, JSONObject jsonData) throws IOException {
+        if (connection == null || jsonData == null) {
+            return;
+        }
+        
+        try (OutputStream os = connection.getOutputStream()) {
+            byte[] input = jsonData.toJSONString().getBytes(StandardCharsets.UTF_8);
+            os.write(input, 0, input.length);
+        } catch (IOException e) {
+            LOG.error("Error writing JSON to connection", e);
+            throw e;
+        }
+    }
+    
+    /**
+     * Read response from an HTTP connection.
+     * @param connection HttpURLConnection
+     * @return Response string
+     */
+    public static String readResponseFromConnection(HttpURLConnection connection) {
+        if (connection == null) {
+            return null;
+        }
+        
+        try {
+            StringBuilder response = new StringBuilder();
+            
+            try (BufferedReader br = new BufferedReader(new InputStreamReader(connection.getInputStream(), StandardCharsets.UTF_8))) {
+                String line;
+                while ((line = br.readLine()) != null) {
+                    response.append(line);
+                }
+            }
+            
+            return response.toString();
+        } catch (IOException e) {
+            LOG.error("Error reading response from connection", e);
+            
+            // Try to read error stream
+            try {
+                StringBuilder errorResponse = new StringBuilder();
+                
+                try (BufferedReader br = new BufferedReader(new InputStreamReader(connection.getErrorStream(), StandardCharsets.UTF_8))) {
+                    String line;
+                    while ((line = br.readLine()) != null) {
+                        errorResponse.append(line);
+                    }
+                }
+                
+                LOG.error("Error response: " + errorResponse);
+            } catch (Exception ex) {
+                LOG.error("Error reading error stream", ex);
+            }
+            
+            return null;
+        }
+    }
+    
+    /**
+     * Test connection to the ModForge server.
+     * @param serverUrl Server URL
+     * @return Whether connection is successful
      */
     public static boolean testConnection(String serverUrl) {
         if (serverUrl == null || serverUrl.isEmpty()) {
-            LOG.warn("Cannot test connection: server URL is empty");
             return false;
         }
         
         try {
-            // Normalize URL
-            if (!serverUrl.endsWith("/")) {
-                serverUrl += "/";
-            }
+            // Call health check API
+            String healthCheckUrl = serverUrl + "/api/health";
+            HttpURLConnection connection = createConnection(healthCheckUrl, "GET");
             
-            // Try to connect to health endpoint
-            String healthUrl = serverUrl + "api/health";
-            LOG.info("Testing connection to " + healthUrl);
-            
-            URL url = new URL(healthUrl);
-            HttpURLConnection connection = (HttpURLConnection) url.openConnection();
-            connection.setConnectTimeout(CONNECTION_TIMEOUT);
-            connection.setReadTimeout(CONNECTION_TIMEOUT);
-            connection.setRequestMethod("GET");
-            
-            int responseCode = connection.getResponseCode();
-            
-            if (responseCode == 200) {
-                LOG.info("Connection successful: " + responseCode);
-                return true;
-            } else {
-                LOG.warn("Connection test failed with response code: " + responseCode);
+            if (connection == null) {
+                LOG.warn("Failed to create connection to " + healthCheckUrl);
                 return false;
             }
+            
+            // Get response
+            int responseCode = connection.getResponseCode();
+            
+            return responseCode == HttpURLConnection.HTTP_OK;
         } catch (Exception e) {
-            LOG.warn("Connection test failed", e);
+            LOG.error("Error testing connection to " + serverUrl, e);
             return false;
         }
     }
     
     /**
-     * Test if a URL is valid (can be connected to).
-     * @param urlString URL string to test
-     * @return Whether the URL is valid and can be connected to
+     * Test connection to the ModForge server with authentication.
+     * @param serverUrl Server URL
+     * @param token Access token
+     * @return Whether connection is successful
      */
-    public static boolean isValidUrl(String urlString) {
-        if (urlString == null || urlString.isEmpty()) {
+    public static boolean testAuthenticatedConnection(String serverUrl, String token) {
+        if (serverUrl == null || serverUrl.isEmpty() || token == null || token.isEmpty()) {
             return false;
         }
         
-        URLConnection connection = null;
         try {
-            URL url = new URL(urlString);
-            connection = url.openConnection();
-            connection.setConnectTimeout(CONNECTION_TIMEOUT);
-            connection.connect();
-            return true;
-        } catch (IOException e) {
-            LOG.debug("URL validation failed for: " + urlString, e);
-            return false;
-        } finally {
-            if (connection instanceof HttpURLConnection) {
-                ((HttpURLConnection) connection).disconnect();
+            // Call authenticated API
+            String authCheckUrl = serverUrl + "/api/auth/verify";
+            HttpURLConnection connection = TokenAuthConnectionUtil.createTokenAuthConnection(authCheckUrl, "GET", token);
+            
+            if (connection == null) {
+                LOG.warn("Failed to create connection to " + authCheckUrl);
+                return false;
             }
+            
+            // Get response
+            int responseCode = connection.getResponseCode();
+            
+            return responseCode == HttpURLConnection.HTTP_OK;
+        } catch (Exception e) {
+            LOG.error("Error testing authenticated connection to " + serverUrl, e);
+            return false;
         }
     }
 }

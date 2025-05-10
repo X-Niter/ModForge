@@ -1,253 +1,59 @@
 package com.modforge.intellij.plugin.utils;
 
 import com.intellij.openapi.diagnostic.Logger;
-import org.json.simple.JSONObject;
-import org.json.simple.parser.JSONParser;
-import org.json.simple.parser.ParseException;
 
-import java.io.BufferedReader;
 import java.io.IOException;
-import java.io.InputStreamReader;
-import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
-import java.nio.charset.StandardCharsets;
 
 /**
- * Utility for making token-authenticated HTTP requests to the ModForge server.
+ * Utility class for creating authenticated connections to the ModForge server.
  */
 public class TokenAuthConnectionUtil {
     private static final Logger LOG = Logger.getInstance(TokenAuthConnectionUtil.class);
     
-    /**
-     * Make a GET request to the ModForge server with token authentication.
-     * @param serverUrl Base URL of the ModForge server
-     * @param endpoint API endpoint
-     * @param token Authentication token
-     * @return Response as JSONObject, or null if request failed
-     */
-    public static JSONObject get(String serverUrl, String endpoint, String token) {
-        try {
-            // Normalize URL
-            if (!serverUrl.endsWith("/")) {
-                serverUrl += "/";
-            }
-            
-            // Remove leading slash from endpoint if present
-            if (endpoint.startsWith("/")) {
-                endpoint = endpoint.substring(1);
-            }
-            
-            // Create URL
-            String url = serverUrl + endpoint;
-            
-            LOG.info("Making GET request to " + url);
-            
-            return makeRequest("GET", url, token, null);
-        } catch (Exception e) {
-            LOG.error("GET request failed", e);
-            return null;
-        }
-    }
+    // Connection timeout in milliseconds (10 seconds)
+    private static final int CONNECTION_TIMEOUT = 10000;
+    
+    // Read timeout in milliseconds (30 seconds)
+    private static final int READ_TIMEOUT = 30000;
     
     /**
-     * Make a POST request to the ModForge server with token authentication.
-     * @param serverUrl Base URL of the ModForge server
-     * @param endpoint API endpoint
+     * Create an authenticated HTTP connection to the specified URL with the specified method.
+     * @param urlString URL string
+     * @param method HTTP method (GET, POST, etc.)
      * @param token Authentication token
-     * @param data Data to send in request body as JSONObject
-     * @return Response as JSONObject, or null if request failed
+     * @return HttpURLConnection
      */
-    public static JSONObject post(String serverUrl, String endpoint, String token, JSONObject data) {
-        try {
-            // Normalize URL
-            if (!serverUrl.endsWith("/")) {
-                serverUrl += "/";
-            }
-            
-            // Remove leading slash from endpoint if present
-            if (endpoint.startsWith("/")) {
-                endpoint = endpoint.substring(1);
-            }
-            
-            // Create URL
-            String url = serverUrl + endpoint;
-            
-            LOG.info("Making POST request to " + url);
-            
-            return makeRequest("POST", url, token, data);
-        } catch (Exception e) {
-            LOG.error("POST request failed", e);
-            return null;
-        }
-    }
-    
-    /**
-     * Make a PUT request to the ModForge server with token authentication.
-     * @param serverUrl Base URL of the ModForge server
-     * @param endpoint API endpoint
-     * @param token Authentication token
-     * @param data Data to send in request body as JSONObject
-     * @return Response as JSONObject, or null if request failed
-     */
-    public static JSONObject put(String serverUrl, String endpoint, String token, JSONObject data) {
-        try {
-            // Normalize URL
-            if (!serverUrl.endsWith("/")) {
-                serverUrl += "/";
-            }
-            
-            // Remove leading slash from endpoint if present
-            if (endpoint.startsWith("/")) {
-                endpoint = endpoint.substring(1);
-            }
-            
-            // Create URL
-            String url = serverUrl + endpoint;
-            
-            LOG.info("Making PUT request to " + url);
-            
-            return makeRequest("PUT", url, token, data);
-        } catch (Exception e) {
-            LOG.error("PUT request failed", e);
-            return null;
-        }
-    }
-    
-    /**
-     * Make a DELETE request to the ModForge server with token authentication.
-     * @param serverUrl Base URL of the ModForge server
-     * @param endpoint API endpoint
-     * @param token Authentication token
-     * @return Response as JSONObject, or null if request failed
-     */
-    public static JSONObject delete(String serverUrl, String endpoint, String token) {
-        try {
-            // Normalize URL
-            if (!serverUrl.endsWith("/")) {
-                serverUrl += "/";
-            }
-            
-            // Remove leading slash from endpoint if present
-            if (endpoint.startsWith("/")) {
-                endpoint = endpoint.substring(1);
-            }
-            
-            // Create URL
-            String url = serverUrl + endpoint;
-            
-            LOG.info("Making DELETE request to " + url);
-            
-            return makeRequest("DELETE", url, token, null);
-        } catch (Exception e) {
-            LOG.error("DELETE request failed", e);
-            return null;
-        }
-    }
-    
-    /**
-     * Make an HTTP request with token authentication.
-     * @param method HTTP method (GET, POST, PUT, DELETE)
-     * @param urlString URL to make request to
-     * @param token Authentication token
-     * @param data Data to send in request body as JSONObject (for POST and PUT)
-     * @return Response as JSONObject, or null if request failed
-     * @throws IOException If connection fails
-     * @throws ParseException If JSON parsing fails
-     */
-    private static JSONObject makeRequest(String method, String urlString, String token, JSONObject data) 
-            throws IOException, ParseException {
-        if (urlString == null || method == null) {
-            LOG.error("URL or method is null");
-            return null;
-        }
-        
-        HttpURLConnection connection = null;
-        
+    public static HttpURLConnection createTokenAuthConnection(String urlString, String method, String token) {
         try {
             URL url = new URL(urlString);
-            connection = (HttpURLConnection) url.openConnection();
-            connection.setRequestMethod(method);
-            connection.setRequestProperty("Content-Type", "application/json");
-            connection.setConnectTimeout(15000); // 15 seconds timeout
-            connection.setReadTimeout(30000); // 30 seconds timeout
+            HttpURLConnection connection = (HttpURLConnection) url.openConnection();
             
-            // Add token if provided
+            // Set request method
+            connection.setRequestMethod(method);
+            
+            // Set timeouts
+            connection.setConnectTimeout(CONNECTION_TIMEOUT);
+            connection.setReadTimeout(READ_TIMEOUT);
+            
+            // Set common properties
+            connection.setUseCaches(false);
+            connection.setDoInput(true);
+            
+            if ("POST".equals(method) || "PUT".equals(method)) {
+                connection.setDoOutput(true);
+            }
+            
+            // Set authorization header
             if (token != null && !token.isEmpty()) {
                 connection.setRequestProperty("Authorization", "Bearer " + token);
             }
             
-            // Add request body for POST and PUT
-            if ((method.equals("POST") || method.equals("PUT")) && data != null) {
-                connection.setDoOutput(true);
-                try (OutputStream os = connection.getOutputStream()) {
-                    byte[] input = data.toJSONString().getBytes(StandardCharsets.UTF_8);
-                    os.write(input, 0, input.length);
-                }
-            }
-            
-            int responseCode = connection.getResponseCode();
-            
-            if (responseCode >= 400) {
-                LOG.error(method + " request failed with response code " + responseCode + " for URL: " + urlString);
-                
-                // Try to read the error response
-                try {
-                    StringBuilder errorResponse = new StringBuilder();
-                    try (BufferedReader br = new BufferedReader(new InputStreamReader(
-                            connection.getErrorStream(), StandardCharsets.UTF_8))) {
-                        String responseLine;
-                        while ((responseLine = br.readLine()) != null) {
-                            errorResponse.append(responseLine.trim());
-                        }
-                    }
-                    if (errorResponse.length() > 0) {
-                        LOG.error("Error response: " + errorResponse);
-                    }
-                } catch (Exception e) {
-                    LOG.error("Could not read error response", e);
-                }
-                
-                return null;
-            }
-            
-            // Read response
-            StringBuilder response = new StringBuilder();
-            try (BufferedReader br = new BufferedReader(new InputStreamReader(
-                    connection.getInputStream(), StandardCharsets.UTF_8))) {
-                String responseLine;
-                while ((responseLine = br.readLine()) != null) {
-                    response.append(responseLine.trim());
-                }
-            }
-            
-            // Check if the response is empty
-            String responseStr = response.toString();
-            if (responseStr.isEmpty()) {
-                LOG.warn("Empty response received from server");
-                return new JSONObject(); // Return empty JSONObject instead of null
-            }
-            
-            // Parse response
-            try {
-                JSONParser parser = new JSONParser();
-                Object parsedResponse = parser.parse(responseStr);
-                
-                // Check if the response is a JSONObject
-                if (parsedResponse instanceof JSONObject) {
-                    return (JSONObject) parsedResponse;
-                } else {
-                    LOG.error("Response is not a JSONObject: " + responseStr);
-                    return null;
-                }
-            } catch (ParseException e) {
-                LOG.error("Failed to parse JSON response: " + responseStr, e);
-                throw e;
-            }
-        } finally {
-            if (connection != null) {
-                connection.disconnect();
-            }
+            return connection;
+        } catch (IOException e) {
+            LOG.error("Error creating authenticated connection to " + urlString, e);
+            return null;
         }
     }
 }
