@@ -4,7 +4,7 @@ plugins {
 }
 
 group 'com.modforge'
-version '1.0.0'
+version '1.0-SNAPSHOT'
 
 repositories {
     mavenCentral()
@@ -12,40 +12,48 @@ repositories {
 
 dependencies {
     implementation 'com.googlecode.json-simple:json-simple:1.1.1'
+    implementation 'org.apache.httpcomponents:httpclient:4.5.13'
     testImplementation 'org.junit.jupiter:junit-jupiter-api:5.8.1'
     testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine:5.8.1'
 }
 
-// Configure Gradle IntelliJ Plugin
-// Read more: https://github.com/JetBrains/gradle-intellij-plugin
-intellij {
-    version = '2022.3'
-    type = 'IC' // Target IDE Platform: IntelliJ IDEA Community Edition
-    plugins = ['java']
-}
-
+// Set compatibility for Java versions
 java {
     sourceCompatibility = JavaVersion.VERSION_11
     targetCompatibility = JavaVersion.VERSION_11
 }
 
-test {
-    useJUnitPlatform()
+intellij {
+    version = '2022.2'
+    type = 'IC' // IntelliJ IDEA Community Edition
+    
+    plugins = [
+        'java', // Add Java plugin support
+    ]
 }
 
-tasks {
-    patchPluginXml {
-        sinceBuild = '223'
-        untilBuild = '233.*'
-    }
+// Configure the runIde task to use enough memory
+runIde {
+    jvmArgs = ['-Xmx2g']
+}
+
+patchPluginXml {
+    changeNotes = """
+        <h2>ModForge IntelliJ Plugin</h2>
+        <p>Initial release of the ModForge IntelliJ Plugin for Minecraft mod development.</p>
+        <h3>Features:</h3>
+        <ul>
+            <li>Integration with ModForge server</li>
+            <li>Continuous mod development with error fixing</li>
+            <li>Pattern recognition for improved AI efficiency</li>
+            <li>Multiple mod loader support</li>
+        </ul>
+    """
     
-    signPlugin {
-        certificateChain = System.getenv('CERTIFICATE_CHAIN')
-        privateKey = System.getenv('PRIVATE_KEY')
-        password = System.getenv('PRIVATE_KEY_PASSWORD')
-    }
-    
-    publishPlugin {
-        token = System.getenv('PUBLISH_TOKEN')
-    }
+    sinceBuild = '221'
+    untilBuild = '232.*'
+}
+
+test {
+    useJUnitPlatform()
 }

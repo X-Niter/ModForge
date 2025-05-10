@@ -157,43 +157,97 @@ public class TokenAuthConnectionUtil {
      */
     private static JSONObject makeRequest(String method, String urlString, String token, JSONObject data) 
             throws IOException, ParseException {
-        URL url = new URL(urlString);
-        HttpURLConnection connection = (HttpURLConnection) url.openConnection();
-        connection.setRequestMethod(method);
-        connection.setRequestProperty("Content-Type", "application/json");
-        
-        // Add token if provided
-        if (token != null && !token.isEmpty()) {
-            connection.setRequestProperty("Authorization", "Bearer " + token);
-        }
-        
-        // Add request body for POST and PUT
-        if ((method.equals("POST") || method.equals("PUT")) && data != null) {
-            connection.setDoOutput(true);
-            try (OutputStream os = connection.getOutputStream()) {
-                byte[] input = data.toJSONString().getBytes(StandardCharsets.UTF_8);
-                os.write(input, 0, input.length);
-            }
-        }
-        
-        int responseCode = connection.getResponseCode();
-        
-        if (responseCode >= 400) {
-            LOG.error(method + " request failed with response code " + responseCode);
+        if (urlString == null || method == null) {
+            LOG.error("URL or method is null");
             return null;
         }
         
-        // Read response
-        StringBuilder response = new StringBuilder();
-        try (BufferedReader br = new BufferedReader(new InputStreamReader(connection.getInputStream(), StandardCharsets.UTF_8))) {
-            String responseLine;
-            while ((responseLine = br.readLine()) != null) {
-                response.append(responseLine.trim());
+        HttpURLConnection connection = null;
+        
+        try {
+            URL url = new URL(urlString);
+            connection = (HttpURLConnection) url.openConnection();
+            connection.setRequestMethod(method);
+            connection.setRequestProperty("Content-Type", "application/json");
+            connection.setConnectTimeout(15000); // 15 seconds timeout
+            connection.setReadTimeout(30000); // 30 seconds timeout
+            
+            // Add token if provided
+            if (token != null && !token.isEmpty()) {
+                connection.setRequestProperty("Authorization", "Bearer " + token);
+            }
+            
+            // Add request body for POST and PUT
+            if ((method.equals("POST") || method.equals("PUT")) && data != null) {
+                connection.setDoOutput(true);
+                try (OutputStream os = connection.getOutputStream()) {
+                    byte[] input = data.toJSONString().getBytes(StandardCharsets.UTF_8);
+                    os.write(input, 0, input.length);
+                }
+            }
+            
+            int responseCode = connection.getResponseCode();
+            
+            if (responseCode >= 400) {
+                LOG.error(method + " request failed with response code " + responseCode + " for URL: " + urlString);
+                
+                // Try to read the error response
+                try {
+                    StringBuilder errorResponse = new StringBuilder();
+                    try (BufferedReader br = new BufferedReader(new InputStreamReader(
+                            connection.getErrorStream(), StandardCharsets.UTF_8))) {
+                        String responseLine;
+                        while ((responseLine = br.readLine()) != null) {
+                            errorResponse.append(responseLine.trim());
+                        }
+                    }
+                    if (errorResponse.length() > 0) {
+                        LOG.error("Error response: " + errorResponse);
+                    }
+                } catch (Exception e) {
+                    LOG.error("Could not read error response", e);
+                }
+                
+                return null;
+            }
+            
+            // Read response
+            StringBuilder response = new StringBuilder();
+            try (BufferedReader br = new BufferedReader(new InputStreamReader(
+                    connection.getInputStream(), StandardCharsets.UTF_8))) {
+                String responseLine;
+                while ((responseLine = br.readLine()) != null) {
+                    response.append(responseLine.trim());
+                }
+            }
+            
+            // Check if the response is empty
+            String responseStr = response.toString();
+            if (responseStr.isEmpty()) {
+                LOG.warn("Empty response received from server");
+                return new JSONObject(); // Return empty JSONObject instead of null
+            }
+            
+            // Parse response
+            try {
+                JSONParser parser = new JSONParser();
+                Object parsedResponse = parser.parse(responseStr);
+                
+                // Check if the response is a JSONObject
+                if (parsedResponse instanceof JSONObject) {
+                    return (JSONObject) parsedResponse;
+                } else {
+                    LOG.error("Response is not a JSONObject: " + responseStr);
+                    return null;
+                }
+            } catch (ParseException e) {
+                LOG.error("Failed to parse JSON response: " + responseStr, e);
+                throw e;
+            }
+        } finally {
+            if (connection != null) {
+                connection.disconnect();
             }
         }
-        
-        // Parse response
-        JSONParser parser = new JSONParser();
-        return (JSONObject) parser.parse(response.toString());
     }
 }
