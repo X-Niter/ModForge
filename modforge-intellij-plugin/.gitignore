@@ -1,39 +1,20 @@
-# IntelliJ IDEA
-.idea/
-*.iml
-*.iws
-*.ipr
-*.iws
-.idea_modules/
+# Build output
+build/
 out/
 
 # Gradle
 .gradle/
-build/
-gradle-app.setting
-!gradle-wrapper.jar
-!gradle-wrapper.properties
-.gradletasknamecache
 
-# Eclipse
-.classpath
-.project
-.settings/
-bin/
+# IDE
+.idea/
+*.iml
+*.iws
+*.ipr
 
-# Java
-*.class
+# Logs
 *.log
-*.jar
-hs_err_pid*
+logs/
 
 # OS specific
 .DS_Store
 Thumbs.db
-ehthumbs.db
-
-# Project specific
-dist/
-classes/
-.vscode/
-temp/

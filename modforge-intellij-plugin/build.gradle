@@ -1,59 +1,57 @@
 plugins {
     id 'java'
-    id 'org.jetbrains.intellij' version '1.13.2'
+    id 'org.jetbrains.intellij' version '1.15.0'
 }
 
 group 'com.modforge'
-version '1.0-SNAPSHOT'
+version '1.0.0'
 
 repositories {
     mavenCentral()
 }
 
-dependencies {
-    implementation 'com.googlecode.json-simple:json-simple:1.1.1'
-    implementation 'org.apache.httpcomponents:httpclient:4.5.13'
-    testImplementation 'org.junit.jupiter:junit-jupiter-api:5.8.1'
-    testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine:5.8.1'
-}
-
-// Set compatibility for Java versions
-java {
-    sourceCompatibility = JavaVersion.VERSION_11
-    targetCompatibility = JavaVersion.VERSION_11
-}
-
+// Configure Gradle IntelliJ Plugin
+// See https://plugins.jetbrains.com/docs/intellij/tools-gradle-intellij-plugin.html
 intellij {
-    version = '2022.2'
-    type = 'IC' // IntelliJ IDEA Community Edition
+    version = '2022.3.3'
+    type = 'IC' // Target IDE Platform - Community Edition
+    plugins = ['com.intellij.java']
+}
+
+dependencies {
+    implementation 'com.fasterxml.jackson.core:jackson-databind:2.14.2'
+    implementation 'org.apache.commons:commons-lang3:3.12.0'
+    implementation 'org.json:json:20230227'
+    testImplementation 'junit:junit:4.13.2'
+}
+
+java {
+    sourceCompatibility = JavaVersion.VERSION_17
+    targetCompatibility = JavaVersion.VERSION_17
+}
+
+tasks {
+    patchPluginXml {
+        sinceBuild = "223"
+        untilBuild = "233.*"
+        changeNotes = """
+            <h1>Version 1.0.0</h1>
+            <ul>
+                <li>Initial release with core functionality</li>
+                <li>Authentication system</li>
+                <li>Continuous development</li>
+                <li>Pattern recognition for optimized API usage</li>
+                <li>Multi-mod loader support</li>
+            </ul>
+        """
+    }
+
+    runIde {
+        // Increase available memory
+        jvmArgs = ['-Xmx2048m']
+    }
     
-    plugins = [
-        'java', // Add Java plugin support
-    ]
-}
-
-// Configure the runIde task to use enough memory
-runIde {
-    jvmArgs = ['-Xmx2g']
-}
-
-patchPluginXml {
-    changeNotes = """
-        <h2>ModForge IntelliJ Plugin</h2>
-        <p>Initial release of the ModForge IntelliJ Plugin for Minecraft mod development.</p>
-        <h3>Features:</h3>
-        <ul>
-            <li>Integration with ModForge server</li>
-            <li>Continuous mod development with error fixing</li>
-            <li>Pattern recognition for improved AI efficiency</li>
-            <li>Multiple mod loader support</li>
-        </ul>
-    """
-    
-    sinceBuild = '221'
-    untilBuild = '232.*'
-}
-
-test {
-    useJUnitPlatform()
+    test {
+        useJUnit()
+    }
 }
