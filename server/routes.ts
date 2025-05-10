@@ -62,7 +62,7 @@ async function generateModCodeAsync(mod: any, build: any): Promise<void> {
     console.error("Error in generateModCodeAsync:", error);
     // Update build with error
     await storage.updateBuild(build.id, {
-      status: BuildStatus.Failed,
+      status: "failed", // Using string literal instead of enum
       logs: build.logs + `\nError during mod generation: ${error instanceof Error ? error.message : String(error)}\n`,
       errorCount: 1,
       warningCount: 0
@@ -78,7 +78,7 @@ async function compileModAsync(mod: any, build: any): Promise<void> {
     const compileResult = await compileMod(mod.id);
     
     // Update build with compilation results
-    const status = compileResult.success ? BuildStatus.Success : BuildStatus.Failed;
+    const status = compileResult.success ? "succeeded" : "failed"; // Using string literals
     currentLogs += compileResult.logs;
     
     await storage.updateBuild(build.id, {
@@ -163,7 +163,7 @@ async function compileModAsync(mod: any, build: any): Promise<void> {
   } catch (error) {
     console.error("Error in compileModAsync:", error);
     await storage.updateBuild(build.id, {
-      status: BuildStatus.Failed,
+      status: "failed", // Using string literal
       logs: currentLogs + `\nError during compilation: ${error instanceof Error ? error.message : String(error)}\n`,
       errorCount: 1
     });
