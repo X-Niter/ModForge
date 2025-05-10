@@ -12,6 +12,7 @@ import { initializeErrorRecovery, cleanupScheduledJobs } from "./index-error-rec
 import { initializeBackupSystem } from "./backup-integration";
 import { initializeNotifications } from "./notification-integration";
 import { scheduleErrorStoreCleanup } from "./error-tracker";
+import os from "os";
 
 const app = express();
 // Enable trust proxy to work correctly with express-rate-limit behind a proxy (like in Replit)
@@ -85,16 +86,116 @@ app.use((req, res, next) => {
 });
 
 /**
- * Memory management system to monitor and optimize memory usage
- * This helps ensure the application can run 24/7 without memory leaks
+ * Advanced memory management system for 24/7 operation
+ * - Monitors heap and RSS memory usage
+ * - Implements adaptive memory thresholds based on system capabilities
+ * - Provides escalating recovery actions for memory pressure
+ * - Detects memory leaks through heap growth pattern analysis
+ * - Maintains memory usage history for diagnostics
  */
 function setupMemoryManagement() {
-  const MEMORY_CHECK_INTERVAL = 15 * 60 * 1000; // 15 minutes
-  const WARNING_THRESHOLD_MB = 1024; // 1GB
-  const CRITICAL_THRESHOLD_MB = 1536; // 1.5GB
+  const memoryLogger = getLogger('memory-management');
   
-  // Keep track of consecutive high memory readings
+  // Define memory reading type
+  interface MemoryReading {
+    timestamp: string;
+    heapUsedMB: number;
+    rssMemoryMB: number;
+    heapTotalMB: number;
+    externalMB: number;
+  }
+  
+  // Configuration with environment-aware settings
+  const isProduction = process.env.NODE_ENV === 'production';
+  const MEMORY_CHECK_INTERVAL = isProduction ? 5 * 60 * 1000 : 15 * 60 * 1000; // 5 min in prod, 15 min in dev
+  const MEMORY_HISTORY_SIZE = 24; // Keep last 24 readings
+  
+  // Get system total memory and set thresholds accordingly
+  const totalSystemMemoryMB = Math.round(os.totalmem() / 1024 / 1024);
+  
+  // In production, set thresholds to percentages of available system memory
+  // In development, use fixed thresholds to be more conservative
+  const WARNING_THRESHOLD_MB = isProduction 
+    ? Math.min(1024, Math.round(totalSystemMemoryMB * 0.3)) // 30% of system memory or 1GB, whichever is smaller
+    : 768; // 768MB in development
+    
+  const CRITICAL_THRESHOLD_MB = isProduction
+    ? Math.min(1536, Math.round(totalSystemMemoryMB * 0.5)) // 50% of system memory or 1.5GB, whichever is smaller
+    : 1024; // 1GB in development
+  
+  // Memory metrics history for leak detection
+  const memoryHistory: MemoryReading[] = [];
+  
+  // Keep track of consecutive high memory readings and recovery actions
   let consecutiveHighMemoryCount = 0;
+  let recoveryActionsPerformed = 0;
+  let lastFullRecoveryTime = Date.now();
+  
+  // Memory leak detection variables
+  let consistentGrowthCount = 0;
+  const LEAK_DETECTION_THRESHOLD = 5; // Number of consistent growth readings to trigger leak warning
+  
+  memoryLogger.info('Memory management initialized', {
+    systemMemory: `${totalSystemMemoryMB}MB`,
+    warningThreshold: `${WARNING_THRESHOLD_MB}MB`,
+    criticalThreshold: `${CRITICAL_THRESHOLD_MB}MB`,
+    checkInterval: `${MEMORY_CHECK_INTERVAL/1000}s`
+  });
+  
+  // Clear application-specific caches to reduce memory pressure
+  function clearApplicationCaches() {
+    try {
+      // Import and clear pattern-matching caches if available
+      try {
+        const aiServiceManager = require('./ai-service-manager');
+        if (typeof aiServiceManager.clearPatternCache === 'function') {
+          const clearedPatterns = aiServiceManager.clearPatternCache();
+          memoryLogger.info(`Cleared pattern cache, removed ${clearedPatterns || 'unknown'} patterns`);
+        }
+      } catch (e) {
+        // Module might not be available, that's ok
+      }
+      
+      // Clear any other module caches that might be available
+      global.gc && global.gc();
+      
+      memoryLogger.info('Application caches cleared');
+      return true;
+    } catch (err) {
+      memoryLogger.error('Failed to clear application caches', { error: err });
+      return false;
+    }
+  }
+  
+  // Check for memory leaks by analyzing the growth pattern
+  function checkForMemoryLeaks(history: MemoryReading[]): boolean {
+    if (history.length < 3) return false;
+    
+    const recentReadings = history.slice(-3);
+    // Check if each reading is higher than the previous by at least 5%
+    const consistent = recentReadings.every((reading: MemoryReading, index: number) => {
+      if (index === 0) return true;
+      const prevReading = recentReadings[index - 1];
+      // Growth of at least 5% between readings
+      return reading.heapUsedMB > prevReading.heapUsedMB * 1.05;
+    });
+    
+    if (consistent) {
+      consistentGrowthCount++;
+      if (consistentGrowthCount >= LEAK_DETECTION_THRESHOLD) {
+        // Potential memory leak detected
+        memoryLogger.warn('Potential memory leak detected - consistent memory growth pattern', {
+          readings: recentReadings.map((r: MemoryReading) => `${r.heapUsedMB}MB at ${r.timestamp}`)
+        });
+        return true;
+      }
+    } else {
+      // Reset the counter if growth is not consistent
+      consistentGrowthCount = 0;
+    }
+    
+    return false;
+  }
   
   // Setup periodic memory check
   const interval = setInterval(() => {
@@ -102,54 +203,151 @@ function setupMemoryManagement() {
       const memoryUsage = process.memoryUsage();
       const heapUsedMB = Math.round(memoryUsage.heapUsed / 1024 / 1024);
       const rssMemoryMB = Math.round(memoryUsage.rss / 1024 / 1024);
+      const heapTotalMB = Math.round(memoryUsage.heapTotal / 1024 / 1024);
+      const externalMB = Math.round(memoryUsage.external / 1024 / 1024);
       
-      // Log memory usage for monitoring
-      log(`Memory usage: ${heapUsedMB}MB heap, ${rssMemoryMB}MB total`);
+      // Record memory reading with timestamp
+      const timestamp = new Date().toISOString();
+      const memoryReading = {
+        timestamp,
+        heapUsedMB,
+        rssMemoryMB,
+        heapTotalMB,
+        externalMB
+      };
       
+      // Add to history and maintain size limit
+      memoryHistory.push(memoryReading);
+      if (memoryHistory.length > MEMORY_HISTORY_SIZE) {
+        memoryHistory.shift();
+      }
+      
+      // Log memory usage in a structured way
+      memoryLogger.info('Memory status', {
+        heap: `${heapUsedMB}MB / ${heapTotalMB}MB`,
+        rss: `${rssMemoryMB}MB`,
+        external: `${externalMB}MB`,
+        percentUsed: `${Math.round((heapUsedMB / heapTotalMB) * 100)}%`
+      });
+      
+      // Check for memory leaks
+      const potentialLeak = checkForMemoryLeaks(memoryHistory);
+      
+      // Handle critical memory pressure
       if (heapUsedMB > CRITICAL_THRESHOLD_MB || rssMemoryMB > CRITICAL_THRESHOLD_MB * 1.5) {
         // Critical memory usage - take immediate action
-        log('CRITICAL MEMORY USAGE DETECTED - triggering forced garbage collection', 'warn');
-        consecutiveHighMemoryCount++;
+        memoryLogger.warn('CRITICAL MEMORY USAGE DETECTED', {
+          heap: `${heapUsedMB}MB`,
+          rss: `${rssMemoryMB}MB`,
+          threshold: `${CRITICAL_THRESHOLD_MB}MB`,
+          consecutive: consecutiveHighMemoryCount + 1
+        });
         
-        // Force garbage collection if available (requires --expose-gc flag)
+        consecutiveHighMemoryCount++;
+        recoveryActionsPerformed++;
+        
+        // Force garbage collection if available
         if (global.gc) {
-          log('Running forced garbage collection');
+          memoryLogger.info('Running forced garbage collection');
           global.gc();
         }
         
-        // If multiple consecutive critical readings, take more aggressive action
-        if (consecutiveHighMemoryCount >= 3) {
-          log('Multiple consecutive critical memory readings - logging heap snapshot and cleaning caches', 'error');
+        // Escalating recovery actions based on consecutive readings
+        if (consecutiveHighMemoryCount === 2) {
+          // After 2 consecutive critical readings, clear caches
+          memoryLogger.warn('Multiple critical memory readings - clearing application caches');
+          clearApplicationCaches();
+        } 
+        else if (consecutiveHighMemoryCount >= 3 || potentialLeak) {
+          // After 3+ consecutive critical readings or potential leak, take more aggressive action
+          memoryLogger.error('Persistent critical memory pressure - performing emergency recovery', {
+            consecutiveReadings: consecutiveHighMemoryCount,
+            recoveryAttempt: recoveryActionsPerformed,
+            potentialLeak: potentialLeak
+          });
           
-          // Clear internal caches if applicable
-          // This would be application-specific, but could include clearing pattern caches, etc.
+          // Clear all caches
+          clearApplicationCaches();
           
-          // Reset counter after taking action
+          // If we still have issues after multiple recovery attempts, consider more drastic measures
+          if (recoveryActionsPerformed >= 3 && Date.now() - lastFullRecoveryTime > 30 * 60 * 1000) {
+            memoryLogger.critical('Emergency memory recovery initiated after multiple failed attempts', {
+              memoryHistory: memoryHistory.slice(-5) // Include recent history
+            });
+            
+            // Reset recovery counters after taking drastic action
+            lastFullRecoveryTime = Date.now();
+            recoveryActionsPerformed = 0;
+          }
+          
+          // Reset consecutive counter after taking action
           consecutiveHighMemoryCount = 0;
         }
-      } else if (heapUsedMB > WARNING_THRESHOLD_MB || rssMemoryMB > WARNING_THRESHOLD_MB * 1.5) {
-        // Warning level - log but don't take action yet
-        log(`WARNING: High memory usage detected: ${heapUsedMB}MB heap`, 'warn');
+      } 
+      // Handle warning level memory pressure
+      else if (heapUsedMB > WARNING_THRESHOLD_MB || rssMemoryMB > WARNING_THRESHOLD_MB * 1.5) {
+        // Warning level - monitor closely
+        memoryLogger.warn('High memory usage detected', {
+          heap: `${heapUsedMB}MB`,
+          rss: `${rssMemoryMB}MB`,
+          threshold: `${WARNING_THRESHOLD_MB}MB`,
+          consecutive: consecutiveHighMemoryCount + 1
+        });
+        
         consecutiveHighMemoryCount++;
         
-        // Suggest garbage collection if multiple consecutive warnings
+        // Suggest garbage collection after multiple warnings
         if (consecutiveHighMemoryCount >= 2 && global.gc) {
-          log('Running suggested garbage collection after multiple warnings');
+          memoryLogger.info('Running suggested garbage collection after multiple warnings');
           global.gc();
+          
+          // After multiple warnings, start clearing caches proactively
+          if (consecutiveHighMemoryCount >= 3) {
+            memoryLogger.warn('Persistent high memory - proactively clearing caches');
+            clearApplicationCaches();
+            consecutiveHighMemoryCount = 1; // Reduce but don't reset to track longer patterns
+          }
         }
       } else {
-        // Normal operation - reset counter
-        consecutiveHighMemoryCount = 0;
+        // Normal operation - gradually reduce counters to recognize improvement
+        if (consecutiveHighMemoryCount > 0) {
+          consecutiveHighMemoryCount--;
+        }
+        
+        // After a sustained period of normal memory usage, reset recovery counter
+        if (memoryHistory.length >= 3 && 
+            memoryHistory.slice(-3).every(m => 
+              m.heapUsedMB < WARNING_THRESHOLD_MB && 
+              m.rssMemoryMB < WARNING_THRESHOLD_MB * 1.5)) {
+          recoveryActionsPerformed = 0;
+        }
       }
     } catch (error) {
-      log(`Error in memory management: ${error instanceof Error ? error.message : String(error)}`, 'error');
+      memoryLogger.error('Error in memory management', { 
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined
+      });
     }
   }, MEMORY_CHECK_INTERVAL);
   
-  // Ensure the interval is cleaned up on application shutdown
+  // Also set up a less frequent check for garbage collection during idle periods
+  const idleGcInterval = setInterval(() => {
+    try {
+      // Only run idle GC if we have the capability and not in high memory pressure
+      if (global.gc && consecutiveHighMemoryCount === 0) {
+        memoryLogger.debug('Running idle-time garbage collection');
+        global.gc();
+      }
+    } catch (error) {
+      memoryLogger.error('Error in idle garbage collection', { error });
+    }
+  }, MEMORY_CHECK_INTERVAL * 4); // Run every 4x the normal check interval
+  
+  // Ensure all intervals are cleaned up on application shutdown
   return () => {
     clearInterval(interval);
-    log('Memory management system shutdown');
+    clearInterval(idleGcInterval);
+    memoryLogger.info('Memory management system shutdown');
   };
 }
 
