@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { useLocation, useRoute, navigate } from "wouter";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useForm } from "react-hook-form";
@@ -167,7 +168,15 @@ export default function IdeaGeneratorPage() {
         title: "Redirecting to mod creation",
         description: "Taking you to the code generator to create your mod.",
       });
-      // In a real implementation, we would navigate to the code generator page with the expanded idea
+      
+      // Navigate to the code generator with the expanded idea data
+      navigate("/code-generator", { 
+        state: { 
+          expandedIdea: expandedIdea,
+          ideaTitle: selectedIdea?.title || "", 
+          ideaDescription: selectedIdea?.description || "" 
+        } 
+      });
     }
   };
 
