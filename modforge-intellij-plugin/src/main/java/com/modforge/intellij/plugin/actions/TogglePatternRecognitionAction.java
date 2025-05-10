@@ -2,90 +2,158 @@ package com.modforge.intellij.plugin.actions;
 
 import com.intellij.openapi.actionSystem.AnAction;
 import com.intellij.openapi.actionSystem.AnActionEvent;
-import com.intellij.openapi.actionSystem.Toggleable;
+import com.intellij.openapi.actionSystem.Presentation;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.Messages;
+import com.modforge.intellij.plugin.ai.PatternRecognitionService;
 import com.modforge.intellij.plugin.auth.ModAuthenticationManager;
 import com.modforge.intellij.plugin.settings.ModForgeSettings;
 import org.jetbrains.annotations.NotNull;
 
+import java.text.NumberFormat;
+import java.util.Locale;
+import java.util.Map;
+
 /**
  * Action for toggling pattern recognition.
  */
-public class TogglePatternRecognitionAction extends AnAction implements Toggleable {
+public class TogglePatternRecognitionAction extends AnAction {
     private static final Logger LOG = Logger.getInstance(TogglePatternRecognitionAction.class);
-    
-    @Override
-    public void actionPerformed(@NotNull AnActionEvent e) {
-        Project project = e.getProject();
-        
-        if (project == null) {
-            LOG.warn("Project is null");
-            return;
-        }
-        
-        try {
-            // Check if authenticated
-            ModAuthenticationManager authManager = ModAuthenticationManager.getInstance();
-            if (!authManager.isAuthenticated()) {
-                Messages.showErrorDialog(
-                        project,
-                        "You must be logged in to use pattern recognition.",
-                        "Authentication Required"
-                );
-                return;
-            }
-            
-            // Get settings
-            ModForgeSettings settings = ModForgeSettings.getInstance();
-            
-            // Toggle pattern recognition
-            boolean enabled = !settings.isEnablePatternRecognition();
-            settings.setEnablePatternRecognition(enabled);
-            
-            // Show message
-            if (enabled) {
-                Messages.showInfoMessage(
-                        project,
-                        "Pattern recognition has been enabled.\n" +
-                                "This helps reduce API usage by learning from previous requests.",
-                        "Pattern Recognition"
-                );
-            } else {
-                Messages.showInfoMessage(
-                        project,
-                        "Pattern recognition has been disabled.\n" +
-                                "All requests will be sent to the API, which may incur higher costs.",
-                        "Pattern Recognition"
-                );
-            }
-            
-            // Update selected state
-            Toggleable.setSelected(e.getPresentation(), enabled);
-        } catch (Exception ex) {
-            LOG.error("Error in toggle pattern recognition action", ex);
-            
-            Messages.showErrorDialog(
-                    project,
-                    "An error occurred: " + ex.getMessage(),
-                    "Error"
-            );
-        }
-    }
     
     @Override
     public void update(@NotNull AnActionEvent e) {
         Project project = e.getProject();
+        Presentation presentation = e.getPresentation();
         
-        // Only enable if authenticated and project is available
+        // Disable action if there's no project
+        if (project == null) {
+            presentation.setEnabled(false);
+            presentation.setText("Toggle Pattern Recognition");
+            return;
+        }
+        
+        // Make sure the user is authenticated
         ModAuthenticationManager authManager = ModAuthenticationManager.getInstance();
-        boolean enabled = authManager.isAuthenticated() && project != null;
+        if (!authManager.isAuthenticated()) {
+            presentation.setEnabled(false);
+            presentation.setText("Login to Use Pattern Recognition");
+            return;
+        }
         
-        e.getPresentation().setEnabled(enabled);
+        // Update text based on whether pattern recognition is enabled
+        PatternRecognitionService service = project.getService(PatternRecognitionService.class);
+        boolean enabled = service != null && service.isEnabled();
         
-        // Update selected state
-        ModForgeSettings settings = ModForgeSettings.getInstance();
-        Toggleable.setSelected(e.getPresentation(), settings.isEnablePatternRecognition());
+        presentation.setEnabled(true);
+        presentation.setText(enabled ? "Disable Pattern Recognition" : "Enable Pattern Recognition");
+    }
+    
+    @Override
+    public void actionPerformed(@NotNull AnActionEvent e) {
+        Project project = e.getProject();
+        if (project == null) {
+            return;
+        }
+        
+        // Make sure the user is authenticated
+        ModAuthenticationManager authManager = ModAuthenticationManager.getInstance();
+        if (!authManager.isAuthenticated()) {
+            Messages.showErrorDialog(
+                    project,
+                    "You must be logged in to use pattern recognition.",
+                    "Authentication Required"
+            );
+            return;
+        }
+        
+        // Toggle pattern recognition
+        PatternRecognitionService service = project.getService(PatternRecognitionService.class);
+        if (service != null) {
+            boolean currentState = service.isEnabled();
+            
+            if (currentState) {
+                // Show confirmation dialog before disabling
+                int result = Messages.showYesNoDialog(
+                        project,
+                        "Are you sure you want to disable pattern recognition? This will increase API usage and costs.",
+                        "Disable Pattern Recognition",
+                        "Disable",
+                        "Cancel",
+                        null
+                );
+                
+                if (result == Messages.YES) {
+                    service.setEnabled(false);
+                    
+                    ModForgeSettings settings = ModForgeSettings.getInstance();
+                    settings.setEnablePatternRecognition(false);
+                    
+                    Messages.showInfoMessage(
+                            project,
+                            "Pattern recognition has been disabled.",
+                            "Pattern Recognition"
+                    );
+                }
+            } else {
+                // Enable pattern recognition
+                service.setEnabled(true);
+                
+                ModForgeSettings settings = ModForgeSettings.getInstance();
+                settings.setEnablePatternRecognition(true);
+                
+                Messages.showInfoMessage(
+                        project,
+                        "Pattern recognition has been enabled.",
+                        "Pattern Recognition"
+                );
+            }
+        }
+    }
+    
+    /**
+     * Show pattern recognition metrics.
+     *
+     * @param project The project
+     */
+    public void showMetrics(@NotNull Project project) {
+        PatternRecognitionService service = project.getService(PatternRecognitionService.class);
+        if (service == null) {
+            return;
+        }
+        
+        Map<String, Object> metrics = service.getMetrics();
+        
+        boolean enabled = (boolean) metrics.get("enabled");
+        int totalRequests = (int) metrics.get("totalRequests");
+        int patternMatches = (int) metrics.get("patternMatches");
+        int apiCalls = (int) metrics.get("apiCalls");
+        double estimatedTokensSaved = (double) metrics.get("estimatedTokensSaved");
+        double estimatedCostSaved = (double) metrics.get("estimatedCostSaved");
+        Map<String, Integer> patternCountsByType = (Map<String, Integer>) metrics.get("patternCountsByType");
+        
+        // Format numbers
+        NumberFormat numberFormat = NumberFormat.getNumberInstance(Locale.US);
+        NumberFormat currencyFormat = NumberFormat.getCurrencyInstance(Locale.US);
+        
+        StringBuilder sb = new StringBuilder();
+        sb.append("Pattern Recognition Metrics:\n\n");
+        sb.append("Status: ").append(enabled ? "Enabled" : "Disabled").append("\n");
+        sb.append("Total Requests: ").append(numberFormat.format(totalRequests)).append("\n");
+        sb.append("Pattern Matches: ").append(numberFormat.format(patternMatches)).append("\n");
+        sb.append("API Calls: ").append(numberFormat.format(apiCalls)).append("\n");
+        sb.append("Estimated Tokens Saved: ").append(numberFormat.format(estimatedTokensSaved)).append("\n");
+        sb.append("Estimated Cost Saved: ").append(currencyFormat.format(estimatedCostSaved)).append("\n\n");
+        
+        sb.append("Patterns by Type:\n");
+        patternCountsByType.forEach((type, count) -> {
+            sb.append("- ").append(type).append(": ").append(numberFormat.format(count)).append("\n");
+        });
+        
+        Messages.showInfoMessage(
+                project,
+                sb.toString(),
+                "Pattern Recognition Metrics"
+        );
     }
 }

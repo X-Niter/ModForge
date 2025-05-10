@@ -2,16 +2,18 @@ package com.modforge.intellij.plugin.actions;
 
 import com.intellij.openapi.actionSystem.AnAction;
 import com.intellij.openapi.actionSystem.AnActionEvent;
+import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.diagnostic.Logger;
+import com.intellij.openapi.progress.ProgressIndicator;
+import com.intellij.openapi.progress.ProgressManager;
+import com.intellij.openapi.progress.Task;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.DialogWrapper;
 import com.intellij.openapi.ui.Messages;
-import com.intellij.openapi.ui.ValidationInfo;
 import com.intellij.ui.components.JBLabel;
 import com.intellij.ui.components.JBPasswordField;
 import com.intellij.ui.components.JBTextField;
 import com.intellij.util.ui.FormBuilder;
-import com.intellij.util.ui.JBUI;
 import com.modforge.intellij.plugin.auth.ModAuthenticationManager;
 import com.modforge.intellij.plugin.settings.ModForgeSettings;
 import org.jetbrains.annotations.NotNull;
@@ -19,6 +21,7 @@ import org.jetbrains.annotations.Nullable;
 
 import javax.swing.*;
 import java.awt.*;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * Action for logging in to ModForge.
@@ -27,146 +30,172 @@ public class LoginAction extends AnAction {
     private static final Logger LOG = Logger.getInstance(LoginAction.class);
     
     @Override
+    public void update(@NotNull AnActionEvent e) {
+        ModAuthenticationManager authManager = ModAuthenticationManager.getInstance();
+        
+        // Enable action only if the user is not authenticated
+        e.getPresentation().setEnabled(!authManager.isAuthenticated());
+    }
+    
+    @Override
     public void actionPerformed(@NotNull AnActionEvent e) {
         Project project = e.getProject();
         
-        if (project == null) {
-            LOG.warn("Project is null");
+        // Check if server URL is set
+        ModForgeSettings settings = ModForgeSettings.getInstance();
+        String serverUrl = settings.getServerUrl();
+        if (serverUrl.isEmpty()) {
+            Messages.showErrorDialog(
+                    project,
+                    "Please set the ModForge server URL in the settings.",
+                    "Login Error"
+            );
             return;
         }
         
-        try {
-            // Check if already authenticated
-            ModAuthenticationManager authManager = ModAuthenticationManager.getInstance();
-            if (authManager.isAuthenticated()) {
-                Messages.showInfoMessage(
-                        project,
-                        "You are already logged in as " + authManager.getUsername(),
-                        "Already Authenticated"
-                );
-                return;
-            }
-            
-            // Show login dialog
-            LoginDialog dialog = new LoginDialog(project);
-            boolean proceed = dialog.showAndGet();
-            
-            if (!proceed) {
-                return;
-            }
-            
+        // Show login dialog
+        LoginDialog dialog = new LoginDialog(project);
+        if (dialog.showAndGet()) {
             String username = dialog.getUsername();
             String password = dialog.getPassword();
-            boolean rememberMe = dialog.isRememberMe();
             
-            // Save remember me setting
-            ModForgeSettings settings = ModForgeSettings.getInstance();
-            settings.setRememberMe(rememberMe);
-            
-            // Perform login
-            authManager.login(username, password)
-                    .thenAccept(success -> {
-                        if (success) {
-                            SwingUtilities.invokeLater(() -> {
-                                Messages.showInfoMessage(
-                                        project,
-                                        "Successfully logged in as " + username,
-                                        "Login Successful"
-                                );
-                            });
+            // Show progress while logging in
+            ProgressManager.getInstance().run(new Task.Backgroundable(project, "Logging in to ModForge") {
+                @Override
+                public void run(@NotNull ProgressIndicator indicator) {
+                    indicator.setIndeterminate(true);
+                    
+                    ModAuthenticationManager authManager = ModAuthenticationManager.getInstance();
+                    AtomicBoolean success = new AtomicBoolean(false);
+                    
+                    authManager.login(username, password)
+                            .thenAccept(success::set)
+                            .join(); // Wait for completion
+                    
+                    // Show result on UI thread
+                    ApplicationManager.getApplication().invokeLater(() -> {
+                        if (success.get()) {
+                            Messages.showInfoMessage(
+                                    project,
+                                    "Successfully logged in as " + authManager.getUsername(),
+                                    "Login Successful"
+                            );
+                            
+                            // Enable features that require authentication
+                            enableContinuousDevelopmentIfPossible(project);
                         } else {
-                            SwingUtilities.invokeLater(() -> {
-                                Messages.showErrorDialog(
-                                        project,
-                                        "Failed to log in. Please check your credentials.",
-                                        "Login Failed"
-                                );
-                            });
+                            Messages.showErrorDialog(
+                                    project,
+                                    "Login failed. Please check your credentials and try again.",
+                                    "Login Failed"
+                            );
                         }
                     });
-        } catch (Exception ex) {
-            LOG.error("Error in login action", ex);
+                }
+            });
+        }
+    }
+    
+    /**
+     * Enable continuous development if it's enabled in settings.
+     *
+     * @param project The project
+     */
+    private void enableContinuousDevelopmentIfPossible(Project project) {
+        if (project == null) {
+            return;
+        }
+        
+        ModForgeSettings settings = ModForgeSettings.getInstance();
+        if (settings.isEnableContinuousDevelopment()) {
+            // We could automatically start continuous development here
+            // but for now, we'll just let the user know it's available
             
-            Messages.showErrorDialog(
+            Messages.showInfoMessage(
                     project,
-                    "An error occurred: " + ex.getMessage(),
-                    "Error"
+                    "Continuous development is enabled in settings. You can start it from the ModForge menu.",
+                    "Continuous Development"
             );
         }
     }
     
-    @Override
-    public void update(@NotNull AnActionEvent e) {
-        // Only enable if not authenticated
-        ModAuthenticationManager authManager = ModAuthenticationManager.getInstance();
-        
-        e.getPresentation().setEnabled(!authManager.isAuthenticated());
-    }
-    
     /**
-     * Dialog for entering login credentials.
+     * Dialog for logging in to ModForge.
      */
     private static class LoginDialog extends DialogWrapper {
         private final JBTextField usernameField;
         private final JBPasswordField passwordField;
-        private final JCheckBox rememberMeCheckbox;
         
-        public LoginDialog(Project project) {
-            super(project, true);
-            
-            // Get last username from settings
-            ModForgeSettings settings = ModForgeSettings.getInstance();
-            String lastUsername = settings.getLastUsername();
-            boolean rememberMe = settings.isRememberMe();
-            
-            usernameField = new JBTextField(lastUsername, 20);
-            passwordField = new JBPasswordField();
-            rememberMeCheckbox = new JCheckBox("Remember me", rememberMe);
-            
+        public LoginDialog(@Nullable Project project) {
+            super(project);
             setTitle("Login to ModForge");
+            setCancelButtonText("Cancel");
+            setOKButtonText("Login");
+            
+            usernameField = new JBTextField();
+            passwordField = new JBPasswordField();
+            
             init();
         }
         
         @Override
-        protected @Nullable ValidationInfo doValidate() {
-            if (usernameField.getText().trim().isEmpty()) {
-                return new ValidationInfo("Username is required", usernameField);
-            }
+        protected @Nullable JComponent createCenterPanel() {
+            // Create a panel with labels and fields
+            JPanel panel = FormBuilder.createFormBuilder()
+                    .addLabeledComponent(new JBLabel("Username:"), usernameField, 1, false)
+                    .addLabeledComponent(new JBLabel("Password:"), passwordField, 1, false)
+                    .addComponentFillVertically(new JPanel(), 0)
+                    .getPanel();
             
-            if (passwordField.getPassword().length == 0) {
-                return new ValidationInfo("Password is required", passwordField);
-            }
+            panel.setPreferredSize(new Dimension(300, panel.getPreferredSize().height));
             
-            return null;
+            return panel;
         }
         
         @Override
-        protected @Nullable JComponent createCenterPanel() {
-            JPanel panel = new JPanel(new BorderLayout());
-            
-            // Build form
-            FormBuilder formBuilder = FormBuilder.createFormBuilder()
-                    .addLabeledComponent(new JBLabel("Username:"), usernameField)
-                    .addLabeledComponent(new JBLabel("Password:"), passwordField)
-                    .addComponent(rememberMeCheckbox);
-            
-            panel.add(formBuilder.getPanel(), BorderLayout.CENTER);
-            panel.setPreferredSize(new Dimension(300, 150));
-            
-            return JBUI.Panels.simplePanel()
-                    .addToCenter(panel);
+        public @Nullable JComponent getPreferredFocusedComponent() {
+            return usernameField;
         }
         
+        /**
+         * Get the entered username.
+         *
+         * @return The username
+         */
         public String getUsername() {
             return usernameField.getText().trim();
         }
         
+        /**
+         * Get the entered password.
+         *
+         * @return The password
+         */
         public String getPassword() {
             return new String(passwordField.getPassword());
         }
         
-        public boolean isRememberMe() {
-            return rememberMeCheckbox.isSelected();
+        @Override
+        protected void doOKAction() {
+            if (getUsername().isEmpty()) {
+                Messages.showErrorDialog(
+                        getContentPanel(),
+                        "Username cannot be empty",
+                        "Validation Error"
+                );
+                return;
+            }
+            
+            if (getPassword().isEmpty()) {
+                Messages.showErrorDialog(
+                        getContentPanel(),
+                        "Password cannot be empty",
+                        "Validation Error"
+                );
+                return;
+            }
+            
+            super.doOKAction();
         }
     }
 }

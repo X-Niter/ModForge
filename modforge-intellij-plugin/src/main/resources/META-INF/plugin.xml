@@ -1,118 +1,112 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <idea-plugin>
     <id>com.modforge.intellij.plugin</id>
-    <name>ModForge</name>
-    <vendor email="support@modforge.com" url="https://www.modforge.com">ModForge</vendor>
-
+    <name>ModForge AI</name>
+    <vendor email="support@modforge.dev" url="https://www.modforge.dev">ModForge</vendor>
+    
     <description><![CDATA[
-    <h1>ModForge - AI-Powered Minecraft Mod Development</h1>
-    <p>ModForge is an advanced autonomous AI-powered Minecraft mod development platform that 
-    democratizes mod creation through intelligent technologies and collaborative tools.</p>
-    
-    <h2>Key Features:</h2>
+    <p>ModForge AI - Smart Minecraft Mod Development</p>
+    <p>This plugin provides AI-powered assistance for Minecraft mod development:</p>
     <ul>
-        <li><b>Multi-mod loader support:</b> Forge, Fabric, Quilt, Architectury</li>
-        <li><b>AI-driven development:</b> Generate code and fix errors with AI assistance</li>
-        <li><b>Autonomous continuous development:</b> Let the AI work on your mod while you're away</li>
-        <li><b>Pattern recognition:</b> Reduces API usage and costs by learning from previous requests</li>
-        <li><b>GitHub integration:</b> Automatically push changes to GitHub</li>
+        <li>Multi-mod loader support (Forge, Fabric, Quilt, Architectury)</li>
+        <li>AI-driven code generation</li>
+        <li>Automatic error detection and fixing</li>
+        <li>Pattern recognition to reduce API costs</li>
+        <li>Continuous development for 24/7 improvement</li>
     </ul>
-    
-    <h2>How to use:</h2>
-    <ol>
-        <li>Install the plugin</li>
-        <li>Create a ModForge account at <a href="https://www.modforge.com">modforge.com</a></li>
-        <li>Login to your account in the plugin</li>
-        <li>Start creating Minecraft mods with AI assistance</li>
-    </ol>
+    <p>Features:</p>
+    <ul>
+        <li>Generate code with AI by describing what you want</li>
+        <li>Fix compilation errors automatically</li>
+        <li>Continuous development that keeps working even when you're not</li>
+        <li>Cost optimization through pattern recognition</li>
+        <li>GitHub integration for version control</li>
+    </ul>
     ]]></description>
-
+    
     <depends>com.intellij.modules.platform</depends>
     <depends>com.intellij.modules.java</depends>
-
+    
     <extensions defaultExtensionNs="com.intellij">
-        <!-- Settings -->
-        <applicationService
-                serviceImplementation="com.modforge.intellij.plugin.settings.ModForgeSettings"/>
-        <applicationConfigurable
-                parentId="tools"
-                instance="com.modforge.intellij.plugin.settings.ModForgeSettingsConfigurable"
-                id="com.modforge.intellij.plugin.settings.ModForgeSettingsConfigurable"
-                displayName="ModForge"/>
-                
-        <!-- Services -->
-        <applicationService
-                serviceImplementation="com.modforge.intellij.plugin.auth.ModAuthenticationManager"/>
-        <projectService
-                serviceImplementation="com.modforge.intellij.plugin.services.ContinuousDevelopmentService"/>
-        <projectService
-                serviceImplementation="com.modforge.intellij.plugin.services.AutonomousCodeGenerationService"/>
-        <projectService
-                serviceImplementation="com.modforge.intellij.plugin.ai.PatternRecognitionService"/>
-                
         <!-- Tool Windows -->
-        <toolWindow id="ModForge"
-                    anchor="right"
-                    factoryClass="com.modforge.intellij.plugin.ui.ModForgeToolWindowFactory"
-                    icon="AllIcons.General.Modified"/>
-    </extensions>
-
-    <actions>
-        <!-- Authentication Actions -->
-        <group id="ModForge.Auth" 
-               text="ModForge Authentication" 
-               description="ModForge authentication actions"
-               popup="true"
-               icon="AllIcons.General.User">
-            <action id="ModForge.Login" 
-                    class="com.modforge.intellij.plugin.actions.LoginAction" 
-                    text="Login to ModForge" 
-                    description="Login to ModForge"/>
-            <action id="ModForge.Logout" 
-                    class="com.modforge.intellij.plugin.actions.LogoutAction" 
-                    text="Logout from ModForge" 
-                    description="Logout from ModForge"/>
-            <add-to-group group-id="ToolsMenu" anchor="last"/>
-        </group>
+        <toolWindow id="ModForge AI" 
+                    anchor="right" 
+                    factoryClass="com.modforge.intellij.plugin.ui.ModForgeToolWindowFactory" 
+                    icon="/icons/modforge.svg"/>
         
-        <!-- AI Actions -->
-        <group id="ModForge.AI" 
-               text="ModForge AI" 
-               description="ModForge AI actions"
-               popup="true"
-               icon="AllIcons.General.Modified">
-            <action id="ModForge.GenerateCode" 
-                    class="com.modforge.intellij.plugin.actions.GenerateCodeAction" 
-                    text="Generate Code with AI" 
-                    description="Generate code with AI"/>
-            <action id="ModForge.FixErrors" 
-                    class="com.modforge.intellij.plugin.actions.FixErrorsAction" 
-                    text="Fix Errors with AI" 
-                    description="Fix errors with AI"/>
-            <separator/>
-            <action id="ModForge.ToggleContinuousDevelopment" 
-                    class="com.modforge.intellij.plugin.actions.ToggleContinuousDevelopmentAction" 
-                    text="Toggle Continuous Development" 
-                    description="Toggle continuous development for the current project"/>
-            <action id="ModForge.TogglePatternRecognition" 
-                    class="com.modforge.intellij.plugin.actions.TogglePatternRecognitionAction" 
-                    text="Toggle Pattern Recognition" 
-                    description="Toggle pattern recognition to reduce API usage"/>
-            <add-to-group group-id="EditorPopupMenu" anchor="last"/>
+        <!-- Services -->
+        <projectService serviceImplementation="com.modforge.intellij.plugin.services.AutonomousCodeGenerationService"/>
+        <projectService serviceImplementation="com.modforge.intellij.plugin.services.ContinuousDevelopmentService"/>
+        <projectService serviceImplementation="com.modforge.intellij.plugin.ai.PatternRecognitionService"/>
+        
+        <!-- Application Services -->
+        <applicationService serviceImplementation="com.modforge.intellij.plugin.auth.ModAuthenticationManager"/>
+        <applicationService serviceImplementation="com.modforge.intellij.plugin.settings.ModForgeSettings"/>
+        
+        <!-- Settings -->
+        <applicationConfigurable parentId="tools" 
+                                instance="com.modforge.intellij.plugin.settings.ModForgeSettingsConfigurable"
+                                id="com.modforge.intellij.plugin.settings.ModForgeSettingsConfigurable" 
+                                displayName="ModForge AI Settings"/>
+    </extensions>
+    
+    <actions>
+        <!-- Actions Group -->
+        <group id="ModForge.ActionGroup" text="ModForge AI" description="ModForge AI actions" popup="true">
             <add-to-group group-id="ToolsMenu" anchor="last"/>
+            
+            <!-- Authentication Actions -->
+            <action id="ModForge.LoginAction"
+                    class="com.modforge.intellij.plugin.actions.LoginAction"
+                    text="Login to ModForge"
+                    description="Login to ModForge server">
+            </action>
+            <action id="ModForge.LogoutAction"
+                    class="com.modforge.intellij.plugin.actions.LogoutAction"
+                    text="Logout from ModForge"
+                    description="Logout from ModForge server">
+            </action>
+            <separator/>
+            
+            <!-- Code Generation Actions -->
+            <action id="ModForge.GenerateCodeAction"
+                    class="com.modforge.intellij.plugin.actions.GenerateCodeAction"
+                    text="Generate Code with AI"
+                    description="Generate code using AI">
+                <keyboard-shortcut keymap="$default" first-keystroke="alt shift G"/>
+            </action>
+            <action id="ModForge.FixErrorsAction"
+                    class="com.modforge.intellij.plugin.actions.FixErrorsAction"
+                    text="Fix Errors with AI"
+                    description="Fix compilation errors using AI">
+                <keyboard-shortcut keymap="$default" first-keystroke="alt shift F"/>
+            </action>
+            <separator/>
+            
+            <!-- Continuous Development Actions -->
+            <action id="ModForge.ToggleContinuousDevelopmentAction"
+                    class="com.modforge.intellij.plugin.actions.ToggleContinuousDevelopmentAction"
+                    text="Toggle Continuous Development"
+                    description="Enable or disable continuous development">
+            </action>
+            <action id="ModForge.TogglePatternRecognitionAction"
+                    class="com.modforge.intellij.plugin.actions.TogglePatternRecognitionAction"
+                    text="Toggle Pattern Recognition"
+                    description="Enable or disable pattern recognition">
+            </action>
         </group>
         
         <!-- Editor Actions -->
-        <action id="ModForge.GenerateCodeEditor" 
-                class="com.modforge.intellij.plugin.actions.GenerateCodeAction" 
-                text="Generate Code with ModForge AI" 
-                description="Generate code with ModForge AI">
-            <add-to-group group-id="GenerateGroup" anchor="last"/>
+        <action id="ModForge.EditorGenerateCodeAction"
+                class="com.modforge.intellij.plugin.actions.GenerateCodeAction"
+                text="Generate Code with ModForge AI"
+                description="Generate code using ModForge AI">
+            <add-to-group group-id="EditorPopupMenu" anchor="last"/>
         </action>
-        <action id="ModForge.FixErrorsEditor" 
-                class="com.modforge.intellij.plugin.actions.FixErrorsAction" 
-                text="Fix Errors with ModForge AI" 
-                description="Fix errors with ModForge AI">
+        <action id="ModForge.EditorFixErrorsAction"
+                class="com.modforge.intellij.plugin.actions.FixErrorsAction"
+                text="Fix Errors with ModForge AI"
+                description="Fix compilation errors using ModForge AI">
             <add-to-group group-id="EditorPopupMenu" anchor="last"/>
         </action>
     </actions>

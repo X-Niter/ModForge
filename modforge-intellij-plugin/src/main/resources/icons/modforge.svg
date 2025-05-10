@@ -1,6 +1,24 @@
-<?xml version="1.0" encoding="UTF-8" standalone="no"?>
-<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16" fill="none">
-  <rect width="16" height="16" rx="2" fill="#3C3F41"/>
-  <path d="M2.5 8.5L4.5 10.5L6.5 8.5L8.5 10.5L10.5 8.5L12.5 10.5L13.5 9.5V4C13.5 3.17157 12.8284 2.5 12 2.5H4C3.17157 2.5 2.5 3.17157 2.5 4V9.5L3.5 8.5" stroke="#6AAF35" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
-  <rect x="4" y="4" width="8" height="4" rx="1" fill="#6AAF35"/>
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="16px" height="16px" viewBox="0 0 16 16" version="1.1" xmlns="http://www.w3.org/2000/svg">
+    <title>modforge-icon</title>
+    <g id="ModForge" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
+        <g id="modforge-icon" fill-rule="nonzero">
+            <!-- Anvil base -->
+            <path d="M3,8 L13,8 L14,12 L2,12 L3,8 Z" fill="#6C6C6C" id="anvil-base"/>
+            <!-- Anvil top -->
+            <path d="M5,4 L11,4 L12,8 L4,8 L5,4 Z" fill="#8C8C8C" id="anvil-top"/>
+            <!-- Code block -->
+            <path d="M6,5 L10,5 L10,9 L6,9 Z" fill="#3592C4" id="code-block"/>
+            <!-- AI symbol (simplified brain) -->
+            <path d="M7,6 C7,5.5 7.5,5 8,5 C8.5,5 9,5.5 9,6 C9,7 7,7 7,6 Z" fill="#F04E98" id="ai-brain-left"/>
+            <path d="M7,8 C7,7.5 7.5,7 8,7 C8.5,7 9,7.5 9,8 C9,9 7,9 7,8 Z" fill="#F04E98" id="ai-brain-right"/>
+            <!-- Handle -->
+            <path d="M7,2 L9,2 L9,4 L7,4 Z" fill="#5C5C5C" id="anvil-handle"/>
+            <!-- Sparkles (representing AI coding) -->
+            <circle cx="12" cy="5" r="1" fill="#FFD700" id="sparkle1"/>
+            <circle cx="4" cy="5" r="1" fill="#FFD700" id="sparkle2"/>
+            <circle cx="13" cy="9" r="1" fill="#FFD700" id="sparkle3"/>
+            <circle cx="3" cy="9" r="1" fill="#FFD700" id="sparkle4"/>
+        </g>
+    </g>
 </svg>
