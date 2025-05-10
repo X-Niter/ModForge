@@ -12,6 +12,7 @@ import path from "path";
 import os from "os";
 import { fileURLToPath } from "url";
 import { getLogger } from "./logging";
+import { notifyHealthStateChange } from "./notification-integration";
 
 // Set up logger
 const logger = getLogger('health-check');
@@ -455,16 +456,63 @@ export function scheduleHealthChecks(interval: number = 5 * 60 * 1000): () => vo
             current: currentStatus.status,
             checks: currentStatus.detailedChecks
           });
+          
+          // Send notification for degraded state
+          notifyHealthStateChange(
+            lastStatus.status,
+            currentStatus.status,
+            `System health degraded from ${lastStatus.status.toUpperCase()} to ${currentStatus.status.toUpperCase()}`,
+            {
+              checks: Object.entries(currentStatus.detailedChecks)
+                .filter(([_, check]) => !check.passed)
+                .reduce((acc, [key, value]) => ({ ...acc, [key]: value }), {}),
+              memory: currentStatus.memory,
+              uptime: currentStatus.uptime
+            }
+          ).catch(error => {
+            logger.error('Failed to send health state change notification', { error });
+          });
         } else if (currentStatus.status === 'unhealthy') {
           logger.error(`System health deteriorated to unhealthy state`, {
             previous: lastStatus.status,
             current: currentStatus.status,
             checks: currentStatus.detailedChecks
           });
+          
+          // Send notification for unhealthy state
+          notifyHealthStateChange(
+            lastStatus.status,
+            currentStatus.status,
+            `CRITICAL: System health deteriorated to UNHEALTHY state`,
+            {
+              checks: Object.entries(currentStatus.detailedChecks)
+                .filter(([_, check]) => !check.passed)
+                .reduce((acc, [key, value]) => ({ ...acc, [key]: value }), {}),
+              memory: currentStatus.memory,
+              database: currentStatus.database,
+              uptime: currentStatus.uptime
+            }
+          ).catch(error => {
+            logger.error('Failed to send health state change notification', { error });
+          });
         } else if (currentStatus.status === 'healthy' && lastStatus.status !== 'healthy') {
           logger.info(`System health recovered to healthy state`, {
             previous: lastStatus.status,
             current: currentStatus.status
+          });
+          
+          // Send notification for recovery
+          notifyHealthStateChange(
+            lastStatus.status,
+            currentStatus.status,
+            `System health recovered to HEALTHY state`,
+            {
+              previousState: lastStatus.status,
+              uptime: currentStatus.uptime,
+              recoveryTime: new Date().toISOString()
+            }
+          ).catch(error => {
+            logger.error('Failed to send health state recovery notification', { error });
           });
         }
       }

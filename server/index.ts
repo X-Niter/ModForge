@@ -264,6 +264,11 @@ process.on('unhandledRejection', (reason, promise) => {
     shutdownLogger.info('Shutting down backup system...');
     cleanupBackups();
     
+    // Clean up notification system
+    shutdownLogger.info('Shutting down notification system...');
+    cleanupNotifications();
+    shutdownLogger.info('Notification system shutdown complete');
+    
     // Import the continuousService to clean it up
     const { continuousService } = await import('./continuous-service');
     
