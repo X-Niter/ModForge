@@ -24,6 +24,7 @@ public class LoginDialog extends DialogWrapper {
     private final JBTextField serverUrlField;
     private final JCheckBox rememberCredentialsCheckBox;
     private final Project project;
+    private JButton testConnectionButton;
 
     /**
      * Constructor.
@@ -71,7 +72,7 @@ public class LoginDialog extends DialogWrapper {
         // Test Connection button
         c.gridx = 2;
         c.weightx = 0.0;
-        JButton testConnectionButton = new JButton("Test Connection");
+        testConnectionButton = new JButton("Test Connection");
         panel.add(testConnectionButton, c);
         
         // Username
