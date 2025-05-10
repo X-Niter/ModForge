@@ -69,11 +69,11 @@ export default function HomePage() {
       </div>
       
       <Tabs defaultValue="features" className="w-full mb-10">
-        <TabsList className="grid w-full grid-cols-4">
-          <TabsTrigger value="features">Key Features</TabsTrigger>
-          <TabsTrigger value="getting-started">Getting Started</TabsTrigger>
-          <TabsTrigger value="integrations">Integrations</TabsTrigger>
-          <TabsTrigger value="faq">FAQ</TabsTrigger>
+        <TabsList className="grid w-full grid-cols-4 bg-card border border-border/50">
+          <TabsTrigger value="features" className="data-[state=active]:bg-gradient-to-br data-[state=active]:from-blue-600/20 data-[state=active]:to-violet-600/20">Key Features</TabsTrigger>
+          <TabsTrigger value="getting-started" className="data-[state=active]:bg-gradient-to-br data-[state=active]:from-blue-600/20 data-[state=active]:to-violet-600/20">Getting Started</TabsTrigger>
+          <TabsTrigger value="integrations" className="data-[state=active]:bg-gradient-to-br data-[state=active]:from-blue-600/20 data-[state=active]:to-violet-600/20">Integrations</TabsTrigger>
+          <TabsTrigger value="faq" className="data-[state=active]:bg-gradient-to-br data-[state=active]:from-blue-600/20 data-[state=active]:to-violet-600/20">FAQ</TabsTrigger>
         </TabsList>
         
         <TabsContent value="features" className="py-4">
@@ -179,10 +179,10 @@ export default function HomePage() {
         </TabsContent>
       </Tabs>
 
-      <section className="my-12 py-10 px-6 bg-muted rounded-lg overflow-hidden relative">
+      <section className="my-12 py-10 px-6 bg-card rounded-lg overflow-hidden relative border border-border/50">
         {/* Decorative gradient overlay */}
-        <div className="absolute -top-24 -right-24 w-48 h-48 bg-gradient-to-br from-blue-600/20 to-violet-600/20 rounded-full blur-xl"></div>
-        <div className="absolute -bottom-24 -left-24 w-48 h-48 bg-gradient-to-tr from-violet-600/20 to-blue-600/20 rounded-full blur-xl"></div>
+        <div className="absolute -top-24 -right-24 w-48 h-48 bg-gradient-to-br from-blue-600/10 to-violet-600/10 rounded-full blur-xl"></div>
+        <div className="absolute -bottom-24 -left-24 w-48 h-48 bg-gradient-to-tr from-violet-600/10 to-blue-600/10 rounded-full blur-xl"></div>
         
         <div className="relative">
           <h2 className="text-2xl md:text-3xl font-bold mb-4 text-center bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-violet-600">
@@ -193,7 +193,7 @@ export default function HomePage() {
           </p>
           <div className="flex justify-center">
             <Link href="/idea-generator">
-              <Button size="lg" className="bg-gradient-to-r from-blue-600 to-violet-600 hover:from-blue-700 hover:to-violet-700 shadow-lg">
+              <Button size="lg" className="bg-gradient-to-r from-blue-600 to-violet-600 hover:from-blue-700 hover:to-violet-700 shadow-md">
                 Get Started Now
               </Button>
             </Link>
@@ -206,13 +206,13 @@ export default function HomePage() {
 
 function FeatureCard({ icon, title, description }: { icon?: React.ReactNode, title: string, description: string }) {
   return (
-    <Card className="overflow-hidden border-border/50 transition-all duration-200 hover:shadow-md hover:border-border/80">
+    <Card className="overflow-hidden bg-card border-border/50 transition-all duration-300 hover:shadow-lg hover:shadow-primary/5 hover:border-border/80">
       <CardHeader className="pb-2">
         {icon ? (
           <div className="mb-3">{icon}</div>
         ) : (
           <div className="mb-3">
-            <div className="h-10 w-10 rounded-md bg-gradient-to-br from-blue-600/20 to-violet-600/20 flex items-center justify-center">
+            <div className="h-10 w-10 rounded-md bg-gradient-to-br from-primary/20 to-secondary/20 flex items-center justify-center">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                 <path d="M7 8h10M7 12h10M7 16h10" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
                 <rect x="3" y="3" width="18" height="18" rx="2" stroke="currentColor" strokeWidth="2"/>
@@ -220,10 +220,10 @@ function FeatureCard({ icon, title, description }: { icon?: React.ReactNode, tit
             </div>
           </div>
         )}
-        <CardTitle className="text-lg">{title}</CardTitle>
+        <CardTitle className="text-lg bg-clip-text text-transparent bg-gradient-to-r from-primary to-secondary">{title}</CardTitle>
       </CardHeader>
       <CardContent>
-        <CardDescription className="text-sm leading-relaxed">{description}</CardDescription>
+        <CardDescription className="text-sm leading-relaxed text-muted-foreground">{description}</CardDescription>
       </CardContent>
     </Card>
   );
