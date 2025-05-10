@@ -6,6 +6,7 @@ import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.Messages;
 import com.modforge.intellij.plugin.auth.ModAuthenticationManager;
+import com.modforge.intellij.plugin.services.ContinuousDevelopmentService;
 import org.jetbrains.annotations.NotNull;
 
 /**
@@ -30,30 +31,27 @@ public class LogoutAction extends AnAction {
                 Messages.showInfoMessage(
                         project,
                         "You are not logged in.",
-                        "Not Logged In"
+                        "Not Authenticated"
                 );
                 return;
             }
             
-            // Confirm logout
-            int option = Messages.showYesNoDialog(
-                    project,
-                    "Are you sure you want to log out?",
-                    "Confirm Logout",
-                    Messages.getQuestionIcon()
-            );
+            // Get username before logout
+            String username = authManager.getUsername();
             
-            if (option != Messages.YES) {
-                return;
+            // Stop continuous development if active
+            ContinuousDevelopmentService continuousService = project.getService(ContinuousDevelopmentService.class);
+            if (continuousService != null && continuousService.isRunning()) {
+                continuousService.stop();
             }
             
-            // Logout
-            String username = authManager.getUsername();
+            // Perform logout
             authManager.logout();
             
+            // Show success message
             Messages.showInfoMessage(
                     project,
-                    "Successfully logged out" + (username != null ? " from " + username : ""),
+                    "Successfully logged out user: " + username,
                     "Logout Successful"
             );
         } catch (Exception ex) {

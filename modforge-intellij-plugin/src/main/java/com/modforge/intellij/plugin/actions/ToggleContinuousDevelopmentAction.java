@@ -2,6 +2,7 @@ package com.modforge.intellij.plugin.actions;
 
 import com.intellij.openapi.actionSystem.AnAction;
 import com.intellij.openapi.actionSystem.AnActionEvent;
+import com.intellij.openapi.actionSystem.Toggleable;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.Messages;
@@ -13,7 +14,7 @@ import org.jetbrains.annotations.NotNull;
 /**
  * Action for toggling continuous development.
  */
-public class ToggleContinuousDevelopmentAction extends AnAction {
+public class ToggleContinuousDevelopmentAction extends AnAction implements Toggleable {
     private static final Logger LOG = Logger.getInstance(ToggleContinuousDevelopmentAction.class);
     
     @Override
@@ -31,43 +32,45 @@ public class ToggleContinuousDevelopmentAction extends AnAction {
             if (!authManager.isAuthenticated()) {
                 Messages.showErrorDialog(
                         project,
-                        "You must be logged in to toggle continuous development.",
+                        "You must be logged in to use continuous development.",
                         "Authentication Required"
                 );
                 return;
             }
             
-            // Get settings
-            ModForgeSettings settings = ModForgeSettings.getInstance();
-            boolean continuousDevelopment = settings.isContinuousDevelopment();
-            
-            // Get service
-            ContinuousDevelopmentService service = project.getService(ContinuousDevelopmentService.class);
-            if (service == null) {
-                LOG.error("ContinuousDevelopmentService is null");
+            // Get continuous development service
+            ContinuousDevelopmentService continuousService = project.getService(ContinuousDevelopmentService.class);
+            if (continuousService == null) {
+                LOG.error("Continuous development service is null");
                 return;
             }
             
-            // Toggle continuous development
-            boolean newValue = !continuousDevelopment;
-            settings.setContinuousDevelopment(newValue);
+            // Get settings
+            ModForgeSettings settings = ModForgeSettings.getInstance();
             
-            // Start or stop service
-            if (newValue) {
-                service.start();
+            // Toggle continuous development
+            if (continuousService.isRunning()) {
+                continuousService.stop();
+                settings.setEnableContinuousDevelopment(false);
+                
                 Messages.showInfoMessage(
                         project,
-                        "Continuous development enabled",
+                        "Continuous development has been stopped.",
                         "Continuous Development"
                 );
             } else {
-                service.stop();
+                continuousService.start();
+                settings.setEnableContinuousDevelopment(true);
+                
                 Messages.showInfoMessage(
                         project,
-                        "Continuous development disabled",
+                        "Continuous development has been started.",
                         "Continuous Development"
                 );
             }
+            
+            // Update selected state
+            Toggleable.setSelected(e.getPresentation(), continuousService.isRunning());
         } catch (Exception ex) {
             LOG.error("Error in toggle continuous development action", ex);
             
@@ -81,18 +84,20 @@ public class ToggleContinuousDevelopmentAction extends AnAction {
     
     @Override
     public void update(@NotNull AnActionEvent e) {
-        // Only enable if authenticated
-        ModAuthenticationManager authManager = ModAuthenticationManager.getInstance();
-        
-        e.getPresentation().setEnabled(authManager.isAuthenticated() && e.getProject() != null);
-        
-        // Update text
         Project project = e.getProject();
+        
+        // Only enable if authenticated and project is available
+        ModAuthenticationManager authManager = ModAuthenticationManager.getInstance();
+        boolean enabled = authManager.isAuthenticated() && project != null;
+        
+        e.getPresentation().setEnabled(enabled);
+        
+        // Update selected state if project is available
         if (project != null) {
-            ModForgeSettings settings = ModForgeSettings.getInstance();
-            boolean continuousDevelopment = settings.isContinuousDevelopment();
-            
-            e.getPresentation().setText(continuousDevelopment ? "Disable Continuous Development" : "Enable Continuous Development");
+            ContinuousDevelopmentService continuousService = project.getService(ContinuousDevelopmentService.class);
+            if (continuousService != null) {
+                Toggleable.setSelected(e.getPresentation(), continuousService.isRunning());
+            }
         }
     }
 }

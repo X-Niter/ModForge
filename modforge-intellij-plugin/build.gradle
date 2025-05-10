@@ -1,57 +1,89 @@
 plugins {
     id 'java'
-    id 'org.jetbrains.intellij' version '1.15.0'
+    id 'org.jetbrains.intellij' version '1.13.3'
 }
 
 group 'com.modforge'
 version '1.0.0'
 
+sourceCompatibility = 17
+targetCompatibility = 17
+
 repositories {
     mavenCentral()
 }
 
-// Configure Gradle IntelliJ Plugin
-// See https://plugins.jetbrains.com/docs/intellij/tools-gradle-intellij-plugin.html
-intellij {
-    version = '2022.3.3'
-    type = 'IC' // Target IDE Platform - Community Edition
-    plugins = ['com.intellij.java']
-}
-
 dependencies {
-    implementation 'com.fasterxml.jackson.core:jackson-databind:2.14.2'
+    implementation 'com.google.code.gson:gson:2.10.1'
     implementation 'org.apache.commons:commons-lang3:3.12.0'
-    implementation 'org.json:json:20230227'
-    testImplementation 'junit:junit:4.13.2'
-}
-
-java {
-    sourceCompatibility = JavaVersion.VERSION_17
-    targetCompatibility = JavaVersion.VERSION_17
-}
-
-tasks {
-    patchPluginXml {
-        sinceBuild = "223"
-        untilBuild = "233.*"
-        changeNotes = """
-            <h1>Version 1.0.0</h1>
-            <ul>
-                <li>Initial release with core functionality</li>
-                <li>Authentication system</li>
-                <li>Continuous development</li>
-                <li>Pattern recognition for optimized API usage</li>
-                <li>Multi-mod loader support</li>
-            </ul>
-        """
-    }
-
-    runIde {
-        // Increase available memory
-        jvmArgs = ['-Xmx2048m']
-    }
+    implementation 'org.apache.commons:commons-text:1.10.0'
+    implementation 'org.apache.commons:commons-collections4:4.4'
+    implementation 'org.apache.commons:commons-io:1.3.2'
+    implementation 'com.fasterxml.jackson.core:jackson-core:2.14.2'
+    implementation 'com.fasterxml.jackson.core:jackson-databind:2.14.2'
+    implementation 'com.fasterxml.jackson.core:jackson-annotations:2.14.2'
     
-    test {
-        useJUnit()
-    }
+    testImplementation 'org.junit.jupiter:junit-jupiter-api:5.9.2'
+    testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine:5.9.2'
+    testImplementation 'org.mockito:mockito-core:5.2.0'
+    testImplementation 'org.mockito:mockito-junit-jupiter:5.2.0'
+}
+
+// Configure Gradle IntelliJ Plugin
+// Read more: https://plugins.jetbrains.com/docs/intellij/tools-gradle-intellij-plugin.html
+intellij {
+    version = '2023.1.5'
+    type = 'IC' // IntelliJ IDEA Community Edition
+    plugins = ['java']
+}
+
+compileJava {
+    options.encoding = 'UTF-8'
+    options.compilerArgs << "-Xlint:unchecked" << "-Xlint:deprecation"
+}
+
+compileTestJava {
+    options.encoding = 'UTF-8'
+}
+
+test {
+    useJUnitPlatform()
+}
+
+patchPluginXml {
+    sinceBuild = '231'
+    untilBuild = '241.*'
+    changeNotes = """
+    <h2>Initial Release</h2>
+    <ul>
+      <li>Authentication with ModForge server</li>
+      <li>Code generation with AI</li>
+      <li>Error fixing with AI</li>
+      <li>Pattern recognition to reduce API usage</li>
+      <li>Continuous development for Minecraft mods</li>
+      <li>GitHub integration for version control</li>
+    </ul>
+    """
+}
+
+runIde {
+    // Set IDE JVM arguments
+    jvmArgs = ['-Xmx2048m']
+}
+
+buildSearchableOptions {
+    enabled = false
+}
+
+signPlugin {
+    // Uncomment and configure for plugin signing
+    // certificateChain = file(System.getenv('CERTIFICATE_CHAIN') ?: '')
+    // privateKey = file(System.getenv('PRIVATE_KEY') ?: '')
+    // password = System.getenv('PRIVATE_KEY_PASSWORD')
+}
+
+publishPlugin {
+    // Uncomment and configure for plugin publishing
+    // token = System.getenv('PUBLISH_TOKEN')
+    // channels = ['stable']
 }
