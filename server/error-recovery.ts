@@ -227,7 +227,8 @@ async function recoverFromDatabaseConnectionIssues(): Promise<RecoveryResult> {
           };
         } catch (endError) {
           logger.error("Failed to end database connection pool", {
-            error: endError
+            error: endError instanceof Error ? endError.message : String(endError),
+            stack: endError instanceof Error ? endError.stack : undefined
           });
           
           return {

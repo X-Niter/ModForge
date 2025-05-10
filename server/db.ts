@@ -27,9 +27,9 @@ export const pool = new Pool(poolConfig);
 
 // Set up error handling for the pool
 pool.on('error', (err, client) => {
-  console.error('Unexpected error on idle database client', err);
-  // Attempt to exit gracefully
-  process.exit(-1);
+  console.error('Unexpected error on idle database client', err instanceof Error ? err.message : String(err));
+  // Log but don't exit - the error recovery system will handle reconnection
+  // This prevents the application from crashing on transient database errors
 });
 
 // Create Drizzle ORM instance with our schemas
