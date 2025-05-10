@@ -35,7 +35,7 @@ export const insertUserSchema = createInsertSchema(users)
     metadata: true,
   })
   .extend({
-    username: z.string().min(3).max(20),
+    username: z.string().min(3).max(20).regex(/^[a-zA-Z0-9_\-$&]+$/, "Username can only contain letters, numbers, and the special characters: _ - $ &"),
     password: z.string().min(1),  // Allow empty password for OAuth users
     email: z.string().email().optional().nullable(),
     githubId: z.string().optional().nullable(),
