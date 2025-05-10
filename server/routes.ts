@@ -23,6 +23,7 @@ import { continuousService } from "./continuous-service";
 import { generateModIdeas, expandModIdea, ideaGenerationRequestSchema } from "./idea-generator-service";
 import { setupAuth } from "./auth"; // This function returns a requireAuth middleware
 import { errorHandlerMiddleware } from "./error-handler";
+import { errorTrackerMiddleware } from "./error-tracker";
 import { z } from "zod";
 import { insertModSchema } from "@shared/schema";
 import { BuildStatus } from "@shared/schemas/core/builds";
@@ -33,6 +34,7 @@ import patternLearningRouter from "./routes/pattern-learning-metrics";
 import githubRoutes from "./routes/github-routes";
 import errorMonitoringRouter from "./routes/error-monitoring";
 import healthCheckRoutes from "./routes/health-check-routes";
+import errorTrackingRoutes from "./routes/error-tracking-routes";
 import axios from "axios";
 import rateLimit from "express-rate-limit";
 import path from "path";
@@ -1400,6 +1402,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/github", githubRoutes);
   app.use("/api/error-monitoring", requireAuth, errorMonitoringRouter);
   app.use("/api/health-check", healthCheckRoutes);
+  app.use("/api/error-tracking", requireAuth, errorTrackingRoutes);
   
   // Test endpoint for logging system
   app.get("/api/logging/test", requireAuth, (req, res) => {
@@ -1467,6 +1470,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     }
   });
+  
+  // Add error tracker middleware before the main error handler
+  app.use(errorTrackerMiddleware());
   
   // Register global error handler as the last middleware
   app.use(errorHandlerMiddleware);
