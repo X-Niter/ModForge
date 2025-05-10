@@ -10,6 +10,7 @@ import { scheduleMaintenanceTasks } from "./maintenance-tasks";
 import { rootLogger, getLogger } from "./logging";
 import { initializeErrorRecovery, cleanupScheduledJobs } from "./index-error-recovery";
 import { initializeBackupSystem } from "./backup-integration";
+import { initializeNotifications } from "./notification-integration";
 
 const app = express();
 // Enable trust proxy to work correctly with express-rate-limit behind a proxy (like in Replit)
@@ -194,6 +195,9 @@ process.on('unhandledRejection', (reason, promise) => {
   
   // Initialize backup system
   const cleanupBackups = initializeBackupSystem();
+  
+  // Initialize notification system
+  const cleanupNotifications = initializeNotifications();
   
   const server = await registerRoutes(app);
 
