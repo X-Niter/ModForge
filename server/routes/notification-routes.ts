@@ -7,7 +7,13 @@
 
 import { Router } from 'express';
 import { getLogger } from '../logging';
-import { updateNotificationSettings, getNotificationSettings, NotificationChannel, NotificationSeverity } from '../notification-manager';
+import { 
+  updateNotificationSettings, 
+  getNotificationSettings, 
+  NotificationChannel, 
+  NotificationSeverity,
+  NotificationSettings
+} from '../notification-manager';
 import { z } from 'zod';
 
 const logger = getLogger('notification-routes');
@@ -90,15 +96,7 @@ router.post('/settings', (req, res) => {
     }
     
     // Transform to proper format for updateNotificationSettings
-    const settingsToUpdate: {
-      channels?: typeof result.data.channels;
-      batchingSeconds?: number;
-      throttling?: {
-        enabled?: boolean;
-        maxPerHour?: number;
-        maxPerDay?: number;
-      };
-    } = {};
+    const settingsToUpdate: Partial<NotificationSettings> = {};
     
     if (result.data.channels) {
       settingsToUpdate.channels = result.data.channels;
@@ -109,12 +107,22 @@ router.post('/settings', (req, res) => {
     }
     
     if (result.data.throttling) {
+      // Convert partial throttling settings to required format
+      const currentThrottling = getNotificationSettings().throttling;
+      const throttlingEntries = Object.entries(result.data.throttling)
+        .filter(([_, v]) => v !== undefined);
+      
+      // Ensure all required fields are present with proper types
       settingsToUpdate.throttling = {
-        ...getNotificationSettings().throttling, // Keep existing values
-        ...Object.fromEntries(
-          Object.entries(result.data.throttling)
-            .filter(([_, v]) => v !== undefined)
-        )
+        enabled: 'enabled' in result.data.throttling && result.data.throttling.enabled !== undefined 
+          ? !!result.data.throttling.enabled 
+          : currentThrottling.enabled,
+        maxPerHour: 'maxPerHour' in result.data.throttling && result.data.throttling.maxPerHour !== undefined 
+          ? result.data.throttling.maxPerHour 
+          : currentThrottling.maxPerHour,
+        maxPerDay: 'maxPerDay' in result.data.throttling && result.data.throttling.maxPerDay !== undefined 
+          ? result.data.throttling.maxPerDay 
+          : currentThrottling.maxPerDay
       };
     }
     

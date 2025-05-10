@@ -55,11 +55,11 @@ export interface NotificationChannelConfig {
   enabled: boolean;
   channel: NotificationChannel;
   minSeverity: NotificationSeverity;
-  config: Record<string, any>;
+  config: Record<string, unknown>;
 }
 
 // Notification settings
-interface NotificationSettings {
+export interface NotificationSettings {
   channels: NotificationChannelConfig[];
   throttling: {
     enabled: boolean;
@@ -184,7 +184,7 @@ export function getNotificationSettings(): NotificationSettings {
  */
 async function sendEmailNotification(
   message: NotificationMessage,
-  config: Record<string, any>
+  config: Record<string, string | number | boolean | null | Record<string, unknown>>
 ): Promise<boolean> {
   try {
     const { recipients, from, smtp } = config;
