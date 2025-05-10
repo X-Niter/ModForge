@@ -58,8 +58,21 @@ export default function HomePage() {
             </a>
           </div>
         </div>
-        <div className="flex-1 rounded-md overflow-hidden shadow-xl">
-          <img src="/img/hero-image.png" alt="ModForge Platform" className="w-full h-auto" />
+        <div className="flex-1 rounded-md overflow-hidden shadow-xl bg-gradient-to-br from-blue-600/10 to-violet-600/10 p-4">
+          <div className="w-full h-full flex items-center justify-center">
+            <div className="flex flex-col items-center space-y-4 py-8">
+              <div className="h-24 w-24 rounded-full bg-gradient-to-br from-blue-600 to-violet-600 flex items-center justify-center">
+                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M7 8h10M7 12h10M7 16h10" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                  <rect x="3" y="3" width="18" height="18" rx="2" stroke="white" strokeWidth="2"/>
+                </svg>
+              </div>
+              <h3 className="text-xl font-semibold text-center">ModForge Platform</h3>
+              <p className="text-muted-foreground text-center max-w-md">
+                Intelligent AI-powered Minecraft mod development with multi-loader support
+              </p>
+            </div>
+          </div>
         </div>
       </div>
 
