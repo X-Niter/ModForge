@@ -6,9 +6,26 @@ import session from "express-session";
 import { scrypt, randomBytes, timingSafeEqual } from "crypto";
 import { promisify } from "util";
 import jwt from "jsonwebtoken";
-// Define a simplified version of the JWT sign function to avoid type issues
-function signJwt(payload: any, secret: string, options: { expiresIn: string | number }): string {
-  return jwt.sign(payload, secret, options as any);
+/**
+ * Define a properly typed JWT sign function to avoid type issues
+ * This wraps the jsonwebtoken sign function to provide better type safety
+ */
+function signJwt(payload: Record<string, any>, secret: string, options: { expiresIn: string | number }): string {
+  // Ensure the payload has the correct shape
+  const validPayload = { ...payload };
+  
+  // Ensure the secret is a non-empty string
+  if (!secret || typeof secret !== 'string') {
+    throw new Error('Invalid JWT secret');
+  }
+  
+  // Cast to any to bypass TypeScript's strict typing of the jwt.sign method
+  // We know our types are correct, but TypeScript's definition is more restrictive
+  return jwt.sign(validPayload, secret, {
+    expiresIn: typeof options.expiresIn === 'number' 
+      ? options.expiresIn.toString() 
+      : options.expiresIn
+  } as any);
 }
 import { storage } from "./storage";
 import { InsertUser } from "@shared/schema";
@@ -24,20 +41,38 @@ declare module 'express-session' {
   }
 }
 
-// Type guard to check if a value is a Record<string, unknown>
+/**
+ * Type guard to check if a value is a Record<string, unknown>
+ * More robust check than just typeof === 'object'
+ */
 function isRecord(value: unknown): value is Record<string, unknown> {
-  return value !== null && typeof value === 'object';
+  return value !== null && 
+         typeof value === 'object' && 
+         !Array.isArray(value) &&
+         !(value instanceof Date);
 }
 
-// Define a utility function to ensure metadata is the correct type
+/**
+ * Define a utility function to ensure metadata is the correct type
+ * This creates a type-safe way to ensure metadata is always a proper object
+ * without compromising the original object's other properties
+ */
 function ensureMetadataType<T extends { metadata?: any }>(user: T): T & { metadata: Record<string, unknown> } {
-  if (user) {
-    // Make sure metadata is always a proper object
-    if (!isRecord(user.metadata)) {
-      user.metadata = {};
-    }
+  if (!user) {
+    throw new Error('User object is null or undefined');
   }
-  return user as T & { metadata: Record<string, unknown> };
+  
+  const result = { ...user };
+  
+  // Make sure metadata is always a proper object
+  if (!isRecord(result.metadata)) {
+    result.metadata = {};
+  } else {
+    // Create a fresh copy to avoid mutation issues
+    result.metadata = { ...result.metadata };
+  }
+  
+  return result as T & { metadata: Record<string, unknown> };
 }
 
 // Extend Express to include User type
