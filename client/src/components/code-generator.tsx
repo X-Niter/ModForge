@@ -439,7 +439,6 @@ export function CodeGenerator() {
               error={error}
               generatedCode={generatedCode}
               explanation={explanation}
-              isGenerating={isGenerating}
             />
           </div>
         </TabsContent>
