@@ -784,6 +784,60 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     }
   });
+  
+  // New frontend-friendly routes for the idea generator page
+  
+  // Generate ideas
+  app.post("/api/idea-generator/generate", async (req, res) => {
+    try {
+      // Create a compatible request object expected by the service
+      const ideaRequest = {
+        theme: req.body.theme || "",
+        modLoader: req.body.modLoader || "forge",
+        complexity: req.body.complexity || "Moderate",
+        minecraftVersion: req.body.minecraftVersion || "1.20.4",
+        keywords: req.body.keywords || [],
+        count: req.body.count || 3
+      };
+      
+      // Validate request body
+      const validationResult = ideaGenerationRequestSchema.safeParse(ideaRequest);
+      if (!validationResult.success) {
+        return res.status(400).json({ 
+          message: "Invalid request data",
+          errors: validationResult.error.errors 
+        });
+      }
+
+      const ideas = await generateModIdeas(validationResult.data);
+      res.json(ideas);
+    } catch (error) {
+      console.error("Error generating ideas:", error);
+      res.status(500).json({ 
+        message: "Failed to generate ideas",
+        error: error instanceof Error ? error.message : String(error)
+      });
+    }
+  });
+
+  // Expand idea
+  app.post("/api/idea-generator/expand", async (req, res) => {
+    try {
+      const { title, description } = req.body;
+      if (!title || !description) {
+        return res.status(400).json({ message: "Title and description are required" });
+      }
+
+      const expandedIdea = await expandModIdea(title, description);
+      res.json(expandedIdea);
+    } catch (error) {
+      console.error("Error expanding idea:", error);
+      res.status(500).json({ 
+        message: "Failed to expand idea",
+        error: error instanceof Error ? error.message : String(error)
+      });
+    }
+  });
 
   // Start/stop continuous development
   app.post("/api/mods/:id/continuous-development", async (req, res) => {

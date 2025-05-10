@@ -11,21 +11,21 @@ interface ExtendedRequestInit extends RequestInit {
   data?: any;
 }
 
-export async function apiRequest<T = any>(
-  url: string,
-  options?: ExtendedRequestInit
-): Promise<T> {
-  const res = await fetch(url, {
-    ...options,
-    body: options?.data ? JSON.stringify(options.data) : options?.body,
-    headers: (options?.data || options?.body)
-      ? { ...options?.headers, "Content-Type": "application/json" } 
-      : options?.headers,
+export async function apiRequest(
+  method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE",
+  path: string,
+  data?: any
+): Promise<Response> {
+  const isGet = method === "GET";
+  const options: RequestInit = {
+    method,
+    headers: !isGet ? { "Content-Type": "application/json" } : undefined,
+    body: !isGet && data ? JSON.stringify(data) : undefined,
     credentials: "include",
-  });
+  };
 
-  await throwIfResNotOk(res);
-  return await res.json();
+  const url = path.startsWith("http") ? path : path;
+  return fetch(url, options);
 }
 
 type UnauthorizedBehavior = "returnNull" | "throw";

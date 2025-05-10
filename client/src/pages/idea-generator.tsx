@@ -37,13 +37,15 @@ export default function IdeaGenerator() {
   // Generate ideas mutation
   const generateMutation = useMutation({
     mutationFn: async () => {
-      const response = await apiRequest("POST", "/api/idea-generator/generate", {
+      const data = {
         modLoader: preferredLoader,
         complexity: complexityLabel(complexity),
         theme: theme,
         minecraftVersion: mcVersion,
         keywords: keywords.split(',').map(k => k.trim()).filter(Boolean)
-      });
+      };
+      
+      const response = await apiRequest("POST", "/api/idea-generator/generate", data);
       
       if (!response.ok) {
         throw new Error("Failed to generate ideas");
@@ -70,10 +72,12 @@ export default function IdeaGenerator() {
   // Expand idea mutation
   const expandMutation = useMutation({
     mutationFn: async (idea: ModIdea) => {
-      const response = await apiRequest("POST", "/api/idea-generator/expand", {
+      const data = {
         title: idea.title,
         description: idea.description
-      });
+      };
+      
+      const response = await apiRequest("POST", "/api/idea-generator/expand", data);
       
       if (!response.ok) {
         throw new Error("Failed to expand idea");

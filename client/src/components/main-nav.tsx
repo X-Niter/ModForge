@@ -1,4 +1,4 @@
-import { useLocation, useNavigate } from "wouter";
+import { useLocation } from "wouter";
 import { 
   BarChart3, 
   Code2, 
@@ -71,8 +71,7 @@ const navItems = [
 ];
 
 export function MainNav() {
-  const [location] = useLocation();
-  const navigate = useNavigate();
+  const [location, setLocation] = useLocation();
 
   return (
     <nav className="flex flex-col space-y-1 p-2">
@@ -86,7 +85,7 @@ export function MainNav() {
               ? "bg-accent" 
               : "opacity-70 hover:opacity-100"
           )}
-          onClick={() => navigate(item.href)}
+          onClick={() => setLocation(item.href)}
         >
           <span className={cn("", item.color)}>
             {item.icon}
