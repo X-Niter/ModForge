@@ -50,7 +50,9 @@ async function generateModCodeAsync(mod: any, build: any): Promise<void> {
       await storage.createModFile({
         modId: mod.id,
         path: file.path,
-        content: file.content
+        content: file.content,
+        contentType: "text/plain", // Default content type
+        metadata: {} // Default empty metadata
       });
     }
     
@@ -129,7 +131,9 @@ async function compileModAsync(mod: any, build: any): Promise<void> {
           await storage.createModFile({
             modId: mod.id,
             path: file.path,
-            content: file.content
+            content: file.content,
+            contentType: "text/plain", // Default content type
+            metadata: {} // Default empty metadata
           });
         }
       }
@@ -891,7 +895,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const file = await storage.createModFile({
         modId,
         path,
-        content
+        content,
+        contentType: "text/plain", // Default content type
+        metadata: {} // Default empty metadata
       });
 
       res.status(201).json({ file });
