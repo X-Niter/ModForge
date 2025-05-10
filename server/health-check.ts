@@ -182,6 +182,11 @@ async function checkFileSystem(): Promise<CheckResult & { fileSystemStatus?: Fil
         await fs.mkdir(LOG_DIR, { recursive: true });
         logDirAccess = true;
       } catch (createErr) {
+        logger.error('Failed to create log directory', {
+          error: createErr instanceof Error ? createErr.message : String(createErr),
+          stack: createErr instanceof Error ? createErr.stack : undefined,
+          path: LOG_DIR
+        });
         logDirAccess = false;
       }
     }
@@ -195,6 +200,11 @@ async function checkFileSystem(): Promise<CheckResult & { fileSystemStatus?: Fil
         await fs.mkdir(TMP_DIR, { recursive: true });
         tempDirAccess = true;
       } catch (createErr) {
+        logger.error('Failed to create temp directory', {
+          error: createErr instanceof Error ? createErr.message : String(createErr),
+          stack: createErr instanceof Error ? createErr.stack : undefined,
+          path: TMP_DIR
+        });
         tempDirAccess = false;
       }
     }
@@ -321,7 +331,11 @@ async function checkFileSystem(): Promise<CheckResult & { fileSystemStatus?: Fil
             break; // Successfully retrieved disk space information
           }
         } catch (methodErr) {
-          // Continue to next method
+          // Log error but continue to next method
+          logger.debug(`Disk space check method ${i} failed`, {
+            error: methodErr instanceof Error ? methodErr.message : String(methodErr),
+            method: i
+          });
           continue;
         }
       }
