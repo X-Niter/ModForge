@@ -493,4 +493,35 @@ export function setupAuth(app: Express) {
       return next();
     })(req, res, next);
   };
+  
+  // Temporary debug endpoint for password checking
+  app.post("/api/debug/check-password", async (req: Request, res: Response) => {
+    try {
+      const { username, password } = req.body;
+      if (!username || !password) {
+        return res.status(400).json({ message: "Username and password required" });
+      }
+      
+      // Find the user
+      const [user] = await db.select().from(users).where(eq(users.username, username));
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      
+      // Check password
+      const matches = await comparePasswords(password, user.password);
+      
+      // Return result
+      return res.json({
+        username,
+        passwordMatches: matches,
+        passwordLength: user.password.length,
+        passwordFormat: user.password.includes('.') ? 'hash.salt' : 'plain',
+        passwordSaltPresent: user.password.split('.')[1] ? true : false
+      });
+    } catch (error) {
+      console.error("Password check error:", error);
+      return res.status(500).json({ message: "Error checking password", error: String(error) });
+    }
+  });
 }
