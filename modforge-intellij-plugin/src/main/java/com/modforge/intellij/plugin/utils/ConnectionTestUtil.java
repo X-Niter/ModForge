@@ -1,199 +1,179 @@
 package com.modforge.intellij.plugin.utils;
 
 import com.intellij.openapi.diagnostic.Logger;
+import org.apache.commons.lang3.time.StopWatch;
 
 import java.io.IOException;
 import java.net.HttpURLConnection;
-import java.net.URL;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.time.Duration;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Supplier;
 
 /**
- * Utility class for testing connections to the ModForge server.
- * Compatible with IntelliJ IDEA 2025.1 and Java 21.
+ * Utility class for testing network connections with modern Java 21 features.
+ * Optimized for IntelliJ IDEA 2025.1 compatibility.
  */
 public class ConnectionTestUtil {
     private static final Logger LOG = Logger.getInstance(ConnectionTestUtil.class);
-    private static final ExecutorService EXECUTOR = Executors.newVirtualThreadPerTaskExecutor();
-    private static final int MAX_RETRIES = 2;
-    private static final int CONNECTION_TIMEOUT_MS = 5000;
-    private static final int READ_TIMEOUT_MS = 5000;
+    
+    // Connection timeout in seconds
+    private static final int CONNECTION_TIMEOUT_SECONDS = 10;
+    
+    // Maximum number of retries
+    private static final int MAX_RETRIES = 3;
+    
+    // Executor service for virtual threads (Java 21 feature)
+    private static final ExecutorService virtualThreadExecutor = Executors.newVirtualThreadPerTaskExecutor();
     
     /**
-     * Test the connection to the server asynchronously.
-     *
-     * @param serverUrl The server URL to test
-     * @return A CompletableFuture that will be resolved to true if the connection is successful, false otherwise
+     * Test a connection to the specified URL
+     * 
+     * @param url The URL to test
+     * @return true if connection succeeds, false otherwise
      */
-    public static CompletableFuture<Boolean> testConnection(String serverUrl) {
-        return CompletableFuture.supplyAsync(() -> {
-            try {
-                String healthEndpoint = serverUrl.endsWith("/") ? serverUrl + "health" : serverUrl + "/health";
-                return testHealthEndpoint(healthEndpoint);
-            } catch (Exception e) {
-                LOG.error("Error testing connection", e);
-                return false;
-            }
-        }, EXECUTOR);
-    }
-    
-    /**
-     * Test the connection to the server health endpoint synchronously with retries.
-     *
-     * @param healthEndpoint The health endpoint URL to test
-     * @return true if the connection is successful, false otherwise
-     */
-    private static boolean testHealthEndpoint(String healthEndpoint) {
-        for (int retry = 0; retry <= MAX_RETRIES; retry++) {
-            if (retry > 0) {
-                LOG.info("Retrying health check (" + retry + "/" + MAX_RETRIES + ")");
-                try {
-                    TimeUnit.MILLISECONDS.sleep(500 * retry); // Exponential backoff
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
-                    LOG.warn("Interrupted while waiting to retry", e);
-                    return false;
-                }
-            }
-            
-            HttpURLConnection connection = null;
-            try {
-                URL url = new URL(healthEndpoint);
-                connection = (HttpURLConnection) url.openConnection();
-                connection.setRequestMethod("GET");
-                connection.setConnectTimeout(CONNECTION_TIMEOUT_MS);
-                connection.setReadTimeout(READ_TIMEOUT_MS);
-                
-                int responseCode = connection.getResponseCode();
-                LOG.info("Health check response code: " + responseCode);
-                
-                if (responseCode == 200) {
-                    return true;
-                }
-                
-                // Only retry for server errors or timeouts
-                if (responseCode < 500) {
-                    return false;
-                }
-            } catch (IOException e) {
-                if (retry >= MAX_RETRIES) {
-                    LOG.error("Error testing connection to health endpoint", e);
-                } else {
-                    LOG.warn("Error testing connection to health endpoint, will retry", e);
-                }
-            } finally {
-                if (connection != null) {
-                    connection.disconnect();
-                }
-            }
-        }
+    public static boolean testConnection(String url) {
+        LOG.info("Testing connection to " + url);
+        StopWatch watch = new StopWatch();
+        watch.start();
         
-        return false;
-    }
-    
-    /**
-     * Test user authentication asynchronously.
-     *
-     * @param serverUrl The server URL
-     * @param token     The user token
-     * @return A CompletableFuture that will be resolved to true if the authentication is successful, false otherwise
-     */
-    public static CompletableFuture<Boolean> testAuthentication(String serverUrl, String token) {
-        return CompletableFuture.supplyAsync(() -> {
-            try {
-                String authEndpoint = serverUrl.endsWith("/") ? serverUrl + "auth/verify" : serverUrl + "/auth/verify";
-                return testAuthEndpoint(authEndpoint, token);
-            } catch (Exception e) {
-                LOG.error("Error testing authentication", e);
-                return false;
-            }
-        }, EXECUTOR);
-    }
-    
-    /**
-     * Test authentication synchronously with retries.
-     *
-     * @param authEndpoint The authentication endpoint URL to test
-     * @param token        The user token
-     * @return true if the authentication is successful, false otherwise
-     */
-    private static boolean testAuthEndpoint(String authEndpoint, String token) {
-        for (int retry = 0; retry <= MAX_RETRIES; retry++) {
-            if (retry > 0) {
-                LOG.info("Retrying auth check (" + retry + "/" + MAX_RETRIES + ")");
-                try {
-                    TimeUnit.MILLISECONDS.sleep(500 * retry); // Exponential backoff
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
-                    LOG.warn("Interrupted while waiting to retry", e);
-                    return false;
-                }
-            }
-            
-            HttpURLConnection connection = null;
-            try {
-                URL url = new URL(authEndpoint);
-                connection = (HttpURLConnection) url.openConnection();
-                connection.setRequestMethod("GET");
-                connection.setConnectTimeout(CONNECTION_TIMEOUT_MS);
-                connection.setReadTimeout(READ_TIMEOUT_MS);
-                connection.setRequestProperty("Authorization", "Bearer " + token);
-                connection.setRequestProperty("Accept", "application/json");
-                
-                int responseCode = connection.getResponseCode();
-                LOG.info("Auth check response code: " + responseCode);
-                
-                if (responseCode == 200) {
-                    return true;
-                }
-                
-                // 401 Unauthorized - token is invalid, no need to retry
-                if (responseCode == 401) {
-                    LOG.info("Invalid token, authentication failed");
-                    return false;
-                }
-                
-                // Only retry for server errors or timeouts
-                if (responseCode < 500) {
-                    return false;
-                }
-            } catch (IOException e) {
-                if (retry >= MAX_RETRIES) {
-                    LOG.error("Error testing authentication", e);
-                } else {
-                    LOG.warn("Error testing authentication, will retry", e);
-                }
-            } finally {
-                if (connection != null) {
-                    connection.disconnect();
-                }
-            }
-        }
-        
-        return false;
-    }
-    
-    /**
-     * Shutdown the executor service gracefully.
-     * This method should be called when the plugin is being unloaded.
-     */
-    public static void shutdown() {
         try {
-            LOG.info("Shutting down connection test executor service");
-            EXECUTOR.shutdown();
-            if (!EXECUTOR.awaitTermination(5, TimeUnit.SECONDS)) {
-                LOG.warn("Executor did not terminate in the specified time, forcing shutdown");
-                EXECUTOR.shutdownNow();
-                if (!EXECUTOR.awaitTermination(5, TimeUnit.SECONDS)) {
-                    LOG.error("Executor did not terminate");
+            HttpClient client = HttpClient.newBuilder()
+                .connectTimeout(Duration.ofSeconds(CONNECTION_TIMEOUT_SECONDS))
+                .executor(virtualThreadExecutor)
+                .build();
+                
+            HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(url))
+                .timeout(Duration.ofSeconds(CONNECTION_TIMEOUT_SECONDS))
+                .GET()
+                .build();
+                
+            HttpResponse<Void> response = client.send(request, HttpResponse.BodyHandlers.discarding());
+            
+            watch.stop();
+            int statusCode = response.statusCode();
+            LOG.info("Connection test to " + url + " completed in " + watch.getTime(TimeUnit.MILLISECONDS) + "ms with status: " + statusCode);
+            
+            return statusCode >= 200 && statusCode < 300;
+        } catch (IOException | InterruptedException e) {
+            watch.stop();
+            LOG.warn("Connection test to " + url + " failed after " + watch.getTime(TimeUnit.MILLISECONDS) + "ms: " + e.getMessage());
+            return false;
+        }
+    }
+    
+    /**
+     * Test a connection with retry logic using exponential backoff
+     * 
+     * @param url The URL to test
+     * @return true if connection succeeds within retry attempts, false otherwise
+     */
+    public static boolean testConnectionWithRetry(String url) {
+        for (int attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+            if (testConnection(url)) {
+                if (attempt > 1) {
+                    LOG.info("Connection succeeded on retry attempt " + attempt);
+                }
+                return true;
+            }
+            
+            if (attempt < MAX_RETRIES) {
+                // Exponential backoff: 1s, 2s, 4s, etc.
+                long delayMs = (long) Math.pow(2, attempt - 1) * 1000;
+                LOG.info("Retrying connection in " + delayMs + "ms (attempt " + attempt + " of " + MAX_RETRIES + ")");
+                try {
+                    Thread.sleep(delayMs);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    LOG.warn("Connection retry interrupted");
+                    return false;
                 }
             }
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            LOG.warn("Interrupted while shutting down executor", e);
-            EXECUTOR.shutdownNow();
         }
+        
+        LOG.warn("Connection test failed after " + MAX_RETRIES + " attempts");
+        return false;
+    }
+    
+    /**
+     * Asynchronously test a connection using virtual threads
+     * 
+     * @param url The URL to test
+     * @return CompletableFuture that resolves to connection test result
+     */
+    public static CompletableFuture<Boolean> testConnectionAsync(String url) {
+        return CompletableFuture.supplyAsync(() -> testConnection(url), virtualThreadExecutor);
+    }
+    
+    /**
+     * Test if a connection has proper authentication
+     * 
+     * @param url The URL to test
+     * @param authHeaderSupplier Supplier that provides the authentication header
+     * @return true if authenticated connection succeeds, false otherwise
+     */
+    public static boolean testAuthenticatedConnection(String url, Supplier<String> authHeaderSupplier) {
+        LOG.info("Testing authenticated connection to " + url);
+        StopWatch watch = new StopWatch();
+        watch.start();
+        
+        try {
+            String authHeader = authHeaderSupplier.get();
+            if (authHeader == null || authHeader.isEmpty()) {
+                LOG.warn("Authentication header is empty or null");
+                return false;
+            }
+            
+            HttpClient client = HttpClient.newBuilder()
+                .connectTimeout(Duration.ofSeconds(CONNECTION_TIMEOUT_SECONDS))
+                .executor(virtualThreadExecutor)
+                .build();
+                
+            HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(url))
+                .timeout(Duration.ofSeconds(CONNECTION_TIMEOUT_SECONDS))
+                .header("Authorization", authHeader)
+                .GET()
+                .build();
+                
+            HttpResponse<Void> response = client.send(request, HttpResponse.BodyHandlers.discarding());
+            
+            watch.stop();
+            int statusCode = response.statusCode();
+            LOG.info("Authenticated connection test to " + url + " completed in " + watch.getTime(TimeUnit.MILLISECONDS) + 
+                    "ms with status: " + statusCode);
+            
+            return statusCode != HttpURLConnection.HTTP_UNAUTHORIZED 
+                && statusCode != HttpURLConnection.HTTP_FORBIDDEN;
+        } catch (IOException | InterruptedException e) {
+            watch.stop();
+            LOG.warn("Authenticated connection test to " + url + " failed after " + 
+                    watch.getTime(TimeUnit.MILLISECONDS) + "ms: " + e.getMessage());
+            return false;
+        }
+    }
+    
+    /**
+     * Get the current health status of connection utilities
+     * 
+     * @return A string representation of the connection utilities health
+     */
+    public static String getConnectionHealthStatus() {
+        return "Virtual Thread Executor: " + (virtualThreadExecutor.isShutdown() ? "SHUTDOWN" : "ACTIVE");
+    }
+    
+    /**
+     * Clean up resources when plugin is shutting down
+     */
+    public static void cleanup() {
+        LOG.info("Cleaning up connection test utilities");
+        virtualThreadExecutor.shutdownNow();
     }
 }

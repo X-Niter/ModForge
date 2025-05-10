@@ -1,110 +1,151 @@
 plugins {
     id 'java'
-    id 'org.jetbrains.intellij' version '1.17.0'
+    id 'org.jetbrains.intellij' version '1.17.2'
 }
 
 group 'com.modforge'
-version '1.0.0'
+version '2.1.0'
 
 repositories {
     mavenCentral()
 }
 
 dependencies {
-    implementation 'com.google.code.gson:gson:2.10.1'
+    implementation 'org.kohsuke:github-api:1.321'
     implementation 'org.apache.commons:commons-lang3:3.14.0'
-    implementation 'org.apache.httpcomponents.client5:httpclient5:5.3'
+    implementation 'com.google.code.gson:gson:2.10.1'
+    implementation 'com.squareup.okhttp3:okhttp:4.12.0'
     implementation 'commons-io:commons-io:2.15.1'
-    implementation 'org.commonmark:commonmark:0.22.0'  // For Markdown processing
-    implementation 'com.fasterxml.jackson.core:jackson-databind:2.16.1'
-    implementation 'org.slf4j:slf4j-api:2.0.10'
-    
-    testImplementation 'org.junit.jupiter:junit-jupiter-api:5.10.1'
-    testImplementation 'org.mockito:mockito-core:5.8.0'
-    testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine:5.10.1'
+    implementation 'org.zeroturnaround:zt-zip:1.16'
+    testImplementation 'org.junit.jupiter:junit-jupiter-api:5.10.2'
+    testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine:5.10.2'
+    testImplementation 'org.mockito:mockito-core:5.10.0'
 }
 
 // Configure Gradle IntelliJ Plugin
-// Read more: https://plugins.jetbrains.com/docs/intellij/tools-gradle-intellij-plugin.html
 intellij {
-    version = '2025.1'  // Updated to match current IntelliJ IDEA 2025.1
-    type = 'IC' // Target IDE Platform: IntelliJ IDEA Community Edition
+    version = '2025.1'
+    type = 'IC' // Target IDE: IntelliJ IDEA Community Edition
     plugins = [
-        'com.intellij.java', 
-        'Git4Idea',
+        'java',
+        'git4idea',
         'org.jetbrains.plugins.github',
-        'com.demonwav.minecraft-dev:2025.1-1.8.4'  // Support for Minecraft Development
+        'org.jetbrains.plugins.terminal',
+        // If Minecraft Development plugin is required, add it here
+        // 'com.demonwav.minecraft-dev:2025.1-1.8.4'
     ]
 }
 
+// Configure Java sourceSets
+sourceSets {
+    main {
+        java {
+            srcDirs = ['src/main/java']
+        }
+        resources {
+            srcDirs = ['src/main/resources']
+        }
+    }
+    test {
+        java {
+            srcDirs = ['src/test/java']
+        }
+        resources {
+            srcDirs = ['src/test/resources']
+        }
+    }
+}
+
+// Set Java compatibility version
+java {
+    sourceCompatibility = JavaVersion.VERSION_21
+    targetCompatibility = JavaVersion.VERSION_21
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(21)
+    }
+}
+
+// Additional IntelliJ plugin configuration
 tasks {
-    // Set the JVM compatibility versions for Java 21
-    withType(JavaCompile) {
-        sourceCompatibility = '21'
-        targetCompatibility = '21'
-        options.encoding = 'UTF-8'
-    }
-    
-    // Add a clean build task
-    clean {
-        doFirst {
-            logger.info("Cleaning output directories")
-        }
-    }
-    
-    // Configure build task
-    build {
-        dependsOn(clean)
-        doLast {
-            logger.info("ModForge IntelliJ plugin built successfully")
-        }
+    patchPluginXml {
+        sinceBuild = "251"
+        untilBuild = "252.*"
+        changeNotes = """
+            <h2>Version 2.1.0 - May 10, 2025</h2>
+            <ul>
+                <li><b>Added:</b> Full compatibility with IntelliJ IDEA 2025.1</li>
+                <li><b>Added:</b> Java 21 virtual thread optimization</li>
+                <li><b>Added:</b> Environment validation and compatibility checking</li>
+                <li><b>Added:</b> Improved error handling and recovery mechanisms</li>
+                <li><b>Updated:</b> GitHub workflow generation to use JDK 21</li>
+                <li><b>Updated:</b> Connection utilities to use modern retry logic</li>
+                <li><b>Fixed:</b> Multiple compatibility issues with IntelliJ IDEA 2025.1</li>
+                <li><b>Improved:</b> Plugin activation and IDE integration</li>
+            </ul>
+        """
     }
 
-    patchPluginXml {
-        sinceBuild = '251'
-        untilBuild = '252.*'  // Ensure compatibility with IntelliJ 2025.1 and future 2025.2
-        
-        // Plugin vendor information
-        pluginDescription = """
-            <p>ModForge AI - Smart Minecraft Mod Development</p>
-            <p>This plugin provides AI-powered assistance for Minecraft mod development:</p>
-            <ul>
-                <li>Multi-mod loader support (Forge, Fabric, Quilt, Architectury)</li>
-                <li>AI-driven code generation</li>
-                <li>Automatic error detection and fixing</li>
-                <li>Pattern recognition to reduce API costs</li>
-                <li>Continuous development for 24/7 improvement</li>
-            </ul>
-        """
-        
-        changeNotes = """
-            <ul>
-                <li><b>1.0.0</b>
-                    <ul>
-                        <li>Initial release</li>
-                        <li>AI-powered code generation</li>
-                        <li>Automatic error detection and fixing</li>
-                        <li>Pattern recognition for cost optimization</li>
-                        <li>Continuous development features</li>
-                        <li>GitHub integration</li>
-                        <li>Multi-mod loader support</li>
-                    </ul>
-                </li>
-            </ul>
-        """
+    runIde {
+        jvmArgs = [
+            '-Xmx2g',
+            '--add-opens=java.base/java.util=ALL-UNNAMED',
+            '--add-opens=java.base/java.lang=ALL-UNNAMED'
+        ]
     }
-    
-    signPlugin {
-        certificateChain = System.getenv('CERTIFICATE_CHAIN')
-        privateKey = System.getenv('PRIVATE_KEY')
-        password = System.getenv('PRIVATE_KEY_PASSWORD')
-    }
-    
-    publishPlugin {
-        token = System.getenv('PUBLISH_TOKEN')
-    }
-    
+
+    // JUnit 5 integration
     test {
         useJUnitPlatform()
     }
+
+    // Generate JAR with sources for debugging
+    jar {
+        from sourceSets.main.allSource
+        manifest {
+            attributes(
+                'Implementation-Title': 'ModForge IntelliJ Plugin',
+                'Implementation-Version': version,
+                'Built-By': System.getProperty('user.name'),
+                'Build-Timestamp': new java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSZ").format(new Date()),
+                'Created-By': "Gradle ${gradle.gradleVersion}",
+                'Build-Jdk': "${System.getProperty('java.version')} (${System.getProperty('java.vendor')} ${System.getProperty('java.vm.version')})",
+                'Build-OS': "${System.getProperty('os.name')} ${System.getProperty('os.arch')} ${System.getProperty('os.version')}"
+            )
+        }
+    }
 }
+
+// Add verification tasks
+tasks.register('validatePluginForProduction') {
+    group = 'verification'
+    description = 'Validates that the plugin is ready for production deployment'
+
+    doLast {
+        println "Validating plugin for production deployment..."
+        
+        // Check Java version
+        def javaVersion = System.getProperty('java.version')
+        def javaVersionMajor = javaVersion.split('\\.')[0].toInteger()
+        if (javaVersionMajor < 21) {
+            throw new GradleException("Invalid Java version: $javaVersion. Java 21 or higher is required.")
+        }
+        println "✓ Java version check passed: $javaVersion"
+        
+        // Check plugin version
+        if (version == '1.0-SNAPSHOT') {
+            throw new GradleException("Plugin version is still set to development snapshot. Set a proper release version.")
+        }
+        println "✓ Plugin version check passed: $version"
+        
+        // Check until-build is properly set
+        if (!tasks.patchPluginXml.untilBuild.get().endsWith(".*")) {
+            throw new GradleException("untilBuild should end with '.*' to support minor IDE updates")
+        }
+        println "✓ Plugin build range check passed: ${tasks.patchPluginXml.sinceBuild.get()} - ${tasks.patchPluginXml.untilBuild.get()}"
+        
+        println "✓ Plugin validation completed successfully"
+    }
+}
+
+// Link validation to build
+tasks.buildPlugin.dependsOn(validatePluginForProduction)
