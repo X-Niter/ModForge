@@ -86,6 +86,76 @@ async function compileModAsync(mod: any, build: any): Promise<void> {
       warningCount: compileResult.warnings.length,
       downloadUrl: compileResult.downloadUrl
     });
+    
+    // If compilation failed and auto-fix is enabled, try to fix errors
+    if (!compileResult.success && compileResult.errors.length > 0 && 
+        (mod.autoFixLevel === "Balanced" || mod.autoFixLevel === "Aggressive")) {
+      
+      // Add to logs safely
+      currentLogs += "\nAttempting to fix compilation errors...\n";
+      const preFixUpdate = await storage.updateBuild(build.id, { logs: currentLogs });
+      
+      if (preFixUpdate) {
+        currentLogs = preFixUpdate.logs;
+      }
+      
+      // Get all mod files
+      const modFiles = await storage.getModFilesByModId(mod.id);
+      const files = modFiles.map(file => ({
+        path: file.path,
+        content: file.content
+      }));
+      
+      // Fix errors
+      const fixResult = await fixCompilationErrors(files, compileResult.errors);
+      
+      // Update logs
+      currentLogs += fixResult.logs;
+      const postFixUpdate = await storage.updateBuild(build.id, { logs: currentLogs });
+      
+      if (postFixUpdate) {
+        currentLogs = postFixUpdate.logs;
+      }
+      
+      // Update mod files with fixed versions
+      for (const file of fixResult.files) {
+        const existingFile = modFiles.find(f => f.path === file.path);
+        
+        if (existingFile) {
+          await storage.updateModFile(existingFile.id, {
+            content: file.content
+          });
+        } else {
+          await storage.createModFile({
+            modId: mod.id,
+            path: file.path,
+            content: file.content
+          });
+        }
+      }
+      
+      // Try to compile again
+      currentLogs += "\nAttempting to compile with fixed code...\n";
+      const recompileUpdate = await storage.updateBuild(build.id, { logs: currentLogs });
+      
+      if (recompileUpdate) {
+        currentLogs = recompileUpdate.logs;
+      }
+      
+      const recompileResult = await compileMod(mod.id);
+      
+      // Update build with recompilation results
+      const finalStatus = recompileResult.success ? BuildStatus.Success : BuildStatus.Failed;
+      currentLogs += recompileResult.logs;
+      
+      await storage.updateBuild(build.id, {
+        status: finalStatus,
+        logs: currentLogs,
+        errorCount: recompileResult.errors.length,
+        warningCount: recompileResult.warnings.length,
+        downloadUrl: recompileResult.downloadUrl
+      });
+    }
   } catch (error) {
     console.error("Error in compileModAsync:", error);
     await storage.updateBuild(build.id, {
@@ -638,27 +708,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
-  // Generate generic code
   // Removed duplicate endpoint for generate-generic-code
   // The functionality is covered by the /api/ai/generate-code endpoint
 
   // Add features
   app.post("/api/ai/add-features", async (req, res) => {
     try {
-      const { files, newFeatureDescription } = req.body;
-      if (!files || !newFeatureDescription) {
-        return res.status(400).json({ message: "Missing required fields" });
+      const { files, features, modLoader, mcVersion } = req.body;
+      if (!files || !features) {
+        return res.status(400).json({ message: "Files and features are required" });
       }
 
-      const result = await addModFeatures(files, newFeatureDescription);
+      const result = await addModFeatures(files, features, modLoader, mcVersion);
       res.json(result);
     } catch (error) {
       console.error("Error adding features:", error);
-      res.status(500).json({ message: "Failed to add features" });
+      res.status(500).json({ 
+        message: "Failed to add features",
+        error: error instanceof Error ? error.message : String(error)
+      });
     }
   });
-  
-  // Generate mod ideas
+
+  // Generate ideas
   app.post("/api/ai/generate-ideas", async (req, res) => {
     try {
       // Validate request body
@@ -670,539 +742,216 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      // Generate ideas
-      const ideas = await generateModIdeas(validationResult.data);
+      const ideaRequest = validationResult.data;
+      const ideas = await generateModIdeas(ideaRequest);
       res.json(ideas);
     } catch (error) {
-      console.error("Error generating mod ideas:", error);
+      console.error("Error generating ideas:", error);
       res.status(500).json({ 
-        message: "Failed to generate mod ideas",
+        message: "Failed to generate ideas",
         error: error instanceof Error ? error.message : String(error)
       });
     }
   });
-  
-  // Expand a mod idea
+
+  // Expand idea
   app.post("/api/ai/expand-idea", async (req, res) => {
     try {
       const { title, description } = req.body;
       if (!title || !description) {
-        return res.status(400).json({ message: "Missing required fields: title and description" });
+        return res.status(400).json({ message: "Title and description are required" });
       }
 
-      // Expand the idea
       const expandedIdea = await expandModIdea(title, description);
       res.json(expandedIdea);
     } catch (error) {
-      console.error("Error expanding mod idea:", error);
+      console.error("Error expanding idea:", error);
       res.status(500).json({ 
-        message: "Failed to expand mod idea",
+        message: "Failed to expand idea",
         error: error instanceof Error ? error.message : String(error)
       });
     }
   });
 
-  // Continuous Development Endpoints
-
-  // Start continuous development
-  app.post("/api/mods/:id/continuous-development/start", async (req, res) => {
+  // Start/stop continuous development
+  app.post("/api/mods/:id/continuous-development", async (req, res) => {
     try {
       const modId = parseInt(req.params.id, 10);
       if (isNaN(modId)) {
         return res.status(400).json({ message: "Invalid mod ID" });
       }
 
+      const { action, frequency } = req.body;
+      if (action !== "start" && action !== "stop") {
+        return res.status(400).json({ message: "Action must be 'start' or 'stop'" });
+      }
+
+      // Check if mod exists
       const mod = await storage.getMod(modId);
       if (!mod) {
         return res.status(404).json({ message: "Mod not found" });
       }
 
-      // Get frequency from the mod's compileFrequency setting
-      let frequency = 5 * 60 * 1000; // Default: 5 minutes
-      
-      switch (mod.compileFrequency) {
-        case "Every 5 Minutes":
-          frequency = 5 * 60 * 1000;
-          break;
-        case "Every 15 Minutes":
-          frequency = 15 * 60 * 1000;
-          break;
-        case "Manual Only":
-          return res.status(400).json({ 
-            message: "Cannot start continuous development for mods with 'Manual Only' compile frequency" 
-          });
-        case "After Every Change":
-          frequency = 2 * 60 * 1000; // Check every 2 minutes for changes
-          break;
+      if (action === "start") {
+        const frequencyMs = frequency ? parseInt(frequency, 10) * 1000 : undefined;
+        continuousService.startContinuousDevelopment(modId, frequencyMs);
+        res.json({ message: "Continuous development started" });
+      } else {
+        continuousService.stopContinuousDevelopment(modId);
+        res.json({ message: "Continuous development stopped" });
       }
-
-      // Start continuous development
-      continuousService.startContinuousDevelopment(modId, frequency);
-
-      res.json({ 
-        message: "Continuous development started",
-        modId,
-        frequency,
-        compileFrequency: mod.compileFrequency
-      });
     } catch (error) {
-      console.error("Error starting continuous development:", error);
-      res.status(500).json({ message: "Failed to start continuous development" });
-    }
-  });
-
-  // Stop continuous development
-  app.post("/api/mods/:id/continuous-development/stop", async (req, res) => {
-    try {
-      const modId = parseInt(req.params.id, 10);
-      if (isNaN(modId)) {
-        return res.status(400).json({ message: "Invalid mod ID" });
-      }
-
-      const mod = await storage.getMod(modId);
-      if (!mod) {
-        return res.status(404).json({ message: "Mod not found" });
-      }
-
-      // Stop continuous development
-      continuousService.stopContinuousDevelopment(modId);
-
-      res.json({ 
-        message: "Continuous development stopped",
-        modId
-      });
-    } catch (error) {
-      console.error("Error stopping continuous development:", error);
-      res.status(500).json({ message: "Failed to stop continuous development" });
+      console.error("Error managing continuous development:", error);
+      res.status(500).json({ message: "Failed to manage continuous development" });
     }
   });
 
   // Get continuous development status
-  app.get("/api/mods/:id/continuous-development/status", async (req, res) => {
+  app.get("/api/mods/:id/continuous-development", async (req, res) => {
     try {
       const modId = parseInt(req.params.id, 10);
       if (isNaN(modId)) {
         return res.status(400).json({ message: "Invalid mod ID" });
       }
 
+      // Check if mod exists
       const mod = await storage.getMod(modId);
       if (!mod) {
         return res.status(404).json({ message: "Mod not found" });
       }
 
-      // Get continuous development status
-      const status = continuousService.getStatistics(modId);
+      const isRunning = continuousService.isRunning(modId);
+      const stats = continuousService.getStatistics(modId);
 
-      res.json({ 
-        modId,
-        status
+      res.json({
+        isRunning,
+        statistics: stats
       });
     } catch (error) {
       console.error("Error getting continuous development status:", error);
       res.status(500).json({ message: "Failed to get continuous development status" });
     }
   });
-  
-  // Get features and their progress for a mod
-  app.get("/api/mods/:id/features/progress", async (req, res) => {
+
+  // Get mod files
+  app.get("/api/mods/:id/files", async (req, res) => {
     try {
       const modId = parseInt(req.params.id, 10);
       if (isNaN(modId)) {
         return res.status(400).json({ message: "Invalid mod ID" });
       }
 
+      const files = await storage.getModFilesByModId(modId);
+      res.json({ files });
+    } catch (error) {
+      console.error("Error fetching mod files:", error);
+      res.status(500).json({ message: "Failed to fetch mod files" });
+    }
+  });
+
+  // Get a specific mod file
+  app.get("/api/mods/:modId/files/:fileId", async (req, res) => {
+    try {
+      const fileId = parseInt(req.params.fileId, 10);
+      if (isNaN(fileId)) {
+        return res.status(400).json({ message: "Invalid file ID" });
+      }
+
+      const file = await storage.getModFile(fileId);
+      if (!file) {
+        return res.status(404).json({ message: "File not found" });
+      }
+
+      res.json({ file });
+    } catch (error) {
+      console.error("Error fetching mod file:", error);
+      res.status(500).json({ message: "Failed to fetch mod file" });
+    }
+  });
+
+  // Create a mod file
+  app.post("/api/mods/:id/files", async (req, res) => {
+    try {
+      const modId = parseInt(req.params.id, 10);
+      if (isNaN(modId)) {
+        return res.status(400).json({ message: "Invalid mod ID" });
+      }
+
+      const { path, content } = req.body;
+      if (!path || content === undefined) {
+        return res.status(400).json({ message: "Path and content are required" });
+      }
+
+      // Check if mod exists
       const mod = await storage.getMod(modId);
       if (!mod) {
         return res.status(404).json({ message: "Mod not found" });
       }
 
-      // In a real implementation, this would fetch from a database
-      // For now, we'll simulate this with a static data object
-      res.json({
+      const file = await storage.createModFile({
         modId,
-        features: [
-          {
-            id: "feature-1",
-            name: "Basic mod structure and configuration",
-            status: "completed",
-            progress: 100,
-            notes: "Initial setup complete with all required files"
-          },
-          {
-            id: "feature-2",
-            name: "Custom weapons implementation",
-            status: "in_progress",
-            progress: 65,
-            estimatedCompletion: "~20 minutes",
-            notes: "Currently implementing attack animations"
-          },
-          {
-            id: "feature-3",
-            name: "Stamina system",
-            status: "planned",
-            progress: 0,
-            estimatedCompletion: "~45 minutes",
-            notes: "Will start after weapons implementation"
-          },
-          {
-            id: "feature-4",
-            name: "Particle effects for combat actions",
-            status: "planned",
-            progress: 0,
-            estimatedCompletion: "~30 minutes"
-          }
-        ],
-        currentFeature: "feature-2",
-        aiSuggestions: [
-          "Consider adding special weapon effects for critical hits",
-          "Combat balancing: adjust damage values based on weapon weight",
-          "Add sound effects for each weapon type"
-        ]
+        path,
+        content
       });
+
+      res.status(201).json({ file });
     } catch (error) {
-      console.error("Error getting feature progress:", error);
-      res.status(500).json({ message: "Failed to get feature progress" });
+      console.error("Error creating mod file:", error);
+      res.status(500).json({ message: "Failed to create mod file" });
     }
   });
-  
-  // Get analytics data for a mod
-  app.get("/api/mods/:id/analytics/:timeRange?", async (req, res) => {
+
+  // Update a mod file
+  app.patch("/api/mods/:modId/files/:fileId", async (req, res) => {
     try {
-      const modId = parseInt(req.params.id, 10);
-      if (isNaN(modId)) {
-        return res.status(400).json({ message: "Invalid mod ID" });
+      const fileId = parseInt(req.params.fileId, 10);
+      if (isNaN(fileId)) {
+        return res.status(400).json({ message: "Invalid file ID" });
       }
 
-      const timeRange = req.params.timeRange || "week";
-      
-      const mod = await storage.getMod(modId);
-      if (!mod) {
-        return res.status(404).json({ message: "Mod not found" });
+      const { content } = req.body;
+      if (content === undefined) {
+        return res.status(400).json({ message: "Content is required" });
       }
 
-      // In a real implementation, this would calculate analytics from real data
-      // For now, we'll simulate this with a static data object
-      res.json({
-        modId: mod.id,
-        buildStats: {
-          totalBuilds: 37,
-          successfulBuilds: 29,
-          failedBuilds: 8,
-          buildsByDay: [
-            { date: "Mon", count: 5, successful: 3, failed: 2 },
-            { date: "Tue", count: 7, successful: 5, failed: 2 },
-            { date: "Wed", count: 6, successful: 5, failed: 1 },
-            { date: "Thu", count: 8, successful: 7, failed: 1 },
-            { date: "Fri", count: 6, successful: 5, failed: 1 },
-            { date: "Sat", count: 3, successful: 2, failed: 1 },
-            { date: "Sun", count: 2, successful: 2, failed: 0 }
-          ]
-        },
-        errorStats: {
-          totalErrors: 24,
-          errorsFixed: 22,
-          errorCategories: [
-            { name: "Syntax", count: 9 },
-            { name: "Type", count: 7 },
-            { name: "Logical", count: 4 },
-            { name: "Dependency", count: 3 },
-            { name: "Other", count: 1 }
-          ],
-          errorsByDay: [
-            { date: "Mon", count: 5, fixed: 4 },
-            { date: "Tue", count: 6, fixed: 5 },
-            { date: "Wed", count: 4, fixed: 4 },
-            { date: "Thu", count: 3, fixed: 3 },
-            { date: "Fri", count: 4, fixed: 4 },
-            { date: "Sat", count: 2, fixed: 2 },
-            { date: "Sun", count: 0, fixed: 0 }
-          ]
-        },
-        featureStats: {
-          totalFeatures: 12,
-          completedFeatures: 8,
-          featureCategories: [
-            { name: "Weapons", count: 5 },
-            { name: "Combat System", count: 3 },
-            { name: "UI", count: 2 },
-            { name: "Effects", count: 2 }
-          ],
-          featureProgress: [
-            { date: "Week 1", completed: 2, total: 12 },
-            { date: "Week 2", completed: 5, total: 12 },
-            { date: "Week 3", completed: 8, total: 12 }
-          ]
-        },
-        performanceStats: {
-          averageBuildTime: 42,
-          averageFixTime: 18,
-          buildTimes: [
-            { buildNumber: 1, time: 65 },
-            { buildNumber: 2, time: 58 },
-            { buildNumber: 3, time: 51 },
-            { buildNumber: 4, time: 48 },
-            { buildNumber: 5, time: 45 },
-            { buildNumber: 6, time: 43 },
-            { buildNumber: 7, time: 40 }
-          ]
-        }
-      });
+      // Check if file exists
+      const file = await storage.getModFile(fileId);
+      if (!file) {
+        return res.status(404).json({ message: "File not found" });
+      }
+
+      const updatedFile = await storage.updateModFile(fileId, { content });
+      res.json({ file: updatedFile });
     } catch (error) {
-      console.error("Error getting analytics data:", error);
-      res.status(500).json({ message: "Failed to get analytics data" });
+      console.error("Error updating mod file:", error);
+      res.status(500).json({ message: "Failed to update mod file" });
     }
   });
 
-  // Mount the metrics API routes
-  app.use('/api/metrics', apiMetricsRouter);
-  
-  // Mount the web explorer API routes
-  app.use('/api/web-explorer', webExplorerRouter);
-  
-  // Mount the JAR analyzer API routes
-  app.use('/api/jar-analyzer', jarAnalyzerRouter);
+  // Delete a mod file
+  app.delete("/api/mods/:modId/files/:fileId", async (req, res) => {
+    try {
+      const fileId = parseInt(req.params.fileId, 10);
+      if (isNaN(fileId)) {
+        return res.status(400).json({ message: "Invalid file ID" });
+      }
+
+      const success = await storage.deleteModFile(fileId);
+      if (!success) {
+        return res.status(404).json({ message: "File not found" });
+      }
+
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting mod file:", error);
+      res.status(500).json({ message: "Failed to delete mod file" });
+    }
+  });
+
+  // Use feature routers
+  app.use("/api/metrics", apiMetricsRouter);
+  app.use("/api/web-explorer", webExplorerRouter);
+  app.use("/api/jar-analyzer", jarAnalyzerRouter);
 
   return httpServer;
-}
-
-// Asynchronous code generation process
-async function generateModCodeAsync(mod: any, build: any) {
-  try {
-    // Generate code
-    const result = await generateModCode(
-      mod.name,
-      mod.description,
-      mod.modLoader,
-      mod.minecraftVersion,
-      mod.idea
-    );
-
-    // Update build logs - use null coalescing to handle undefined case
-    const initialUpdate = await storage.updateBuild(build.id, {
-      logs: build.logs + result.logs
-    });
-    
-    if (!initialUpdate) {
-      throw new Error(`Failed to update build ${build.id}`);
-    }
-    
-    let currentLogs = initialUpdate.logs || '';
-
-    // Store files in storage
-    for (const file of result.files) {
-      await storage.createModFile({
-        modId: mod.id,
-        path: file.path,
-        content: file.content
-      });
-    }
-
-    // Compile the mod - add to logs safely
-    currentLogs += "\nStarting compilation process...\n";
-    const preCompileUpdate = await storage.updateBuild(build.id, { logs: currentLogs });
-    
-    if (preCompileUpdate) {
-      currentLogs = preCompileUpdate.logs;
-    }
-    
-    const compileResult = await compileMod(mod.id);
-
-    // Update build with compilation results
-    const status = compileResult.success ? BuildStatus.Success : BuildStatus.Failed;
-    currentLogs += compileResult.logs;
-    
-    const postCompileUpdate = await storage.updateBuild(build.id, {
-      status,
-      logs: currentLogs,
-      errorCount: compileResult.errors.length,
-      warningCount: compileResult.warnings.length,
-      downloadUrl: compileResult.downloadUrl
-    });
-    
-    if (postCompileUpdate) {
-      currentLogs = postCompileUpdate.logs;
-    }
-
-    // If compilation failed and auto-fix is enabled, try to fix errors
-    if (!compileResult.success && compileResult.errors.length > 0 && 
-        (mod.autoFixLevel === "Balanced" || mod.autoFixLevel === "Aggressive")) {
-      
-      // Add fix logs
-      currentLogs += "\nAttempting to fix compilation errors...\n";
-      const preFixUpdate = await storage.updateBuild(build.id, { logs: currentLogs });
-      
-      if (preFixUpdate) {
-        currentLogs = preFixUpdate.logs;
-      }
-
-      // Get all mod files
-      const modFiles = await storage.getModFilesByModId(mod.id);
-      const files = modFiles.map(file => ({
-        path: file.path,
-        content: file.content
-      }));
-
-      // Fix errors
-      const fixResult = await fixCompilationErrors(files, compileResult.errors);
-
-      // Update logs
-      currentLogs += fixResult.logs;
-      const fixLogsUpdate = await storage.updateBuild(build.id, { logs: currentLogs });
-      
-      if (fixLogsUpdate) {
-        currentLogs = fixLogsUpdate.logs;
-      }
-
-      // Update mod files with fixes
-      for (const file of fixResult.files) {
-        const existingFile = modFiles.find(f => f.path === file.path);
-        if (existingFile) {
-          await storage.updateModFile(existingFile.id, {
-            content: file.content
-          });
-        } else {
-          await storage.createModFile({
-            modId: mod.id,
-            path: file.path,
-            content: file.content
-          });
-        }
-      }
-
-      // Try compilation again
-      currentLogs += "\nRetrying compilation after fixes...\n";
-      const preRetryUpdate = await storage.updateBuild(build.id, { logs: currentLogs });
-      
-      if (preRetryUpdate) {
-        currentLogs = preRetryUpdate.logs;
-      }
-
-      const retryResult = await compileMod(mod.id);
-      
-      // Update build with new compilation results
-      const newStatus = retryResult.success ? BuildStatus.Success : BuildStatus.Failed;
-      currentLogs += retryResult.logs;
-      
-      await storage.updateBuild(build.id, {
-        status: newStatus,
-        logs: currentLogs,
-        errorCount: retryResult.errors.length,
-        warningCount: retryResult.warnings.length,
-        downloadUrl: retryResult.downloadUrl
-      });
-    }
-  } catch (error) {
-    console.error("Error in generateModCodeAsync:", error);
-    // Update build with error
-    await storage.updateBuild(build.id, {
-      status: BuildStatus.Failed,
-      logs: build.logs + `\nError during mod generation: ${error instanceof Error ? error.message : String(error)}\n`,
-      errorCount: 1,
-      warningCount: 0
-    });
-  }
-}
-
-// Asynchronous compilation process
-async function compileModAsync(mod: any, build: any) {
-  let currentLogs = build.logs || '';
-  
-  try {
-    // Compile the mod
-    const compileResult = await compileMod(mod.id);
-
-    // Update build with compilation results
-    const status = compileResult.success ? BuildStatus.Success : BuildStatus.Failed;
-    currentLogs += compileResult.logs;
-    
-    const compileUpdate = await storage.updateBuild(build.id, {
-      status,
-      logs: currentLogs,
-      errorCount: compileResult.errors.length,
-      warningCount: compileResult.warnings.length,
-      downloadUrl: compileResult.downloadUrl
-    });
-    
-    if (compileUpdate) {
-      currentLogs = compileUpdate.logs;
-    }
-
-    // If compilation failed and auto-fix is enabled, try to fix errors
-    if (!compileResult.success && compileResult.errors.length > 0 && 
-        (mod.autoFixLevel === "Balanced" || mod.autoFixLevel === "Aggressive")) {
-      
-      // Add to logs safely
-      currentLogs += "\nAttempting to fix compilation errors...\n";
-      const preFixUpdate = await storage.updateBuild(build.id, { logs: currentLogs });
-      
-      if (preFixUpdate) {
-        currentLogs = preFixUpdate.logs;
-      }
-
-      // Get all mod files
-      const modFiles = await storage.getModFilesByModId(mod.id);
-      const files = modFiles.map(file => ({
-        path: file.path,
-        content: file.content
-      }));
-
-      // Fix errors
-      const fixResult = await fixCompilationErrors(files, compileResult.errors);
-
-      // Update logs
-      currentLogs += fixResult.logs;
-      const fixLogsUpdate = await storage.updateBuild(build.id, { logs: currentLogs });
-      
-      if (fixLogsUpdate) {
-        currentLogs = fixLogsUpdate.logs;
-      }
-
-      // Update mod files with fixes
-      for (const file of fixResult.files) {
-        const existingFile = modFiles.find(f => f.path === file.path);
-        if (existingFile) {
-          await storage.updateModFile(existingFile.id, {
-            content: file.content
-          });
-        } else {
-          await storage.createModFile({
-            modId: mod.id,
-            path: file.path,
-            content: file.content
-          });
-        }
-      }
-
-      // Try compilation again
-      currentLogs += "\nRetrying compilation after fixes...\n";
-      const preRetryUpdate = await storage.updateBuild(build.id, { logs: currentLogs });
-      
-      if (preRetryUpdate) {
-        currentLogs = preRetryUpdate.logs;
-      }
-
-      const retryResult = await compileMod(mod.id);
-      
-      // Update build with new compilation results
-      const newStatus = retryResult.success ? BuildStatus.Success : BuildStatus.Failed;
-      currentLogs += retryResult.logs;
-      
-      await storage.updateBuild(build.id, {
-        status: newStatus,
-        logs: currentLogs,
-        errorCount: retryResult.errors.length,
-        warningCount: retryResult.warnings.length,
-        downloadUrl: retryResult.downloadUrl
-      });
-    }
-  } catch (error) {
-    console.error("Error in compileModAsync:", error);
-    // Update build with error
-    await storage.updateBuild(build.id, {
-      status: BuildStatus.Failed,
-      logs: build.logs + `\nError during compilation: ${error instanceof Error ? error.message : String(error)}\n`,
-      errorCount: 1,
-      warningCount: 0
-    });
-  }
 }
