@@ -6,7 +6,7 @@ import com.intellij.openapi.actionSystem.AnAction;
 import com.intellij.openapi.actionSystem.AnActionEvent;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.project.Project;
-import com.modforge.intellij.plugin.settings.ModForgeSettings;
+import com.modforge.intellij.plugin.auth.ModAuthenticationManager;
 import org.jetbrains.annotations.NotNull;
 
 /**
@@ -21,18 +21,9 @@ public class LogoutAction extends AnAction {
         
         LOG.info("Logging out from ModForge server");
         
-        // Clear authentication
-        ModForgeSettings settings = ModForgeSettings.getInstance();
-        
-        // If "remember credentials" is disabled, clear username and password too
-        if (!settings.isRememberCredentials()) {
-            settings.setUsername("");
-            settings.setPassword("");
-        }
-        
-        // Always clear token and authentication
-        settings.setAccessToken("");
-        settings.setAuthenticated(false);
+        // Log out using authentication manager
+        ModAuthenticationManager authManager = ModAuthenticationManager.getInstance();
+        authManager.logout();
         
         // Notify user
         NotificationGroupManager.getInstance()
@@ -49,9 +40,9 @@ public class LogoutAction extends AnAction {
     @Override
     public void update(@NotNull AnActionEvent e) {
         Project project = e.getProject();
-        ModForgeSettings settings = ModForgeSettings.getInstance();
+        ModAuthenticationManager authManager = ModAuthenticationManager.getInstance();
         
         // Only enable if we have a project and are authenticated
-        e.getPresentation().setEnabledAndVisible(project != null && settings.isAuthenticated());
+        e.getPresentation().setEnabledAndVisible(project != null && authManager.isAuthenticated());
     }
 }
