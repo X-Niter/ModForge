@@ -1,205 +1,111 @@
 package com.modforge.intellij.plugin.services;
 
-import com.intellij.openapi.components.Service;
-import com.intellij.openapi.components.ServiceManager;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.project.Project;
 import com.modforge.intellij.plugin.settings.ModForgeSettings;
 import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
-
-import java.io.IOException;
-import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
-import java.time.Duration;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.concurrent.CompletableFuture;
 
 /**
- * Service for autonomous code generation.
+ * Service for autonomous code generation using AI.
  */
-@Service
-public final class AutonomousCodeGenerationService {
+public class AutonomousCodeGenerationService {
     private static final Logger LOG = Logger.getInstance(AutonomousCodeGenerationService.class);
-    
     private final Project project;
-    private final HttpClient httpClient;
     
     /**
-     * Gets the instance of this service for the specified project.
-     * @param project The project
-     * @return The service instance
-     */
-    public static AutonomousCodeGenerationService getInstance(@NotNull Project project) {
-        return project.getService(AutonomousCodeGenerationService.class);
-    }
-    
-    /**
-     * Creates a new instance of this service.
+     * Constructor.
      * @param project The project
      */
     public AutonomousCodeGenerationService(Project project) {
         this.project = project;
-        this.httpClient = HttpClient.newBuilder()
-                .version(HttpClient.Version.HTTP_2)
-                .connectTimeout(Duration.ofSeconds(30))
-                .build();
+        LOG.info("AutonomousCodeGenerationService created for project: " + project.getName());
     }
     
     /**
-     * Generates code from a prompt.
+     * Generate code using AI.
      * @param prompt The prompt to generate code from
-     * @param language The programming language to generate code in (optional)
-     * @param context Additional context for code generation (optional)
-     * @return A future that completes with the generated code
+     * @return The generated code, or null if generation failed
      */
-    public CompletableFuture<String> generateCode(String prompt, @Nullable String language, @Nullable String context) {
-        // TODO: Implement API call to generate code
-        // For now, just return a mock result
+    public String generateCode(String prompt) {
+        LOG.info("Generating code for prompt: " + prompt);
         
-        return CompletableFuture.supplyAsync(() -> {
-            try {
-                // Simulate API latency
-                Thread.sleep(2000);
-                
-                // Mock response
-                if (language != null && language.equalsIgnoreCase("java")) {
-                    return "/**\n" +
-                           " * Generated code for: " + prompt + "\n" +
-                           " */\n" +
-                           "public class GeneratedCode {\n" +
-                           "    public static void main(String[] args) {\n" +
-                           "        System.out.println(\"Generated code for: " + prompt + "\");\n" +
-                           "    }\n" +
-                           "}";
-                } else {
-                    return "// Generated code for: " + prompt + "\n" +
-                           "function main() {\n" +
-                           "    console.log(\"Generated code for: " + prompt + "\");\n" +
-                           "}\n" +
-                           "\n" +
-                           "main();";
-                }
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                return "// Error generating code: " + e.getMessage();
-            }
-        });
-    }
-    
-    /**
-     * Fixes code with errors.
-     * @param code The code to fix
-     * @param errorMessage The error message
-     * @param context Additional context for code fixing (optional)
-     * @return A future that completes with the fixed code
-     */
-    public CompletableFuture<String> fixCode(String code, String errorMessage, @Nullable String context) {
-        // TODO: Implement API call to fix code
-        // For now, just return a mock result
-        
-        return CompletableFuture.supplyAsync(() -> {
-            try {
-                // Simulate API latency
-                Thread.sleep(2000);
-                
-                // Mock response - just add a comment with the error message
-                return "// Fixed code with error: " + errorMessage + "\n" + code;
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                return "// Error fixing code: " + e.getMessage();
-            }
-        });
-    }
-    
-    /**
-     * Explains code.
-     * @param code The code to explain
-     * @param context Additional context for code explanation (optional)
-     * @return A future that completes with the explanation
-     */
-    public CompletableFuture<String> explainCode(String code, @Nullable String context) {
-        // TODO: Implement API call to explain code
-        // For now, just return a mock result
-        
-        return CompletableFuture.supplyAsync(() -> {
-            try {
-                // Simulate API latency
-                Thread.sleep(2000);
-                
-                // Mock response
-                return "This code appears to be " + (code.contains("class") ? "Java" : "JavaScript") + " code.\n\n" +
-                       "It defines a " + (code.contains("class") ? "class" : "function") + " that " +
-                       "performs some operations. The main purpose of this code is to demonstrate " +
-                       "code explanation functionality.";
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                return "Error explaining code: " + e.getMessage();
-            }
-        });
-    }
-    
-    /**
-     * Generates documentation for code.
-     * @param code The code to generate documentation for
-     * @param context Additional context for documentation generation (optional)
-     * @return A future that completes with the documented code
-     */
-    public CompletableFuture<String> generateDocumentation(String code, @Nullable String context) {
-        // TODO: Implement API call to generate documentation
-        // For now, just return a mock result
-        
-        return CompletableFuture.supplyAsync(() -> {
-            try {
-                // Simulate API latency
-                Thread.sleep(2000);
-                
-                // Mock response - add JavaDoc/JSDoc comments
-                if (code.contains("class")) {
-                    // Java code
-                    return "/**\n" +
-                           " * This class demonstrates documentation generation.\n" +
-                           " * \n" +
-                           " * @author ModForge AI\n" +
-                           " */\n" + code;
-                } else {
-                    // JavaScript code
-                    return "/**\n" +
-                           " * This function demonstrates documentation generation.\n" +
-                           " * \n" +
-                           " * @author ModForge AI\n" +
-                           " */\n" + code;
-                }
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                return "// Error generating documentation: " + e.getMessage();
-            }
-        });
-    }
-    
-    /**
-     * Makes an API call to the ModForge API.
-     * @param endpoint The API endpoint
-     * @param payload The request payload
-     * @return The API response as a String
-     * @throws IOException If an I/O error occurs
-     * @throws InterruptedException If the operation is interrupted
-     */
-    private String makeApiCall(String endpoint, Map<String, Object> payload) throws IOException, InterruptedException {
-        // Get API key from settings
         ModForgeSettings settings = ModForgeSettings.getInstance();
-        String apiKey = settings.getOpenAiApiKey();
-        
-        if (apiKey == null || apiKey.isEmpty()) {
-            throw new IOException("API key not configured. Please configure it in the settings.");
+        if (!settings.isEnableAIGeneration()) {
+            LOG.info("AI code generation is disabled in settings");
+            return null;
         }
         
-        // TODO: Implement real API call with proper JSON serialization
-        // For now, just return a mock response
+        // TODO: Implement AI code generation
         
-        return "Mock API response for endpoint: " + endpoint;
+        return "// TODO: Implement AI-generated code\n" +
+               "// This is a placeholder for generated code\n" +
+               "// Prompt: " + prompt;
+    }
+    
+    /**
+     * Fix code using AI.
+     * @param code The code to fix
+     * @param errorMessage The error message to fix
+     * @return The fixed code, or null if fixing failed
+     */
+    public String fixCode(String code, String errorMessage) {
+        LOG.info("Fixing code with error: " + errorMessage);
+        
+        ModForgeSettings settings = ModForgeSettings.getInstance();
+        if (!settings.isEnableAIGeneration()) {
+            LOG.info("AI code generation is disabled in settings");
+            return null;
+        }
+        
+        // TODO: Implement AI code fixing
+        
+        return "// TODO: Implement AI-fixed code\n" +
+               "// This is a placeholder for fixed code\n" +
+               "// Original code had error: " + errorMessage + "\n" +
+               code;
+    }
+    
+    /**
+     * Generate documentation for code using AI.
+     * @param code The code to generate documentation for
+     * @return The generated documentation, or null if generation failed
+     */
+    public String generateDocumentation(String code) {
+        LOG.info("Generating documentation for code");
+        
+        ModForgeSettings settings = ModForgeSettings.getInstance();
+        if (!settings.isEnableAIGeneration()) {
+            LOG.info("AI code generation is disabled in settings");
+            return null;
+        }
+        
+        // TODO: Implement AI documentation generation
+        
+        return "/**\n" +
+               " * TODO: Implement AI-generated documentation\n" +
+               " * This is a placeholder for generated documentation\n" +
+               " */";
+    }
+    
+    /**
+     * Explain code using AI.
+     * @param code The code to explain
+     * @return The explanation, or null if explanation failed
+     */
+    public String explainCode(String code) {
+        LOG.info("Explaining code");
+        
+        ModForgeSettings settings = ModForgeSettings.getInstance();
+        if (!settings.isEnableAIGeneration()) {
+            LOG.info("AI code generation is disabled in settings");
+            return null;
+        }
+        
+        // TODO: Implement AI code explanation
+        
+        return "This code appears to be a placeholder. Here's what it does:\n\n" +
+               "1. It's commented out with TODO markers\n" +
+               "2. It's a placeholder for actual functionality\n" +
+               "3. It should be replaced with real implementation";
     }
 }

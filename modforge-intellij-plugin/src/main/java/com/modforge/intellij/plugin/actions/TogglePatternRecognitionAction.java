@@ -1,99 +1,66 @@
 package com.modforge.intellij.plugin.actions;
 
+import com.intellij.notification.NotificationGroupManager;
+import com.intellij.notification.NotificationType;
 import com.intellij.openapi.actionSystem.AnAction;
 import com.intellij.openapi.actionSystem.AnActionEvent;
 import com.intellij.openapi.actionSystem.Presentation;
+import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.project.Project;
-import com.intellij.openapi.ui.Messages;
 import com.modforge.intellij.plugin.ai.PatternRecognitionService;
-import com.modforge.intellij.plugin.settings.ModForgeSettings;
 import org.jetbrains.annotations.NotNull;
 
-import java.util.Map;
-
 /**
- * Action to toggle pattern recognition.
+ * Action for toggling pattern recognition.
  */
 public class TogglePatternRecognitionAction extends AnAction {
+    private static final Logger LOG = Logger.getInstance(TogglePatternRecognitionAction.class);
+    
     @Override
     public void actionPerformed(@NotNull AnActionEvent e) {
-        final Project project = e.getProject();
+        Project project = e.getProject();
         
-        if (project == null) {
+        LOG.info("Toggling pattern recognition");
+        
+        // Get pattern recognition service
+        PatternRecognitionService patternRecognitionService = 
+                PatternRecognitionService.getInstance();
+        
+        if (patternRecognitionService == null) {
+            LOG.error("Could not get PatternRecognitionService");
             return;
         }
         
-        // Get settings
-        ModForgeSettings settings = ModForgeSettings.getInstance();
-        boolean enabled = settings.isPatternRecognitionEnabled();
+        // Toggle pattern recognition
+        boolean isEnabled = patternRecognitionService.toggle();
         
-        // Toggle setting
-        settings.setPatternRecognitionEnabled(!enabled);
+        // Update action presentation
+        Presentation presentation = e.getPresentation();
+        presentation.setText((isEnabled ? "Disable" : "Enable") + " Pattern Recognition");
         
-        // Get service
-        PatternRecognitionService service = PatternRecognitionService.getInstance();
+        // Show notification
+        String message = "Pattern recognition " + (isEnabled ? "enabled" : "disabled");
         
-        if (service == null) {
-            Messages.showErrorDialog(
-                    project,
-                    "Pattern recognition service not available.",
-                    "Toggle Pattern Recognition"
-            );
-            return;
-        }
-        
-        // Show status message
-        if (!enabled) {
-            // Get statistics
-            Map<String, Object> statistics = service.getStatistics();
-            int totalRequests = (int) statistics.getOrDefault("totalRequests", 0);
-            int patternMatches = (int) statistics.getOrDefault("patternMatches", 0);
-            double estimatedCostSaved = (double) statistics.getOrDefault("estimatedCostSaved", 0.0);
-            
-            Messages.showInfoDialog(
-                    project,
-                    "Pattern recognition has been enabled.\n\n" +
-                            "This feature reduces API costs by caching similar requests.\n\n" +
-                            "Statistics:\n" +
-                            "Total Requests: " + totalRequests + "\n" +
-                            "Pattern Matches: " + patternMatches + "\n" +
-                            "Estimated Cost Saved: $" + String.format("%.2f", estimatedCostSaved),
-                    "Pattern Recognition Enabled"
-            );
-        } else {
-            Messages.showInfoDialog(
-                    project,
-                    "Pattern recognition has been disabled.\n\n" +
-                            "All requests will now go directly to the API.",
-                    "Pattern Recognition Disabled"
-            );
-        }
-        
-        // Update presentation
-        update(e);
+        NotificationGroupManager.getInstance()
+                .getNotificationGroup("ModForge Notifications")
+                .createNotification(
+                        "Pattern Recognition",
+                        message,
+                        isEnabled ? NotificationType.INFORMATION : NotificationType.WARNING)
+                .notify(project);
     }
     
     @Override
     public void update(@NotNull AnActionEvent e) {
-        Project project = e.getProject();
+        // Get pattern recognition service
+        PatternRecognitionService patternRecognitionService = 
+                PatternRecognitionService.getInstance();
         
-        if (project == null) {
-            e.getPresentation().setEnabledAndVisible(false);
-            return;
+        boolean isEnabled = false;
+        if (patternRecognitionService != null) {
+            isEnabled = patternRecognitionService.isEnabled();
         }
         
-        // Get settings
-        ModForgeSettings settings = ModForgeSettings.getInstance();
-        boolean enabled = settings.isPatternRecognitionEnabled();
-        
-        // Update text based on current state
-        Presentation presentation = e.getPresentation();
-        
-        presentation.setText(enabled ? "Disable Pattern Recognition" : "Enable Pattern Recognition");
-        presentation.setDescription(enabled ?
-                "Disable pattern recognition to reduce API costs" :
-                "Enable pattern recognition to reduce API costs");
-        
-        presentation.setEnabledAndVisible(true);
+        e.getPresentation().setText((isEnabled ? "Disable" : "Enable") + " Pattern Recognition");
     }
 }
