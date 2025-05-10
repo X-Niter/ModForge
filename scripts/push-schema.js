@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-const { execSync } = require('child_process');
+import { execSync } from 'child_process';
 
 function push() {
   try {
@@ -11,13 +11,9 @@ function push() {
     }
     
     console.log('🚀 Starting schema push with automatic approval...');
-    // Execute the command with automatic YES to all prompts and pipe output to process.stdout
-    execSync('npx drizzle-kit push:pg --verbose', { 
-      stdio: 'inherit',
-      env: {
-        ...process.env,
-        DRIZZLE_KIT_AUTOCONFIRM: 'true' // Auto-confirm all prompts
-      }
+    // Force flag automatically approves all data loss statements
+    execSync('npx drizzle-kit push --force', { 
+      stdio: 'inherit'
     });
     console.log('\n✅ Database schema pushed successfully');
   } catch (error) {

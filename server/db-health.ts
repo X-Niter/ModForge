@@ -1,15 +1,6 @@
 import { db } from "./db";
 import { sql } from "drizzle-orm";
-import { QueryResult } from "@neondatabase/serverless";
-
-// Define the expected query result types
-interface VersionQueryResult {
-  version: string;
-}
-
-interface UptimeQueryResult {
-  uptime: number | string;
-}
+import { pool } from "./db";
 
 interface HealthCheckResult {
   status: 'healthy' | 'unhealthy' | 'error';
@@ -31,10 +22,10 @@ export async function checkDatabaseHealth(): Promise<HealthCheckResult> {
   const timestamp = new Date().toISOString();
   
   try {
-    // First check basic connectivity
-    const connectionResult = await db.execute(sql`SELECT 1 as health_check`);
+    // First check basic connectivity using the pool directly
+    const connectionCheck = await pool.query('SELECT 1 as health_check');
     
-    if (!connectionResult) {
+    if (!connectionCheck || connectionCheck.rows.length === 0) {
       return { 
         status: "unhealthy", 
         message: "Database query returned unexpected result",
@@ -44,24 +35,26 @@ export async function checkDatabaseHealth(): Promise<HealthCheckResult> {
     
     // Get database information
     try {
-      // Execute queries with proper type casting
-      const versionResult = await db.execute<VersionQueryResult>(sql`SELECT version() as version`);
-      const uptimeResult = await db.execute<UptimeQueryResult>(sql`SELECT extract(epoch from current_timestamp - pg_postmaster_start_time()) as uptime`);
+      // Query database version and uptime
+      const versionResult = await pool.query('SELECT version() as version');
+      const uptimeResult = await pool.query('SELECT extract(epoch from current_timestamp - pg_postmaster_start_time()) as uptime');
       
-      // Extract result data safely
-      const versionRows = versionResult.rows || [];
-      const uptimeRows = uptimeResult.rows || [];
+      const databaseVersion = versionResult.rows[0]?.version || 'Unknown';
+      const uptime = Number(uptimeResult.rows[0]?.uptime || 0);
       
-      const databaseVersion = versionRows.length > 0 ? versionRows[0].version : 'Unknown';
-      const uptime = uptimeRows.length > 0 ? Number(uptimeRows[0].uptime) : 0;
+      // Sanitize the connection string for display
+      const connectionString = process.env.DATABASE_URL || '';
+      const sanitizedConnection = connectionString.includes('@') 
+        ? connectionString.split('@')[1]?.split('/')[0] || 'Unknown'
+        : 'Connected';
       
       return { 
         status: "healthy", 
         message: "Database connection is healthy", 
         databaseInfo: {
           version: databaseVersion,
-          connection: process.env.DATABASE_URL?.split('@')[1]?.split('/')[0] || 'Unknown',
-          uptime: Number(uptime)
+          connection: sanitizedConnection,
+          uptime: uptime
         },
         timestamp
       };
