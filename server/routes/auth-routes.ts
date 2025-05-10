@@ -7,6 +7,16 @@ import express, { Router, Request, Response } from 'express';
 import axios from 'axios';
 import { githubOAuth } from '../config/github-oauth';
 import { storage } from '../storage';
+import { z } from 'zod';
+import 'express-session';
+
+// Extend the Express.Session interface to include our custom properties
+declare module 'express-session' {
+  interface SessionData {
+    userId: number;
+    isAuthenticated: boolean;
+  }
+}
 
 const router = Router();
 
@@ -82,6 +92,15 @@ router.get('/github/callback', async (req, res) => {
     // Check if user exists, create if not
     let user = await storage.getUserByUsername(githubUser.login);
     
+    // Prepare GitHub metadata
+    const githubMetadata = {
+      id: githubUser.id,
+      login: githubUser.login,
+      avatar_url: githubUser.avatar_url,
+      html_url: githubUser.html_url,
+      type: githubUser.type
+    };
+    
     if (!user) {
       // Create a new user
       user = await storage.createUser({
@@ -89,38 +108,28 @@ router.get('/github/callback', async (req, res) => {
         email: githubUser.email || `${githubUser.login}@github.user`,
         password: '', // No password for OAuth users
         avatarUrl: githubUser.avatar_url,
-        githubId: githubUser.id,
+        githubId: String(githubUser.id),
         githubToken: accessToken,
         metadata: {
-          github: {
-            id: githubUser.id,
-            login: githubUser.login,
-            avatar_url: githubUser.avatar_url,
-            html_url: githubUser.html_url,
-            type: githubUser.type
-          }
+          github: githubMetadata
         }
       });
     } else {
       // Update existing user with new token
+      const updatedMetadata = typeof user.metadata === 'object' && user.metadata !== null
+        ? { ...user.metadata, github: githubMetadata }
+        : { github: githubMetadata };
+        
       user = await storage.updateUser(user.id, {
         githubToken: accessToken,
         avatarUrl: githubUser.avatar_url,
-        metadata: {
-          ...user.metadata,
-          github: {
-            id: githubUser.id,
-            login: githubUser.login,
-            avatar_url: githubUser.avatar_url,
-            html_url: githubUser.html_url,
-            type: githubUser.type
-          }
-        }
+        githubId: String(githubUser.id),
+        metadata: updatedMetadata
       });
     }
     
     // Set user session
-    if (req.session) {
+    if (req.session && user) {
       req.session.userId = user.id;
       req.session.isAuthenticated = true;
     }

@@ -2,12 +2,36 @@ import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import helmet from "helmet";
+import session from "express-session";
+import { pool } from "./db";
+import connectPgSimple from "connect-pg-simple";
+import authRoutes from "./routes/auth-routes";
 
 const app = express();
 // Enable trust proxy to work correctly with express-rate-limit behind a proxy (like in Replit)
 app.set('trust proxy', 1);
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
+
+// Setup PostgreSQL session store
+const PgSession = connectPgSimple(session);
+app.use(session({
+  store: new PgSession({
+    pool,
+    tableName: 'session', // Use default table name
+    createTableIfMissing: true
+  }),
+  secret: process.env.SESSION_SECRET || 'modforge-dev-secret', // Use env var in production
+  resave: false,
+  saveUninitialized: false,
+  cookie: { 
+    secure: process.env.NODE_ENV === 'production',
+    maxAge: 30 * 24 * 60 * 60 * 1000 // 30 days
+  }
+}));
+
+// Register authentication routes
+app.use('/api/auth', authRoutes);
 
 // Set security headers with helmet
 app.use(helmet({
