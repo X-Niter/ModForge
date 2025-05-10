@@ -871,15 +871,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       if (action === "start") {
         const frequencyMs = frequency ? parseInt(frequency, 10) * 1000 : undefined;
-        continuousService.startContinuousDevelopment(modId, frequencyMs);
-        res.json({ message: "Continuous development started" });
+        const result = continuousService.startContinuousDevelopment(modId, frequencyMs);
+        
+        if (result.success) {
+          res.json({ 
+            success: true, 
+            message: "Continuous development started"
+          });
+        } else {
+          // If there was a circuit breaker or other issue, return as a 409 Conflict
+          res.status(409).json({ 
+            success: false, 
+            message: result.message || "Could not start continuous development" 
+          });
+        }
       } else {
-        continuousService.stopContinuousDevelopment(modId);
-        res.json({ message: "Continuous development stopped" });
+        const result = continuousService.stopContinuousDevelopment(modId);
+        
+        if (result.success) {
+          res.json({ 
+            success: true, 
+            message: "Continuous development stopped"
+          });
+        } else {
+          // Return conflict if it wasn't running
+          res.status(409).json({ 
+            success: false, 
+            message: result.message || "Continuous development was not running" 
+          });
+        }
       }
     } catch (error) {
-      console.error("Error managing continuous development:", error);
-      res.status(500).json({ message: "Failed to manage continuous development" });
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      console.error("Error managing continuous development:", errorMessage);
+      res.status(500).json({ 
+        success: false, 
+        message: "Failed to manage continuous development",
+        error: errorMessage 
+      });
     }
   });
 

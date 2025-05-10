@@ -40,20 +40,41 @@ class ContinuousService extends EventEmitter {
    * Start continuous development for a mod
    * @param modId The mod ID to continuously develop
    * @param frequency How often to check for changes and compile (in milliseconds)
+   * @returns Object with success status and any relevant message
    */
-  public startContinuousDevelopment(modId: number, frequency: number = 5 * 60 * 1000): void {
+  public startContinuousDevelopment(modId: number, frequency: number = 5 * 60 * 1000): {success: boolean, message?: string} {
     // Don't start if already running
     if (this.running.get(modId)) {
-      return;
+      return {success: false, message: "Continuous development is already running for this mod"};
+    }
+    
+    // Check circuit breaker status
+    const circuitBreakerKey = `circuit_breaker_${modId}`;
+    const circuitBreakerCount = parseInt(process.env[circuitBreakerKey] || '0', 10);
+    const lastTripTime = parseInt(process.env[`${circuitBreakerKey}_time`] || '0', 10);
+    
+    if (circuitBreakerCount >= 5 && lastTripTime > 0) {
+      const now = Date.now();
+      if (now - lastTripTime < 60 * 60 * 1000) {
+        const remainingTimeMinutes = Math.ceil((60 * 60 * 1000 - (now - lastTripTime)) / (60 * 1000));
+        return {
+          success: false, 
+          message: `Circuit breaker is tripped for this mod due to previous errors. Automatic retry in ${remainingTimeMinutes} minutes.`
+        };
+      } else {
+        // Reset circuit breaker since timeout has elapsed
+        process.env[circuitBreakerKey] = '0';
+        delete process.env[`${circuitBreakerKey}_time`];
+      }
     }
     
     this.running.set(modId, true);
     this.buildCounts.set(modId, 0);
-    console.log(`Starting continuous development for mod ${modId} at ${frequency}ms intervals`);
+    logContinuous(modId, `Starting continuous development at ${frequency}ms intervals`);
     
     // Initial build
     this.processMod(modId).catch(err => {
-      console.error(`Error in initial build for mod ${modId}:`, err);
+      logContinuous(modId, `Error in initial build: ${err instanceof Error ? err.message : String(err)}`, 'error');
     });
     
     // Set up interval for future builds
@@ -64,24 +85,27 @@ class ContinuousService extends EventEmitter {
       }
       
       this.processMod(modId).catch(err => {
-        console.error(`Error in continuous development for mod ${modId}:`, err);
+        logContinuous(modId, `Error in scheduled build: ${err instanceof Error ? err.message : String(err)}`, 'error');
       });
     }, frequency);
     
     this.intervals.set(modId, interval);
     this.emit('started', modId);
+    
+    return {success: true};
   }
   
   /**
    * Stop continuous development for a mod
    * @param modId The mod ID to stop developing
+   * @returns Object with success status and any relevant message
    */
-  public stopContinuousDevelopment(modId: number): void {
+  public stopContinuousDevelopment(modId: number): {success: boolean, message?: string} {
     if (!this.running.get(modId)) {
-      return;
+      return {success: false, message: "Continuous development is not running for this mod"};
     }
     
-    console.log(`Stopping continuous development for mod ${modId}`);
+    logContinuous(modId, `Stopping continuous development`);
     this.running.set(modId, false);
     
     const interval = this.intervals.get(modId);
@@ -90,7 +114,30 @@ class ContinuousService extends EventEmitter {
       this.intervals.delete(modId);
     }
     
+    // Gracefully handle any in-progress builds
+    try {
+      // Find any in-progress builds and mark them as stopped
+      storage.getBuildsByModId(modId).then(builds => {
+        const inProgressBuilds = builds.filter(b => b.status === BuildStatus.InProgress || b.status === BuildStatus.Queued);
+        
+        for (const build of inProgressBuilds) {
+          storage.updateBuild(build.id, {
+            status: BuildStatus.Failed,
+            logs: build.logs + '\n\nBuild stopped by user or system.'
+          }).catch(err => {
+            logContinuous(modId, `Error cleaning up build ${build.id}: ${err instanceof Error ? err.message : String(err)}`, 'error');
+          });
+        }
+      }).catch(err => {
+        logContinuous(modId, `Error retrieving builds during shutdown: ${err instanceof Error ? err.message : String(err)}`, 'error');
+      });
+    } catch (err) {
+      // Don't let cleanup errors prevent stopping
+      logContinuous(modId, `Error during cleanup: ${err instanceof Error ? err.message : String(err)}`, 'error');
+    }
+    
     this.emit('stopped', modId);
+    return {success: true};
   }
   
   /**
@@ -288,7 +335,7 @@ class ContinuousService extends EventEmitter {
           downloadUrl: compileResult.downloadUrl || undefined
         });
         
-        console.log(`Continuous development cycle for mod ${mod.name} completed with status: ${status}`);
+        logContinuous(modId, `Continuous development cycle for mod ${mod.name} completed with status: ${status}`, status === BuildStatus.Failed ? 'warn' : 'info');
         
         // Reset circuit breaker if build is successful
         if (compileResult.success) {
@@ -308,7 +355,8 @@ class ContinuousService extends EventEmitter {
         });
       }
     } catch (error) {
-      console.error(`Error in continuous development cycle for mod ${modId}:`, error);
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      logContinuous(modId, `Error in continuous development cycle: ${errorMessage}`, 'error');
       
       // Increment circuit breaker count
       const circuitBreakerKey = `circuit_breaker_${modId}`;
@@ -318,7 +366,26 @@ class ContinuousService extends EventEmitter {
       // If circuit breaker threshold reached, trip it
       if (currentCount + 1 >= 5) {
         process.env[`${circuitBreakerKey}_time`] = Date.now().toString();
-        console.warn(`Circuit breaker tripped for mod ${modId}.`);
+        logContinuous(modId, `Circuit breaker tripped after ${currentCount + 1} consecutive failures.`, 'warn');
+        
+        try {
+          // Update any ongoing builds to failed status
+          const mod = await storage.getMod(modId);
+          if (mod) {
+            const builds = await storage.getBuildsByModId(modId);
+            const inProgressBuilds = builds.filter(b => b.status === BuildStatus.InProgress);
+            
+            for (const build of inProgressBuilds) {
+              await storage.updateBuild(build.id, {
+                status: BuildStatus.Failed,
+                logs: build.logs + '\n\nBuild terminated due to circuit breaker activation after multiple failures.'
+              });
+            }
+          }
+        } catch (innerError) {
+          // Don't let this error handling cause another error
+          logContinuous(modId, `Error while cleaning up builds after circuit breaker trip: ${innerError instanceof Error ? innerError.message : String(innerError)}`, 'error');
+        }
       }
       
       // Emit the error event
@@ -334,9 +401,52 @@ class ContinuousService extends EventEmitter {
    * @param modId The mod ID to get statistics for
    */
   public getStatistics(modId: number) {
+    // Get circuit breaker status
+    const circuitBreakerKey = `circuit_breaker_${modId}`;
+    const circuitBreakerCount = parseInt(process.env[circuitBreakerKey] || '0', 10);
+    const circuitBreakerTripped = circuitBreakerCount >= 5;
+    
+    // Get circuit breaker trip time if applicable
+    let circuitBreakerResetTime = null;
+    if (circuitBreakerTripped) {
+      const lastTripTime = parseInt(process.env[`${circuitBreakerKey}_time`] || '0', 10);
+      if (lastTripTime > 0) {
+        // Calculate when the circuit breaker will reset (1 hour from trip time)
+        const resetTime = new Date(lastTripTime + 60 * 60 * 1000);
+        circuitBreakerResetTime = resetTime.toISOString();
+      }
+    }
+    
     return {
       isRunning: this.isRunning(modId),
-      buildCount: this.buildCounts.get(modId) || 0
+      buildCount: this.buildCounts.get(modId) || 0,
+      circuitBreakerStatus: {
+        tripped: circuitBreakerTripped,
+        failureCount: circuitBreakerCount,
+        resetTime: circuitBreakerResetTime
+      }
+    };
+  }
+  
+  /**
+   * Get the health status of the continuous development service
+   */
+  public getHealthStatus() {
+    const runningMods = Array.from(this.running.entries())
+      .filter(([_, isRunning]) => isRunning)
+      .map(([modId]) => modId);
+    
+    const trippedCircuitBreakers = Object.keys(process.env)
+      .filter(key => key.startsWith('circuit_breaker_') && !key.includes('_time'))
+      .filter(key => parseInt(process.env[key] || '0', 10) >= 5)
+      .map(key => parseInt(key.replace('circuit_breaker_', ''), 10));
+    
+    return {
+      status: 'healthy',
+      runningMods,
+      trippedCircuitBreakers,
+      activeJobs: runningMods.length,
+      timestamp: new Date().toISOString()
     };
   }
 }
