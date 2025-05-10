@@ -27,6 +27,12 @@
     <depends>com.intellij.modules.platform</depends>
     <depends>com.intellij.modules.java</depends>
     
+    <extensionPoints>
+        <extensionPoint name="modLoaderContributor" 
+                       interface="com.modforge.intellij.plugin.utils.ModLoaderContributor" 
+                       dynamic="true"/>
+    </extensionPoints>
+    
     <extensions defaultExtensionNs="com.intellij">
         <!-- Tool Windows -->
         <toolWindow id="ModForge AI" 
@@ -34,10 +40,13 @@
                     factoryClass="com.modforge.intellij.plugin.ui.ModForgeToolWindowFactory" 
                     icon="/icons/modforge.svg"/>
         
-        <!-- Services -->
+        <!-- Project Services -->
         <projectService serviceImplementation="com.modforge.intellij.plugin.services.AutonomousCodeGenerationService"/>
         <projectService serviceImplementation="com.modforge.intellij.plugin.services.ContinuousDevelopmentService"/>
         <projectService serviceImplementation="com.modforge.intellij.plugin.ai.PatternRecognitionService"/>
+        <projectService serviceImplementation="com.modforge.intellij.plugin.github.GitHubIntegrationService"/>
+        <projectService serviceImplementation="com.modforge.intellij.plugin.notifications.ModForgeNotificationService"/>
+        <projectService serviceImplementation="com.modforge.intellij.plugin.templates.ModTemplateService"/>
         
         <!-- Application Services -->
         <applicationService serviceImplementation="com.modforge.intellij.plugin.auth.ModAuthenticationManager"/>
@@ -48,6 +57,11 @@
                                 instance="com.modforge.intellij.plugin.settings.ModForgeSettingsConfigurable"
                                 id="com.modforge.intellij.plugin.settings.ModForgeSettingsConfigurable" 
                                 displayName="ModForge AI Settings"/>
+                                
+        <!-- Notifications -->
+        <notificationGroup id="ModForge Notifications" 
+                          displayType="BALLOON"
+                          key="notification.group.modforge"/>
     </extensions>
     
     <actions>
@@ -83,6 +97,14 @@
             </action>
             <separator/>
             
+            <!-- Template Actions -->
+            <action id="ModForge.CreateFromTemplateAction"
+                    class="com.modforge.intellij.plugin.actions.CreateFromTemplateAction"
+                    text="Create Mod from Template"
+                    description="Create a new mod from a template">
+            </action>
+            <separator/>
+            
             <!-- Continuous Development Actions -->
             <action id="ModForge.ToggleContinuousDevelopmentAction"
                     class="com.modforge.intellij.plugin.actions.ToggleContinuousDevelopmentAction"
@@ -93,6 +115,29 @@
                     class="com.modforge.intellij.plugin.actions.TogglePatternRecognitionAction"
                     text="Toggle Pattern Recognition"
                     description="Enable or disable pattern recognition">
+            </action>
+            <separator/>
+            
+            <!-- GitHub Actions -->
+            <action id="ModForge.PushToGitHubAction"
+                    class="com.modforge.intellij.plugin.actions.PushToGitHubAction"
+                    text="Push to GitHub"
+                    description="Push mod to GitHub repository">
+            </action>
+        </group>
+        
+        <!-- New Group -->
+        <group id="ModForge.NewGroup" 
+               class="com.modforge.intellij.plugin.actions.ModForgeNewGroup" 
+               text="ModForge" 
+               popup="true" 
+               icon="/icons/modforge.svg">
+            <add-to-group group-id="NewGroup" anchor="after" relative-to-action="NewFromTemplate"/>
+            
+            <action id="ModForge.NewModFromTemplate"
+                    class="com.modforge.intellij.plugin.actions.CreateFromTemplateAction"
+                    text="Minecraft Mod"
+                    description="Create a new Minecraft mod from a template">
             </action>
         </group>
         
