@@ -1,297 +1,400 @@
 package com.modforge.intellij.plugin.services;
 
-import com.intellij.openapi.components.Service;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.project.Project;
-import com.modforge.intellij.plugin.ai.PatternRecognitionService;
+import com.intellij.openapi.components.Service;
+import com.intellij.util.concurrency.AppExecutorUtil;
 import com.modforge.intellij.plugin.auth.ModAuthenticationManager;
 import com.modforge.intellij.plugin.settings.ModForgeSettings;
 import com.modforge.intellij.plugin.utils.TokenAuthConnectionUtil;
-import org.json.simple.JSONArray;
+import com.modforge.intellij.plugin.utils.ConnectionTestUtil;
+import org.jetbrains.annotations.NotNull;
 import org.json.simple.JSONObject;
+import org.json.simple.parser.JSONParser;
+
+import java.net.HttpURLConnection;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
- * Service that manages autonomous code generation.
+ * Service for autonomous code generation.
  */
 @Service(Service.Level.PROJECT)
 public final class AutonomousCodeGenerationService {
     private static final Logger LOG = Logger.getInstance(AutonomousCodeGenerationService.class);
     
     private final Project project;
-    private int successfulPatternMatches = 0;
-    private int totalApiFallbacks = 0;
-    private int totalRequests = 0;
+    private final ExecutorService executorService;
     
+    // Metrics
+    private final AtomicInteger successfulPatternMatches = new AtomicInteger(0);
+    private final AtomicInteger apiFallbacks = new AtomicInteger(0);
+    
+    /**
+     * Create AutonomousCodeGenerationService.
+     * @param project Project
+     */
     public AutonomousCodeGenerationService(Project project) {
         this.project = project;
+        this.executorService = AppExecutorUtil.createBoundedApplicationPoolExecutor("ModForge Autonomous Code Generation", 4);
     }
     
     /**
-     * Process mods from server response.
-     * @param response Response from server
+     * Generate code asynchronously.
+     * @param description Code description
+     * @param className Optional class name
+     * @param fileName Optional file name
+     * @return CompletableFuture with generated code
      */
-    public void processMods(JSONObject response) {
-        if (response == null) {
-            LOG.error("Response is null");
-            return;
-        }
-        
-        if (!response.containsKey("mods")) {
-            LOG.error("Response doesn't contain mods");
-            return;
-        }
-        
-        try {
-            JSONArray mods = (JSONArray) response.get("mods");
-            
-            LOG.info("Processing " + mods.size() + " mods");
-            
-            for (Object modObj : mods) {
-                JSONObject mod = (JSONObject) modObj;
-                processMod(mod);
+    public CompletableFuture<String> generateCodeAsync(String description, String className, String fileName) {
+        return CompletableFuture.supplyAsync(() -> {
+            try {
+                return generateCode(description, className, fileName);
+            } catch (Exception e) {
+                LOG.error("Error generating code", e);
+                throw new RuntimeException("Error generating code: " + e.getMessage(), e);
             }
-        } catch (Exception e) {
-            LOG.error("Error processing mods", e);
-        }
+        }, executorService);
     }
     
     /**
-     * Process a single mod.
-     * @param mod Mod data
+     * Generate code.
+     * @param description Code description
+     * @param className Optional class name
+     * @param fileName Optional file name
+     * @return Generated code
      */
-    private void processMod(JSONObject mod) {
-        if (mod == null) {
-            LOG.error("Cannot process null mod");
-            return;
-        }
-        
+    public String generateCode(String description, String className, String fileName) {
         try {
-            if (!mod.containsKey("id")) {
-                LOG.error("Mod does not have an ID");
-                return;
+            // Check if inputs are valid
+            if (description == null || description.isEmpty()) {
+                LOG.warn("Code description is empty");
+                return null;
             }
             
-            Object idObj = mod.get("id");
-            long modId;
-            
-            if (idObj instanceof Long) {
-                modId = (Long) idObj;
-            } else if (idObj instanceof Integer) {
-                modId = ((Integer) idObj).longValue();
-            } else if (idObj instanceof String) {
-                try {
-                    modId = Long.parseLong((String) idObj);
-                } catch (NumberFormatException e) {
-                    LOG.error("Invalid mod ID format: " + idObj, e);
-                    return;
-                }
-            } else {
-                LOG.error("Unexpected mod ID type: " + (idObj != null ? idObj.getClass().getName() : "null"));
-                return;
+            // Check if authenticated
+            ModAuthenticationManager authManager = ModAuthenticationManager.getInstance();
+            if (!authManager.isAuthenticated()) {
+                LOG.warn("Not authenticated");
+                return null;
             }
             
-            LOG.info("Processing mod #" + modId);
+            // Create input data
+            JSONObject inputData = new JSONObject();
+            inputData.put("description", description);
             
-            // Check if development is needed
-            if (needsDevelopment(mod)) {
-                developMod(modId);
-            }
-        } catch (Exception e) {
-            LOG.error("Error processing mod", e);
-        }
-    }
-    
-    /**
-     * Check if a mod needs development.
-     * @param mod Mod data
-     * @return Whether the mod needs development
-     */
-    private boolean needsDevelopment(JSONObject mod) {
-        if (mod == null) {
-            return false;
-        }
-        
-        try {
-            // Check for compilation errors
-            if (mod.containsKey("hasErrors")) {
-                Object hasErrorsObj = mod.get("hasErrors");
-                if (hasErrorsObj instanceof Boolean && (Boolean) hasErrorsObj) {
-                    LOG.info("Mod has compilation errors, needs development");
-                    return true;
-                }
+            if (className != null && !className.isEmpty()) {
+                inputData.put("className", className);
             }
             
-            // Check if continuous development is requested
-            if (mod.containsKey("continuousDevelopment")) {
-                Object contDevObj = mod.get("continuousDevelopment");
-                if (contDevObj instanceof Boolean && (Boolean) contDevObj) {
-                    LOG.info("Continuous development is requested for mod");
-                    return true;
-                }
+            if (fileName != null && !fileName.isEmpty()) {
+                inputData.put("fileName", fileName);
             }
             
-            return false;
-        } catch (Exception e) {
-            LOG.error("Error checking if mod needs development", e);
-            return false;
-        }
-    }
-    
-    /**
-     * Request mod development from server.
-     * @param modId Mod ID
-     */
-    private void developMod(long modId) {
-        LOG.info("Requesting development for mod #" + modId);
-        
-        totalRequests++;
-        
-        // Check authentication
-        ModAuthenticationManager authManager = ModAuthenticationManager.getInstance();
-        if (!authManager.isAuthenticated()) {
-            LOG.warn("Not authenticated, skipping development");
-            return;
-        }
-        
-        // Check connection
-        ModForgeSettings settings = ModForgeSettings.getInstance();
-        String serverUrl = settings.getServerUrl();
-        String token = settings.getAccessToken();
-        
-        // Check if pattern recognition is enabled
-        boolean usePatterns = settings.isPatternRecognition();
-        
-        // Get pattern recognition service if needed
-        PatternRecognitionService patternService = null;
-        if (usePatterns) {
-            patternService = project.getService(PatternRecognitionService.class);
-        }
-        
-        try {
-            // Create development request
-            JSONObject requestData = new JSONObject();
-            requestData.put("modId", modId);
-            requestData.put("usePatterns", usePatterns);
+            // Check for pattern recognition
+            ModForgeSettings settings = ModForgeSettings.getInstance();
+            boolean usePatterns = settings.isPatternRecognition();
+            inputData.put("usePatterns", usePatterns);
             
-            // Send request to server
-            JSONObject response = TokenAuthConnectionUtil.post(serverUrl, "/api/mods/" + modId + "/develop", token, requestData);
+            // Call API
+            String serverUrl = settings.getServerUrl();
+            String token = settings.getAccessToken();
             
-            if (response == null) {
-                LOG.error("Failed to send development request to server");
-                return;
+            if (serverUrl == null || serverUrl.isEmpty() || token == null || token.isEmpty()) {
+                LOG.warn("Server URL or token is empty");
+                return null;
             }
             
-            // Process response
-            processDevelopmentResponse(response, patternService);
-        } catch (Exception e) {
-            LOG.error("Error requesting development", e);
-        }
-    }
-    
-    /**
-     * Process development response from server.
-     * @param response Response from server
-     * @param patternService Pattern recognition service
-     */
-    private void processDevelopmentResponse(JSONObject response, PatternRecognitionService patternService) {
-        if (response == null) {
-            return;
-        }
-        
-        try {
-            // Check for success
-            boolean isSuccess = false;
-            if (response.containsKey("success")) {
-                Object successObj = response.get("success");
-                if (successObj instanceof Boolean) {
-                    isSuccess = (Boolean) successObj;
-                }
+            // Call code generation API
+            String generateUrl = serverUrl + "/api/generate-code";
+            HttpURLConnection connection = TokenAuthConnectionUtil.createTokenAuthConnection(generateUrl, "POST", token);
+            
+            if (connection == null) {
+                LOG.warn("Failed to create connection to " + generateUrl);
+                return null;
             }
             
-            if (isSuccess) {
-                LOG.info("Development request was successful");
+            // Set content type
+            connection.setRequestProperty("Content-Type", "application/json");
+            
+            // Write input data
+            ConnectionTestUtil.writeJsonToConnection(connection, inputData);
+            
+            // Get response
+            int responseCode = connection.getResponseCode();
+            
+            if (responseCode == HttpURLConnection.HTTP_OK) {
+                // Parse response
+                String response = ConnectionTestUtil.readResponseFromConnection(connection);
                 
-                // Check if pattern was used
-                boolean patternUsed = false;
-                if (response.containsKey("patternUsed")) {
-                    Object patternUsedObj = response.get("patternUsed");
-                    if (patternUsedObj instanceof Boolean) {
-                        patternUsed = (Boolean) patternUsedObj;
-                    }
+                if (response == null || response.isEmpty()) {
+                    LOG.warn("Empty response from code generation API");
+                    return null;
                 }
                 
-                if (patternUsed) {
-                    successfulPatternMatches++;
+                // Parse JSON
+                JSONParser parser = new JSONParser();
+                Object responseObj = parser.parse(response);
+                
+                if (responseObj instanceof JSONObject) {
+                    JSONObject responseJson = (JSONObject) responseObj;
                     
-                    if (patternService != null && response.containsKey("patternId")) {
-                        Object patternIdObj = response.get("patternId");
-                        if (patternIdObj instanceof String) {
-                            patternService.recordPatternSuccess((String) patternIdObj);
-                        }
+                    // Check if pattern was used
+                    Object patternUsedObj = responseJson.get("patternUsed");
+                    if (patternUsedObj instanceof Boolean && (Boolean) patternUsedObj) {
+                        successfulPatternMatches.incrementAndGet();
+                    } else {
+                        apiFallbacks.incrementAndGet();
+                    }
+                    
+                    // Get generated code
+                    Object codeObj = responseJson.get("code");
+                    if (codeObj instanceof String) {
+                        return (String) codeObj;
+                    } else {
+                        LOG.warn("Code not found in response");
+                        return null;
                     }
                 } else {
-                    totalApiFallbacks++;
-                    
-                    // Record pattern failure if pattern recognition is enabled
-                    if (patternService != null && response.containsKey("patternId")) {
-                        Object patternIdObj = response.get("patternId");
-                        if (patternIdObj instanceof String) {
-                            patternService.recordPatternFailure((String) patternIdObj);
-                        }
-                    }
+                    LOG.warn("Response is not a JSON object");
+                    return null;
                 }
             } else {
-                Object messageObj = response.get("message");
-                String message = messageObj != null ? messageObj.toString() : "Unknown error";
-                LOG.error("Development request failed: " + message);
+                LOG.warn("Code generation failed with response code " + responseCode);
+                return null;
             }
         } catch (Exception e) {
-            LOG.error("Error processing development response", e);
+            LOG.error("Error generating code", e);
+            return null;
         }
     }
     
     /**
-     * Get the number of successful pattern matches.
+     * Fix code with errors.
+     * @param code Code with errors
+     * @param fileName File name
+     * @return Fixed code
+     */
+    public String fixCode(String code, String fileName) {
+        try {
+            // Check if inputs are valid
+            if (code == null || code.isEmpty()) {
+                LOG.warn("Code is empty");
+                return null;
+            }
+            
+            // Check if authenticated
+            ModAuthenticationManager authManager = ModAuthenticationManager.getInstance();
+            if (!authManager.isAuthenticated()) {
+                LOG.warn("Not authenticated");
+                return null;
+            }
+            
+            // Create input data
+            JSONObject inputData = new JSONObject();
+            inputData.put("code", code);
+            
+            if (fileName != null && !fileName.isEmpty()) {
+                inputData.put("fileName", fileName);
+            }
+            
+            // Check for pattern recognition
+            ModForgeSettings settings = ModForgeSettings.getInstance();
+            boolean usePatterns = settings.isPatternRecognition();
+            inputData.put("usePatterns", usePatterns);
+            
+            // Call API
+            String serverUrl = settings.getServerUrl();
+            String token = settings.getAccessToken();
+            
+            if (serverUrl == null || serverUrl.isEmpty() || token == null || token.isEmpty()) {
+                LOG.warn("Server URL or token is empty");
+                return null;
+            }
+            
+            // Call fix code API
+            String fixUrl = serverUrl + "/api/fix-code";
+            HttpURLConnection connection = TokenAuthConnectionUtil.createTokenAuthConnection(fixUrl, "POST", token);
+            
+            if (connection == null) {
+                LOG.warn("Failed to create connection to " + fixUrl);
+                return null;
+            }
+            
+            // Set content type
+            connection.setRequestProperty("Content-Type", "application/json");
+            
+            // Write input data
+            ConnectionTestUtil.writeJsonToConnection(connection, inputData);
+            
+            // Get response
+            int responseCode = connection.getResponseCode();
+            
+            if (responseCode == HttpURLConnection.HTTP_OK) {
+                // Parse response
+                String response = ConnectionTestUtil.readResponseFromConnection(connection);
+                
+                if (response == null || response.isEmpty()) {
+                    LOG.warn("Empty response from fix code API");
+                    return null;
+                }
+                
+                // Parse JSON
+                JSONParser parser = new JSONParser();
+                Object responseObj = parser.parse(response);
+                
+                if (responseObj instanceof JSONObject) {
+                    JSONObject responseJson = (JSONObject) responseObj;
+                    
+                    // Check if pattern was used
+                    Object patternUsedObj = responseJson.get("patternUsed");
+                    if (patternUsedObj instanceof Boolean && (Boolean) patternUsedObj) {
+                        successfulPatternMatches.incrementAndGet();
+                    } else {
+                        apiFallbacks.incrementAndGet();
+                    }
+                    
+                    // Get fixed code
+                    Object fixedCodeObj = responseJson.get("code");
+                    if (fixedCodeObj instanceof String) {
+                        return (String) fixedCodeObj;
+                    } else {
+                        LOG.warn("Fixed code not found in response");
+                        return null;
+                    }
+                } else {
+                    LOG.warn("Response is not a JSON object");
+                    return null;
+                }
+            } else {
+                LOG.warn("Fix code failed with response code " + responseCode);
+                return null;
+            }
+        } catch (Exception e) {
+            LOG.error("Error fixing code", e);
+            return null;
+        }
+    }
+    
+    /**
+     * Add features to mod.
+     * @param featureDescription Feature description
+     * @return Whether features were added successfully
+     */
+    public boolean addFeatures(String featureDescription) {
+        try {
+            // Check if inputs are valid
+            if (featureDescription == null || featureDescription.isEmpty()) {
+                LOG.warn("Feature description is empty");
+                return false;
+            }
+            
+            // Check if authenticated
+            ModAuthenticationManager authManager = ModAuthenticationManager.getInstance();
+            if (!authManager.isAuthenticated()) {
+                LOG.warn("Not authenticated");
+                return false;
+            }
+            
+            // Create input data
+            JSONObject inputData = new JSONObject();
+            inputData.put("featureDescription", featureDescription);
+            
+            // Check for pattern recognition
+            ModForgeSettings settings = ModForgeSettings.getInstance();
+            boolean usePatterns = settings.isPatternRecognition();
+            inputData.put("usePatterns", usePatterns);
+            
+            // Call API
+            String serverUrl = settings.getServerUrl();
+            String token = settings.getAccessToken();
+            
+            if (serverUrl == null || serverUrl.isEmpty() || token == null || token.isEmpty()) {
+                LOG.warn("Server URL or token is empty");
+                return false;
+            }
+            
+            // Call add features API
+            String addFeaturesUrl = serverUrl + "/api/add-features";
+            HttpURLConnection connection = TokenAuthConnectionUtil.createTokenAuthConnection(addFeaturesUrl, "POST", token);
+            
+            if (connection == null) {
+                LOG.warn("Failed to create connection to " + addFeaturesUrl);
+                return false;
+            }
+            
+            // Set content type
+            connection.setRequestProperty("Content-Type", "application/json");
+            
+            // Write input data
+            ConnectionTestUtil.writeJsonToConnection(connection, inputData);
+            
+            // Get response
+            int responseCode = connection.getResponseCode();
+            
+            if (responseCode == HttpURLConnection.HTTP_OK) {
+                // Parse response
+                String response = ConnectionTestUtil.readResponseFromConnection(connection);
+                
+                if (response == null || response.isEmpty()) {
+                    LOG.warn("Empty response from add features API");
+                    return false;
+                }
+                
+                // Parse JSON
+                JSONParser parser = new JSONParser();
+                Object responseObj = parser.parse(response);
+                
+                if (responseObj instanceof JSONObject) {
+                    JSONObject responseJson = (JSONObject) responseObj;
+                    
+                    // Check if pattern was used
+                    Object patternUsedObj = responseJson.get("patternUsed");
+                    if (patternUsedObj instanceof Boolean && (Boolean) patternUsedObj) {
+                        successfulPatternMatches.incrementAndGet();
+                    } else {
+                        apiFallbacks.incrementAndGet();
+                    }
+                    
+                    // Get success status
+                    Object successObj = responseJson.get("success");
+                    return successObj instanceof Boolean && (Boolean) successObj;
+                } else {
+                    LOG.warn("Response is not a JSON object");
+                    return false;
+                }
+            } else {
+                LOG.warn("Add features failed with response code " + responseCode);
+                return false;
+            }
+        } catch (Exception e) {
+            LOG.error("Error adding features", e);
+            return false;
+        }
+    }
+    
+    /**
+     * Get number of successful pattern matches.
      * @return Number of successful pattern matches
      */
     public int getSuccessfulPatternMatches() {
-        return successfulPatternMatches;
+        return successfulPatternMatches.get();
     }
     
     /**
-     * Get the number of API fallbacks.
+     * Get number of API fallbacks.
      * @return Number of API fallbacks
      */
-    public int getTotalApiFallbacks() {
-        return totalApiFallbacks;
+    public int getApiFallbacks() {
+        return apiFallbacks.get();
     }
     
     /**
-     * Get the total number of requests.
-     * @return Total number of requests
+     * Dispose service.
      */
-    public int getTotalRequests() {
-        return totalRequests;
-    }
-    
-    /**
-     * Get the pattern success rate.
-     * @return Pattern success rate
-     */
-    public double getPatternSuccessRate() {
-        if (totalRequests == 0) {
-            return 0.0;
-        }
-        
-        return (double) successfulPatternMatches / totalRequests;
-    }
-    
-    /**
-     * Reset the metrics.
-     */
-    public void resetMetrics() {
-        successfulPatternMatches = 0;
-        totalApiFallbacks = 0;
-        totalRequests = 0;
+    public void dispose() {
+        // Shutdown executor service
+        executorService.shutdownNow();
     }
 }

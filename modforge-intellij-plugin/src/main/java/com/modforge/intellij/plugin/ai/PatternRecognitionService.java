@@ -1,234 +1,259 @@
 package com.modforge.intellij.plugin.ai;
 
-import com.intellij.openapi.components.Service;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.project.Project;
-import com.intellij.util.concurrency.AppExecutorUtil;
+import com.intellij.openapi.components.Service;
 import com.modforge.intellij.plugin.auth.ModAuthenticationManager;
 import com.modforge.intellij.plugin.settings.ModForgeSettings;
 import com.modforge.intellij.plugin.utils.TokenAuthConnectionUtil;
+import com.modforge.intellij.plugin.utils.ConnectionTestUtil;
 import org.json.simple.JSONObject;
+import org.json.simple.parser.JSONParser;
 
-import java.util.HashMap;
-import java.util.Map;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
+import java.net.HttpURLConnection;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
- * Service that manages pattern recognition and learning.
+ * Service for pattern recognition in AI tasks.
  */
 @Service(Service.Level.PROJECT)
 public final class PatternRecognitionService {
     private static final Logger LOG = Logger.getInstance(PatternRecognitionService.class);
     
     private final Project project;
-    private final ScheduledExecutorService executor;
-    private final Map<String, Integer> patternSuccessCount = new HashMap<>();
-    private final Map<String, Integer> patternFailureCount = new HashMap<>();
-    private int totalSuccesses = 0;
-    private int totalFailures = 0;
     
+    // Metrics
+    private final AtomicInteger patternMatches = new AtomicInteger(0);
+    private final AtomicInteger patternStorageCount = new AtomicInteger(0);
+    
+    /**
+     * Create PatternRecognitionService.
+     * @param project Project
+     */
     public PatternRecognitionService(Project project) {
         this.project = project;
-        this.executor = AppExecutorUtil.getAppScheduledExecutorService();
-        
-        // Start periodic sync
-        startPeriodicSync();
     }
     
     /**
-     * Start periodic synchronization of pattern metrics with server.
+     * Store a pattern for future use.
+     * @param patternType Type of pattern (code, error, feature, etc.)
+     * @param inputData Input data for pattern
+     * @param outputData Output data for pattern
+     * @return Whether pattern was stored successfully
      */
-    private void startPeriodicSync() {
-        executor.scheduleWithFixedDelay(
-                this::syncPatternMetrics,
-                60000, // Initial delay of 1 minute
-                30 * 60 * 1000, // Every 30 minutes
-                TimeUnit.MILLISECONDS
-        );
-    }
-    
-    /**
-     * Synchronize pattern metrics with server.
-     */
-    private void syncPatternMetrics() {
-        LOG.info("Synchronizing pattern metrics with server");
-        
+    public boolean storePattern(String patternType, JSONObject inputData, JSONObject outputData) {
         try {
-            // Check authentication
+            // Check if pattern recognition is enabled
+            ModForgeSettings settings = ModForgeSettings.getInstance();
+            if (!settings.isPatternRecognition()) {
+                LOG.info("Pattern recognition is disabled");
+                return false;
+            }
+            
+            // Check if authenticated
             ModAuthenticationManager authManager = ModAuthenticationManager.getInstance();
             if (!authManager.isAuthenticated()) {
-                LOG.warn("Not authenticated, skipping pattern metrics sync");
-                return;
+                LOG.warn("Not authenticated");
+                return false;
             }
             
-            // Check if there's anything to sync
-            if (totalSuccesses == 0 && totalFailures == 0) {
-                LOG.info("No pattern metrics to sync");
-                return;
-            }
+            // Create pattern data
+            JSONObject patternData = new JSONObject();
+            patternData.put("patternType", patternType);
+            patternData.put("inputData", inputData);
+            patternData.put("outputData", outputData);
             
-            // Prepare metrics data
-            JSONObject metricsData = new JSONObject();
-            metricsData.put("successes", totalSuccesses);
-            metricsData.put("failures", totalFailures);
-            
-            JSONObject successPatterns = new JSONObject();
-            for (Map.Entry<String, Integer> entry : patternSuccessCount.entrySet()) {
-                if (entry.getKey() != null) {
-                    successPatterns.put(entry.getKey(), entry.getValue());
-                }
-            }
-            metricsData.put("successPatterns", successPatterns);
-            
-            JSONObject failurePatterns = new JSONObject();
-            for (Map.Entry<String, Integer> entry : patternFailureCount.entrySet()) {
-                if (entry.getKey() != null) {
-                    failurePatterns.put(entry.getKey(), entry.getValue());
-                }
-            }
-            metricsData.put("failurePatterns", failurePatterns);
-            
-            // Get server URL and token
-            ModForgeSettings settings = ModForgeSettings.getInstance();
+            // Call API
             String serverUrl = settings.getServerUrl();
             String token = settings.getAccessToken();
             
             if (serverUrl == null || serverUrl.isEmpty() || token == null || token.isEmpty()) {
-                LOG.error("Invalid server URL or token for syncing metrics");
-                return;
+                LOG.warn("Server URL or token is empty");
+                return false;
             }
             
-            // Send metrics to server
-            JSONObject response = TokenAuthConnectionUtil.post(serverUrl, "/api/patterns/metrics", token, metricsData);
+            // Call store pattern API
+            String storePatternUrl = serverUrl + "/api/store-pattern";
+            HttpURLConnection connection = TokenAuthConnectionUtil.createTokenAuthConnection(storePatternUrl, "POST", token);
             
-            if (response != null) {
-                boolean success = false;
-                if (response.containsKey("success")) {
-                    Object successObj = response.get("success");
-                    if (successObj instanceof Boolean) {
-                        success = (Boolean) successObj;
-                    }
+            if (connection == null) {
+                LOG.warn("Failed to create connection to " + storePatternUrl);
+                return false;
+            }
+            
+            // Set content type
+            connection.setRequestProperty("Content-Type", "application/json");
+            
+            // Write pattern data
+            ConnectionTestUtil.writeJsonToConnection(connection, patternData);
+            
+            // Get response
+            int responseCode = connection.getResponseCode();
+            
+            if (responseCode == HttpURLConnection.HTTP_OK) {
+                // Parse response
+                String response = ConnectionTestUtil.readResponseFromConnection(connection);
+                
+                if (response == null || response.isEmpty()) {
+                    LOG.warn("Empty response from store pattern API");
+                    return false;
                 }
                 
-                if (success) {
-                    LOG.info("Pattern metrics synchronized successfully");
+                // Parse JSON
+                JSONParser parser = new JSONParser();
+                Object responseObj = parser.parse(response);
+                
+                if (responseObj instanceof JSONObject) {
+                    JSONObject responseJson = (JSONObject) responseObj;
                     
-                    // Reset local metrics
-                    resetMetrics();
+                    // Get success status
+                    Object successObj = responseJson.get("success");
+                    if (successObj instanceof Boolean && (Boolean) successObj) {
+                        // Increment pattern storage count
+                        patternStorageCount.incrementAndGet();
+                        return true;
+                    } else {
+                        return false;
+                    }
                 } else {
-                    LOG.error("Failed to synchronize pattern metrics: " + 
-                              (response.containsKey("message") ? response.get("message") : "Unknown error"));
+                    LOG.warn("Response is not a JSON object");
+                    return false;
                 }
             } else {
-                LOG.error("No response when synchronizing pattern metrics");
+                LOG.warn("Store pattern failed with response code " + responseCode);
+                return false;
             }
         } catch (Exception e) {
-            LOG.error("Error synchronizing pattern metrics", e);
+            LOG.error("Error storing pattern", e);
+            return false;
         }
     }
     
     /**
-     * Record a successful pattern match.
-     * @param patternId Pattern ID
+     * Find a pattern for given input data.
+     * @param patternType Type of pattern (code, error, feature, etc.)
+     * @param inputData Input data for pattern
+     * @return Output data for pattern or null if no pattern found
      */
-    public void recordPatternSuccess(String patternId) {
-        if (patternId == null || patternId.isEmpty()) {
-            return;
+    public JSONObject findPattern(String patternType, JSONObject inputData) {
+        try {
+            // Check if pattern recognition is enabled
+            ModForgeSettings settings = ModForgeSettings.getInstance();
+            if (!settings.isPatternRecognition()) {
+                LOG.info("Pattern recognition is disabled");
+                return null;
+            }
+            
+            // Check if authenticated
+            ModAuthenticationManager authManager = ModAuthenticationManager.getInstance();
+            if (!authManager.isAuthenticated()) {
+                LOG.warn("Not authenticated");
+                return null;
+            }
+            
+            // Create search data
+            JSONObject searchData = new JSONObject();
+            searchData.put("patternType", patternType);
+            searchData.put("inputData", inputData);
+            
+            // Call API
+            String serverUrl = settings.getServerUrl();
+            String token = settings.getAccessToken();
+            
+            if (serverUrl == null || serverUrl.isEmpty() || token == null || token.isEmpty()) {
+                LOG.warn("Server URL or token is empty");
+                return null;
+            }
+            
+            // Call find pattern API
+            String findPatternUrl = serverUrl + "/api/find-pattern";
+            HttpURLConnection connection = TokenAuthConnectionUtil.createTokenAuthConnection(findPatternUrl, "POST", token);
+            
+            if (connection == null) {
+                LOG.warn("Failed to create connection to " + findPatternUrl);
+                return null;
+            }
+            
+            // Set content type
+            connection.setRequestProperty("Content-Type", "application/json");
+            
+            // Write search data
+            ConnectionTestUtil.writeJsonToConnection(connection, searchData);
+            
+            // Get response
+            int responseCode = connection.getResponseCode();
+            
+            if (responseCode == HttpURLConnection.HTTP_OK) {
+                // Parse response
+                String response = ConnectionTestUtil.readResponseFromConnection(connection);
+                
+                if (response == null || response.isEmpty()) {
+                    LOG.warn("Empty response from find pattern API");
+                    return null;
+                }
+                
+                // Parse JSON
+                JSONParser parser = new JSONParser();
+                Object responseObj = parser.parse(response);
+                
+                if (responseObj instanceof JSONObject) {
+                    JSONObject responseJson = (JSONObject) responseObj;
+                    
+                    // Get pattern found status
+                    Object patternFoundObj = responseJson.get("patternFound");
+                    if (patternFoundObj instanceof Boolean && (Boolean) patternFoundObj) {
+                        // Increment pattern matches count
+                        patternMatches.incrementAndGet();
+                        
+                        // Get output data
+                        Object outputDataObj = responseJson.get("outputData");
+                        if (outputDataObj instanceof JSONObject) {
+                            return (JSONObject) outputDataObj;
+                        } else {
+                            LOG.warn("Output data not found in response");
+                            return null;
+                        }
+                    } else {
+                        return null;
+                    }
+                } else {
+                    LOG.warn("Response is not a JSON object");
+                    return null;
+                }
+            } else if (responseCode == HttpURLConnection.HTTP_NOT_FOUND) {
+                // No pattern found
+                return null;
+            } else {
+                LOG.warn("Find pattern failed with response code " + responseCode);
+                return null;
+            }
+        } catch (Exception e) {
+            LOG.error("Error finding pattern", e);
+            return null;
         }
-        
-        LOG.info("Recording success for pattern " + patternId);
-        
-        patternSuccessCount.put(patternId, patternSuccessCount.getOrDefault(patternId, 0) + 1);
-        totalSuccesses++;
     }
     
     /**
-     * Record a failed pattern match.
-     * @param patternId Pattern ID
+     * Get number of pattern matches.
+     * @return Number of pattern matches
      */
-    public void recordPatternFailure(String patternId) {
-        if (patternId == null || patternId.isEmpty()) {
-            return;
-        }
-        
-        LOG.info("Recording failure for pattern " + patternId);
-        
-        patternFailureCount.put(patternId, patternFailureCount.getOrDefault(patternId, 0) + 1);
-        totalFailures++;
+    public int getPatternMatches() {
+        return patternMatches.get();
     }
     
     /**
-     * Get pattern success rate.
-     * @return Success rate (0-1)
+     * Get number of patterns stored.
+     * @return Number of patterns stored
      */
-    public double getSuccessRate() {
-        int total = totalSuccesses + totalFailures;
-        
-        if (total == 0) {
-            return 0.0;
-        }
-        
-        return (double) totalSuccesses / total;
+    public int getPatternStorageCount() {
+        return patternStorageCount.get();
     }
     
     /**
-     * Get total number of pattern matches (both success and failure).
-     * @return Total number of pattern matches
-     */
-    public int getTotalMatches() {
-        return totalSuccesses + totalFailures;
-    }
-    
-    /**
-     * Get total number of successful pattern matches.
-     * @return Total number of successful pattern matches
-     */
-    public int getTotalSuccesses() {
-        return totalSuccesses;
-    }
-    
-    /**
-     * Get total number of failed pattern matches.
-     * @return Total number of failed pattern matches
-     */
-    public int getTotalFailures() {
-        return totalFailures;
-    }
-    
-    /**
-     * Get number of unique patterns recognized.
-     * @return Number of unique patterns
-     */
-    public int getUniquePatternCount() {
-        // Combine keys from both maps
-        Map<String, Boolean> uniquePatterns = new HashMap<>();
-        
-        for (String patternId : patternSuccessCount.keySet()) {
-            uniquePatterns.put(patternId, true);
-        }
-        
-        for (String patternId : patternFailureCount.keySet()) {
-            uniquePatterns.put(patternId, true);
-        }
-        
-        return uniquePatterns.size();
-    }
-    
-    /**
-     * Reset pattern metrics.
+     * Reset pattern match count.
      */
     public void resetMetrics() {
-        patternSuccessCount.clear();
-        patternFailureCount.clear();
-        totalSuccesses = 0;
-        totalFailures = 0;
-    }
-    
-    /**
-     * Force sync pattern metrics with server.
-     */
-    public void forceSyncMetrics() {
-        syncPatternMetrics();
+        patternMatches.set(0);
+        patternStorageCount.set(0);
     }
 }
