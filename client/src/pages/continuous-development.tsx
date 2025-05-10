@@ -39,7 +39,7 @@ export default function ContinuousDevelopment() {
               
               <div className="flex items-center space-x-2">
                 {currentMod && (
-                  <Badge variant="outline" className="bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-100">
+                  <Badge variant="outline" className="bg-primary/10 text-primary border-primary/20">
                     <Code className="h-3 w-3 mr-1" /> {currentMod.name}
                   </Badge>
                 )}
@@ -91,35 +91,35 @@ export default function ContinuousDevelopment() {
                               <div className="space-y-4">
                                 <div className="flex justify-between items-center pb-2 border-b">
                                   <span className="text-muted-foreground">AI System</span>
-                                  <Badge variant="outline" className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100">
+                                  <Badge variant="outline" className="bg-primary/10 text-primary dark:bg-primary/5 dark:text-primary/90 border-primary/20">
                                     Operational
                                   </Badge>
                                 </div>
                                 
                                 <div className="flex justify-between items-center pb-2 border-b">
                                   <span className="text-muted-foreground">Build System</span>
-                                  <Badge variant="outline" className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100">
+                                  <Badge variant="outline" className="bg-primary/10 text-primary dark:bg-primary/5 dark:text-primary/90 border-primary/20">
                                     Operational
                                   </Badge>
                                 </div>
                                 
                                 <div className="flex justify-between items-center pb-2 border-b">
                                   <span className="text-muted-foreground">OpenAI API</span>
-                                  <Badge variant="outline" className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100">
+                                  <Badge variant="outline" className="bg-secondary/10 text-secondary dark:bg-secondary/5 dark:text-secondary/90 border-secondary/20">
                                     Connected
                                   </Badge>
                                 </div>
                                 
                                 <div className="flex justify-between items-center pb-2 border-b">
                                   <span className="text-muted-foreground">Database</span>
-                                  <Badge variant="outline" className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100">
+                                  <Badge variant="outline" className="bg-primary/10 text-primary dark:bg-primary/5 dark:text-primary/90 border-primary/20">
                                     Healthy
                                   </Badge>
                                 </div>
                                 
                                 <div className="flex justify-between items-center pb-2 border-b">
                                   <span className="text-muted-foreground">Continuous Integration</span>
-                                  <Badge variant="outline" className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100">
+                                  <Badge variant="outline" className="bg-accent/10 text-accent dark:bg-accent/5 dark:text-accent/90 border-accent/20">
                                     Active
                                   </Badge>
                                 </div>

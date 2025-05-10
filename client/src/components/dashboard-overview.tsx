@@ -40,7 +40,7 @@ export function DashboardOverview() {
     if (!health) return { color: "text-red-500", text: "Unavailable" };
     
     if (health.status === "healthy") {
-      return { color: "text-green-500", text: "Operational" };
+      return { color: "text-primary", text: "Operational" };
     } else if (health.status === "unhealthy") {
       return { color: "text-amber-500", text: "Degraded" };
     } else {
@@ -102,7 +102,7 @@ export function DashboardOverview() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-green-600">
+            <div className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-primary to-secondary">
               {usageQuery.data ? formatCurrency(usageQuery.data.estimatedCostSaved) : "$0.00"}
             </div>
             <div className="text-sm text-muted-foreground mt-1">
@@ -134,19 +134,19 @@ export function DashboardOverview() {
       {healthQuery.data && (
         <Alert
           variant={healthQuery.data.status === "healthy" ? "default" : "destructive"}
-          className={healthQuery.data.status === "healthy" ? "border-green-500 bg-green-50" : ""}
+          className={healthQuery.data.status === "healthy" ? "border-primary/30 bg-primary/5 dark:bg-card dark:border-primary/20" : ""}
         >
           {healthQuery.data.status === "healthy" ? (
-            <CheckCircle className="h-5 w-5 text-green-500" />
+            <CheckCircle className="h-5 w-5 text-primary" />
           ) : (
             <ServerCrash className="h-5 w-5" />
           )}
-          <AlertTitle>
+          <AlertTitle className={healthQuery.data.status === "healthy" ? "bg-clip-text text-transparent bg-gradient-to-r from-primary to-secondary" : ""}>
             {healthQuery.data.status === "healthy"
               ? "All Systems Operational"
               : "System Issues Detected"}
           </AlertTitle>
-          <AlertDescription>
+          <AlertDescription className="text-muted-foreground">
             {healthQuery.data.status === "healthy" ? (
               <>
                 Database, AI services, and pattern learning systems are functioning normally.
@@ -166,8 +166,8 @@ export function DashboardOverview() {
         <h3 className="text-lg font-medium">Quick Actions</h3>
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
           <Link href="/idea-generator">
-            <div className="border rounded-lg p-4 cursor-pointer hover:bg-accent hover:text-accent-foreground transition-colors">
-              <h4 className="font-medium flex items-center">
+            <div className="border border-border/50 bg-card/80 rounded-lg p-4 cursor-pointer hover:bg-primary/5 hover:border-primary/30 transition-all duration-200">
+              <h4 className="font-medium flex items-center text-primary">
                 <BrainCircuit className="h-4 w-4 mr-2" />
                 Generate Mod Ideas
               </h4>
@@ -178,8 +178,8 @@ export function DashboardOverview() {
           </Link>
           
           <Link href="/code-generator">
-            <div className="border rounded-lg p-4 cursor-pointer hover:bg-accent hover:text-accent-foreground transition-colors">
-              <h4 className="font-medium flex items-center">
+            <div className="border border-border/50 bg-card/80 rounded-lg p-4 cursor-pointer hover:bg-secondary/5 hover:border-secondary/30 transition-all duration-200">
+              <h4 className="font-medium flex items-center text-secondary">
                 <Code className="h-4 w-4 mr-2" />
                 Generate Mod Code
               </h4>
@@ -190,8 +190,8 @@ export function DashboardOverview() {
           </Link>
           
           <Link href="/continuous-development">
-            <div className="border rounded-lg p-4 cursor-pointer hover:bg-accent hover:text-accent-foreground transition-colors">
-              <h4 className="font-medium flex items-center">
+            <div className="border border-border/50 bg-card/80 rounded-lg p-4 cursor-pointer hover:bg-accent/5 hover:border-accent/30 transition-all duration-200">
+              <h4 className="font-medium flex items-center text-accent">
                 <Workflow className="h-4 w-4 mr-2" />
                 Continuous Development
               </h4>
