@@ -966,6 +966,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/metrics", apiMetricsRouter);
   app.use("/api/web-explorer", webExplorerRouter);
   app.use("/api/jar-analyzer", jarAnalyzerRouter);
+  app.use("/api/pattern-learning", patternLearningRouter);
 
   return httpServer;
 }
