@@ -7,6 +7,18 @@
 
 import { Router, Request, Response, NextFunction } from 'express';
 import { getLogger } from '../logging';
+
+// Import Express user type
+declare global {
+  namespace Express {
+    interface User {
+      id: number;
+      username: string;
+      isAdmin: boolean;
+      [key: string]: any;
+    }
+  }
+}
 import { 
   updateNotificationSettings, 
   getNotificationSettings, 
@@ -20,6 +32,29 @@ import { z } from 'zod';
 
 const logger = getLogger('notification-routes');
 const router = Router();
+
+/**
+ * Middleware to ensure only admin users can access protected endpoints
+ */
+function requireAdmin(req: Request, res: Response, next: NextFunction) {
+  // Check if user exists and is authenticated
+  if (!req.user) {
+    return res.status(401).json({ error: 'Authentication required' });
+  }
+  
+  // Check if user has admin privileges
+  if (!req.user.isAdmin) {
+    logger.warn('Unauthorized access attempt to admin endpoint', { 
+      userId: req.user.id,
+      username: req.user.username,
+      endpoint: req.originalUrl
+    });
+    return res.status(403).json({ error: 'Admin privileges required' });
+  }
+  
+  // User is authenticated and has admin privileges
+  next();
+}
 
 /**
  * Sanitize config object by removing sensitive information
@@ -100,7 +135,7 @@ const updateNotificationSettingsSchema = z.object({
 });
 
 // Get current notification settings
-router.get('/settings', (req, res) => {
+router.get('/settings', requireAdmin, (req: Request, res: Response) => {
   try {
     const settings = getNotificationSettings();
     
@@ -121,7 +156,7 @@ router.get('/settings', (req, res) => {
 });
 
 // Update notification settings
-router.post('/settings', (req, res) => {
+router.post('/settings', requireAdmin, (req: Request, res: Response) => {
   try {
     // Validate request body
     const result = updateNotificationSettingsSchema.safeParse(req.body);
@@ -180,7 +215,7 @@ router.post('/settings', (req, res) => {
 });
 
 // Test notification endpoint
-router.post('/test', (req, res) => {
+router.post('/test', requireAdmin, (req: Request, res: Response) => {
   try {
     // Validate request
     const testSchema = z.object({

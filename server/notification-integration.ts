@@ -61,12 +61,28 @@ export async function notifyHealthStateChange(
     notificationMessage = `System health changed from ${previousState.toUpperCase()} to ${currentState.toUpperCase()}: ${message}`;
   }
   
-  // Send the notification
-  await sendSystemStatusNotification(status, notificationMessage, {
-    previousState,
-    currentState,
-    ...details
-  });
+  try {
+    // Send the notification
+    await sendSystemStatusNotification(status, notificationMessage, {
+      previousState,
+      currentState,
+      ...details
+    });
+    logger.debug('Health state change notification sent', {
+      status,
+      previousState,
+      currentState
+    });
+  } catch (error) {
+    logger.error('Failed to send health state change notification', {
+      error,
+      status,
+      previousState,
+      currentState
+    });
+    // Don't throw the error as we don't want health check notifications
+    // to break the main application flow
+  }
 }
 
 /**
@@ -76,17 +92,30 @@ export async function notifyCriticalError(
   error: Error,
   context: Record<string, any> = {}
 ): Promise<void> {
-  await sendTrackedErrorNotification(
-    'untracked-' + Date.now(),
-    error.message,
-    ErrorSeverity.CRITICAL,
-    ErrorCategory.UNKNOWN,
-    1,
-    {
-      stack: error.stack,
-      ...context
-    }
-  );
+  try {
+    await sendTrackedErrorNotification(
+      'untracked-' + Date.now(),
+      error.message,
+      ErrorSeverity.CRITICAL,
+      ErrorCategory.UNKNOWN,
+      1,
+      {
+        stack: error.stack,
+        ...context
+      }
+    );
+    logger.debug('Critical error notification sent', {
+      message: error.message
+    });
+  } catch (notificationError) {
+    // Use console.error as a last resort if the logger itself might be broken
+    console.error('Failed to send critical error notification:', notificationError);
+    logger.error('Failed to send critical error notification', {
+      originalError: error.message,
+      notificationError
+    });
+    // We don't throw here to prevent cascading failures
+  }
 }
 
 /**
