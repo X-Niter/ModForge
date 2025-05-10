@@ -1,4 +1,4 @@
-import type { Express, Request, Response } from "express";
+import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { compileMod } from "./compiler";
@@ -26,12 +26,37 @@ import apiMetricsRouter from "./routes/api-metrics";
 import webExplorerRouter from "./routes/web-explorer-routes";
 import jarAnalyzerRouter from "./routes/jar-analyzer-routes";
 import axios from "axios";
+import rateLimit from "express-rate-limit";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Create HTTP server
   const httpServer = createServer(app);
+  
+  // Configure rate limiters
+  const standardLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    limit: 100, // Limit each IP to 100 requests per windowMs
+    standardHeaders: 'draft-7',
+    legacyHeaders: false,
+    message: {
+      status: 429,
+      message: 'Too many requests, please try again later.'
+    }
+  });
+  
+  // More strict rate limiting for AI endpoints
+  const aiLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    limit: 30, // Limit each IP to 30 requests per windowMs
+    standardHeaders: 'draft-7',
+    legacyHeaders: false,
+    message: {
+      status: 429,
+      message: 'Too many AI requests, please try again later.'
+    }
+  });
 
-  // Health check endpoint
+  // Health check endpoint - always needs to be accessible
   app.get("/api/health", async (req, res) => {
     try {
       const dbHealth = await checkDatabaseHealth();
@@ -83,6 +108,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Apply standard rate limiter to other API endpoints
+  app.use("/api", standardLimiter);
+  
+  // Apply stricter rate limit to AI-specific endpoints
+  app.use("/api/ai", aiLimiter);
+  
   // Get all mods for a user
   app.get("/api/mods", async (req, res) => {
     try {
@@ -516,23 +547,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Generate generic code
-  app.post("/api/ai/generate-generic-code", async (req, res) => {
-    try {
-      const { prompt, language, context, complexity } = req.body;
-      if (!prompt) {
-        return res.status(400).json({ message: "Prompt is required" });
-      }
-
-      const result = await generateCode(prompt, { language, context, complexity });
-      res.json(result);
-    } catch (error) {
-      console.error("Error generating generic code:", error);
-      res.status(500).json({ 
-        message: "Failed to generate generic code",
-        error: error instanceof Error ? error.message : String(error)
-      });
-    }
-  });
+  // Removed duplicate endpoint for generate-generic-code
+  // The functionality is covered by the /api/ai/generate-code endpoint
 
   // Add features
   app.post("/api/ai/add-features", async (req, res) => {
