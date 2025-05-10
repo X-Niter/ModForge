@@ -13,6 +13,9 @@ repositories {
 dependencies {
     implementation 'com.google.code.gson:gson:2.10.1'
     implementation 'org.apache.commons:commons-lang3:3.13.0'
+    implementation 'org.apache.httpcomponents:httpclient:4.5.14'
+    implementation 'commons-io:commons-io:2.13.0'
+    implementation 'org.commonmark:commonmark:0.21.0'  // For Markdown processing
     
     testImplementation 'org.junit.jupiter:junit-jupiter-api:5.10.0'
     testImplementation 'org.mockito:mockito-core:5.6.0'
@@ -22,21 +25,37 @@ dependencies {
 // Configure Gradle IntelliJ Plugin
 // Read more: https://plugins.jetbrains.com/docs/intellij/tools-gradle-intellij-plugin.html
 intellij {
-    version = '2023.2'
+    version = '2023.3'  // Updated to latest stable version
     type = 'IC' // Target IDE Platform: IntelliJ IDEA Community Edition
-    plugins = ['com.intellij.java']
+    plugins = ['com.intellij.java', 'Git4Idea']  // Added Git integration plugin
 }
 
 tasks {
     // Set the JVM compatibility versions
-    withType<JavaCompile> {
+    withType(JavaCompile) {
         sourceCompatibility = '17'
         targetCompatibility = '17'
+        options.encoding = 'UTF-8'
+    }
+    
+    // Add a clean build task
+    clean {
+        doFirst {
+            logger.info("Cleaning output directories")
+        }
+    }
+    
+    // Configure build task
+    build {
+        dependsOn(clean)
+        doLast {
+            logger.info("ModForge IntelliJ plugin built successfully")
+        }
     }
 
     patchPluginXml {
         sinceBuild = '232'
-        untilBuild = '243.*'
+        untilBuild = '241.*'  // Ensure compatibility with latest 2024.1 releases
         
         // Plugin vendor information
         pluginDescription = """

@@ -1,63 +1,104 @@
-# ModForge IntelliJ IDEA Plugin
+# ModForge IntelliJ Plugin
 
-IntelliJ IDEA plugin for ModForge, an AI-powered development platform for Minecraft mods.
+## Overview
+
+ModForge IntelliJ Plugin is an AI-powered assistant for Minecraft mod development. The plugin integrates with the IntelliJ IDEA development environment to provide intelligent code generation, error detection and fixing, and continuous development capabilities.
 
 ## Features
 
-- Connect to the ModForge server for AI-assisted mod development
-- Automatically fix compilation errors using AI
-- Generate code, documentation, and explanations
-- Continuous development mode that automatically improves your mod
-- GitHub integration for seamless version control
+- **Multi-mod loader support** - Works with Forge, Fabric, Quilt, and Architectury
+- **AI-driven code generation** - Generate code by describing what you want
+- **Automatic error detection and fixing** - Fix compilation errors with AI
+- **Pattern recognition** - Reduces API costs by learning from patterns
+- **Continuous development** - Keep working on your mods even when you're not
+- **GitHub integration** - Automatic workflows for continuous improvement
 
-## Authentication System
+## System Requirements
 
-The plugin uses a robust token-based authentication system, which provides:
-
-- Secure and persistent connections to the ModForge server
-- Token-based authentication for API requests
-- Automatic authentication verification
-- Session persistence between IDE restarts
-
-### Authentication Flow
-
-1. User logs in with username and password
-2. Server generates a JWT token with a 30-day expiry
-3. Token is stored securely in the plugin settings
-4. All API requests use the token for authentication
-5. Token is automatically verified on IDE startup
+- IntelliJ IDEA 2023.2 or later (Community or Ultimate edition)
+- Java Development Kit (JDK) 17 or later
+- Internet connection for API access
 
 ## Installation
 
-1. Install the plugin from the JetBrains Marketplace
-2. Open IntelliJ IDEA settings and navigate to **Tools > ModForge**
-3. Enter your ModForge server URL and credentials
-4. Click **Test Connection** to verify the connection
+### Installation from Disk
+
+1. Build the plugin or download the latest release
+2. Open IntelliJ IDEA
+3. Go to Settings/Preferences → Plugins
+4. Click the gear icon → Install Plugin from Disk...
+5. Select the .zip file from the `build/distributions` directory
+6. Restart IntelliJ IDEA when prompted
+
+### Building from Source
+
+1. Clone this repository
+2. Navigate to the plugin directory
+3. Run the build script:
+   ```
+   ./build-plugin.sh
+   ```
+4. The script will output the location of the generated plugin file
+5. Follow the installation steps above to install the plugin
+
+## Configuration
+
+1. After installation, open the ModForge settings in IntelliJ IDEA:
+   - Settings/Preferences → Tools → ModForge AI Settings
+2. Configure the following settings:
+   - Server URL: The URL of your ModForge server
+   - API Key: Your OpenAI API key
+   - GitHub Token: Your GitHub personal access token (if using GitHub integration)
+3. Click "Test Connection" to verify your settings
+4. Click "Apply" to save your settings
 
 ## Usage
 
-After authenticating, you can access ModForge features from:
+### Generate Code with AI
 
-1. **Tools > ModForge** menu
-2. The ModForge toolbar
-3. The ModForge tool window
-4. Right-click in the editor for context-specific options
+1. Right-click in the editor
+2. Select "Generate Code with ModForge AI"
+3. Describe what you want to generate
+4. Review and accept the generated code
 
-## Development and Testing
+### Fix Errors with AI
 
-The plugin includes several tools for testing authentication:
+1. If there are compilation errors, right-click on the error
+2. Select "Fix Errors with ModForge AI"
+3. The plugin will analyze and fix the errors
 
-- **Verify Authentication**: Simple check that authentication is working
-- **Test Token Authentication**: Comprehensive testing of token-based requests
-- **Test Authentication Endpoints**: Tests all authentication endpoints
-- **Test Complete Auth Flow**: Tests the entire authentication flow from login to using the token
+### Create a New Mod
 
-## Requirements
+1. Go to File → New → ModForge → Minecraft Mod
+2. Select the mod loader (Forge, Fabric, Quilt, or Architectury)
+3. Enter the mod details
+4. Click "Create" to generate the mod template
 
-- IntelliJ IDEA 2021.3 or higher
-- Java 11 or higher
-- Internet connection to the ModForge server
+### Push to GitHub
+
+1. From the Tools menu, select ModForge AI → Push to GitHub
+2. Enter the repository details
+3. Click "Push" to create or update the GitHub repository
+
+### Toggle Continuous Development
+
+1. From the Tools menu, select ModForge AI → Toggle Continuous Development
+2. The plugin will start monitoring and improving your code automatically
+
+## Troubleshooting
+
+- If the plugin is not working, check the following:
+  - Make sure you have a valid API key
+  - Check your network connection
+  - Verify the server URL is correct
+  - Check the IntelliJ IDEA log for errors (Help → Show Log)
+
+## Support
+
+For support, please contact:
+- Email: support@modforge.dev
+- Website: https://www.modforge.dev
 
 ## License
 
-This plugin is licensed under the [MIT License](LICENSE).
+This plugin is distributed under the terms of the Apache License 2.0.
