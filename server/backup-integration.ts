@@ -5,8 +5,9 @@
  * ensuring critical data is regularly backed up and properly managed.
  */
 
-import { scheduleBackups } from './backup-manager';
+import { scheduleBackups, BackupStatus, BackupResult, runFullBackup, BackupType, createBackup } from './backup-manager';
 import { getLogger } from './logging';
+import { notifyBackupResult } from './notification-integration';
 
 const logger = getLogger('backup-integration');
 

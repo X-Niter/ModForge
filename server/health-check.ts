@@ -464,7 +464,7 @@ export function scheduleHealthChecks(interval: number = 5 * 60 * 1000): () => vo
             `System health degraded from ${lastStatus.status.toUpperCase()} to ${currentStatus.status.toUpperCase()}`,
             {
               checks: Object.entries(currentStatus.detailedChecks)
-                .filter(([_, check]) => !check.passed)
+                .filter(([_, check]) => check.status !== 'healthy')
                 .reduce((acc, [key, value]) => ({ ...acc, [key]: value }), {}),
               memory: currentStatus.memory,
               uptime: currentStatus.uptime
