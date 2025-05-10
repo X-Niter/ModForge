@@ -34,6 +34,7 @@ public final class ModAuthenticationManager implements PersistentStateComponent<
     private static final Type USER_MAP_TYPE = new TypeToken<Map<String, Object>>() {}.getType();
     
     private String token = "";
+    private String githubToken = "";
     private Map<String, Object> user = new HashMap<>();
     private boolean authenticated = false;
     
@@ -121,6 +122,7 @@ public final class ModAuthenticationManager implements PersistentStateComponent<
      */
     public void logout() {
         token = "";
+        githubToken = "";
         user = new HashMap<>();
         authenticated = false;
     }
@@ -180,6 +182,51 @@ public final class ModAuthenticationManager implements PersistentStateComponent<
     @NotNull
     public Map<String, Object> getUser() {
         return new HashMap<>(user);
+    }
+    
+    /**
+     * Get the server URL.
+     * 
+     * @return The server URL from settings
+     */
+    @NotNull
+    public String getServerUrl() {
+        ModForgeSettings settings = ModForgeSettings.getInstance();
+        return settings.getServerUrl();
+    }
+    
+    /**
+     * Get the GitHub token.
+     * 
+     * @return The GitHub token, or an empty string if not available
+     */
+    @NotNull
+    public String getGitHubToken() {
+        if (githubToken != null && !githubToken.isEmpty()) {
+            return githubToken;
+        }
+        
+        // Try to get from user object if available
+        if (isAuthenticated() && user.containsKey("githubToken")) {
+            Object tokenObj = user.get("githubToken");
+            if (tokenObj != null) {
+                githubToken = tokenObj.toString();
+                return githubToken;
+            }
+        }
+        
+        // Fallback to settings
+        ModForgeSettings settings = ModForgeSettings.getInstance();
+        return settings.getGitHubToken();
+    }
+    
+    /**
+     * Set the GitHub token.
+     * 
+     * @param token The GitHub token
+     */
+    public void setGitHubToken(@NotNull String token) {
+        this.githubToken = token;
     }
     
     /**
