@@ -97,7 +97,6 @@ async function compileModAsync(mod: any, build: any): Promise<void> {
 }
 
 export async function registerRoutes(app: Express): Promise<Server> {
-export async function registerRoutes(app: Express): Promise<Server> {
   // Create HTTP server
   const httpServer = createServer(app);
   
@@ -1104,6 +1103,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 }
 
 // Asynchronous compilation process
+async function compileModProcess(mod: any, build: any): Promise<void> {
   let currentLogs = build.logs || '';
   
   try {
