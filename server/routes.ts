@@ -723,7 +723,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Files and features are required" });
       }
 
-      const result = await addModFeatures(files, features, modLoader, mcVersion);
+      // Only passing the required arguments (files and features)
+      const result = await addModFeatures(files, features);
       res.json(result);
     } catch (error) {
       console.error("Error adding features:", error);
