@@ -1161,6 +1161,60 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
+  // API metrics for continuous service (admin only)
+  app.get("/api/system/continuous-service/metrics", requireAuth, async (req, res) => {
+    // Check if user is admin
+    if (!req.user?.isAdmin) {
+      return res.status(403).json({
+        success: false, 
+        message: "Administrative privileges required for this operation"
+      });
+    }
+    
+    try {
+      // Get circuit breaker stats
+      const circuitBreakerKeys = Object.keys(process.env)
+        .filter(key => key.startsWith('circuit_breaker_') && !key.includes('_time'));
+      
+      const circuitBreakerStats = circuitBreakerKeys.map(key => {
+        const modId = parseInt(key.replace('circuit_breaker_', ''), 10);
+        const count = parseInt(process.env[key] || '0', 10);
+        const timeKey = `${key}_time`;
+        const tripTime = process.env[timeKey] ? new Date(parseInt(process.env[timeKey], 10)) : null;
+        
+        return {
+          modId,
+          failureCount: count,
+          tripped: count >= 5,
+          tripTime: tripTime ? tripTime.toISOString() : null
+        };
+      });
+      
+      // Get overall system metrics
+      const totalRunningMods = Array.from(continuousService.getHealthStatus().runningMods).length;
+      const totalTrippedCircuitBreakers = circuitBreakerStats.filter(s => s.tripped).length;
+      
+      // Return comprehensive metrics
+      res.json({
+        success: true,
+        metrics: {
+          totalRunningMods,
+          totalTrippedCircuitBreakers,
+          circuitBreakers: circuitBreakerStats,
+          timestamp: new Date().toISOString()
+        }
+      });
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      console.error("Error getting continuous service metrics:", errorMessage);
+      res.status(500).json({
+        success: false,
+        message: "Failed to get continuous service metrics",
+        error: errorMessage
+      });
+    }
+  });
+  
   // Continuous service health endpoint (admin only)
   app.get("/api/system/continuous-service/health", requireAuth, async (req, res) => {
     // Check if user is admin

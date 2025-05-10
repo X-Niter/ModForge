@@ -478,9 +478,13 @@ class ContinuousService extends EventEmitter {
    * Get the health status of the continuous development service
    */
   public getHealthStatus() {
-    const runningMods = Array.from(this.running.entries())
-      .filter(([_, isRunning]) => isRunning)
-      .map(([modId]) => modId);
+    // Get a list of all running mods using a more compatible approach
+    const runningMods: number[] = [];
+    this.running.forEach((isRunning, modId) => {
+      if (isRunning) {
+        runningMods.push(modId);
+      }
+    });
     
     const trippedCircuitBreakers = Object.keys(process.env)
       .filter(key => key.startsWith('circuit_breaker_') && !key.includes('_time'))
@@ -510,15 +514,11 @@ class ContinuousService extends EventEmitter {
     // Shutdown all continuous development processes
     this.shutdownAll("Application shutting down");
     
-    // Clear all intervals
-    const modIds = Array.from(this.intervals.keys());
-    for (const modId of modIds) {
-      const interval = this.intervals.get(modId);
-      if (interval) {
-        clearInterval(interval);
-        this.intervals.delete(modId);
-      }
-    }
+    // Clear all intervals using a different approach to avoid TypeScript iterator issues
+    this.intervals.forEach((interval, modId) => {
+      clearInterval(interval);
+      this.intervals.delete(modId);
+    });
     
     console.log("[ContinuousService] Cleanup complete - all resources released");
   }
@@ -529,9 +529,13 @@ class ContinuousService extends EventEmitter {
    * @returns Object with success status and summary information
    */
   public shutdownAll(reason: string = "System maintenance"): {success: boolean, summary: {shutdownCount: number, failedIds: number[]}} {
-    const runningMods = Array.from(this.running.entries())
-      .filter(([_, isRunning]) => isRunning)
-      .map(([modId]) => modId);
+    // Get a list of all running mods using a more compatible approach
+    const runningMods: number[] = [];
+    this.running.forEach((isRunning, modId) => {
+      if (isRunning) {
+        runningMods.push(modId);
+      }
+    });
     
     const failedIds: number[] = [];
     let shutdownCount = 0;
