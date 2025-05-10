@@ -7,11 +7,12 @@ const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 // Schema for idea generation request
 export const ideaGenerationRequestSchema = z.object({
-  theme: z.string().optional(),
-  complexity: z.enum(["simple", "medium", "complex"]).default("medium"),
-  preferredModLoader: z.enum(["Any", "Forge", "Fabric", "Bukkit", "Spigot", "Paper"]).default("Any"),
-  gameVersion: z.string().optional(),
-  existingIdeas: z.array(z.string()).optional(),
+  theme: z.string().optional().default(""),
+  complexity: z.string().default("Moderate"),
+  modLoader: z.string().default("forge"),
+  minecraftVersion: z.string().optional().default("1.20.4"),
+  keywords: z.array(z.string()).optional().default([]),
+  count: z.number().optional().default(3),
 });
 
 export type IdeaGenerationRequest = z.infer<typeof ideaGenerationRequestSchema>;
@@ -49,22 +50,22 @@ export async function generateModIdeas(request: IdeaGenerationRequest): Promise<
   try {
     // Build the prompt based on the request parameters
     let systemPrompt = `You are an expert Minecraft mod developer who specializes in creative mod ideas. 
-Generate ${request.complexity === "simple" ? "3" : request.complexity === "medium" ? "4" : "5"} unique, detailed, and innovative Minecraft mod ideas.`;
+Generate ${request.count || 3} unique, detailed, and innovative Minecraft mod ideas with ${request.complexity || "Moderate"} complexity.`;
 
     if (request.theme) {
       systemPrompt += ` The ideas should relate to the theme: "${request.theme}".`;
     }
 
-    if (request.preferredModLoader !== "Any") {
-      systemPrompt += ` The ideas should be suitable for implementation using the ${request.preferredModLoader} mod loader.`;
+    if (request.modLoader !== "forge") {
+      systemPrompt += ` The ideas should be suitable for implementation using the ${request.modLoader} mod loader.`;
     }
 
-    if (request.gameVersion) {
-      systemPrompt += ` The ideas should be compatible with Minecraft version ${request.gameVersion}.`;
+    if (request.minecraftVersion) {
+      systemPrompt += ` The ideas should be compatible with Minecraft version ${request.minecraftVersion}.`;
     }
 
-    if (request.existingIdeas && request.existingIdeas.length > 0) {
-      systemPrompt += ` Avoid similar concepts to these existing ideas: ${request.existingIdeas.join(", ")}.`;
+    if (request.keywords && request.keywords.length > 0) {
+      systemPrompt += ` The ideas should include concepts related to these keywords: ${request.keywords.join(", ")}.`;
     }
 
     systemPrompt += `
@@ -102,8 +103,8 @@ Format your response as a JSON object with the following structure:
       systemPrompt, 
       request.theme || null,
       request.complexity,
-      request.preferredModLoader !== "Any" ? request.preferredModLoader : null,
-      request.gameVersion || null
+      request.modLoader,
+      request.minecraftVersion || null
     );
     
     // If we found a good pattern match, use it
@@ -145,8 +146,8 @@ Format your response as a JSON object with the following structure:
         systemPrompt,
         request.theme || null,
         request.complexity,
-        request.preferredModLoader !== "Any" ? request.preferredModLoader : null,
-        request.gameVersion || null,
+        request.modLoader,
+        request.minecraftVersion || null,
         parsedResponse
       );
       
