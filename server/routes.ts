@@ -25,6 +25,7 @@ import { BuildStatus } from "@/types";
 import apiMetricsRouter from "./routes/api-metrics";
 import webExplorerRouter from "./routes/web-explorer-routes";
 import jarAnalyzerRouter from "./routes/jar-analyzer-routes";
+import patternLearningRouter from "./routes/pattern-learning-metrics";
 import axios from "axios";
 import rateLimit from "express-rate-limit";
 
