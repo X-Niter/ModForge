@@ -13,7 +13,10 @@ export interface CompletionResponse {
 }
 
 // Initialize OpenAI client
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY || "dummy_key_for_development" });
+if (!process.env.OPENAI_API_KEY) {
+  throw new Error("OPENAI_API_KEY is required for AI functionality");
+}
+const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 // Helper to format timestamps
 function getTimestamp(): string {

@@ -490,6 +490,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     }
   });
+  
+  // Generate generic code
+  app.post("/api/ai/generate-generic-code", async (req, res) => {
+    try {
+      const { prompt, language, context, complexity } = req.body;
+      if (!prompt) {
+        return res.status(400).json({ message: "Prompt is required" });
+      }
+
+      const result = await generateCode(prompt, { language, context, complexity });
+      res.json(result);
+    } catch (error) {
+      console.error("Error generating generic code:", error);
+      res.status(500).json({ 
+        message: "Failed to generate generic code",
+        error: error instanceof Error ? error.message : String(error)
+      });
+    }
+  });
 
   // Add features
   app.post("/api/ai/add-features", async (req, res) => {
