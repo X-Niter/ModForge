@@ -18,32 +18,33 @@ public class LogoutAction extends AnAction {
     public void actionPerformed(@NotNull AnActionEvent e) {
         Project project = e.getProject();
         
-        if (project == null) {
-            return;
-        }
-        
-        // Check if authenticated
-        if (!ModForgeSettings.getInstance().isAuthenticated()) {
-            showNotification(project, "Not logged in", "You are not currently logged in to ModForge.", NotificationType.INFORMATION);
-            return;
-        }
-        
         // Perform logout
-        boolean success = AuthenticationManager.getInstance().logout();
+        AuthenticationManager authManager = AuthenticationManager.getInstance();
+        boolean success = authManager.logout();
         
         if (success) {
-            showNotification(project, "Logout successful", "You have been logged out from ModForge.", NotificationType.INFORMATION);
+            // Clear credentials if not set to remember
+            ModForgeSettings settings = ModForgeSettings.getInstance();
+            if (!settings.isRememberCredentials()) {
+                settings.setUsername("");
+                settings.setPassword("");
+            }
+            
+            showNotification(project, "Logout Successful", 
+                    "You have been logged out from the ModForge server.", 
+                    NotificationType.INFORMATION);
         } else {
-            showNotification(project, "Logout failed", "Failed to log out from ModForge. Please try again.", NotificationType.ERROR);
+            showNotification(project, "Logout Failed", 
+                    "Failed to log out from the ModForge server.", 
+                    NotificationType.ERROR);
         }
     }
     
     @Override
     public void update(@NotNull AnActionEvent e) {
-        // Only enable action if authenticated
-        boolean isAuthenticated = ModForgeSettings.getInstance().isAuthenticated();
-        e.getPresentation().setEnabled(isAuthenticated);
-        e.getPresentation().setVisible(true);
+        // Enable action only when the user is authenticated
+        ModForgeSettings settings = ModForgeSettings.getInstance();
+        e.getPresentation().setEnabledAndVisible(settings.isAuthenticated());
     }
     
     /**

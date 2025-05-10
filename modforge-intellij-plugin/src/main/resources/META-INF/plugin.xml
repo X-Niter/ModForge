@@ -33,6 +33,14 @@
         
         <!-- Startup Activities -->
         <postStartupActivity implementation="com.modforge.intellij.plugin.startup.AuthenticationStartupActivity"/>
+        
+        <!-- Settings -->
+        <applicationConfigurable 
+            parentId="tools" 
+            instance="com.modforge.intellij.plugin.settings.ModForgeSettingsConfigurable" 
+            id="com.modforge.intellij.plugin.settings.ModForgeSettingsConfigurable" 
+            displayName="ModForge" 
+            nonDefaultProject="true"/>
 
         <!-- Tool Window -->
         <toolWindow id="ModForge" 
