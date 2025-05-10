@@ -2,8 +2,12 @@ package com.modforge.intellij.plugin.ui.toolwindow;
 
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.project.Project;
+import com.intellij.openapi.ui.SimpleToolWindowPanel;
 import com.intellij.openapi.wm.ToolWindow;
+import com.intellij.ui.JBColor;
 import com.intellij.ui.components.JBLabel;
+import com.intellij.ui.components.JBPanel;
+import com.intellij.ui.components.JBScrollPane;
 import com.intellij.ui.components.JBTabbedPane;
 import com.intellij.util.ui.JBUI;
 import com.intellij.util.ui.UIUtil;
@@ -16,6 +20,7 @@ import org.json.simple.JSONObject;
 
 import javax.swing.*;
 import java.awt.*;
+import java.text.NumberFormat;
 
 /**
  * Content for ModForge tool window.
@@ -23,225 +28,46 @@ import java.awt.*;
 public class ModForgeToolWindowContent {
     private static final Logger LOG = Logger.getInstance(ModForgeToolWindowContent.class);
     
+    private final JPanel mainPanel;
     private final Project project;
-    private final ToolWindow toolWindow;
-    private JPanel mainPanel;
+    
+    // Status labels
+    private final JLabel authStatusLabel = new JLabel("Not authenticated");
+    private final JLabel usernameLabel = new JLabel("Not logged in");
+    private final JLabel continuousDevelopmentLabel = new JLabel("Disabled");
+    private final JLabel patternRecognitionLabel = new JLabel("Disabled");
+    
+    // Metrics labels
+    private final JLabel taskCountLabel = new JLabel("0");
+    private final JLabel patternMatchesLabel = new JLabel("0");
+    private final JLabel apiFallbacksLabel = new JLabel("0");
+    private final JLabel costSavingsLabel = new JLabel("$0.00");
+    
+    // Refresh timer
     private Timer refreshTimer;
     
-    // UI components
-    private JLabel authStatusLabel;
-    private JLabel usernameLabel;
-    private JLabel continuousDevelopmentStatusLabel;
-    private JLabel patternRecognitionStatusLabel;
-    private JLabel taskCountLabel;
-    private JLabel patternMatchesLabel;
-    private JLabel apiFallbacksLabel;
-    private JLabel patternSuccessRateLabel;
-    private JLabel uniquePatternsLabel;
-    
+    /**
+     * Create ModForge tool window content.
+     * @param project Project
+     * @param toolWindow Tool window
+     */
     public ModForgeToolWindowContent(Project project, ToolWindow toolWindow) {
         this.project = project;
-        this.toolWindow = toolWindow;
         
-        createUI();
-        startRefreshTimer();
-    }
-    
-    /**
-     * Create UI components.
-     */
-    private void createUI() {
-        mainPanel = new JPanel(new BorderLayout());
+        // Create main panel
+        mainPanel = new SimpleToolWindowPanel(true, true);
         
-        // Create tabs
+        // Create and add content
         JBTabbedPane tabbedPane = new JBTabbedPane();
+        tabbedPane.addTab("Status", createStatusPanel());
+        tabbedPane.addTab("Metrics", createMetricsPanel());
         
-        // Dashboard tab
-        JPanel dashboardPanel = createDashboardPanel();
-        tabbedPane.addTab("Dashboard", dashboardPanel);
-        
-        // Development tab
-        JPanel developmentPanel = createDevelopmentPanel();
-        tabbedPane.addTab("Development", developmentPanel);
-        
-        // Patterns tab
-        JPanel patternsPanel = createPatternsPanel();
-        tabbedPane.addTab("Patterns", patternsPanel);
-        
-        // Add tabs to main panel
         mainPanel.add(tabbedPane, BorderLayout.CENTER);
         
-        // Initial update
+        // Initial UI update
         updateUI();
-    }
-    
-    /**
-     * Create dashboard panel.
-     * @return Dashboard panel
-     */
-    private JPanel createDashboardPanel() {
-        JPanel panel = new JPanel(new GridBagLayout());
-        panel.setBorder(JBUI.Borders.empty(10));
         
-        GridBagConstraints c = new GridBagConstraints();
-        c.fill = GridBagConstraints.HORIZONTAL;
-        c.weightx = 1.0;
-        c.insets = JBUI.insets(5);
-        
-        // Authentication status
-        c.gridx = 0;
-        c.gridy = 0;
-        c.gridwidth = 1;
-        panel.add(new JBLabel("Authentication Status:"), c);
-        
-        c.gridx = 1;
-        c.gridy = 0;
-        authStatusLabel = new JLabel("Unknown");
-        panel.add(authStatusLabel, c);
-        
-        // Username
-        c.gridx = 0;
-        c.gridy = 1;
-        panel.add(new JBLabel("Username:"), c);
-        
-        c.gridx = 1;
-        c.gridy = 1;
-        usernameLabel = new JLabel("Not logged in");
-        panel.add(usernameLabel, c);
-        
-        // Continuous development status
-        c.gridx = 0;
-        c.gridy = 2;
-        panel.add(new JBLabel("Continuous Development:"), c);
-        
-        c.gridx = 1;
-        c.gridy = 2;
-        continuousDevelopmentStatusLabel = new JLabel("Disabled");
-        panel.add(continuousDevelopmentStatusLabel, c);
-        
-        // Pattern recognition status
-        c.gridx = 0;
-        c.gridy = 3;
-        panel.add(new JBLabel("Pattern Recognition:"), c);
-        
-        c.gridx = 1;
-        c.gridy = 3;
-        patternRecognitionStatusLabel = new JLabel("Disabled");
-        panel.add(patternRecognitionStatusLabel, c);
-        
-        // Spacer
-        c.gridx = 0;
-        c.gridy = 4;
-        c.gridwidth = 2;
-        c.weighty = 1.0;
-        panel.add(Box.createVerticalGlue(), c);
-        
-        return panel;
-    }
-    
-    /**
-     * Create development panel.
-     * @return Development panel
-     */
-    private JPanel createDevelopmentPanel() {
-        JPanel panel = new JPanel(new GridBagLayout());
-        panel.setBorder(JBUI.Borders.empty(10));
-        
-        GridBagConstraints c = new GridBagConstraints();
-        c.fill = GridBagConstraints.HORIZONTAL;
-        c.weightx = 1.0;
-        c.insets = JBUI.insets(5);
-        
-        // Task count
-        c.gridx = 0;
-        c.gridy = 0;
-        c.gridwidth = 1;
-        panel.add(new JBLabel("Tasks Executed:"), c);
-        
-        c.gridx = 1;
-        c.gridy = 0;
-        taskCountLabel = new JLabel("0");
-        panel.add(taskCountLabel, c);
-        
-        // Spacer
-        c.gridx = 0;
-        c.gridy = 1;
-        c.gridwidth = 2;
-        c.weighty = 1.0;
-        panel.add(Box.createVerticalGlue(), c);
-        
-        return panel;
-    }
-    
-    /**
-     * Create patterns panel.
-     * @return Patterns panel
-     */
-    private JPanel createPatternsPanel() {
-        JPanel panel = new JPanel(new GridBagLayout());
-        panel.setBorder(JBUI.Borders.empty(10));
-        
-        GridBagConstraints c = new GridBagConstraints();
-        c.fill = GridBagConstraints.HORIZONTAL;
-        c.weightx = 1.0;
-        c.insets = JBUI.insets(5);
-        
-        // Pattern matches
-        c.gridx = 0;
-        c.gridy = 0;
-        c.gridwidth = 1;
-        panel.add(new JBLabel("Pattern Matches:"), c);
-        
-        c.gridx = 1;
-        c.gridy = 0;
-        patternMatchesLabel = new JLabel("0");
-        panel.add(patternMatchesLabel, c);
-        
-        // API fallbacks
-        c.gridx = 0;
-        c.gridy = 1;
-        panel.add(new JBLabel("API Fallbacks:"), c);
-        
-        c.gridx = 1;
-        c.gridy = 1;
-        apiFallbacksLabel = new JLabel("0");
-        panel.add(apiFallbacksLabel, c);
-        
-        // Pattern success rate
-        c.gridx = 0;
-        c.gridy = 2;
-        panel.add(new JBLabel("Pattern Success Rate:"), c);
-        
-        c.gridx = 1;
-        c.gridy = 2;
-        patternSuccessRateLabel = new JLabel("0%");
-        panel.add(patternSuccessRateLabel, c);
-        
-        // Unique patterns
-        c.gridx = 0;
-        c.gridy = 3;
-        panel.add(new JBLabel("Unique Patterns:"), c);
-        
-        c.gridx = 1;
-        c.gridy = 3;
-        uniquePatternsLabel = new JLabel("0");
-        panel.add(uniquePatternsLabel, c);
-        
-        // Spacer
-        c.gridx = 0;
-        c.gridy = 4;
-        c.gridwidth = 2;
-        c.weighty = 1.0;
-        panel.add(Box.createVerticalGlue(), c);
-        
-        return panel;
-    }
-    
-    /**
-     * Start refresh timer.
-     */
-    private void startRefreshTimer() {
-        // Create timer that refreshes UI every 5 seconds
+        // Set up refresh timer (5 seconds)
         refreshTimer = new Timer(5000, e -> updateUI());
         refreshTimer.start();
     }
@@ -331,60 +157,235 @@ public class ModForgeToolWindowContent {
         boolean continuousDevelopment = settings.isContinuousDevelopment();
         
         if (continuousDevelopment) {
-            // Check if it's actually running
-            ContinuousDevelopmentService service = project.getService(ContinuousDevelopmentService.class);
-            
-            if (service.isRunning()) {
-                continuousDevelopmentStatusLabel.setText("Enabled (Running)");
-                continuousDevelopmentStatusLabel.setForeground(new Color(0, 150, 0)); // Green
-            } else {
-                continuousDevelopmentStatusLabel.setText("Enabled (Not Running)");
-                continuousDevelopmentStatusLabel.setForeground(new Color(200, 130, 0)); // Orange
-            }
+            continuousDevelopmentLabel.setText("Enabled");
+            continuousDevelopmentLabel.setForeground(new Color(0, 150, 0)); // Green
         } else {
-            continuousDevelopmentStatusLabel.setText("Disabled");
-            continuousDevelopmentStatusLabel.setForeground(UIUtil.getContextHelpForeground());
+            continuousDevelopmentLabel.setText("Disabled");
+            continuousDevelopmentLabel.setForeground(new Color(200, 0, 0)); // Red
         }
         
         // Update pattern recognition status
         boolean patternRecognition = settings.isPatternRecognition();
         
         if (patternRecognition) {
-            patternRecognitionStatusLabel.setText("Enabled");
-            patternRecognitionStatusLabel.setForeground(new Color(0, 150, 0)); // Green
+            patternRecognitionLabel.setText("Enabled");
+            patternRecognitionLabel.setForeground(new Color(0, 150, 0)); // Green
         } else {
-            patternRecognitionStatusLabel.setText("Disabled");
-            patternRecognitionStatusLabel.setForeground(UIUtil.getContextHelpForeground());
+            patternRecognitionLabel.setText("Disabled");
+            patternRecognitionLabel.setForeground(new Color(200, 0, 0)); // Red
         }
         
-        // Update development metrics
-        ContinuousDevelopmentService devService = project.getService(ContinuousDevelopmentService.class);
-        taskCountLabel.setText(String.valueOf(devService.getTaskCount()));
-        
-        // Update pattern metrics
-        AutonomousCodeGenerationService autoService = project.getService(AutonomousCodeGenerationService.class);
-        patternMatchesLabel.setText(String.valueOf(autoService.getSuccessfulPatternMatches()));
-        apiFallbacksLabel.setText(String.valueOf(autoService.getTotalApiFallbacks()));
-        
-        double successRate = autoService.getPatternSuccessRate();
-        String successRateStr = String.format("%.1f%%", successRate * 100);
-        patternSuccessRateLabel.setText(successRateStr);
-        
-        // Update unique patterns
-        PatternRecognitionService patternService = project.getService(PatternRecognitionService.class);
-        uniquePatternsLabel.setText(String.valueOf(patternService.getUniquePatternCount()));
+        // Update metrics (if services are available)
+        try {
+            // Update continuous development metrics
+            ContinuousDevelopmentService continuousService = project.getService(ContinuousDevelopmentService.class);
+            if (continuousService != null) {
+                taskCountLabel.setText(String.valueOf(continuousService.getTaskCount()));
+            }
+            
+            // Update pattern recognition metrics
+            AutonomousCodeGenerationService autonomousService = project.getService(AutonomousCodeGenerationService.class);
+            if (autonomousService != null) {
+                int patternMatches = autonomousService.getSuccessfulPatternMatches();
+                int apiFallbacks = autonomousService.getApiFallbacks();
+                
+                patternMatchesLabel.setText(String.valueOf(patternMatches));
+                apiFallbacksLabel.setText(String.valueOf(apiFallbacks));
+                
+                // Calculate estimated cost savings (approximate)
+                double estimatedCostPerRequest = 0.01; // $0.01 per API request saved
+                double costSavings = patternMatches * estimatedCostPerRequest;
+                
+                NumberFormat currencyFormat = NumberFormat.getCurrencyInstance();
+                costSavingsLabel.setText(currencyFormat.format(costSavings));
+            }
+        } catch (Exception e) {
+            LOG.error("Error updating metrics", e);
+        }
     }
     
     /**
-     * Get the main panel.
-     * @return Main panel
+     * Create status panel.
+     * @return Status panel
      */
-    public JPanel getContent() {
+    private JPanel createStatusPanel() {
+        JPanel panel = new JBPanel<>(new GridBagLayout());
+        panel.setBorder(JBUI.Borders.empty(10));
+        
+        GridBagConstraints c = new GridBagConstraints();
+        c.fill = GridBagConstraints.HORIZONTAL;
+        c.insets = JBUI.insets(5);
+        c.gridx = 0;
+        c.gridy = 0;
+        c.weightx = 0.3;
+        
+        // Authentication section
+        JLabel authSectionLabel = new JBLabel("Authentication");
+        authSectionLabel.setFont(authSectionLabel.getFont().deriveFont(Font.BOLD));
+        panel.add(authSectionLabel, c);
+        
+        c.gridx = 1;
+        c.weightx = 0.7;
+        panel.add(authStatusLabel, c);
+        
+        c.gridx = 0;
+        c.gridy++;
+        c.weightx = 0.3;
+        panel.add(new JBLabel("Username:"), c);
+        
+        c.gridx = 1;
+        c.weightx = 0.7;
+        panel.add(usernameLabel, c);
+        
+        // Features section
+        c.gridx = 0;
+        c.gridy++;
+        c.weightx = 1.0;
+        c.gridwidth = 2;
+        c.insets = JBUI.insets(15, 5, 5, 5);
+        
+        JLabel featuresSectionLabel = new JBLabel("Features");
+        featuresSectionLabel.setFont(featuresSectionLabel.getFont().deriveFont(Font.BOLD));
+        panel.add(featuresSectionLabel, c);
+        
+        c.gridx = 0;
+        c.gridy++;
+        c.weightx = 0.3;
+        c.gridwidth = 1;
+        c.insets = JBUI.insets(5);
+        panel.add(new JBLabel("Continuous Development:"), c);
+        
+        c.gridx = 1;
+        c.weightx = 0.7;
+        panel.add(continuousDevelopmentLabel, c);
+        
+        c.gridx = 0;
+        c.gridy++;
+        c.weightx = 0.3;
+        panel.add(new JBLabel("Pattern Recognition:"), c);
+        
+        c.gridx = 1;
+        c.weightx = 0.7;
+        panel.add(patternRecognitionLabel, c);
+        
+        // Add filler to push content to top
+        c.gridx = 0;
+        c.gridy++;
+        c.weighty = 1.0;
+        c.gridwidth = 2;
+        panel.add(new JPanel(), c);
+        
+        return panel;
+    }
+    
+    /**
+     * Create metrics panel.
+     * @return Metrics panel
+     */
+    private JPanel createMetricsPanel() {
+        JPanel panel = new JBPanel<>(new GridBagLayout());
+        panel.setBorder(JBUI.Borders.empty(10));
+        
+        GridBagConstraints c = new GridBagConstraints();
+        c.fill = GridBagConstraints.HORIZONTAL;
+        c.insets = JBUI.insets(5);
+        c.gridx = 0;
+        c.gridy = 0;
+        c.weightx = 0.3;
+        
+        // Usage metrics section
+        JLabel metricsSectionLabel = new JBLabel("Usage Metrics");
+        metricsSectionLabel.setFont(metricsSectionLabel.getFont().deriveFont(Font.BOLD));
+        panel.add(metricsSectionLabel, c);
+        
+        c.gridx = 0;
+        c.gridy++;
+        c.weightx = 0.3;
+        panel.add(new JBLabel("Total Tasks Run:"), c);
+        
+        c.gridx = 1;
+        c.weightx = 0.7;
+        taskCountLabel.setFont(taskCountLabel.getFont().deriveFont(Font.BOLD));
+        panel.add(taskCountLabel, c);
+        
+        // Pattern recognition metrics section
+        c.gridx = 0;
+        c.gridy++;
+        c.weightx = 1.0;
+        c.gridwidth = 2;
+        c.insets = JBUI.insets(15, 5, 5, 5);
+        
+        JLabel patternSectionLabel = new JBLabel("Pattern Recognition Metrics");
+        patternSectionLabel.setFont(patternSectionLabel.getFont().deriveFont(Font.BOLD));
+        panel.add(patternSectionLabel, c);
+        
+        c.gridx = 0;
+        c.gridy++;
+        c.weightx = 0.3;
+        c.gridwidth = 1;
+        c.insets = JBUI.insets(5);
+        panel.add(new JBLabel("Pattern Matches:"), c);
+        
+        c.gridx = 1;
+        c.weightx = 0.7;
+        patternMatchesLabel.setFont(patternMatchesLabel.getFont().deriveFont(Font.BOLD));
+        patternMatchesLabel.setForeground(new Color(0, 150, 0)); // Green
+        panel.add(patternMatchesLabel, c);
+        
+        c.gridx = 0;
+        c.gridy++;
+        c.weightx = 0.3;
+        panel.add(new JBLabel("API Fallbacks:"), c);
+        
+        c.gridx = 1;
+        c.weightx = 0.7;
+        apiFallbacksLabel.setFont(apiFallbacksLabel.getFont().deriveFont(Font.BOLD));
+        panel.add(apiFallbacksLabel, c);
+        
+        // Cost savings section
+        c.gridx = 0;
+        c.gridy++;
+        c.weightx = 1.0;
+        c.gridwidth = 2;
+        c.insets = JBUI.insets(15, 5, 5, 5);
+        
+        JLabel savingsSectionLabel = new JBLabel("Estimated Cost Savings");
+        savingsSectionLabel.setFont(savingsSectionLabel.getFont().deriveFont(Font.BOLD));
+        panel.add(savingsSectionLabel, c);
+        
+        c.gridx = 0;
+        c.gridy++;
+        c.weightx = 0.3;
+        c.gridwidth = 1;
+        c.insets = JBUI.insets(5);
+        panel.add(new JBLabel("API Cost Savings:"), c);
+        
+        c.gridx = 1;
+        c.weightx = 0.7;
+        costSavingsLabel.setFont(costSavingsLabel.getFont().deriveFont(Font.BOLD));
+        costSavingsLabel.setForeground(new Color(0, 100, 0)); // Dark green
+        panel.add(costSavingsLabel, c);
+        
+        // Add filler to push content to top
+        c.gridx = 0;
+        c.gridy++;
+        c.weighty = 1.0;
+        c.gridwidth = 2;
+        panel.add(new JPanel(), c);
+        
+        return panel;
+    }
+    
+    /**
+     * Get component for display in tool window.
+     * @return Component
+     */
+    public JComponent getComponent() {
         return mainPanel;
     }
     
     /**
-     * Dispose resources.
+     * Dispose of resources.
      */
     public void dispose() {
         if (refreshTimer != null) {
