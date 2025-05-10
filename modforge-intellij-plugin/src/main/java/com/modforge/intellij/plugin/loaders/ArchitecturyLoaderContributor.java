@@ -121,8 +121,8 @@ public class ArchitecturyLoaderContributor implements ModLoaderContributor {
     
     @Override
     @Nullable
-    public ModLoaderTemplate getTemplate() {
-        return new ModLoaderTemplate(
+    public ModLoaderContributor.ModLoaderTemplate getTemplate() {
+        return new ModLoaderContributor.ModLoaderTemplate(
                 "architectury-template",
                 "Architectury Multi-Loader Template",
                 "A starter template for cross-platform Minecraft mods using Architectury"

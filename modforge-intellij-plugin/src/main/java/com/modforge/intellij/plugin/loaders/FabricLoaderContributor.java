@@ -98,8 +98,8 @@ public class FabricLoaderContributor implements ModLoaderContributor {
     
     @Override
     @Nullable
-    public ModLoaderTemplate getTemplate() {
-        return new ModLoaderTemplate(
+    public ModLoaderContributor.ModLoaderTemplate getTemplate() {
+        return new ModLoaderContributor.ModLoaderTemplate(
                 "fabric-template",
                 "Fabric Mod Template",
                 "A starter template for Fabric mods"

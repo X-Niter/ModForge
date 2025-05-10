@@ -60,6 +60,108 @@ public class ModLoaderDetector {
     private final Project project;
     
     /**
+     * Get a list of all available mod loaders from the registered contributors.
+     *
+     * @return A list of mod loader information
+     */
+    public static List<ModLoaderInfo> getAvailableModLoaders() {
+        List<ModLoaderInfo> loaders = new ArrayList<>();
+        
+        for (ModLoaderContributor contributor : ModLoaderContributor.EP_NAME.getExtensionList()) {
+            loaders.add(new ModLoaderInfo(
+                    contributor.getModLoaderId(),
+                    contributor.getModLoaderDisplayName(),
+                    contributor.getSupportedMinecraftVersions(),
+                    contributor.getTemplate() != null
+            ));
+        }
+        
+        // If no contributors are registered, add some default entries
+        if (loaders.isEmpty()) {
+            loaders.add(new ModLoaderInfo("forge", "Minecraft Forge", "1.7.10 - 1.20.1", false));
+            loaders.add(new ModLoaderInfo("fabric", "Fabric Mod Loader", "1.14 - 1.20.1", false));
+            loaders.add(new ModLoaderInfo("quilt", "Quilt Mod Loader", "1.18 - 1.20.1", false));
+            loaders.add(new ModLoaderInfo("architectury", "Architectury (Multi-Loader)", "1.16 - 1.20.1", false));
+        }
+        
+        return loaders;
+    }
+    
+    /**
+     * Get a specific mod loader contributor by ID.
+     *
+     * @param loaderId The mod loader ID
+     * @return The contributor, or null if not found
+     */
+    @Nullable
+    public static ModLoaderContributor getContributorById(String loaderId) {
+        if (loaderId == null) {
+            return null;
+        }
+        
+        for (ModLoaderContributor contributor : ModLoaderContributor.EP_NAME.getExtensionList()) {
+            if (loaderId.equals(contributor.getModLoaderId())) {
+                return contributor;
+            }
+        }
+        
+        return null;
+    }
+    
+    /**
+     * Generate a GitHub workflow file for a specific mod loader.
+     *
+     * @param loaderId The mod loader ID
+     * @return The workflow content, or null if no contributor found
+     */
+    @Nullable
+    public static String generateWorkflowForLoader(String loaderId) {
+        ModLoaderContributor contributor = getContributorById(loaderId);
+        return contributor != null ? contributor.generateWorkflowContent() : null;
+    }
+    
+    /**
+     * Get all available templates from all mod loader contributors.
+     *
+     * @return A list of templates
+     */
+    @NotNull
+    public static List<ModLoaderContributor.ModLoaderTemplate> getAvailableTemplates() {
+        List<ModLoaderContributor.ModLoaderTemplate> templates = new ArrayList<>();
+        
+        for (ModLoaderContributor contributor : ModLoaderContributor.EP_NAME.getExtensionList()) {
+            ModLoaderContributor.ModLoaderTemplate template = contributor.getTemplate();
+            if (template != null) {
+                templates.add(template);
+            }
+        }
+        
+        return templates;
+    }
+    
+    /**
+     * Get a template by ID.
+     *
+     * @param templateId The template ID
+     * @return The template, or null if not found
+     */
+    @Nullable
+    public static ModLoaderContributor.ModLoaderTemplate getTemplateById(String templateId) {
+        if (templateId == null) {
+            return null;
+        }
+        
+        for (ModLoaderContributor contributor : ModLoaderContributor.EP_NAME.getExtensionList()) {
+            ModLoaderContributor.ModLoaderTemplate template = contributor.getTemplate();
+            if (template != null && templateId.equals(template.getId())) {
+                return template;
+            }
+        }
+        
+        return null;
+    }
+    
+    /**
      * Create a new mod loader detector.
      *
      * @param project The project

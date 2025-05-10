@@ -101,8 +101,8 @@ public class ForgeLoaderContributor implements ModLoaderContributor {
     
     @Override
     @Nullable
-    public ModLoaderTemplate getTemplate() {
-        return new ModLoaderTemplate(
+    public ModLoaderContributor.ModLoaderTemplate getTemplate() {
+        return new ModLoaderContributor.ModLoaderTemplate(
                 "forge-template",
                 "Forge Mod Template",
                 "A starter template for Minecraft Forge mods"
