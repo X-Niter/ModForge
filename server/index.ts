@@ -1,10 +1,26 @@
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
+import helmet from "helmet";
 
 const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
+
+// Set security headers with helmet
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'"],
+      styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+      fontSrc: ["'self'", "https://fonts.gstatic.com"],
+      imgSrc: ["'self'", "data:", "https:"],
+      connectSrc: ["'self'", "https://api.openai.com"]
+    }
+  },
+  crossOriginEmbedderPolicy: false // Required for some features to work properly
+}));
 
 app.use((req, res, next) => {
   const start = Date.now();
@@ -39,12 +55,29 @@ app.use((req, res, next) => {
 (async () => {
   const server = await registerRoutes(app);
 
-  app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
+  // Improved error handling middleware
+  app.use((err: any, req: Request, res: Response, _next: NextFunction) => {
     const status = err.status || err.statusCode || 500;
     const message = err.message || "Internal Server Error";
-
-    res.status(status).json({ message });
-    throw err;
+    
+    // Don't expose stack traces in production
+    const stack = process.env.NODE_ENV === 'development' ? err.stack : undefined;
+    
+    // Log the error for server-side debugging
+    console.error(`[ERROR] ${req.method} ${req.path}: ${err.message}`);
+    if (stack) console.error(stack);
+    
+    // Send a structured error response
+    res.status(status).json({ 
+      error: {
+        message,
+        status,
+        path: req.path,
+        timestamp: new Date().toISOString()
+      }
+    });
+    
+    // Don't throw the error, as it's already been handled
   });
 
   // importantly only setup vite in development and after
