@@ -36,12 +36,69 @@ class ContinuousService extends EventEmitter {
   private intervals: Map<number, NodeJS.Timeout> = new Map();
   private buildCounts: Map<number, number> = new Map();
   private circuitBreakerMaintenanceInterval: NodeJS.Timeout | null = null;
+  private watchdogInterval: NodeJS.Timeout | null = null;
+  private lastActivityTimestamps: Map<number, number> = new Map(); // Track last activity for each mod
   
   constructor() {
     super();
     
     // Set up periodic circuit breaker maintenance
     this.startCircuitBreakerMaintenance();
+    
+    // Set up watchdog to detect and recover from stalled processes
+    this.startWatchdog();
+  }
+  
+  /**
+   * Start a watchdog to detect and recover from stalled continuous development processes
+   * The watchdog checks for activity and restarts processes that appear to be stalled
+   */
+  private startWatchdog() {
+    // Check every 30 minutes
+    this.watchdogInterval = setInterval(() => {
+      try {
+        const now = Date.now();
+        const MAX_INACTIVITY_MS = 2 * 60 * 60 * 1000; // 2 hours of inactivity is suspicious
+        
+        // Check each running mod
+        this.running.forEach((isRunning, modId) => {
+          if (isRunning) {
+            const lastActivity = this.lastActivityTimestamps.get(modId) || 0;
+            const inactiveMs = now - lastActivity;
+            
+            // If a mod has been inactive for too long, it might be stalled
+            if (lastActivity > 0 && inactiveMs > MAX_INACTIVITY_MS) {
+              logContinuous(modId, `Watchdog detected possible stalled process (inactive for ${Math.floor(inactiveMs / 1000 / 60)} minutes). Restarting.`, 'warn');
+              
+              // Record the restart attempt
+              this.lastActivityTimestamps.set(modId, now);
+              
+              // Stop and restart the process
+              try {
+                // Clear the existing interval
+                const interval = this.intervals.get(modId);
+                if (interval) {
+                  clearInterval(interval);
+                  this.intervals.delete(modId);
+                }
+                
+                // Restart the continuous development with the same frequency
+                const frequencyMs = 5 * 60 * 1000; // Default to 5 minutes
+                this.startContinuousDevelopmentInternal(modId, frequencyMs);
+                
+                logContinuous(modId, `Watchdog successfully restarted continuous development process`, 'info');
+              } catch (error) {
+                logContinuous(modId, `Watchdog failed to restart process: ${error instanceof Error ? error.message : String(error)}`, 'error');
+              }
+            }
+          }
+        });
+      } catch (error) {
+        // Don't let watchdog errors crash the service
+        console.error("Error in watchdog maintenance:", 
+          error instanceof Error ? error.message : String(error));
+      }
+    }, 30 * 60 * 1000); // 30 minutes
   }
   
   /**
@@ -83,7 +140,7 @@ class ContinuousService extends EventEmitter {
   }
   
   /**
-   * Start continuous development for a mod
+   * Public method to start continuous development for a mod
    * @param modId The mod ID to continuously develop
    * @param frequency How often to check for changes and compile (in milliseconds)
    * @returns Object with success status and any relevant message
@@ -114,6 +171,22 @@ class ContinuousService extends EventEmitter {
       }
     }
     
+    // Use the internal method to start the continuous development
+    return this.startContinuousDevelopmentInternal(modId, frequency);
+  }
+  
+  /**
+   * Internal method for starting continuous development
+   * Used by the public method and the watchdog
+   * @param modId The mod ID to continuously develop
+   * @param frequency How often to check for changes and compile (in milliseconds)
+   * @returns Object with success status and any relevant message
+   */
+  private startContinuousDevelopmentInternal(modId: number, frequency: number): {success: boolean, message?: string} {
+    // Record activity timestamp for watchdog
+    const now = Date.now();
+    this.lastActivityTimestamps.set(modId, now);
+    
     this.running.set(modId, true);
     this.buildCounts.set(modId, 0);
     logContinuous(modId, `Starting continuous development at ${frequency}ms intervals`);
@@ -129,6 +202,9 @@ class ContinuousService extends EventEmitter {
         clearInterval(interval);
         return;
       }
+      
+      // Update activity timestamp before each processing cycle
+      this.lastActivityTimestamps.set(modId, Date.now());
       
       this.processMod(modId).catch(err => {
         logContinuous(modId, `Error in scheduled build: ${err instanceof Error ? err.message : String(err)}`, 'error');
