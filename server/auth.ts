@@ -288,29 +288,60 @@ export function setupAuth(app: Express) {
     });
   });
 
-  // User info endpoint
-  app.get("/api/user", (req: Request, res: Response) => {
-    if (!req.isAuthenticated()) {
-      return res.status(401).json({ message: "Not authenticated" });
+  // User info endpoint - supports both session and token authentication
+  app.get("/api/user", (req: Request, res: Response, next: NextFunction) => {
+    // First check if authenticated via session
+    if (req.isAuthenticated()) {
+      // Return user without password
+      const { password, ...userWithoutPassword } = req.user as Express.User;
+      return res.status(200).json(userWithoutPassword);
     }
     
-    // Return user without password
-    const { password, ...userWithoutPassword } = req.user as Express.User;
-    return res.status(200).json(userWithoutPassword);
+    // If not session authenticated, try bearer token authentication
+    passport.authenticate('bearer', { session: false }, (err: Error | null, user: Express.User | false | null | undefined, info: any) => {
+      if (err) {
+        return next(err);
+      }
+      
+      if (!user) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+      
+      // Return user without password
+      const { password, ...userWithoutPassword } = user as Express.User;
+      return res.status(200).json(userWithoutPassword);
+    })(req, res, next);
   });
   
-  // IntelliJ plugin specific auth endpoints
-  app.get("/api/auth/me", (req: Request, res: Response) => {
-    if (!req.isAuthenticated()) {
-      return res.status(401).json({ success: false, message: "Not authenticated" });
+  // IntelliJ plugin specific auth endpoints - supports both session and token auth
+  app.get("/api/auth/me", (req: Request, res: Response, next: NextFunction) => {
+    // First check if authenticated via session
+    if (req.isAuthenticated()) {
+      // Return user without password
+      const { password, ...userWithoutPassword } = req.user as Express.User;
+      return res.status(200).json({
+        success: true,
+        user: userWithoutPassword
+      });
     }
     
-    // Return user without password
-    const { password, ...userWithoutPassword } = req.user as Express.User;
-    return res.status(200).json({
-      success: true,
-      user: userWithoutPassword
-    });
+    // If not session authenticated, try bearer token authentication
+    passport.authenticate('bearer', { session: false }, (err: Error | null, user: Express.User | false | null | undefined, info: any) => {
+      if (err) {
+        return next(err);
+      }
+      
+      if (!user) {
+        return res.status(401).json({ success: false, message: "Not authenticated" });
+      }
+      
+      // Return user without password
+      const { password, ...userWithoutPassword } = user as Express.User;
+      return res.status(200).json({
+        success: true,
+        user: userWithoutPassword
+      });
+    })(req, res, next);
   });
   
   // Verification endpoint for IntelliJ plugin token authentication

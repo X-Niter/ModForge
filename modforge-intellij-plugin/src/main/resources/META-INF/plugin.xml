@@ -88,6 +88,10 @@
                     class="com.modforge.intellij.plugin.actions.VerifyAuthenticationAction" 
                     text="Verify Authentication" 
                     description="Verify authentication status with ModForge server"/>
+            <action id="ModForge.TestAuthEndpoints" 
+                    class="com.modforge.intellij.plugin.actions.TestAuthEndpointsAction" 
+                    text="Test Authentication Endpoints" 
+                    description="Test all authentication endpoints with token auth"/>
             <separator/>
             <action id="ModForge.GenerateCode" 
                     class="com.modforge.intellij.plugin.actions.GenerateCodeAction" 
@@ -149,6 +153,11 @@
                     text="Logout from ModForge" 
                     description="Log out from ModForge server"
                     icon="AllIcons.Actions.Exit"/>
+            <action id="ModForge.VerifyAuthenticationToolbar" 
+                    class="com.modforge.intellij.plugin.actions.VerifyAuthenticationAction" 
+                    text="Verify Authentication" 
+                    description="Verify authentication status with ModForge server"
+                    icon="AllIcons.General.BalloonInformation"/>
             <separator/>
             <action id="ModForge.GenerateCodeToolbar" 
                     class="com.modforge.intellij.plugin.actions.GenerateCodeAction" 

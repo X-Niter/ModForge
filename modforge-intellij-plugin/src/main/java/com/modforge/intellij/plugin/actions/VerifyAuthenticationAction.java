@@ -1,79 +1,63 @@
 package com.modforge.intellij.plugin.actions;
 
-import com.intellij.notification.Notification;
+import com.intellij.notification.NotificationGroupManager;
 import com.intellij.notification.NotificationType;
-import com.intellij.notification.Notifications;
 import com.intellij.openapi.actionSystem.AnAction;
 import com.intellij.openapi.actionSystem.AnActionEvent;
+import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.project.Project;
 import com.modforge.intellij.plugin.auth.AuthenticationManager;
 import com.modforge.intellij.plugin.settings.ModForgeSettings;
 import org.jetbrains.annotations.NotNull;
 
 /**
- * Action for verifying authentication status with the ModForge server.
+ * Action to verify the authentication status with the ModForge server.
+ * Useful for debugging and ensuring the token-based authentication is working.
  */
 public class VerifyAuthenticationAction extends AnAction {
+    private static final Logger LOG = Logger.getInstance(VerifyAuthenticationAction.class);
+    private final AuthenticationManager authManager = new AuthenticationManager();
+    
     @Override
     public void actionPerformed(@NotNull AnActionEvent e) {
         Project project = e.getProject();
-        
         if (project == null) {
             return;
         }
         
-        // Check if credentials are saved
         ModForgeSettings settings = ModForgeSettings.getInstance();
-        if (settings.getUsername().isEmpty() || settings.getPassword().isEmpty()) {
-            showNotification(project, "Authentication Missing", 
-                    "No credentials found. Please set your username and password in the ModForge settings.", 
+        
+        if (!settings.isAuthenticated() || settings.getAccessToken().isEmpty()) {
+            showNotification(project, "Not Authenticated", 
+                    "You are not currently authenticated with ModForge. Please log in first.", 
                     NotificationType.WARNING);
             return;
         }
         
-        // Start verification
-        showNotification(project, "Verifying Authentication", 
-                "Verifying authentication with ModForge server...", 
-                NotificationType.INFORMATION);
+        // Attempt to verify authentication
+        boolean isVerified = authManager.verifyAuthentication();
         
-        // Run in a background thread
-        new Thread(() -> {
-            boolean isValid = AuthenticationManager.getInstance().verifyAuthentication();
-            
-            if (isValid) {
-                showNotification(project, "Authentication Valid", 
-                        "Your authentication with ModForge server is valid.", 
-                        NotificationType.INFORMATION);
-            } else {
-                showNotification(project, "Authentication Invalid", 
-                        "Your authentication with ModForge server is no longer valid. Please log in again.", 
-                        NotificationType.WARNING);
-            }
-        }).start();
+        if (isVerified) {
+            showNotification(project, "Authentication Verified", 
+                    "Successfully verified authentication with ModForge server. User ID: " + settings.getUserId(), 
+                    NotificationType.INFORMATION);
+        } else {
+            showNotification(project, "Authentication Failed", 
+                    "Failed to verify authentication with ModForge server. Please try logging in again.", 
+                    NotificationType.ERROR);
+        }
     }
     
     @Override
     public void update(@NotNull AnActionEvent e) {
-        // Enable action only when a project is available and user is authenticated
-        ModForgeSettings settings = ModForgeSettings.getInstance();
-        e.getPresentation().setEnabledAndVisible(e.getProject() != null && settings.isAuthenticated());
+        // Only enable action if we have a project
+        e.getPresentation().setEnabledAndVisible(e.getProject() != null);
     }
     
-    /**
-     * Shows a notification.
-     * @param project The project
-     * @param title The notification title
-     * @param content The notification content
-     * @param type The notification type
-     */
     private void showNotification(Project project, String title, String content, NotificationType type) {
-        Notification notification = new Notification(
-                "ModForge.Authentication",
-                title,
-                content,
-                type
-        );
-        
-        Notifications.Bus.notify(notification, project);
+        NotificationGroupManager.getInstance()
+                .getNotificationGroup("ModForge Notifications")
+                .createNotification(title, content, type)
+                .notify(project);
     }
 }
