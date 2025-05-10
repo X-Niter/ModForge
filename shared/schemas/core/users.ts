@@ -1,4 +1,4 @@
-import { pgTable, text, serial, boolean, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, boolean, timestamp, jsonb } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -12,10 +12,13 @@ export const users = pgTable("users", {
   email: text("email").unique(),
   password: text("password").notNull(),
   displayName: text("display_name"),
+  avatarUrl: text("avatar_url"),
+  githubId: text("github_id").unique(),
   githubToken: text("github_token"),
   stripeCustomerId: text("stripe_customer_id"),
   stripeSubscriptionId: text("stripe_subscription_id"),
   isAdmin: boolean("is_admin").default(false).notNull(),
+  metadata: jsonb("metadata").default({}).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -29,14 +32,18 @@ export const insertUserSchema = createInsertSchema(users)
     createdAt: true,
     updatedAt: true,
     isAdmin: true,
-    githubToken: true,
-    stripeCustomerId: true,
-    stripeSubscriptionId: true,
+    metadata: true,
   })
   .extend({
     username: z.string().min(3).max(20),
-    password: z.string().min(8),
+    password: z.string().min(1),  // Allow empty password for OAuth users
     email: z.string().email().optional().nullable(),
+    githubId: z.string().optional().nullable(),
+    githubToken: z.string().optional().nullable(),
+    avatarUrl: z.string().optional().nullable(),
+    stripeCustomerId: z.string().optional().nullable(),
+    stripeSubscriptionId: z.string().optional().nullable(),
+    metadata: z.record(z.unknown()).optional().default({}),
   });
 
 // Type exports

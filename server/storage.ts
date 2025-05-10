@@ -20,6 +20,7 @@ export interface IStorage {
   getUser(id: number): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
+  updateUser(id: number, userData: Partial<InsertUser>): Promise<User | undefined>;
   
   // Mod operations
   getMod(id: number): Promise<Mod | undefined>;
@@ -67,7 +68,8 @@ export class MemStorage implements IStorage {
     // Add a default user
     this.createUser({
       username: "demo",
-      password: "password"
+      password: "password",
+      metadata: {}
     });
   }
 
@@ -87,6 +89,20 @@ export class MemStorage implements IStorage {
     const user: User = { ...insertUser, id };
     this.users.set(id, user);
     return user;
+  }
+  
+  async updateUser(id: number, userData: Partial<InsertUser>): Promise<User | undefined> {
+    const user = this.users.get(id);
+    if (!user) return undefined;
+    
+    const updatedUser: User = { 
+      ...user, 
+      ...userData,
+      updatedAt: new Date() 
+    };
+    
+    this.users.set(id, updatedUser);
+    return updatedUser;
   }
   
   // Mod operations
