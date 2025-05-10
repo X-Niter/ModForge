@@ -167,7 +167,7 @@ Format your response as a JSON object with the following structure:
  * @param ideaDescription Brief description of the idea
  * @returns Detailed expansion of the mod idea
  */
-export async function expandModIdea(ideaTitle: string, ideaDescription: string): Promise<{
+export async function expandModIdea(title: string, description: string): Promise<{
   expandedIdea: {
     title: string;
     description: string;

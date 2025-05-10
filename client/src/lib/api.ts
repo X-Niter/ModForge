@@ -26,12 +26,10 @@ export async function expandModIdea(params: {
   title: string;
   description: string;
 }) {
-  const response = await apiRequest("POST", "/api/ai/expand-idea", params);
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.message || "Failed to expand mod idea");
-  }
-  return response.json();
+  return apiRequest("/api/ai/expand-idea", {
+    method: "POST",
+    data: params
+  });
 }
 
 // Generate mod code structure
@@ -42,12 +40,10 @@ export async function generateModCode(params: {
   mcVersion: string;
   idea: string;
 }) {
-  const response = await apiRequest("POST", "/api/ai/generate-mod-code", params);
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.message || "Failed to generate mod code");
-  }
-  return response.json();
+  return apiRequest("/api/ai/generate-mod-code", {
+    method: "POST",
+    data: params
+  });
 }
 
 // Fix compilation errors
@@ -56,12 +52,10 @@ export async function fixCompilationErrors(params: {
   errors: string;
   modLoader: string;
 }) {
-  const response = await apiRequest("POST", "/api/ai/fix-errors", params);
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.message || "Failed to fix compilation errors");
-  }
-  return response.json();
+  return apiRequest("/api/ai/fix-errors", {
+    method: "POST",
+    data: params
+  });
 }
 
 // Generate documentation for code
@@ -70,12 +64,10 @@ export async function generateDocumentation(params: {
   language: string;
   style?: string;
 }) {
-  const response = await apiRequest("POST", "/api/ai/generate-documentation", params);
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.message || "Failed to generate documentation");
-  }
-  return response.json();
+  return apiRequest("/api/ai/generate-documentation", {
+    method: "POST",
+    data: params
+  });
 }
 
 // Add features to an existing mod
@@ -84,12 +76,10 @@ export async function addFeatures(params: {
   featureDescription: string;
   modLoader: string;
 }) {
-  const response = await apiRequest("POST", "/api/ai/add-features", params);
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.message || "Failed to add features");
-  }
-  return response.json();
+  return apiRequest("/api/ai/add-features", {
+    method: "POST",
+    data: params
+  });
 }
 
 // Generic code generation
@@ -99,10 +89,8 @@ export async function generateGenericCode(params: {
   context?: string;
   complexity?: string;
 }) {
-  const response = await apiRequest("POST", "/api/ai/generate-code", params);
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.message || "Failed to generate code");
-  }
-  return response.json();
+  return apiRequest("/api/ai/generate-code", {
+    method: "POST",
+    data: params
+  });
 }

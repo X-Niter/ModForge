@@ -106,12 +106,10 @@ export default function IdeaGeneratorPage() {
 
   const generateIdeasMutation = useMutation({
     mutationFn: async (data: IdeaGenerationFormValues) => {
-      const response = await apiRequest("POST", "/api/ai/generate-ideas", data);
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || "Failed to generate ideas");
-      }
-      return await response.json() as GenerateIdeasResponse;
+      return apiRequest("/api/ai/generate-ideas", {
+        method: "POST",
+        data
+      }) as Promise<GenerateIdeasResponse>;
     },
     onSuccess: (data) => {
       setSelectedIdea(null);
@@ -133,12 +131,10 @@ export default function IdeaGeneratorPage() {
 
   const expandIdeaMutation = useMutation({
     mutationFn: async ({ title, description }: { title: string; description: string }) => {
-      const response = await apiRequest("POST", "/api/ai/expand-idea", { title, description });
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || "Failed to expand idea");
-      }
-      return await response.json() as ExpandedIdeaResponse;
+      return apiRequest("/api/ai/expand-idea", {
+        method: "POST",
+        data: { title, description }
+      }) as Promise<ExpandedIdeaResponse>;
     },
     onSuccess: (data) => {
       setExpandedIdea(data);

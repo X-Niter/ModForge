@@ -534,13 +534,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Expand a mod idea
   app.post("/api/ai/expand-idea", async (req, res) => {
     try {
-      const { ideaTitle, ideaDescription } = req.body;
-      if (!ideaTitle || !ideaDescription) {
-        return res.status(400).json({ message: "Missing required fields: ideaTitle and ideaDescription" });
+      const { title, description } = req.body;
+      if (!title || !description) {
+        return res.status(400).json({ message: "Missing required fields: title and description" });
       }
 
       // Expand the idea
-      const expandedIdea = await expandModIdea(ideaTitle, ideaDescription);
+      const expandedIdea = await expandModIdea(title, description);
       res.json(expandedIdea);
     } catch (error) {
       console.error("Error expanding mod idea:", error);
