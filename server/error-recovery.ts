@@ -83,7 +83,12 @@ async function recoverFromDiskSpaceIssues(): Promise<RecoveryResult> {
     try {
       await fs.mkdir(TMP_DIR, { recursive: true });
     } catch (err) {
-      // Directory already exists, continue
+      // Only suppress errors for directories that already exist
+      if (!(err instanceof Error && err.message.includes('EEXIST'))) {
+        logger.warn('Unexpected error creating temp directory', {
+          error: err instanceof Error ? err.message : String(err)
+        });
+      }
     }
     
     // Get all files in temp directory
