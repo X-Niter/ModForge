@@ -138,6 +138,22 @@ export async function notifyBackupResult(
     status = 'failed';
   }
   
-  // Send the notification
-  await sendBackupStatusNotification(status, message, details);
+  try {
+    // Send the notification
+    await sendBackupStatusNotification(status, message, details);
+    logger.debug('Backup result notification sent', {
+      status,
+      success,
+      partial
+    });
+  } catch (error) {
+    logger.error('Failed to send backup result notification', {
+      error,
+      status,
+      success,
+      partial,
+      message
+    });
+    // Don't throw to avoid breaking backup process if notification fails
+  }
 }
