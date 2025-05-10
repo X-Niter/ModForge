@@ -18,8 +18,8 @@ public class LogoutAction extends AnAction {
     public void actionPerformed(@NotNull AnActionEvent e) {
         Project project = e.getProject();
         
-        // Perform logout
-        AuthenticationManager authManager = AuthenticationManager.getInstance();
+        // Perform logout using non-singleton AuthenticationManager
+        AuthenticationManager authManager = new AuthenticationManager();
         boolean success = authManager.logout();
         
         if (success) {

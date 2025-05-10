@@ -97,6 +97,10 @@
                     class="com.modforge.intellij.plugin.actions.TestAuthEndpointsAction" 
                     text="Test Authentication Endpoints" 
                     description="Test all authentication endpoints with token auth"/>
+            <action id="ModForge.TestTokenAuth" 
+                    class="com.modforge.intellij.plugin.actions.TestTokenAuthAction" 
+                    text="Test Token Authentication" 
+                    description="Test token-based authentication with direct HTTP requests"/>
             <separator/>
             <action id="ModForge.GenerateCode" 
                     class="com.modforge.intellij.plugin.actions.GenerateCodeAction" 
@@ -163,6 +167,11 @@
                     text="Verify Authentication" 
                     description="Verify authentication status with ModForge server"
                     icon="AllIcons.General.BalloonInformation"/>
+            <action id="ModForge.TestTokenAuthToolbar" 
+                    class="com.modforge.intellij.plugin.actions.TestTokenAuthAction" 
+                    text="Test Token Authentication" 
+                    description="Test token-based authentication with direct HTTP requests"
+                    icon="AllIcons.General.Web"/>
             <separator/>
             <action id="ModForge.GenerateCodeToolbar" 
                     class="com.modforge.intellij.plugin.actions.GenerateCodeAction" 
