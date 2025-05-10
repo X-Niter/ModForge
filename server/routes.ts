@@ -1432,6 +1432,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
   });
   
+  // Test endpoint for error tracking system
+  app.post("/api/error-tracking/test", requireAuth, (req, res) => {
+    // Only allow admin users to run the test
+    if (!req.user?.isAdmin) {
+      return res.status(403).json({
+        success: false,
+        message: 'Only administrators can run this test'
+      });
+    }
+    
+    // Import and run the error tracking test
+    import('./test-error-tracking').then(async ({ testErrorTracking }) => {
+      try {
+        await testErrorTracking();
+        
+        res.json({
+          success: true,
+          message: 'Error tracking system test completed successfully',
+          timestamp: new Date().toISOString()
+        });
+      } catch (error) {
+        res.status(500).json({
+          success: false,
+          message: 'Error tracking system test failed',
+          error: error instanceof Error ? error.message : String(error),
+          timestamp: new Date().toISOString()
+        });
+      }
+    }).catch(error => {
+      res.status(500).json({
+        success: false,
+        message: 'Failed to load error tracking test module',
+        error: error instanceof Error ? error.message : String(error),
+        timestamp: new Date().toISOString()
+      });
+    });
+  });
+  
   // Maintenance endpoint for manual system maintenance
   app.post("/api/maintenance/run", requireAuth, async (req, res) => {
     try {
