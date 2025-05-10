@@ -541,7 +541,7 @@ class ContinuousService extends EventEmitter {
       // Record structured error in central error tracking system
       recordError(
         errorObj,
-        "continuous_dev_error", // Using string literal instead of enum
+        ErrorCategory.CONTINUOUS_DEVELOPMENT, // Using enum value
         errorSeverity,
         isTransient, // Now properly determined
         enhancedContext

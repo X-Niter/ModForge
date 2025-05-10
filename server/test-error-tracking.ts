@@ -70,13 +70,13 @@ export async function testErrorTracking(): Promise<void> {
   const fsError = trackError(
     simulateFileSystemError(),
     { source: 'test', modId: 123 },
-    { category: ErrorCategory.FILESYSTEM }
+    { category: ErrorCategory.SYSTEM } // Changed from FILESYSTEM to SYSTEM
   );
   
   const memoryError = trackError(
     simulateOutOfMemoryError(),
     { source: 'test', heapUsed: '2.1GB', heapLimit: '2GB' },
-    { category: ErrorCategory.MEMORY, severity: ErrorSeverity.CRITICAL }
+    { category: ErrorCategory.SYSTEM, severity: ErrorSeverity.CRITICAL } // Changed from MEMORY to SYSTEM
   );
   
   const validationError = trackError(

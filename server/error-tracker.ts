@@ -249,7 +249,7 @@ function determineErrorCategory(error: Error | string, context: Record<string, a
       errorMessage.includes('enoent') ||
       errorStack.includes('fs/') ||
       errorStack.includes('file')) {
-    return ErrorCategory.FILESYSTEM;
+    return ErrorCategory.SYSTEM; // Changed from FILESYSTEM to SYSTEM
   }
   
   if (errorMessage.includes('network') || 
@@ -259,7 +259,7 @@ function determineErrorCategory(error: Error | string, context: Record<string, a
       errorMessage.includes('response') ||
       errorStack.includes('http') ||
       errorStack.includes('request')) {
-    return ErrorCategory.NETWORK;
+    return ErrorCategory.SYSTEM; // Changed from NETWORK to SYSTEM
   }
   
   if (errorMessage.includes('memory') || 
@@ -267,7 +267,7 @@ function determineErrorCategory(error: Error | string, context: Record<string, a
       errorMessage.includes('heap') || 
       errorMessage.includes('out of memory') ||
       errorStack.includes('memory')) {
-    return ErrorCategory.MEMORY;
+    return ErrorCategory.SYSTEM; // Changed from MEMORY to SYSTEM
   }
   
   if (errorMessage.includes('api') || 
@@ -545,7 +545,8 @@ export function getErrorStatistics(): {
     [ErrorSeverity.CRITICAL]: 0,
     [ErrorSeverity.HIGH]: 0,
     [ErrorSeverity.MEDIUM]: 0,
-    [ErrorSeverity.LOW]: 0
+    [ErrorSeverity.LOW]: 0,
+    [ErrorSeverity.INFO]: 0
   };
   
   // Count by category
@@ -556,9 +557,9 @@ export function getErrorStatistics(): {
     [ErrorCategory.VALIDATION]: 0,
     [ErrorCategory.COMPILATION]: 0,
     [ErrorCategory.GITHUB]: 0,
-    [ErrorCategory.FILESYSTEM]: 0,
-    [ErrorCategory.NETWORK]: 0,
-    [ErrorCategory.MEMORY]: 0,
+    [ErrorCategory.SYSTEM]: 0, // Replaced FILESYSTEM, NETWORK, MEMORY
+    [ErrorCategory.AI_SERVICE]: 0,
+    [ErrorCategory.CONTINUOUS_DEVELOPMENT]: 0,
     [ErrorCategory.UNKNOWN]: 0
   };
   
