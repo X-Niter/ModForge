@@ -502,7 +502,10 @@ function checkMemory(): CheckResult & { memoryStatus?: MemoryStatus } {
       responseTime: Date.now() - startTime
     };
   } catch (error) {
-    logger.error('Memory health check failed', { error });
+    logger.error('Memory health check failed', { 
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined
+    });
     
     return {
       status: 'unhealthy',
