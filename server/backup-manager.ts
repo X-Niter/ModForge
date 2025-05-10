@@ -400,7 +400,12 @@ export async function runFullBackup(metadata: Record<string, any> = {}): Promise
  * Get all backup results
  */
 export function getBackups(type?: BackupType): BackupResult[] {
-  const backups = Array.from(backupStore.values());
+  // Convert Map values to array using Array.from
+  const backups: BackupResult[] = [];
+  
+  backupStore.forEach(backup => {
+    backups.push(backup);
+  });
   
   if (type) {
     return backups.filter(b => b.type === type);
@@ -458,13 +463,14 @@ export async function cleanupBackups(maxAge: number = 7 * 24 * 60 * 60 * 1000, m
   // Group backups by type
   const backupsByType: Record<string, BackupResult[]> = {};
   
-  for (const backup of backupStore.values()) {
+  // Use forEach to iterate over Map values
+  backupStore.forEach(backup => {
     if (!backupsByType[backup.type]) {
       backupsByType[backup.type] = [];
     }
     
     backupsByType[backup.type].push(backup);
-  }
+  });
   
   // Process each backup type
   for (const type in backupsByType) {

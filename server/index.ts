@@ -9,6 +9,7 @@ import authRoutes from "./routes/auth-routes";
 import { scheduleMaintenanceTasks } from "./maintenance-tasks";
 import { rootLogger, getLogger } from "./logging";
 import { initializeErrorRecovery, cleanupScheduledJobs } from "./index-error-recovery";
+import { initializeBackupSystem } from "./backup-integration";
 
 const app = express();
 // Enable trust proxy to work correctly with express-rate-limit behind a proxy (like in Replit)
@@ -191,6 +192,9 @@ process.on('unhandledRejection', (reason, promise) => {
   // Initialize error recovery system
   const cleanupErrorRecovery = initializeErrorRecovery();
   
+  // Initialize backup system
+  const cleanupBackups = initializeBackupSystem();
+  
   const server = await registerRoutes(app);
 
   // Improved error handling middleware
@@ -251,6 +255,10 @@ process.on('unhandledRejection', (reason, promise) => {
     // Clean up all scheduled jobs
     shutdownLogger.info('Shutting down scheduled jobs...');
     cleanupScheduledJobs();
+    
+    // Clean up backup system
+    shutdownLogger.info('Shutting down backup system...');
+    cleanupBackups();
     
     // Import the continuousService to clean it up
     const { continuousService } = await import('./continuous-service');
