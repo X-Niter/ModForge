@@ -102,6 +102,13 @@ export function Navbar() {
             className="mr-6 flex items-center space-x-2 cursor-pointer" 
             onClick={() => window.location.href = "/"}
           >
+            {/* Add a custom icon that better matches the dark theme */}
+            <div className="flex items-center justify-center w-8 h-8 rounded-md bg-gradient-to-br from-blue-600 to-violet-600">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M7 8h10M7 12h10M7 16h10" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                <rect x="3" y="3" width="18" height="18" rx="2" stroke="white" strokeWidth="2"/>
+              </svg>
+            </div>
             <span className="hidden font-bold sm:inline-block text-xl bg-gradient-to-r from-blue-600 to-violet-600 bg-clip-text text-transparent">
               ModForge
             </span>
@@ -171,7 +178,15 @@ export function Navbar() {
             </SheetTrigger>
             <SheetContent side="right">
               <SheetHeader>
-                <SheetTitle>ModForge</SheetTitle>
+                <div className="flex items-center space-x-2">
+                  <div className="flex items-center justify-center w-8 h-8 rounded-md bg-gradient-to-br from-blue-600 to-violet-600">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <path d="M7 8h10M7 12h10M7 16h10" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                      <rect x="3" y="3" width="18" height="18" rx="2" stroke="white" strokeWidth="2"/>
+                    </svg>
+                  </div>
+                  <SheetTitle className="bg-gradient-to-r from-blue-600 to-violet-600 bg-clip-text text-transparent">ModForge</SheetTitle>
+                </div>
                 <SheetDescription>
                   AI-powered Minecraft mod development
                 </SheetDescription>
