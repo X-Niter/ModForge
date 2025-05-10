@@ -619,6 +619,163 @@ export function purgeResolvedErrors(olderThan: Date = new Date(Date.now() - 7 * 
 }
 
 /**
+ * Purge all errors (resolved or unresolved) that are older than the specified date
+ * to prevent uncontrolled memory growth in long-running processes
+ */
+export function purgeAllOldErrors(olderThan: Date = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)): number {
+  let purgedCount = 0;
+  const fingerprintsToDelete: string[] = [];
+  
+  // First identify the errors to delete
+  errorStore.forEach((error, fingerprint) => {
+    // Delete any error that hasn't been seen in the specified time period
+    if (error.lastSeen < olderThan) {
+      fingerprintsToDelete.push(fingerprint);
+    }
+  });
+  
+  // Then delete them
+  fingerprintsToDelete.forEach(fingerprint => {
+    errorStore.delete(fingerprint);
+    purgedCount++;
+  });
+  
+  if (purgedCount > 0) {
+    logger.info(`Purged ${purgedCount} old errors for memory management`);
+  }
+  
+  return purgedCount;
+}
+
+/**
+ * Limit the total number of errors stored to prevent memory issues
+ * This keeps the most recent errors and errors with the highest severity
+ */
+export function limitErrorStore(maxErrors: number = 1000): number {
+  const currentCount = errorStore.size;
+  
+  // If we're under the limit, no action needed
+  if (currentCount <= maxErrors) {
+    return 0;
+  }
+  
+  // Calculate how many errors to remove
+  const excessCount = currentCount - maxErrors;
+  let purgedCount = 0;
+  
+  // Convert to array for sorting
+  const errors = Array.from(errorStore.entries()).map(([fingerprint, error]) => ({
+    fingerprint, 
+    error,
+    // Create a score for sorting (higher = more important to keep)
+    score: calculateErrorImportance(error)
+  }));
+  
+  // Sort by importance score (ascending so least important are first)
+  errors.sort((a, b) => a.score - b.score);
+  
+  // Delete the least important errors
+  for (let i = 0; i < excessCount; i++) {
+    if (i < errors.length) {
+      errorStore.delete(errors[i].fingerprint);
+      purgedCount++;
+    }
+  }
+  
+  if (purgedCount > 0) {
+    logger.info(`Purged ${purgedCount} least important errors to stay under memory limit`);
+  }
+  
+  return purgedCount;
+}
+
+/**
+ * Calculate an importance score for an error to determine which ones to keep
+ * Higher score = more important to keep
+ */
+function calculateErrorImportance(error: TrackedError): number {
+  // Start with a base score
+  let score = 0;
+  
+  // Severity is the most important factor (0-3 for LOW to CRITICAL)
+  const severityValues = {
+    [ErrorSeverity.LOW]: 0,
+    [ErrorSeverity.MEDIUM]: 25,
+    [ErrorSeverity.HIGH]: 50,
+    [ErrorSeverity.CRITICAL]: 100
+  };
+  score += severityValues[error.severity] || 0;
+  
+  // Recent errors are more important (1-10 based on recency)
+  // Newer errors get higher scores
+  const ageInDays = (Date.now() - error.lastSeen.getTime()) / (1000 * 60 * 60 * 24);
+  score += Math.max(0, 10 - Math.min(10, ageInDays));
+  
+  // Frequency is important (max 20 points for very frequent errors)
+  score += Math.min(20, error.count / 5);
+  
+  // Unresolved errors are more important than resolved ones
+  if (!error.isResolved) {
+    score += 15;
+  }
+  
+  return score;
+}
+
+/**
+ * Schedule automatic cleanup of errors
+ */
+export function scheduleErrorStoreCleanup(
+  resolvedInterval: number = 24 * 60 * 60 * 1000,  // Daily cleanup of resolved errors
+  oldInterval: number = 7 * 24 * 60 * 60 * 1000,   // Weekly cleanup of very old errors
+  limitInterval: number = 60 * 60 * 1000          // Hourly check of total error count
+): () => void {
+  logger.info('Scheduling automatic error store cleanup');
+  
+  // Schedule cleanup of resolved errors
+  const resolvedTimer = setInterval(() => {
+    try {
+      const olderThan = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000); // 7 days
+      const purged = purgeResolvedErrors(olderThan);
+      logger.debug(`Scheduled cleanup of resolved errors complete`, { purged });
+    } catch (err) {
+      logger.error('Error in scheduled resolved errors cleanup', { error: err });
+    }
+  }, resolvedInterval);
+  
+  // Schedule cleanup of all old errors
+  const oldTimer = setInterval(() => {
+    try {
+      const olderThan = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000); // 30 days
+      const purged = purgeAllOldErrors(olderThan);
+      logger.debug(`Scheduled cleanup of old errors complete`, { purged });
+    } catch (err) {
+      logger.error('Error in scheduled old errors cleanup', { error: err });
+    }
+  }, oldInterval);
+  
+  // Schedule check of total error count
+  const limitTimer = setInterval(() => {
+    try {
+      const purged = limitErrorStore(1000); // Limit to 1000 errors
+      if (purged > 0) {
+        logger.debug(`Error store size limited`, { purged, newSize: errorStore.size });
+      }
+    } catch (err) {
+      logger.error('Error in error store size limiting', { error: err });
+    }
+  }, limitInterval);
+  
+  // Return cleanup function
+  return () => {
+    clearInterval(resolvedTimer);
+    clearInterval(oldTimer);
+    clearInterval(limitTimer);
+    logger.info('Error store cleanup schedules cancelled');
+  };
+}
+
+/**
  * Create a middleware function for Express to track errors
  */
 export function errorTrackerMiddleware() {
