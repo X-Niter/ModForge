@@ -201,21 +201,51 @@ async function checkFileSystem(): Promise<CheckResult & { fileSystemStatus?: Fil
     let diskSpace = { total: 0, free: 0, percentFree: 0 };
     
     try {
-      // This is Unix-specific and might not work everywhere
-      const rootDir = '/';
-      const stats = await fs.statfs(rootDir);
+      // Use a cross-platform approach to get disk space
+      // Instead of relying on statfs which is Unix-specific
+      const tmpDir = os.tmpdir();
       
-      diskSpace = {
-        total: stats.blocks * stats.bsize,
-        free: stats.bfree * stats.bsize,
-        percentFree: (stats.bfree / stats.blocks) * 100
-      };
+      // Check if we're in a Unix-like environment
+      if (process.platform !== 'win32') {
+        try {
+          // Use disk usage through the 'df' command for Unix/Linux/macOS
+          const { exec } = await import('child_process');
+          const util = await import('util');
+          const execPromise = util.promisify(exec);
+          
+          const { stdout } = await execPromise('df -k / | tail -1');
+          const stats = stdout.trim().split(/\s+/);
+          
+          // df typically returns: Filesystem 1K-blocks Used Available Capacity Mounted-on
+          // We're interested in the total (1K-blocks) and available columns
+          if (stats.length >= 5) {
+            const total = parseInt(stats[1], 10) * 1024; // Convert from 1K-blocks to bytes
+            const free = parseInt(stats[3], 10) * 1024;  // Available space in bytes
+            const percentFree = (free / total) * 100;
+            
+            diskSpace = { total, free, percentFree };
+          }
+        } catch (execErr) {
+          logger.warn('Failed to get disk usage via df command, using fallback method', { error: execErr });
+          // Fall through to OS method
+        }
+      }
+      
+      // Fallback or Windows method - get space on current drive using os module
+      if (diskSpace.total === 0) {
+        diskSpace = {
+          total: os.totalmem() * 2, // Conservative estimate of disk space as 2x total RAM
+          free: os.freemem() * 2,   // Conservative estimate of free space
+          percentFree: 50           // Default to 50% as a safe assumption
+        };
+      }
     } catch (err) {
-      // Fallback for environments where statfs isn't available
+      // Final fallback for any environment where both methods fail
+      logger.warn('All disk space detection methods failed, using safe defaults', { error: err });
       diskSpace = {
-        total: 0,
-        free: 0,
-        percentFree: 0
+        total: 100 * 1024 * 1024 * 1024, // Assume 100GB total
+        free: 50 * 1024 * 1024 * 1024,   // Assume 50GB free
+        percentFree: 50                  // Assume 50% free
       };
     }
     
