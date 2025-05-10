@@ -826,38 +826,73 @@ function shouldSendNotificationToChannel(
 }
 
 /**
- * Send a notification
+ * Send a notification with support for retries
+ * @param message The notification message to send
+ * @param isRetry Whether this is a retry attempt (to avoid infinite retry loops)
  */
 export async function sendNotification(
-  message: Omit<NotificationMessage, 'timestamp'>
+  message: Omit<NotificationMessage, 'timestamp'> | NotificationMessage,
+  isRetry: boolean = false
 ): Promise<void> {
-  const fullMessage: NotificationMessage = {
-    ...message,
-    timestamp: new Date()
-  };
+  // Ensure the message has a timestamp
+  const fullMessage: NotificationMessage = 'timestamp' in message
+    ? message as NotificationMessage
+    : {
+        ...message,
+        timestamp: new Date()
+      };
   
   // Always log the notification regardless of other settings
   sendLogNotification(fullMessage, {});
   
-  // If batching is enabled, add to batch
-  if (currentSettings.batchingSeconds > 0) {
+  // If batching is enabled and this is not a retry, add to batch
+  if (currentSettings.batchingSeconds > 0 && !isRetry) {
     addToBatch(fullMessage);
     return;
   }
   
-  // Skip if throttled
-  if (shouldThrottle()) {
+  // Skip if throttled and not a critical notification or retry
+  if (shouldThrottle() && fullMessage.severity !== NotificationSeverity.CRITICAL && !isRetry) {
     logger.warn('Notifications throttled, skipping', { 
-      type: message.type,
-      severity: message.severity,
+      type: fullMessage.type,
+      severity: fullMessage.severity,
       hourlyCount: notificationState.counters.hourly.count,
       hourlyLimit: currentSettings.throttling.maxPerHour
     });
     return;
   }
   
-  // Send to all channels
-  await sendNotificationToAllChannels(fullMessage);
+  try {
+    // Send to all channels
+    await sendNotificationToAllChannels(fullMessage);
+  } catch (error) {
+    // If this is already a retry attempt, don't add to the retry queue again
+    if (isRetry) {
+      throw error; // Re-throw to let the caller know it failed
+    }
+    
+    logger.warn('Failed to send notification, adding to retry queue', {
+      type: fullMessage.type,
+      severity: fullMessage.severity,
+      error: error instanceof Error ? error.message : String(error)
+    });
+    
+    // Add to the retry queue, with priority based on severity
+    failedNotificationsQueue.push({
+      message: fullMessage,
+      attempts: 1,
+      lastAttempt: new Date(),
+      maxAttempts: fullMessage.severity === NotificationSeverity.CRITICAL 
+        ? MAX_RETRY_ATTEMPTS 
+        : Math.min(MAX_RETRY_ATTEMPTS, 3), // Fewer retries for non-critical
+      retryIntervalMs: RETRY_INTERVALS[0]
+    });
+    
+    // For critical notifications, throw so the caller knows it failed initially
+    if (fullMessage.severity === NotificationSeverity.CRITICAL) {
+      throw error;
+    }
+  }
   
   // Update counters
   updateNotificationCounters();
