@@ -254,13 +254,9 @@ export async function pushModToGitHub(
     if (!hasReadme) {
       addLog('Creating README.md...');
       
-      // Get metadata for license and features if available
-      const license = mod.metadata && typeof mod.metadata === 'object' && 'license' in mod.metadata 
-        ? mod.metadata.license
-        : 'MIT License';
-      const features = mod.metadata && typeof mod.metadata === 'object' && 'features' in mod.metadata
-        ? mod.metadata.features
-        : mod.description;
+      // Get license and features from mod fields
+      const license = mod.license || 'MIT License';
+      const features = mod.description;
         
       const readmeContent = `# ${mod.name}
 
