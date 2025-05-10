@@ -486,7 +486,7 @@ export function scheduleHealthChecks(interval: number = 5 * 60 * 1000): () => vo
             `CRITICAL: System health deteriorated to UNHEALTHY state`,
             {
               checks: Object.entries(currentStatus.detailedChecks)
-                .filter(([_, check]) => !check.passed)
+                .filter(([_, check]) => check.status !== 'healthy')
                 .reduce((acc, [key, value]) => ({ ...acc, [key]: value }), {}),
               memory: currentStatus.memory,
               database: currentStatus.database,

@@ -37,6 +37,7 @@ import healthCheckRoutes from "./routes/health-check-routes";
 import errorTrackingRoutes from "./routes/error-tracking-routes";
 import systemDashboardRoutes from "./routes/system-dashboard-routes";
 import backupRoutes from "./routes/backup-routes";
+import notificationRoutes from "./routes/notification-routes";
 import axios from "axios";
 import rateLimit from "express-rate-limit";
 import path from "path";
@@ -1407,6 +1408,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/error-tracking", requireAuth, errorTrackingRoutes);
   app.use("/api/system-dashboard", requireAuth, systemDashboardRoutes);
   app.use("/api/backups", requireAuth, backupRoutes);
+  app.use("/api/notifications", requireAuth, notificationRoutes);
   
   // Test endpoint for logging system
   app.get("/api/logging/test", requireAuth, (req, res) => {
