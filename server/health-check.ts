@@ -300,12 +300,19 @@ function checkMemory(): CheckResult & { memoryStatus?: MemoryStatus } {
     let status: 'healthy' | 'degraded' | 'unhealthy' = 'healthy';
     let message = 'Memory usage is healthy';
     
-    if (percentFree < 20 || percentHeapUsed > 80) {
+    // More lenient thresholds for development environment
+    const isProduction = process.env.NODE_ENV === 'production';
+    const degradedThreshold = isProduction ? 20 : 5;
+    const criticalThreshold = isProduction ? 10 : 2;
+    const heapDegradedThreshold = isProduction ? 80 : 95;
+    const heapCriticalThreshold = isProduction ? 90 : 98;
+    
+    if (percentFree < degradedThreshold || percentHeapUsed > heapDegradedThreshold) {
       status = 'degraded';
       message = 'Memory usage is higher than optimal';
     }
     
-    if (percentFree < 10 || percentHeapUsed > 90) {
+    if (percentFree < criticalThreshold || percentHeapUsed > heapCriticalThreshold) {
       status = 'unhealthy';
       message = 'Critical memory shortage';
     }

@@ -82,15 +82,16 @@ export async function createBackupWithNotification(
     await monitorBackupResult(result);
     return result;
   } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
     logger.error(`Failed to create ${type} backup`, { error });
     const failedResult: BackupResult = {
       id: `failed-${Date.now()}`,
       type,
       status: BackupStatus.FAILED,
-      error: error.message,
-      path: null,
+      error: errorMessage,
+      path: undefined,
       size: 0,
-      createdAt: new Date(),
+      timestamp: new Date(),
       metadata: { ...metadata, failed: true }
     };
     await monitorBackupResult(failedResult);
@@ -111,6 +112,7 @@ export async function runFullBackupWithNotification(
     await monitorBackupResult(results);
     return results;
   } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
     logger.error('Failed to run full backup', { error });
     // Create a failed result for each backup type
     const failedResults: BackupResult[] = Object.values(BackupType)
@@ -119,10 +121,10 @@ export async function runFullBackupWithNotification(
         id: `failed-${type}-${Date.now()}`,
         type: type as BackupType,
         status: BackupStatus.FAILED,
-        error: error.message,
-        path: null,
+        error: errorMessage,
+        path: undefined,
         size: 0,
-        createdAt: new Date(),
+        timestamp: new Date(),
         metadata: { ...metadata, failed: true }
       }));
     await monitorBackupResult(failedResults);
