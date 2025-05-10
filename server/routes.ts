@@ -18,6 +18,7 @@ import {
 import { getUsageMetrics } from "./ai-service-manager";
 import { pushModToGitHub } from "./github";
 import { checkDatabaseHealth } from "./db-health";
+import { checkSystemHealth, scheduleHealthChecks } from "./health-check";
 import { continuousService } from "./continuous-service";
 import { generateModIdeas, expandModIdea, ideaGenerationRequestSchema } from "./idea-generator-service";
 import { setupAuth } from "./auth"; // This function returns a requireAuth middleware
@@ -31,6 +32,7 @@ import jarAnalyzerRouter from "./routes/jar-analyzer-routes";
 import patternLearningRouter from "./routes/pattern-learning-metrics";
 import githubRoutes from "./routes/github-routes";
 import errorMonitoringRouter from "./routes/error-monitoring";
+import healthCheckRoutes from "./routes/health-check-routes";
 import axios from "axios";
 import rateLimit from "express-rate-limit";
 import path from "path";
@@ -1397,6 +1399,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/pattern-learning", patternLearningRouter);
   app.use("/api/github", githubRoutes);
   app.use("/api/error-monitoring", requireAuth, errorMonitoringRouter);
+  app.use("/api/health-check", healthCheckRoutes);
   
   // Test endpoint for logging system
   app.get("/api/logging/test", requireAuth, (req, res) => {
@@ -1467,6 +1470,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   // Register global error handler as the last middleware
   app.use(errorHandlerMiddleware);
+
+  // Schedule periodic health checks (every 5 minutes)
+  const cleanupHealthChecks = scheduleHealthChecks(5 * 60 * 1000);
+  
+  // Add cleanup function to any existing array of cleanup functions
+  const originalClose = httpServer.close.bind(httpServer);
+  httpServer.close = (callback?: (err?: Error) => void) => {
+    // Cleanup health checks when server is closed
+    cleanupHealthChecks();
+    return originalClose(callback);
+  };
 
   return httpServer;
 }
