@@ -2,104 +2,90 @@ package com.modforge.intellij.plugin.settings;
 
 import com.intellij.openapi.options.Configurable;
 import com.intellij.openapi.options.ConfigurationException;
-import com.intellij.openapi.ui.Messages;
 import com.intellij.openapi.util.NlsContexts;
-import com.modforge.intellij.plugin.utils.ConnectionTestUtil;
-import org.jetbrains.annotations.Nls;
 import org.jetbrains.annotations.Nullable;
 
 import javax.swing.*;
-import java.util.concurrent.CompletableFuture;
 
 /**
- * Configurable for ModForge settings.
+ * Settings configurable for ModForge settings.
  */
 public class ModForgeSettingsConfigurable implements Configurable {
-    private ModForgeSettingsComponent settingsComponent;
+    private ModForgeSettingsComponent mySettingsComponent;
     
-    @Nls(capitalization = Nls.Capitalization.Title)
+    /**
+     * Create a settings configurable.
+     */
+    public ModForgeSettingsConfigurable() {
+    }
+    
     @Override
-    public String getDisplayName() {
+    public @NlsContexts.ConfigurableName String getDisplayName() {
         return "ModForge";
     }
     
     @Override
-    public @Nullable JComponent createComponent() {
-        settingsComponent = new ModForgeSettingsComponent();
-        return settingsComponent.getPanel();
+    public JComponent getPreferredFocusedComponent() {
+        return mySettingsComponent.getPreferredFocusedComponent();
+    }
+    
+    @Nullable
+    @Override
+    public JComponent createComponent() {
+        mySettingsComponent = new ModForgeSettingsComponent();
+        return mySettingsComponent.getPanel();
     }
     
     @Override
     public boolean isModified() {
         ModForgeSettings settings = ModForgeSettings.getInstance();
-        
-        return !settingsComponent.getServerUrl().equals(settings.getServerUrl())
-                || settingsComponent.isUseDarkMode() != settings.isUseDarkMode()
-                || settingsComponent.isEnableContinuousDevelopment() != settings.isEnableContinuousDevelopment()
-                || settingsComponent.isEnablePatternRecognition() != settings.isEnablePatternRecognition()
-                || settingsComponent.isEnableGitHubIntegration() != settings.isEnableGitHubIntegration()
-                || !settingsComponent.getGithubToken().equals(settings.getGithubToken())
-                || settingsComponent.getMaxApiRequestsPerDay() != settings.getMaxApiRequestsPerDay();
+        return !mySettingsComponent.getServerUrl().equals(settings.getServerUrl())
+                || mySettingsComponent.isUseDarkMode() != settings.isUseDarkMode()
+                || mySettingsComponent.isEnableContinuousDevelopment() != settings.isEnableContinuousDevelopment()
+                || mySettingsComponent.isEnablePatternRecognition() != settings.isEnablePatternRecognition()
+                || mySettingsComponent.isEnableGitHubIntegration() != settings.isEnableGitHubIntegration()
+                || !mySettingsComponent.getGithubToken().equals(settings.getGithubToken())
+                || mySettingsComponent.getMaxApiRequestsPerDay() != settings.getMaxApiRequestsPerDay();
     }
     
     @Override
     public void apply() throws ConfigurationException {
-        // Validate server URL
-        String serverUrl = settingsComponent.getServerUrl();
-        if (serverUrl.isEmpty()) {
-            throw new ConfigurationException("Server URL is required");
-        }
-        
-        // Validate GitHub token if integration is enabled
-        if (settingsComponent.isEnableGitHubIntegration()) {
-            String githubToken = settingsComponent.getGithubToken();
-            if (githubToken.isEmpty()) {
-                throw new ConfigurationException("GitHub token is required when GitHub integration is enabled");
-            }
-        }
-        
-        // Validate max API requests
-        int maxApiRequests = settingsComponent.getMaxApiRequestsPerDay();
-        if (maxApiRequests <= 0) {
-            throw new ConfigurationException("Max API requests per day must be greater than 0");
-        }
-        
-        // Save settings
         ModForgeSettings settings = ModForgeSettings.getInstance();
-        settings.setServerUrl(serverUrl);
-        settings.setUseDarkMode(settingsComponent.isUseDarkMode());
-        settings.setEnableContinuousDevelopment(settingsComponent.isEnableContinuousDevelopment());
-        settings.setEnablePatternRecognition(settingsComponent.isEnablePatternRecognition());
-        settings.setEnableGitHubIntegration(settingsComponent.isEnableGitHubIntegration());
-        settings.setGithubToken(settingsComponent.getGithubToken());
-        settings.setMaxApiRequestsPerDay(settingsComponent.getMaxApiRequestsPerDay());
+        
+        // Validate serverUrl
+        if (mySettingsComponent.getServerUrl().isEmpty()) {
+            throw new ConfigurationException("Server URL cannot be empty");
+        }
+        
+        // Validate GitHub token if GitHub integration is enabled
+        if (mySettingsComponent.isEnableGitHubIntegration() && mySettingsComponent.getGithubToken().isEmpty()) {
+            throw new ConfigurationException("GitHub token cannot be empty when GitHub integration is enabled");
+        }
+        
+        // Apply changes
+        settings.setServerUrl(mySettingsComponent.getServerUrl());
+        settings.setUseDarkMode(mySettingsComponent.isUseDarkMode());
+        settings.setEnableContinuousDevelopment(mySettingsComponent.isEnableContinuousDevelopment());
+        settings.setEnablePatternRecognition(mySettingsComponent.isEnablePatternRecognition());
+        settings.setEnableGitHubIntegration(mySettingsComponent.isEnableGitHubIntegration());
+        settings.setGithubToken(mySettingsComponent.getGithubToken());
+        settings.setMaxApiRequestsPerDay(mySettingsComponent.getMaxApiRequestsPerDay());
     }
     
     @Override
     public void reset() {
         ModForgeSettings settings = ModForgeSettings.getInstance();
-        
-        settingsComponent.setServerUrl(settings.getServerUrl());
-        settingsComponent.setUseDarkMode(settings.isUseDarkMode());
-        settingsComponent.setEnableContinuousDevelopment(settings.isEnableContinuousDevelopment());
-        settingsComponent.setEnablePatternRecognition(settings.isEnablePatternRecognition());
-        settingsComponent.setEnableGitHubIntegration(settings.isEnableGitHubIntegration());
-        settingsComponent.setGithubToken(settings.getGithubToken());
-        settingsComponent.setMaxApiRequestsPerDay(settings.getMaxApiRequestsPerDay());
+        mySettingsComponent.setServerUrl(settings.getServerUrl());
+        mySettingsComponent.setUseDarkMode(settings.isUseDarkMode());
+        mySettingsComponent.setEnableContinuousDevelopment(settings.isEnableContinuousDevelopment());
+        mySettingsComponent.setEnablePatternRecognition(settings.isEnablePatternRecognition());
+        mySettingsComponent.setEnableGitHubIntegration(settings.isEnableGitHubIntegration());
+        mySettingsComponent.setGithubToken(settings.getGithubToken());
+        mySettingsComponent.setMaxApiRequestsPerDay(settings.getMaxApiRequestsPerDay());
     }
     
     @Override
     public void disposeUIResources() {
-        settingsComponent = null;
-    }
-    
-    /**
-     * Test the connection to the server.
-     *
-     * @param serverUrl The server URL to test
-     * @return A future with the result of the test (true if successful)
-     */
-    public CompletableFuture<Boolean> testConnection(String serverUrl) {
-        return ConnectionTestUtil.testConnection(serverUrl);
+        mySettingsComponent = null;
     }
 }
