@@ -449,6 +449,91 @@ class ContinuousService extends EventEmitter {
       timestamp: new Date().toISOString()
     };
   }
+  
+  /**
+   * Shutdown all continuous development processes
+   * @param reason Optional reason for the shutdown
+   * @returns Object with success status and summary information
+   */
+  public shutdownAll(reason: string = "System maintenance"): {success: boolean, summary: {shutdownCount: number, failedIds: number[]}} {
+    const runningMods = Array.from(this.running.entries())
+      .filter(([_, isRunning]) => isRunning)
+      .map(([modId]) => modId);
+    
+    const failedIds: number[] = [];
+    let shutdownCount = 0;
+    
+    // Attempt to stop each running mod
+    for (const modId of runningMods) {
+      try {
+        this.running.set(modId, false);
+        
+        const interval = this.intervals.get(modId);
+        if (interval) {
+          clearInterval(interval);
+          this.intervals.delete(modId);
+        }
+        
+        // Log the shutdown
+        logContinuous(modId, `Continuous development stopped during system shutdown: ${reason}`);
+        
+        // Update any in-progress builds
+        storage.getBuildsByModId(modId).then(builds => {
+          const inProgressBuilds = builds.filter(b => b.status === "in_progress" || b.status === "queued");
+          
+          for (const build of inProgressBuilds) {
+            storage.updateBuild(build.id, {
+              status: "failed",
+              logs: build.logs + `\n\nBuild terminated during system shutdown: ${reason}`
+            }).catch(err => {
+              logContinuous(modId, `Error marking build as failed: ${err instanceof Error ? err.message : String(err)}`, 'error');
+            });
+          }
+        }).catch(err => {
+          logContinuous(modId, `Error retrieving builds during shutdown: ${err instanceof Error ? err.message : String(err)}`, 'error');
+        });
+        
+        // Emit the stopped event
+        this.emit('stopped', modId);
+        shutdownCount++;
+      } catch (error) {
+        failedIds.push(modId);
+      }
+    }
+    
+    return {
+      success: true,
+      summary: {
+        shutdownCount,
+        failedIds
+      }
+    };
+  }
+  
+  /**
+   * Reset the circuit breaker for a mod
+   * @param modId The mod ID to reset the circuit breaker for
+   * @returns Object with success status and any relevant message
+   */
+  public resetCircuitBreaker(modId: number): {success: boolean, message?: string} {
+    const circuitBreakerKey = `circuit_breaker_${modId}`;
+    const circuitBreakerCount = parseInt(process.env[circuitBreakerKey] || '0', 10);
+    const lastTripTime = parseInt(process.env[`${circuitBreakerKey}_time`] || '0', 10);
+    
+    if (circuitBreakerCount === 0 && lastTripTime === 0) {
+      return {success: false, message: "Circuit breaker is not tripped for this mod"};
+    }
+    
+    // Reset circuit breaker
+    process.env[circuitBreakerKey] = '0';
+    if (process.env[`${circuitBreakerKey}_time`]) {
+      delete process.env[`${circuitBreakerKey}_time`];
+    }
+    
+    logContinuous(modId, "Circuit breaker manually reset");
+    
+    return {success: true, message: "Circuit breaker reset successfully"};
+  }
 }
 
 // Singleton instance

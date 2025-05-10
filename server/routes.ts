@@ -850,23 +850,62 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Start/stop continuous development
-  app.post("/api/mods/:id/continuous-development", async (req, res) => {
+  // Reset circuit breaker for a mod
+  app.post("/api/mods/:id/circuit-breaker/reset", async (req, res) => {
     try {
       const modId = parseInt(req.params.id, 10);
       if (isNaN(modId)) {
-        return res.status(400).json({ message: "Invalid mod ID" });
-      }
-
-      const { action, frequency } = req.body;
-      if (action !== "start" && action !== "stop") {
-        return res.status(400).json({ message: "Action must be 'start' or 'stop'" });
+        return res.status(400).json({ success: false, message: "Invalid mod ID" });
       }
 
       // Check if mod exists
       const mod = await storage.getMod(modId);
       if (!mod) {
-        return res.status(404).json({ message: "Mod not found" });
+        return res.status(404).json({ success: false, message: "Mod not found" });
+      }
+
+      const result = continuousService.resetCircuitBreaker(modId);
+      
+      if (result.success) {
+        res.json({ 
+          success: true, 
+          message: result.message || "Circuit breaker reset successfully"
+        });
+      } else {
+        // Return a 409 Conflict if already reset
+        res.status(409).json({ 
+          success: false, 
+          message: result.message || "Circuit breaker is not tripped" 
+        });
+      }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      console.error("Error resetting circuit breaker:", errorMessage);
+      res.status(500).json({ 
+        success: false, 
+        message: "Failed to reset circuit breaker",
+        error: errorMessage 
+      });
+    }
+  });
+
+  // Start/stop continuous development
+  app.post("/api/mods/:id/continuous-development", async (req, res) => {
+    try {
+      const modId = parseInt(req.params.id, 10);
+      if (isNaN(modId)) {
+        return res.status(400).json({ success: false, message: "Invalid mod ID" });
+      }
+
+      const { action, frequency } = req.body;
+      if (action !== "start" && action !== "stop") {
+        return res.status(400).json({ success: false, message: "Action must be 'start' or 'stop'" });
+      }
+
+      // Check if mod exists
+      const mod = await storage.getMod(modId);
+      if (!mod) {
+        return res.status(404).json({ success: false, message: "Mod not found" });
       }
 
       if (action === "start") {
@@ -917,13 +956,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const modId = parseInt(req.params.id, 10);
       if (isNaN(modId)) {
-        return res.status(400).json({ message: "Invalid mod ID" });
+        return res.status(400).json({ success: false, message: "Invalid mod ID" });
       }
 
       // Check if mod exists
       const mod = await storage.getMod(modId);
       if (!mod) {
-        return res.status(404).json({ message: "Mod not found" });
+        return res.status(404).json({ success: false, message: "Mod not found" });
       }
 
       // Get comprehensive statistics including circuit breaker status
@@ -942,8 +981,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Get any in-progress builds
       const inProgressBuilds = recentBuilds.filter(build => 
-        build.status === BuildStatus.InProgress || 
-        build.status === BuildStatus.Queued
+        build.status === "in_progress" || 
+        build.status === "queued"
       );
       
       res.json({
@@ -1085,8 +1124,52 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Use feature routers
   app.use("/api/metrics", apiMetricsRouter);
   
-  // Continuous service health endpoint
-  app.get("/api/system/continuous-service/health", async (req, res) => {
+  // Admin control for all continuous services
+  app.post("/api/system/continuous-service/control", requireAuth, async (req, res) => {
+    try {
+      // Check if user is admin
+      if (!req.user?.isAdmin) {
+        return res.status(403).json({
+          success: false, 
+          message: "Administrative privileges required for this operation"
+        });
+      }
+      
+      const { action, reason } = req.body;
+      
+      if (action === "shutdown") {
+        const result = continuousService.shutdownAll(reason || "Administrative shutdown");
+        res.json({
+          success: true,
+          message: `All continuous development processes shutdown. ${result.summary.shutdownCount} processes stopped.`,
+          details: result.summary
+        });
+      } else {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid action. Supported actions: 'shutdown'"
+        });
+      }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      console.error("Error controlling continuous service:", errorMessage);
+      res.status(500).json({
+        success: false,
+        message: "Failed to control continuous service",
+        error: errorMessage
+      });
+    }
+  });
+  
+  // Continuous service health endpoint (admin only)
+  app.get("/api/system/continuous-service/health", requireAuth, async (req, res) => {
+    // Check if user is admin
+    if (!req.user?.isAdmin) {
+      return res.status(403).json({
+        success: false, 
+        message: "Administrative privileges required for this operation"
+      });
+    }
     try {
       const health = continuousService.getHealthStatus();
       
