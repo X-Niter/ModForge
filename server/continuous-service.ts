@@ -286,6 +286,14 @@ class ContinuousService extends EventEmitter {
     // Update the activity timestamp for watchdog monitoring
     this.lastActivityTimestamps.set(modId, Date.now());
     
+    // Structured error context for improved debugging
+    const errorContext = {
+      modId,
+      retryCount,
+      timestamp: new Date().toISOString(),
+      processId: `mod-${modId}-build-${Date.now()}`
+    };
+    
     // Circuit breaker pattern to prevent infinite loops
     const maxRetries = 3;
     let attempts = 0;
@@ -488,21 +496,34 @@ class ContinuousService extends EventEmitter {
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
+      const errorObj = error instanceof Error ? error : new Error(errorMessage);
       
-      // Log to continuous service log
-      logContinuous(modId, `Error in continuous development cycle: ${errorMessage}`, 'error');
+      // Log to continuous service log with detailed context
+      logContinuous(modId, `Error in continuous development cycle: ${errorMessage} (retry ${retryCount}/${maxRetries})`, 'error');
+      
+      // Categorize error by analyzing error message and stack trace
+      const isTransient = this.isTransientError(errorMessage, errorObj);
+      const errorSeverity = this.determineErrorSeverity(errorMessage, errorObj, retryCount);
+      
+      // Enhanced error context for better debugging
+      const enhancedContext = {
+        ...errorContext,
+        modId,
+        buildCount: this.buildCounts.get(modId) || 0,
+        retryCount,
+        isTransient,
+        errorType: errorObj.name,
+        stackTrace: errorObj.stack,
+        errorTime: new Date().toISOString()
+      };
       
       // Record structured error in central error tracking system
       recordError(
-        error instanceof Error ? error : new Error(errorMessage),
+        errorObj,
         ErrorCategory.CONTINUOUS_DEVELOPMENT,
-        ErrorSeverity.MEDIUM,
-        false, // Will determine retryability below
-        { 
-          modId,
-          buildCount: this.buildCounts.get(modId) || 0,
-          retryCount
-        }
+        errorSeverity,
+        isTransient, // Now properly determined
+        enhancedContext
       );
       
       // Implement retry for transient errors before incrementing circuit breaker
