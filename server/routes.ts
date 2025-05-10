@@ -288,6 +288,86 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Detailed health metrics for monitoring systems and admins
+  app.get("/api/health/detailed", requireAuth, async (req, res) => {
+    try {
+      // Get database health
+      const dbHealth = await checkDatabaseHealth();
+      
+      // Get continuous development service status
+      const continuousHealth = continuousService.getHealthStatus();
+      
+      // Get usage metrics
+      const usageMetrics = getUsageMetrics();
+      
+      // Get circuit breaker statuses for all mods with circuit breakers
+      const circuitBreakerKeys = Object.keys(process.env)
+        .filter(key => key.startsWith('circuit_breaker_') && !key.includes('_time'));
+      
+      const circuitBreakerStats = circuitBreakerKeys.map(key => {
+        const modId = parseInt(key.replace('circuit_breaker_', ''), 10);
+        const count = parseInt(process.env[key] || '0', 10);
+        const tripped = count >= 5;
+        const tripTimeKey = `${key}_time`;
+        const tripTime = process.env[tripTimeKey] ? new Date(parseInt(process.env[tripTimeKey] || '0', 10)) : null;
+        
+        return {
+          modId,
+          errorCount: count,
+          tripped,
+          tripTime: tripTime ? tripTime.toISOString() : null
+        };
+      });
+      
+      // Get overall system metrics
+      const healthStatus = continuousService.getHealthStatus();
+      const totalRunningMods = healthStatus.runningMods.length;
+      const totalTrippedCircuitBreakers = circuitBreakerStats.filter(s => s.tripped).length;
+      
+      // Format uptime for human readability
+      const formatUptime = (seconds) => {
+        const days = Math.floor(seconds / (3600 * 24));
+        const hours = Math.floor((seconds % (3600 * 24)) / 3600);
+        const minutes = Math.floor((seconds % 3600) / 60);
+        const remainingSeconds = Math.floor(seconds % 60);
+        
+        return `${days}d ${hours}h ${minutes}m ${remainingSeconds}s`;
+      };
+      
+      // Return comprehensive metrics
+      res.json({
+        success: true,
+        status: dbHealth.status === 'healthy' ? 'healthy' : 'unhealthy',
+        database: dbHealth,
+        continuousDevelopment: continuousHealth,
+        usageMetrics,
+        circuitBreakers: {
+          total: circuitBreakerStats.length,
+          tripped: totalTrippedCircuitBreakers,
+          details: circuitBreakerStats
+        },
+        memory: {
+          usage: process.memoryUsage(),
+          heapUsedMB: Math.round(process.memoryUsage().heapUsed / 1024 / 1024 * 100) / 100,
+          heapTotalMB: Math.round(process.memoryUsage().heapTotal / 1024 / 1024 * 100) / 100,
+          rssMemoryMB: Math.round(process.memoryUsage().rss / 1024 / 1024 * 100) / 100
+        },
+        uptime: {
+          seconds: process.uptime(),
+          formatted: formatUptime(process.uptime())
+        },
+        timestamp: new Date().toISOString()
+      });
+    } catch (error) {
+      console.error("Detailed health check error:", error);
+      res.status(500).json({
+        status: "error",
+        message: "Error generating detailed health report",
+        error: error instanceof Error ? error.message : String(error)
+      });
+    }
+  });
+
   // Apply standard rate limiter to other API endpoints
   app.use("/api", standardLimiter);
   
