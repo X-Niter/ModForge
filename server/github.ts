@@ -194,28 +194,20 @@ export async function pushModToGitHub(
       throw new Error(`Mod with ID ${modId} not found`);
     }
     
-    // Try to create GitHub client from session first
-    let github: GitHubClient | null = null;
+    // Try to create GitHub client using our flexible authentication method
+    // This will try multiple authentication sources in order:
+    // 1. Session (if req is provided)
+    // 2. Explicit token (if githubToken is provided)
+    // 3. Environment variable (fallback)
+    let github = await GitHubClient.fromAnyAuth(req, githubToken);
     
-    if (req) {
-      github = await GitHubClient.fromSession(req);
-      if (github) {
-        addLog('Using GitHub authentication from your account');
-      }
-    }
-    
-    // Fall back to token if session doesn't have one
     if (!github) {
-      const token = githubToken || process.env.GITHUB_TOKEN;
-      if (!token) {
-        return {
-          success: false,
-          error: "GitHub authentication failed. Please log in with GitHub or provide a GitHub token.",
-          logs
-        };
-      }
-      
-      github = new GitHubClient(token);
+      addLog('No GitHub authentication available');
+      return {
+        success: false,
+        error: "GitHub authentication failed. Please connect your GitHub account or provide a valid token.",
+        logs
+      };
     }
     
     addLog(`Starting GitHub integration for mod: ${mod.name}`);
