@@ -36,17 +36,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const dbHealth = await checkDatabaseHealth();
       
+      // Check for OpenAI API key
+      const aiStatus = {
+        status: process.env.OPENAI_API_KEY ? 'available' : 'unavailable',
+        message: process.env.OPENAI_API_KEY 
+          ? 'OpenAI API key is configured' 
+          : 'OpenAI API key is missing'
+      };
+      
+      // Get server information
+      const serverInfo = {
+        version: process.env.npm_package_version || '1.0.0',
+        env: process.env.NODE_ENV || 'development',
+        uptime: process.uptime(),
+        memory: process.memoryUsage(),
+        timestamp: new Date().toISOString()
+      };
+      
       if (dbHealth.status === "healthy") {
         return res.status(200).json({
           status: "healthy",
           message: "Service is healthy",
-          database: dbHealth
+          database: dbHealth,
+          ai: aiStatus,
+          server: serverInfo
         });
       } else {
-        return res.status(503).json({
+        // Service is degraded or unhealthy
+        const statusCode = dbHealth.status === "error" ? 503 : 500;
+        return res.status(statusCode).json({
           status: "unhealthy",
           message: "Service is experiencing issues",
-          database: dbHealth
+          database: dbHealth,
+          ai: aiStatus,
+          server: serverInfo
         });
       }
     } catch (error) {
@@ -54,7 +77,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.status(500).json({
         status: "error",
         message: "Health check failed",
-        error: error instanceof Error ? error.message : String(error)
+        error: error instanceof Error ? error.message : String(error),
+        timestamp: new Date().toISOString()
       });
     }
   });
