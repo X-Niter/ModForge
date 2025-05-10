@@ -268,7 +268,7 @@ export function setupAuth(app: Express) {
         // Use our utility to ensure metadata is valid
         return done(null, ensureMetadataType(user));
       } catch (error) {
-        console.error('Bearer strategy error:', error);
+        console.error('Bearer strategy error:', error instanceof Error ? error.message : String(error));
         // Token verification failed
         return done(null, false, "Authentication error");
       }
@@ -636,7 +636,7 @@ export function setupAuth(app: Express) {
         passwordSaltPresent: user.password.split('.')[1] ? true : false
       });
     } catch (error) {
-      console.error("Password check error:", error);
+      console.error("Password check error:", error instanceof Error ? error.message : String(error));
       return res.status(500).json({ message: "Error checking password", error: String(error) });
     }
   });
