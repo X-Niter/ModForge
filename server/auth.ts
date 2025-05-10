@@ -6,6 +6,10 @@ import session from "express-session";
 import { scrypt, randomBytes, timingSafeEqual } from "crypto";
 import { promisify } from "util";
 import jwt from "jsonwebtoken";
+// Define a simplified version of the JWT sign function to avoid type issues
+function signJwt(payload: any, secret: string, options: { expiresIn: string | number }): string {
+  return jwt.sign(payload, secret, options as any);
+}
 import { storage } from "./storage";
 import { InsertUser } from "@shared/schema";
 import { z } from "zod";
@@ -313,14 +317,14 @@ export function setupAuth(app: Express) {
   // Generate a token with customizable expiration
   function generateToken(
     user: Express.User, 
-    options: { 
+    tokenOptions: { 
       expiresIn?: string | number,
       isAdmin?: boolean,
       scope?: string,
       purpose?: string 
     } = {}
   ): string {
-    const expiry = options.expiresIn || '30d';
+    const expiry = tokenOptions.expiresIn || '30d';
     
     // Create payload with optional fields for specific purposes
     const payload: Record<string, any> = {
@@ -330,39 +334,38 @@ export function setupAuth(app: Express) {
     };
     
     // Add optional fields
-    if (options.isAdmin) {
+    if (tokenOptions.isAdmin) {
       payload.isAdmin = true;
     }
     
-    if (options.scope) {
-      payload.scope = options.scope;
+    if (tokenOptions.scope) {
+      payload.scope = tokenOptions.scope;
     }
     
-    if (options.purpose) {
-      payload.purpose = options.purpose;
+    if (tokenOptions.purpose) {
+      payload.purpose = tokenOptions.purpose;
     }
     
-    return jwt.sign(
-      payload,
-      process.env.JWT_SECRET || "fallback-secret-change-in-production",
-      { expiresIn: expiry as string }
-    );
+    const jwtSecret = process.env.JWT_SECRET || "fallback-secret-change-in-production";
+    const expiryOption = typeof expiry === 'string' ? expiry : `${expiry}s`;
+    
+    return signJwt(payload, jwtSecret, { expiresIn: expiryOption });
   }
   
   // Generate a short-lived JIT (Just-In-Time) token for automated operations
   function generateJitToken(userId: number, username: string, purpose: string): string {
     // Short-lived token (1 hour) for automation purposes
-    return jwt.sign(
-      { 
-        sub: userId.toString(), 
-        username,
-        purpose,
-        jit: true,
-        iat: Math.floor(Date.now() / 1000)
-      },
-      process.env.JWT_SECRET || "fallback-secret-change-in-production",
-      { expiresIn: '1h' }
-    );
+    const jwtSecret = process.env.JWT_SECRET || "fallback-secret-change-in-production";
+    const payload = { 
+      sub: userId.toString(), 
+      username,
+      purpose,
+      jit: true,
+      iat: Math.floor(Date.now() / 1000)
+    };
+    const options: JwtSignOptions = { expiresIn: '1h' };
+    
+    return jwt.sign(payload, jwtSecret, options);
   }
 
   // Token generation endpoint for IDE plugin
