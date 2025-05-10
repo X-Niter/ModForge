@@ -51,11 +51,55 @@ export interface NotificationMessage {
 }
 
 // Notification channel configuration
+// Type definition for email notification config
+export interface EmailNotificationConfig {
+  recipients: string[];
+  from: string;
+  smtp: {
+    host: string;
+    port: number;
+    secure: boolean;
+    auth: {
+      user: string;
+      pass: string;
+    };
+  };
+}
+
+// Type definition for Slack notification config
+export interface SlackNotificationConfig {
+  webhookUrl: string;
+  channel?: string;
+  username?: string;
+}
+
+// Type definition for webhook notification config
+export interface WebhookNotificationConfig {
+  url: string;
+  method?: 'GET' | 'POST';
+  headers?: Record<string, string>;
+}
+
+// Type definition for SMS notification config
+export interface SmsNotificationConfig {
+  to: string[];
+  serviceProvider: string;
+  apiKey: string;
+}
+
+// Union type for all notification configs
+export type NotificationConfigType = 
+  | EmailNotificationConfig 
+  | SlackNotificationConfig 
+  | WebhookNotificationConfig 
+  | SmsNotificationConfig 
+  | Record<string, unknown>;
+
 export interface NotificationChannelConfig {
   enabled: boolean;
   channel: NotificationChannel;
   minSeverity: NotificationSeverity;
-  config: Record<string, unknown>;
+  config: NotificationConfigType;
 }
 
 // Notification settings
@@ -184,8 +228,18 @@ export function getNotificationSettings(): NotificationSettings {
  */
 async function sendEmailNotification(
   message: NotificationMessage,
-  config: Record<string, string | number | boolean | null | Record<string, unknown>>
+  config: NotificationConfigType
 ): Promise<boolean> {
+  // Type guard to check if config is an EmailNotificationConfig
+  function isEmailConfig(cfg: NotificationConfigType): cfg is EmailNotificationConfig {
+    return 'recipients' in cfg && 'from' in cfg && 'smtp' in cfg;
+  }
+  
+  // Validate config is email config
+  if (!isEmailConfig(config)) {
+    logger.error('Invalid email notification config', { config });
+    return false;
+  }
   try {
     const { recipients, from, smtp } = config;
     
@@ -249,8 +303,18 @@ async function sendEmailNotification(
  */
 async function sendSlackNotification(
   message: NotificationMessage,
-  config: Record<string, any>
+  config: NotificationConfigType
 ): Promise<boolean> {
+  // Type guard to check if config is a SlackNotificationConfig
+  function isSlackConfig(cfg: NotificationConfigType): cfg is SlackNotificationConfig {
+    return 'webhookUrl' in cfg;
+  }
+  
+  // Validate config is Slack config
+  if (!isSlackConfig(config)) {
+    logger.error('Invalid Slack notification config', { config });
+    return false;
+  }
   try {
     const { webhookUrl, channel } = config;
     
