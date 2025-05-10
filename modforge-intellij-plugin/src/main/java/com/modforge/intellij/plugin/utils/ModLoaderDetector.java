@@ -8,7 +8,42 @@ import org.jetbrains.annotations.Nullable;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.regex.Pattern;
+
+/**
+ * Information about a mod loader.
+ */
+public class ModLoaderInfo {
+    private final String id;
+    private final String displayName;
+    private final String supportedVersions;
+    private final boolean hasTemplate;
+    
+    public ModLoaderInfo(String id, String displayName, String supportedVersions, boolean hasTemplate) {
+        this.id = id;
+        this.displayName = displayName;
+        this.supportedVersions = supportedVersions;
+        this.hasTemplate = hasTemplate;
+    }
+    
+    public String getId() {
+        return id;
+    }
+    
+    public String getDisplayName() {
+        return displayName;
+    }
+    
+    public String getSupportedVersions() {
+        return supportedVersions;
+    }
+    
+    public boolean hasTemplate() {
+        return hasTemplate;
+    }
+}
 
 /**
  * Utility for detecting Minecraft mod loaders.
@@ -16,7 +51,7 @@ import java.util.regex.Pattern;
 public class ModLoaderDetector {
     private static final Logger LOG = Logger.getInstance(ModLoaderDetector.class);
     
-    // Patterns for detecting mod loaders
+    // These patterns are used as a fallback when no contributors are available
     private static final Pattern FORGE_PATTERN = Pattern.compile("forge|minecraftforge", Pattern.CASE_INSENSITIVE);
     private static final Pattern FABRIC_PATTERN = Pattern.compile("fabric|fabricmc", Pattern.CASE_INSENSITIVE);
     private static final Pattern QUILT_PATTERN = Pattern.compile("quilt|quiltmc", Pattern.CASE_INSENSITIVE);
@@ -44,6 +79,22 @@ public class ModLoaderDetector {
         if (baseDir == null) {
             return null;
         }
+        
+        // Try to detect using contributors first
+        for (ModLoaderContributor contributor : ModLoaderContributor.EP_NAME.getExtensionList()) {
+            try {
+                if (contributor.detectModLoader(project, baseDir)) {
+                    LOG.info("Detected mod loader '" + contributor.getModLoaderId() + 
+                            "' using contributor: " + contributor.getClass().getSimpleName());
+                    return contributor.getModLoaderId();
+                }
+            } catch (Exception e) {
+                LOG.warn("Error detecting mod loader with contributor: " + contributor.getClass().getSimpleName(), e);
+            }
+        }
+        
+        // Fallback to built-in detection if no contributors were able to detect
+        LOG.info("No mod loader detected via contributors, falling back to built-in detection");
         
         // First, check for build.gradle or gradle.properties at the project root,
         // as these files often contain mod loader information
@@ -78,6 +129,12 @@ public class ModLoaderDetector {
         // If we haven't found a loader yet, check for specific files that indicate mod loaders
         if (loader == null) {
             loader = detectFromProjectStructure(baseDir);
+        }
+        
+        if (loader != null) {
+            LOG.info("Detected mod loader '" + loader + "' using built-in detection");
+        } else {
+            LOG.info("No mod loader detected");
         }
         
         return loader;

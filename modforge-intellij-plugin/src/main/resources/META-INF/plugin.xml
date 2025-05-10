@@ -62,6 +62,12 @@
         <notificationGroup id="ModForge Notifications" 
                           displayType="BALLOON"
                           key="notification.group.modforge"/>
+                          
+        <!-- Mod Loader Contributors -->
+        <com.modforge.intellij.plugin.modLoaderContributor implementation="com.modforge.intellij.plugin.loaders.ForgeLoaderContributor"/>
+        <com.modforge.intellij.plugin.modLoaderContributor implementation="com.modforge.intellij.plugin.loaders.FabricLoaderContributor"/>
+        <com.modforge.intellij.plugin.modLoaderContributor implementation="com.modforge.intellij.plugin.loaders.QuiltLoaderContributor"/>
+        <com.modforge.intellij.plugin.modLoaderContributor implementation="com.modforge.intellij.plugin.loaders.ArchitecturyLoaderContributor"/>
     </extensions>
     
     <actions>
