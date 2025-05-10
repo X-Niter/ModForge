@@ -1,8 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<idea-plugin>
+<idea-plugin require-restart="true">
     <id>com.modforge.intellij.plugin</id>
     <name>ModForge AI</name>
     <vendor email="support@modforge.dev" url="https://www.modforge.dev">ModForge</vendor>
+    <idea-version since-build="251.23774" until-build="252.*"/>
     
     <description><![CDATA[
     <p>ModForge AI - Smart Minecraft Mod Development</p>
@@ -26,6 +27,9 @@
     
     <depends>com.intellij.modules.platform</depends>
     <depends>com.intellij.modules.java</depends>
+    <depends>Git4Idea</depends>
+    <depends>org.jetbrains.plugins.github</depends>
+    <depends>com.demonwav.minecraft-dev</depends>
     
     <extensionPoints>
         <extensionPoint name="modLoaderContributor" 
@@ -60,8 +64,7 @@
                                 
         <!-- Notifications -->
         <notificationGroup id="ModForge Notifications" 
-                          displayType="BALLOON"
-                          key="notification.group.modforge"/>
+                          displayType="BALLOON"/>
                           
         <!-- Mod Loader Contributors -->
         <com.modforge.intellij.plugin.modLoaderContributor implementation="com.modforge.intellij.plugin.loaders.ForgeLoaderContributor"/>
@@ -83,7 +86,7 @@
             </action>
             <action id="ModForge.LogoutAction"
                     class="com.modforge.intellij.plugin.actions.LogoutAction"
-                    text="Logout from ModForge"
+                    text="Logout from ModForge server"
                     description="Logout from ModForge server">
             </action>
             <separator/>

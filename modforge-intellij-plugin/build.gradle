@@ -1,6 +1,6 @@
 plugins {
     id 'java'
-    id 'org.jetbrains.intellij' version '1.15.0'
+    id 'org.jetbrains.intellij' version '1.17.0'
 }
 
 group 'com.modforge'
@@ -12,29 +12,36 @@ repositories {
 
 dependencies {
     implementation 'com.google.code.gson:gson:2.10.1'
-    implementation 'org.apache.commons:commons-lang3:3.13.0'
-    implementation 'org.apache.httpcomponents:httpclient:4.5.14'
-    implementation 'commons-io:commons-io:2.13.0'
-    implementation 'org.commonmark:commonmark:0.21.0'  // For Markdown processing
+    implementation 'org.apache.commons:commons-lang3:3.14.0'
+    implementation 'org.apache.httpcomponents.client5:httpclient5:5.3'
+    implementation 'commons-io:commons-io:2.15.1'
+    implementation 'org.commonmark:commonmark:0.22.0'  // For Markdown processing
+    implementation 'com.fasterxml.jackson.core:jackson-databind:2.16.1'
+    implementation 'org.slf4j:slf4j-api:2.0.10'
     
-    testImplementation 'org.junit.jupiter:junit-jupiter-api:5.10.0'
-    testImplementation 'org.mockito:mockito-core:5.6.0'
-    testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine:5.10.0'
+    testImplementation 'org.junit.jupiter:junit-jupiter-api:5.10.1'
+    testImplementation 'org.mockito:mockito-core:5.8.0'
+    testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine:5.10.1'
 }
 
 // Configure Gradle IntelliJ Plugin
 // Read more: https://plugins.jetbrains.com/docs/intellij/tools-gradle-intellij-plugin.html
 intellij {
-    version = '2023.3'  // Updated to latest stable version
+    version = '2025.1'  // Updated to match current IntelliJ IDEA 2025.1
     type = 'IC' // Target IDE Platform: IntelliJ IDEA Community Edition
-    plugins = ['com.intellij.java', 'Git4Idea']  // Added Git integration plugin
+    plugins = [
+        'com.intellij.java', 
+        'Git4Idea',
+        'org.jetbrains.plugins.github',
+        'com.demonwav.minecraft-dev:2025.1-1.8.4'  // Support for Minecraft Development
+    ]
 }
 
 tasks {
-    // Set the JVM compatibility versions
+    // Set the JVM compatibility versions for Java 21
     withType(JavaCompile) {
-        sourceCompatibility = '17'
-        targetCompatibility = '17'
+        sourceCompatibility = '21'
+        targetCompatibility = '21'
         options.encoding = 'UTF-8'
     }
     
@@ -54,8 +61,8 @@ tasks {
     }
 
     patchPluginXml {
-        sinceBuild = '232'
-        untilBuild = '241.*'  // Ensure compatibility with latest 2024.1 releases
+        sinceBuild = '251'
+        untilBuild = '252.*'  // Ensure compatibility with IntelliJ 2025.1 and future 2025.2
         
         // Plugin vendor information
         pluginDescription = """
