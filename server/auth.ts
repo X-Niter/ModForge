@@ -144,7 +144,7 @@ export async function comparePasswords(supplied: string, stored: string): Promis
     // Compare using a timing-safe comparison to prevent timing attacks
     return timingSafeEqual(hashedBuf, suppliedBuf);
   } catch (error) {
-    console.error('Error comparing passwords:', error);
+    console.error('Error comparing passwords:', error instanceof Error ? error.message : String(error));
     return false;
   }
 }

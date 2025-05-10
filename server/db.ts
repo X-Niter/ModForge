@@ -43,7 +43,7 @@ async function testConnection() {
     client.release();
     return true;
   } catch (error) {
-    console.error('❌ Failed to connect to the database:', error);
+    console.error('❌ Failed to connect to the database:', error instanceof Error ? error.message : String(error));
     return false;
   }
 }

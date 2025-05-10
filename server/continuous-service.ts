@@ -398,7 +398,7 @@ class ContinuousService extends EventEmitter {
             logs: currentLogs,
             status: BuildStatus.Failed
           });
-          throw fixError;
+          throw error;
         }
         
         // Update logs
