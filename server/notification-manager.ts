@@ -326,7 +326,12 @@ async function sendEmailNotification(
     
     return true;
   } catch (error) {
-    logger.error('Failed to send email notification', { error });
+    logger.error('Failed to send email notification', {
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+      recipients: recipients?.length || 0,
+      subject
+    });
     return false;
   }
 }

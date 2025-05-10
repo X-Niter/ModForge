@@ -324,7 +324,8 @@ async function checkFileSystem(): Promise<CheckResult & { fileSystemStatus?: Fil
       });
       
       // Try each method in sequence until one succeeds
-      for (const method of detectionMethods) {
+      for (let index = 0; index < detectionMethods.length; index++) {
+        const method = detectionMethods[index];
         try {
           diskSpace = await method();
           if (diskSpace.total > 0) {
@@ -332,9 +333,9 @@ async function checkFileSystem(): Promise<CheckResult & { fileSystemStatus?: Fil
           }
         } catch (methodErr) {
           // Log error but continue to next method
-          logger.debug(`Disk space check method ${i} failed`, {
+          logger.debug(`Disk space check method ${index} failed`, {
             error: methodErr instanceof Error ? methodErr.message : String(methodErr),
-            method: i
+            method: index
           });
           continue;
         }
