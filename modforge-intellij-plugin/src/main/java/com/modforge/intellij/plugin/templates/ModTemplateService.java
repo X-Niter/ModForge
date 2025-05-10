@@ -9,6 +9,8 @@ import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.io.FileUtil;
 import com.modforge.intellij.plugin.auth.ModAuthenticationManager;
+import com.modforge.intellij.plugin.utils.ModLoaderContributor;
+import com.modforge.intellij.plugin.utils.ModLoaderDetector;
 import com.modforge.intellij.plugin.utils.TokenAuthConnectionUtil;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -232,8 +234,42 @@ public final class ModTemplateService {
     private CompletableFuture<Void> loadBuiltInTemplates() {
         return CompletableFuture.runAsync(() -> {
             try {
-                // Find built-in templates
-                // For now, we'll just add some example templates
+                // Let's first add templates from loader contributors
+                List<ModLoaderContributor.ModLoaderTemplate> contributorTemplates = 
+                        ModLoaderDetector.getAvailableTemplates();
+                
+                for (ModLoaderContributor.ModLoaderTemplate contribTemplate : contributorTemplates) {
+                    ModLoaderContributor contributor = 
+                            ModLoaderDetector.getContributorById(getLoaderIdFromTemplateId(contribTemplate.getId()));
+                    
+                    if (contributor == null) {
+                        LOG.warn("Could not find contributor for template: " + contribTemplate.getId());
+                        continue;
+                    }
+                    
+                    // Create template files based on contributor type
+                    Map<String, String> files = new HashMap<>();
+                    Map<String, String> variables = new HashMap<>();
+                    
+                    setupTemplateForLoader(contributor.getModLoaderId(), files, variables);
+                    
+                    ModTemplateType type = ModTemplateType.fromId(contributor.getModLoaderId());
+                    
+                    ModTemplate template = new ModTemplate.Builder()
+                            .id(contribTemplate.getId())
+                            .name(contribTemplate.getName())
+                            .description(contribTemplate.getDescription())
+                            .category("ModForge Templates")
+                            .type(type)
+                            .files(files)
+                            .variables(variables)
+                            .build();
+                    
+                    addTemplate(template);
+                    LOG.info("Added template from contributor: " + contribTemplate.getId());
+                }
+                
+                // Still keep the built-in example templates, separate from the loader templates
                 
                 // Forge Example Mod
                 Map<String, String> forgeFiles = new HashMap<>();
@@ -289,7 +325,7 @@ public final class ModTemplateService {
                         .variables(fabricVariables)
                         .build();
                 
-                // Add the templates
+                // Add the example templates
                 addTemplate(forgeTemplate);
                 addTemplate(fabricTemplate);
                 
