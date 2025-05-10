@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { useLocation, useRoute, navigate } from "wouter";
+import { useLocation } from "wouter";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useForm } from "react-hook-form";
@@ -162,6 +162,8 @@ export default function IdeaGeneratorPage() {
     }
   };
 
+  const [, setLocation] = useLocation();
+  
   const handleCreateMod = () => {
     if (expandedIdea) {
       toast({
@@ -169,14 +171,13 @@ export default function IdeaGeneratorPage() {
         description: "Taking you to the code generator to create your mod.",
       });
       
-      // Navigate to the code generator with the expanded idea data
-      navigate("/code-generator", { 
-        state: { 
-          expandedIdea: expandedIdea,
-          ideaTitle: selectedIdea?.title || "", 
-          ideaDescription: selectedIdea?.description || "" 
-        } 
-      });
+      // Use localStorage to pass the data between routes since Wouter doesn't have a built-in state passing mechanism
+      localStorage.setItem('expandedIdea', JSON.stringify(expandedIdea));
+      localStorage.setItem('ideaTitle', selectedIdea?.title || "");
+      localStorage.setItem('ideaDescription', selectedIdea?.description || "");
+      
+      // Navigate to the code generator
+      setLocation("/code-generator");
     }
   };
 
