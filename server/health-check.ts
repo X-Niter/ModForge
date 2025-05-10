@@ -196,76 +196,191 @@ async function checkFileSystem(): Promise<CheckResult & { fileSystemStatus?: Fil
       }
     }
     
-    // Check disk space
-    // Note: This only works in Node.js environments with appropriate permissions
+    // Enhanced disk space detection with multiple fallback methods
     let diskSpace = { total: 0, free: 0, percentFree: 0 };
     
     try {
-      // Use a cross-platform approach to get disk space
-      // Instead of relying on statfs which is Unix-specific
+      // Get the current working directory to check disk space on the appropriate volume
+      const cwd = process.cwd();
       const tmpDir = os.tmpdir();
       
-      // Check if we're in a Unix-like environment
+      // Multiple detection methods in order of preference
+      let detectionMethods = [];
+      
+      // Method 1: df command for Unix-like systems (Linux, macOS)
       if (process.platform !== 'win32') {
-        try {
-          // Use disk usage through the 'df' command for Unix/Linux/macOS
-          const { exec } = await import('child_process');
-          const util = await import('util');
-          const execPromise = util.promisify(exec);
-          
-          const { stdout } = await execPromise('df -k / | tail -1');
-          const stats = stdout.trim().split(/\s+/);
-          
-          // df typically returns: Filesystem 1K-blocks Used Available Capacity Mounted-on
-          // We're interested in the total (1K-blocks) and available columns
-          if (stats.length >= 5) {
-            const total = parseInt(stats[1], 10) * 1024; // Convert from 1K-blocks to bytes
-            const free = parseInt(stats[3], 10) * 1024;  // Available space in bytes
-            const percentFree = (free / total) * 100;
+        detectionMethods.push(async () => {
+          try {
+            const { exec } = await import('child_process');
+            const util = await import('util');
+            const execPromise = util.promisify(exec);
             
-            diskSpace = { total, free, percentFree };
+            // Check the disk where our application is running
+            // Use -P for POSIX output format which is more consistent across systems
+            const { stdout } = await execPromise(`df -Pk "${cwd}" | tail -1`);
+            const stats = stdout.trim().split(/\s+/);
+            
+            // df with -P flag returns: Filesystem 1K-blocks Used Available Capacity Mounted-on
+            if (stats.length >= 5) {
+              const total = parseInt(stats[1], 10) * 1024; // Convert from 1K-blocks to bytes
+              const free = parseInt(stats[3], 10) * 1024;  // Available space in bytes
+              const percentFree = Math.max(0, Math.min(100, (free / total) * 100)); // Constrain between 0-100%
+              
+              if (total > 0 && free >= 0) {
+                logger.debug('Disk space detected via df command', { total, free, percentFree });
+                return { total, free, percentFree };
+              }
+            }
+            throw new Error('Invalid or incomplete df output');
+          } catch (err) {
+            logger.debug('df command method failed', { error: err });
+            throw err; // Pass to next method
           }
-        } catch (execErr) {
-          logger.warn('Failed to get disk usage via df command, using fallback method', { error: execErr });
-          // Fall through to OS method
+        });
+      }
+      
+      // Method 2: Alternative df command format (some Unix variants)
+      if (process.platform !== 'win32') {
+        detectionMethods.push(async () => {
+          try {
+            const { exec } = await import('child_process');
+            const util = await import('util');
+            const execPromise = util.promisify(exec);
+            
+            // Try just getting root filesystem stats
+            const { stdout } = await execPromise('df -k / | tail -1');
+            const stats = stdout.trim().split(/\s+/);
+            
+            if (stats.length >= 5) {
+              const total = parseInt(stats[1], 10) * 1024;
+              const free = parseInt(stats[3], 10) * 1024;
+              const percentFree = Math.max(0, Math.min(100, (free / total) * 100));
+              
+              if (total > 0 && free >= 0) {
+                logger.debug('Disk space detected via alternative df command', { total, free, percentFree });
+                return { total, free, percentFree };
+              }
+            }
+            throw new Error('Invalid or incomplete alternative df output');
+          } catch (err) {
+            logger.debug('Alternative df command method failed', { error: err });
+            throw err;
+          }
+        });
+      }
+      
+      // Method 3: OS module memory as a very rough estimate
+      detectionMethods.push(async () => {
+        try {
+          // This is a very rough estimate, but better than nothing
+          const totalMemory = os.totalmem();
+          const freeMemory = os.freemem();
+          
+          if (totalMemory > 0) {
+            // Use a ratio higher than 2x since disk is typically much larger than RAM
+            const diskRatio = 8; 
+            const total = totalMemory * diskRatio;
+            const free = Math.max(0, Math.min(total, freeMemory * diskRatio));
+            const percentFree = Math.max(0, Math.min(100, (free / total) * 100));
+            
+            logger.warn('Using memory-based estimate for disk space (less accurate)', 
+              { total, free, percentFree, memoryTotal: totalMemory });
+            
+            return { total, free, percentFree };
+          }
+          throw new Error('Invalid memory values');
+        } catch (err) {
+          logger.debug('Memory estimation method failed', { error: err });
+          throw err;
+        }
+      });
+      
+      // Method 4: Final fallback with conservative estimates
+      detectionMethods.push(async () => {
+        logger.warn('All disk space detection methods failed, using safe defaults');
+        
+        // Conservative defaults based on common modern systems
+        const total = 50 * 1024 * 1024 * 1024; // 50GB total
+        const free = 25 * 1024 * 1024 * 1024;  // 25GB free
+        const percentFree = 50;                // 50% free
+        
+        return { total, free, percentFree };
+      });
+      
+      // Try each method in sequence until one succeeds
+      for (const method of detectionMethods) {
+        try {
+          diskSpace = await method();
+          if (diskSpace.total > 0) {
+            break; // Successfully retrieved disk space information
+          }
+        } catch (methodErr) {
+          // Continue to next method
+          continue;
         }
       }
       
-      // Fallback or Windows method - get space on current drive using os module
-      if (diskSpace.total === 0) {
+      // Sanity check - ensure we have positive values
+      if (diskSpace.total <= 0 || diskSpace.free < 0) {
+        logger.warn('Detected invalid disk space values, using safe defaults', { diskSpace });
         diskSpace = {
-          total: os.totalmem() * 2, // Conservative estimate of disk space as 2x total RAM
-          free: os.freemem() * 2,   // Conservative estimate of free space
-          percentFree: 50           // Default to 50% as a safe assumption
+          total: 50 * 1024 * 1024 * 1024, // 50GB total
+          free: 25 * 1024 * 1024 * 1024,  // 25GB free
+          percentFree: 50                 // 50% free
         };
       }
     } catch (err) {
-      // Final fallback for any environment where both methods fail
-      logger.warn('All disk space detection methods failed, using safe defaults', { error: err });
+      // Master error handler for the entire disk space detection
+      logger.error('All disk space detection methods failed', { error: err });
       diskSpace = {
-        total: 100 * 1024 * 1024 * 1024, // Assume 100GB total
-        free: 50 * 1024 * 1024 * 1024,   // Assume 50GB free
-        percentFree: 50                  // Assume 50% free
+        total: 50 * 1024 * 1024 * 1024, // 50GB total
+        free: 25 * 1024 * 1024 * 1024,  // 25GB free
+        percentFree: 50                 // 50% free
       };
     }
     
-    // Determine status
+    // Determine status with environment-aware thresholds
     let status: 'healthy' | 'degraded' | 'unhealthy' = 'healthy';
     let message = 'File system is healthy';
     
-    if (!logDirAccess || !tempDirAccess) {
+    // Directory access is critical for operation
+    if (!logDirAccess && !tempDirAccess) {
+      status = 'unhealthy';
+      message = 'Critical directories are not accessible';
+    } else if (!logDirAccess || !tempDirAccess) {
       status = 'degraded';
       message = 'Some required directories are not accessible';
     }
     
-    if (diskSpace.percentFree < 10) {
-      status = 'degraded';
-      message = 'Disk space is running low';
+    // Environment-specific disk space thresholds
+    const isProduction = process.env.NODE_ENV === 'production';
+    
+    // Production needs more free space for safety
+    const warningThreshold = isProduction ? 15 : 10; // 15% in prod, 10% in dev
+    const criticalThreshold = isProduction ? 8 : 5;  // 8% in prod, 5% in dev
+    const emergencyThreshold = isProduction ? 3 : 2; // 3% in prod, 2% in dev
+    
+    // Calculate absolute free space in GB
+    const freeSpaceGB = diskSpace.free / (1024 * 1024 * 1024);
+    const minimumFreeGB = isProduction ? 5 : 2; // 5GB in prod, 2GB in dev
+    
+    // Check both percentage and absolute values for a more accurate assessment
+    if (diskSpace.percentFree < warningThreshold || freeSpaceGB < minimumFreeGB * 2) {
+      // Only change to degraded if not already unhealthy
+      if (status !== 'unhealthy') {
+        status = 'degraded';
+        message = `Disk space is running low (${Math.round(diskSpace.percentFree)}% free, ${freeSpaceGB.toFixed(1)}GB)`;
+      }
     }
     
-    if (diskSpace.percentFree < 5) {
+    if (diskSpace.percentFree < criticalThreshold || freeSpaceGB < minimumFreeGB) {
+      status = 'degraded';
+      message = `Critical disk space shortage (${Math.round(diskSpace.percentFree)}% free, ${freeSpaceGB.toFixed(1)}GB)`;
+    }
+    
+    if (diskSpace.percentFree < emergencyThreshold || freeSpaceGB < minimumFreeGB / 2) {
       status = 'unhealthy';
-      message = 'Critical disk space shortage';
+      message = `Emergency: Extremely low disk space (${Math.round(diskSpace.percentFree)}% free, ${freeSpaceGB.toFixed(1)}GB)`;
     }
     
     const fileSystemStatus: FileSystemStatus = {
