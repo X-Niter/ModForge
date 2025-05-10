@@ -105,6 +105,9 @@ export function recordError(
       break;
   }
   
+  // Track error statistics
+  updateErrorStats(structuredError);
+  
   // Return original error for chaining
   return actualError;
 }
@@ -183,17 +186,69 @@ export function errorHandlerMiddleware(err: any, req: Request, res: Response, ne
   });
 }
 
+// In-memory error tracking for recent errors
+// This would be replaced with a database in a full implementation
+interface ErrorRecord {
+  message: string;
+  category: ErrorCategory;
+  severity: ErrorSeverity;
+  timestamp: string;
+  count: number;
+}
+
+// Store recent errors in memory
+const recentErrors: ErrorRecord[] = [];
+const errorCountsByCategory: Record<string, number> = {};
+const errorCountsBySeverity: Record<string, number> = {};
+let totalErrorCount = 0;
+
+// Update error tracking stats when recording an error
+function updateErrorStats(error: StructuredError): void {
+  totalErrorCount++;
+  
+  // Update category counts
+  const category = error.category;
+  errorCountsByCategory[category] = (errorCountsByCategory[category] || 0) + 1;
+  
+  // Update severity counts
+  const severity = error.severity;
+  errorCountsBySeverity[severity] = (errorCountsBySeverity[severity] || 0) + 1;
+  
+  // Check if this is a duplicate of a recent error
+  const existingErrorIndex = recentErrors.findIndex(e => 
+    e.message === error.message && e.category === error.category
+  );
+  
+  if (existingErrorIndex >= 0) {
+    // Update existing error
+    recentErrors[existingErrorIndex].count++;
+    recentErrors[existingErrorIndex].timestamp = error.timestamp;
+  } else {
+    // Add new error
+    recentErrors.unshift({
+      message: error.message,
+      category: error.category,
+      severity: error.severity,
+      timestamp: error.timestamp,
+      count: 1
+    });
+    
+    // Keep only the most recent errors
+    if (recentErrors.length > 100) {
+      recentErrors.pop();
+    }
+  }
+}
+
 /**
  * Get a summary of recent errors
  * @returns Summary of errors by category and severity
  */
 export function getErrorSummary() {
-  // In a real implementation, this would query the error logs
-  // For now, just return placeholder information
   return {
-    totalErrors: 0,
-    byCategory: {},
-    bySeverity: {},
-    recentErrors: []
+    totalErrors: totalErrorCount,
+    byCategory: errorCountsByCategory,
+    bySeverity: errorCountsBySeverity,
+    recentErrors: recentErrors.slice(0, 10) // Return only the 10 most recent errors
   };
 }
