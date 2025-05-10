@@ -31,6 +31,10 @@ public class ModForgeSettingsComponent {
     private final JBCheckBox enablePatternRecognitionCheckbox;
     private final JBCheckBox enableGitHubIntegrationCheckbox;
     private final JBPasswordField githubTokenField;
+    private final JBTextField githubUsernameField;
+    private final JBTextField githubRepositoryField;
+    private final JBCheckBox autoMonitorRepositoryCheckbox;
+    private final JBCheckBox autoRespondToIssuesCheckbox;
     private final JSpinner maxApiRequestsSpinner;
     private final JButton testConnectionButton;
     private final JButton resetButton;
@@ -46,6 +50,10 @@ public class ModForgeSettingsComponent {
         enablePatternRecognitionCheckbox = new JBCheckBox("Enable pattern recognition");
         enableGitHubIntegrationCheckbox = new JBCheckBox("Enable GitHub integration");
         githubTokenField = new JBPasswordField();
+        githubUsernameField = new JBTextField();
+        githubRepositoryField = new JBTextField();
+        autoMonitorRepositoryCheckbox = new JBCheckBox("Auto-monitor repositories for issues and PRs");
+        autoRespondToIssuesCheckbox = new JBCheckBox("Auto-respond to issues and PRs with AI");
         
         // Set up spinner for max API requests
         SpinnerNumberModel spinnerModel = new SpinnerNumberModel(100, 1, 1000, 10);
@@ -59,9 +67,15 @@ public class ModForgeSettingsComponent {
         testConnectionButton.addActionListener(e -> testConnection());
         resetButton.addActionListener(e -> resetToDefaults());
         
-        // Enable/disable GitHub token field based on GitHub integration checkbox
-        enableGitHubIntegrationCheckbox.addActionListener(e -> 
-                githubTokenField.setEnabled(enableGitHubIntegrationCheckbox.isSelected()));
+        // Enable/disable GitHub fields based on GitHub integration checkbox
+        enableGitHubIntegrationCheckbox.addActionListener(e -> {
+            boolean enabled = enableGitHubIntegrationCheckbox.isSelected();
+            githubTokenField.setEnabled(enabled);
+            githubUsernameField.setEnabled(enabled);
+            githubRepositoryField.setEnabled(enabled);
+            autoMonitorRepositoryCheckbox.setEnabled(enabled);
+            autoRespondToIssuesCheckbox.setEnabled(enabled);
+        });
         
         // Create main panel
         mainPanel = FormBuilder.createFormBuilder()

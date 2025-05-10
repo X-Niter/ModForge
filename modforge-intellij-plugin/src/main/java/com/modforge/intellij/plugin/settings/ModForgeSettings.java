@@ -5,6 +5,8 @@ import com.intellij.openapi.components.PersistentStateComponent;
 import com.intellij.openapi.components.Service;
 import com.intellij.openapi.components.State;
 import com.intellij.openapi.components.Storage;
+import com.intellij.openapi.options.ShowSettingsUtil;
+import com.intellij.openapi.project.Project;
 import com.intellij.util.xmlb.XmlSerializerUtil;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -24,6 +26,10 @@ public final class ModForgeSettings implements PersistentStateComponent<ModForge
     private boolean enablePatternRecognition = true;
     private boolean enableGitHubIntegration = false;
     private String githubToken = "";
+    private String githubUsername = "";
+    private String githubRepository = "";
+    private boolean autoMonitorRepository = true;
+    private boolean autoRespondToIssues = true;
     private int maxApiRequestsPerDay = 100;
     
     /**
@@ -164,6 +170,96 @@ public final class ModForgeSettings implements PersistentStateComponent<ModForge
     }
     
     /**
+     * Get the GitHub username.
+     *
+     * @return The GitHub username
+     */
+    @NotNull
+    public String getGitHubUsername() {
+        return githubUsername;
+    }
+    
+    /**
+     * Set the GitHub username.
+     *
+     * @param githubUsername The GitHub username
+     */
+    public void setGitHubUsername(@NotNull String githubUsername) {
+        this.githubUsername = githubUsername;
+    }
+    
+    /**
+     * Get the GitHub repository.
+     *
+     * @return The GitHub repository
+     */
+    @NotNull
+    public String getGitHubRepository() {
+        return githubRepository;
+    }
+    
+    /**
+     * Set the GitHub repository.
+     *
+     * @param githubRepository The GitHub repository
+     */
+    public void setGitHubRepository(@NotNull String githubRepository) {
+        this.githubRepository = githubRepository;
+    }
+    
+    /**
+     * Check if auto-monitoring of repositories is enabled.
+     *
+     * @return True if enabled, false otherwise
+     */
+    public boolean isAutoMonitorRepository() {
+        return autoMonitorRepository;
+    }
+    
+    /**
+     * Set if auto-monitoring of repositories is enabled.
+     *
+     * @param autoMonitorRepository True to enable, false to disable
+     */
+    public void setAutoMonitorRepository(boolean autoMonitorRepository) {
+        this.autoMonitorRepository = autoMonitorRepository;
+    }
+    
+    /**
+     * Check if auto-responding to issues is enabled.
+     *
+     * @return True if enabled, false otherwise
+     */
+    public boolean isAutoRespondToIssues() {
+        return autoRespondToIssues;
+    }
+    
+    /**
+     * Set if auto-responding to issues is enabled.
+     *
+     * @param autoRespondToIssues True to enable, false to disable
+     */
+    public void setAutoRespondToIssues(boolean autoRespondToIssues) {
+        this.autoRespondToIssues = autoRespondToIssues;
+    }
+    
+    /**
+     * Open the settings dialog.
+     *
+     * @param project The project
+     */
+    public void openSettings(@Nullable Project project) {
+        if (project == null) {
+            return;
+        }
+        
+        ShowSettingsUtil.getInstance().showSettingsDialog(
+                project,
+                "ModForge AI Settings"
+        );
+    }
+    
+    /**
      * Reset settings to defaults.
      */
     public void resetToDefaults() {
@@ -173,6 +269,10 @@ public final class ModForgeSettings implements PersistentStateComponent<ModForge
         enablePatternRecognition = true;
         enableGitHubIntegration = false;
         githubToken = "";
+        githubUsername = "";
+        githubRepository = "";
+        autoMonitorRepository = true;
+        autoRespondToIssues = true;
         maxApiRequestsPerDay = 100;
     }
     
