@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { generateGenericCode, generateModCode } from "@/lib/api";
+import { generateGenericCode, generateModCode, type ModCode } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Loader2, Code, CheckCircle2, AlertTriangle, BookOpen } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
+import { useMutation } from "@tanstack/react-query";
 
 export function CodeGenerator() {
   const { toast } = useToast();
@@ -90,46 +91,46 @@ export function CodeGenerator() {
     }
   }, [toast]);
   
-  async function handleGenerateGenericCode() {
-    if (!prompt) return;
-    
-    setIsGenerating(true);
-    setError(null);
-    
-    try {
-      const result = await generateGenericCode({
-        prompt,
-        language,
-        complexity,
-        context: context || undefined
-      });
+  // Generic code generation mutation
+  const genericCodeMutation = useMutation({
+    mutationFn: async () => {
+      if (!prompt) {
+        throw new Error("Please enter a description of the code you want to generate");
+      }
       
-      setGeneratedCode(result.code);
-      setExplanation(result.explanation);
+      return generateGenericCode(prompt, context);
+    },
+    onSuccess: (data) => {
+      setGeneratedCode(data.code);
+      setExplanation(data.explanation);
       
       toast({
         title: "Code generated successfully",
         description: "Your code has been generated based on your specifications.",
       });
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "An unknown error occurred");
+    },
+    onError: (error) => {
+      setError(error instanceof Error ? error.message : "An unknown error occurred");
       toast({
         title: "Error generating code",
-        description: err instanceof Error ? err.message : "An unknown error occurred",
+        description: error instanceof Error ? error.message : "An unknown error occurred",
         variant: "destructive",
       });
-    } finally {
-      setIsGenerating(false);
     }
+  });
+  
+  function handleGenerateGenericCode() {
+    setError(null);
+    genericCodeMutation.mutate();
   }
   
-  async function handleGenerateModCode() {
-    if (!modName || !modDescription) return;
-    
-    setIsGenerating(true);
-    setError(null);
-    
-    try {
+  // Minecraft mod generation mutation
+  const modCodeMutation = useMutation({
+    mutationFn: async () => {
+      if (!modName || !modDescription) {
+        throw new Error("Please provide a mod name and description");
+      }
+      
       // Build the idea string from either the expanded idea or the basic title/description
       let idea = "";
       
@@ -169,31 +170,36 @@ export function CodeGenerator() {
         idea = `Title: ${modName}\n\nDescription: ${modDescription}`;
       }
       
-      const result = await generateModCode({
-        modName,
-        modDescription,
-        modLoader,
-        mcVersion,
-        idea
+      return generateModCode({
+        name: modName,
+        description: modDescription,
+        modLoader: modLoader,
+        minecraftVersion: mcVersion,
+        idea: idea
       });
-      
-      setGeneratedCode(result.code);
-      setExplanation(result.explanation);
+    },
+    onSuccess: (data) => {
+      setGeneratedCode(data.code);
+      setExplanation(data.explanation);
       
       toast({
         title: "Mod code generated successfully",
         description: "Your Minecraft mod code has been generated. You can now download or copy the code.",
       });
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "An unknown error occurred");
+    },
+    onError: (error) => {
+      setError(error instanceof Error ? error.message : "An unknown error occurred");
       toast({
         title: "Error generating mod code",
-        description: err instanceof Error ? err.message : "An unknown error occurred",
+        description: error instanceof Error ? error.message : "An unknown error occurred",
         variant: "destructive",
       });
-    } finally {
-      setIsGenerating(false);
     }
+  });
+  
+  function handleGenerateModCode() {
+    setError(null);
+    modCodeMutation.mutate();
   }
   
   const handleCopyCode = () => {
@@ -293,10 +299,10 @@ export function CodeGenerator() {
               <CardFooter>
                 <Button 
                   onClick={handleGenerateGenericCode} 
-                  disabled={isGenerating || !prompt} 
+                  disabled={genericCodeMutation.isPending || !prompt} 
                   className="w-full"
                 >
-                  {isGenerating ? (
+                  {genericCodeMutation.isPending ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                       Generating code...
