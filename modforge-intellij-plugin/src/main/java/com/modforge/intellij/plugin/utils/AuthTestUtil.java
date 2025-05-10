@@ -53,58 +53,14 @@ public class AuthTestUtil {
             return new TestResult(false, 0, "Server URL is empty");
         }
         
-        HttpURLConnection connection = null;
+        // Use TokenAuthConnectionUtil to make the GET request
+        String response = TokenAuthConnectionUtil.makeAuthenticatedGetRequest(endpoint.getPath());
         
-        try {
-            // Normalize the URL (add trailing slash if needed)
-            if (!serverUrl.endsWith("/")) {
-                serverUrl += "/";
-            }
-            
-            // Remove "api" if it's already in the URL to avoid duplication
-            if (serverUrl.endsWith("/api/")) {
-                serverUrl = serverUrl.substring(0, serverUrl.length() - 4);
-            }
-            
-            URL url = new URL(serverUrl + endpoint.getPath().substring(1));
-            connection = (HttpURLConnection) url.openConnection();
-            connection.setRequestMethod("GET");
-            connection.setConnectTimeout(TIMEOUT);
-            connection.setReadTimeout(TIMEOUT);
-            
-            // Set token-based authentication header
-            connection.setRequestProperty("Authorization", "Bearer " + settings.getAccessToken());
-            
-            // Get response code
-            int responseCode = connection.getResponseCode();
-            
-            // Read response
-            StringBuilder response = new StringBuilder();
-            try (BufferedReader br = new BufferedReader(
-                    new InputStreamReader(
-                            responseCode >= 400 
-                                    ? connection.getErrorStream() 
-                                    : connection.getInputStream(), 
-                            StandardCharsets.UTF_8))) {
-                String responseLine;
-                while ((responseLine = br.readLine()) != null) {
-                    response.append(responseLine.trim());
-                }
-            }
-            
-            return new TestResult(
-                    responseCode >= 200 && responseCode < 300,
-                    responseCode,
-                    response.toString()
-            );
-            
-        } catch (IOException e) {
-            LOG.warn("Failed to test authentication endpoint: " + e.getMessage());
-            return new TestResult(false, 0, "Error: " + e.getMessage());
-        } finally {
-            if (connection != null) {
-                connection.disconnect();
-            }
+        if (response != null) {
+            return new TestResult(true, 200, response);
+        } else {
+            LOG.warn("Failed to test authentication endpoint: " + endpoint.getPath());
+            return new TestResult(false, 0, "Error: No response received");
         }
     }
     

@@ -2,7 +2,7 @@ package com.modforge.intellij.plugin.auth;
 
 import com.intellij.openapi.diagnostic.Logger;
 import com.modforge.intellij.plugin.settings.ModForgeSettings;
-import com.modforge.intellij.plugin.utils.ConnectionTestUtil;
+import com.modforge.intellij.plugin.utils.TokenAuthConnectionUtil;
 import org.jetbrains.annotations.NotNull;
 
 import java.io.BufferedReader;
@@ -172,69 +172,20 @@ public class AuthenticationManager {
             return false;
         }
         
-        String serverUrl = settings.getServerUrl();
+        // Use TokenAuthConnectionUtil to verify authentication
+        boolean isValid = TokenAuthConnectionUtil.testTokenAuthentication();
         
-        if (serverUrl.isEmpty()) {
-            return false;
+        if (!isValid) {
+            // Clear authentication state
+            settings.setAuthenticated(false);
+            settings.setAccessToken("");
+            settings.setUserId("");
+            LOG.warn("Authentication is no longer valid");
+        } else {
+            LOG.info("Successfully verified authentication with ModForge server");
         }
         
-        HttpURLConnection connection = null;
-        
-        try {
-            // Normalize the URL (add trailing slash if needed)
-            if (!serverUrl.endsWith("/")) {
-                serverUrl += "/";
-            }
-            
-            // Remove "api" if it's already in the URL to avoid duplication
-            if (serverUrl.endsWith("/api/")) {
-                serverUrl = serverUrl.substring(0, serverUrl.length() - 4);
-            }
-            
-            URL url = new URL(serverUrl + VERIFY_ENDPOINT.substring(1));
-            connection = (HttpURLConnection) url.openConnection();
-            connection.setRequestMethod("GET");
-            connection.setConnectTimeout(TIMEOUT);
-            connection.setReadTimeout(TIMEOUT);
-            
-            // Set authorization header with token
-            connection.setRequestProperty("Authorization", "Bearer " + settings.getAccessToken());
-            
-            // Get response code
-            int responseCode = connection.getResponseCode();
-            
-            // 200 OK means authentication is valid
-            boolean isValid = responseCode == 200;
-            
-            if (isValid) {
-                // Read response to capture any additional info
-                StringBuilder response = new StringBuilder();
-                try (BufferedReader br = new BufferedReader(new InputStreamReader(connection.getInputStream(), StandardCharsets.UTF_8))) {
-                    String responseLine;
-                    while ((responseLine = br.readLine()) != null) {
-                        response.append(responseLine.trim());
-                    }
-                }
-                
-                // Log success
-                LOG.info("Successfully verified authentication with ModForge server");
-                return true;
-            } else {
-                // Clear authentication state
-                settings.setAuthenticated(false);
-                settings.setAccessToken("");
-                settings.setUserId("");
-                LOG.warn("Authentication is no longer valid with response code: " + responseCode);
-                return false;
-            }
-        } catch (IOException e) {
-            LOG.warn("Failed to verify authentication with ModForge server: " + e.getMessage());
-            return false;
-        } finally {
-            if (connection != null) {
-                connection.disconnect();
-            }
-        }
+        return isValid;
     }
     
     /**
@@ -248,59 +199,25 @@ public class AuthenticationManager {
             // Already logged out
             settings.setAuthenticated(false);
             settings.setAccessToken("");
+            settings.setUserId("");
             return true;
         }
         
-        String serverUrl = settings.getServerUrl();
+        // Call the logout endpoint
+        String response = TokenAuthConnectionUtil.makeAuthenticatedPostRequest(LOGOUT_ENDPOINT, null);
+        boolean success = response != null;
         
-        if (serverUrl.isEmpty()) {
-            return false;
+        // Clear authentication state regardless of response
+        settings.setAuthenticated(false);
+        settings.setAccessToken("");
+        settings.setUserId("");
+        
+        if (!success) {
+            LOG.warn("Failed to logout from ModForge server");
+        } else {
+            LOG.info("Successfully logged out from ModForge server");
         }
         
-        HttpURLConnection connection = null;
-        
-        try {
-            // Normalize the URL (add trailing slash if needed)
-            if (!serverUrl.endsWith("/")) {
-                serverUrl += "/";
-            }
-            
-            // Remove "api" if it's already in the URL to avoid duplication
-            if (serverUrl.endsWith("/api/")) {
-                serverUrl = serverUrl.substring(0, serverUrl.length() - 4);
-            }
-            
-            URL url = new URL(serverUrl + LOGOUT_ENDPOINT.substring(1));
-            connection = (HttpURLConnection) url.openConnection();
-            connection.setRequestMethod("POST");
-            connection.setConnectTimeout(TIMEOUT);
-            connection.setReadTimeout(TIMEOUT);
-            
-            // Set authorization header
-            connection.setRequestProperty("Authorization", "Bearer " + settings.getAccessToken());
-            
-            // Get response code
-            int responseCode = connection.getResponseCode();
-            
-            // Clear authentication state regardless of response
-            settings.setAuthenticated(false);
-            settings.setAccessToken("");
-            settings.setUserId("");
-            
-            // 200 OK means logout was successful
-            return responseCode == 200;
-        } catch (IOException e) {
-            LOG.warn("Failed to logout from ModForge server: " + e.getMessage());
-            
-            // Clear authentication state anyway
-            settings.setAuthenticated(false);
-            settings.setAccessToken("");
-            
-            return false;
-        } finally {
-            if (connection != null) {
-                connection.disconnect();
-            }
-        }
+        return success;
     }
 }
