@@ -55,9 +55,27 @@ function recordApiFallback(tokensEstimate: number = AVG_TOKENS_PER_REQUEST) {
 
 /**
  * Get current usage metrics and cost savings
+ * @returns {UsageMetrics} Current usage metrics with additional calculated fields
  */
-export function getUsageMetrics(): UsageMetrics {
-  return { ...usageMetrics };
+export function getUsageMetrics(): UsageMetrics & {
+  efficiencyRate: number;
+  patternMatchPercentage: number;
+  systemStartTime: string;
+} {
+  // Calculate additional metrics
+  const totalRequests = usageMetrics.totalRequests || 1; // Avoid division by zero
+  const patternMatchPercentage = (usageMetrics.patternMatches / totalRequests) * 100;
+  const efficiencyRate = usageMetrics.estimatedTokensSaved / (usageMetrics.apiCalls * AVG_TOKENS_PER_REQUEST || 1);
+  
+  // Get system uptime information
+  const systemStartTime = new Date(Date.now() - process.uptime() * 1000).toISOString();
+  
+  return { 
+    ...usageMetrics,
+    patternMatchPercentage: Math.round(patternMatchPercentage * 100) / 100, // Round to 2 decimal places
+    efficiencyRate: Math.round(efficiencyRate * 100) / 100,
+    systemStartTime
+  };
 }
 
 // Enhanced versions of AI functions that use pattern learning first

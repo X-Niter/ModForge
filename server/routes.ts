@@ -15,11 +15,12 @@ import {
   type CodeGenerationResponse,
   type CompletionResponse
 } from "./ai-service";
+import { getUsageMetrics } from "./ai-service-manager";
 import { pushModToGitHub } from "./github";
 import { checkDatabaseHealth } from "./db-health";
 import { continuousService } from "./continuous-service";
 import { generateModIdeas, expandModIdea, ideaGenerationRequestSchema } from "./idea-generator-service";
-import { setupAuth } from "./auth";
+import { setupAuth } from "./auth"; // This function returns a requireAuth middleware
 import { z } from "zod";
 import { insertModSchema } from "@shared/schema";
 import { BuildStatus } from "@shared/schemas/core/builds";
@@ -288,7 +289,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Detailed health metrics for monitoring systems and admins
+  // Detailed health metrics for monitoring systems and admins  
   app.get("/api/health/detailed", requireAuth, async (req, res) => {
     try {
       // Get database health
@@ -325,7 +326,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const totalTrippedCircuitBreakers = circuitBreakerStats.filter(s => s.tripped).length;
       
       // Format uptime for human readability
-      const formatUptime = (seconds) => {
+      const formatUptime = (seconds: number): string => {
         const days = Math.floor(seconds / (3600 * 24));
         const hours = Math.floor((seconds % (3600 * 24)) / 3600);
         const minutes = Math.floor((seconds % 3600) / 60);

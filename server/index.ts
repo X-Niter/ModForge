@@ -126,11 +126,15 @@ app.use((req, res, next) => {
     // Import the continuousService to clean it up
     const { continuousService } = await import('./continuous-service');
     
-    // Clean up resources
+    // Clean up continuous development service resources (shutdown all running processes)
+    log('Shutting down continuous development service...');
     continuousService.cleanup();
+    log('Continuous development service shutdown complete');
     
     // Close database pool
+    log('Closing database connection pool...');
     await pool.end();
+    log('Database connections closed');
     
     // Close the server
     server.close(() => {
