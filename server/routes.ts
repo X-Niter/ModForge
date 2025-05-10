@@ -22,7 +22,7 @@ import { generateModIdeas, expandModIdea, ideaGenerationRequestSchema } from "./
 import { setupAuth } from "./auth";
 import { z } from "zod";
 import { insertModSchema } from "@shared/schema";
-import { BuildStatus } from "@/types";
+import { BuildStatus } from "@shared/schemas/core/builds";
 import apiMetricsRouter from "./routes/api-metrics";
 import webExplorerRouter from "./routes/web-explorer-routes";
 import jarAnalyzerRouter from "./routes/jar-analyzer-routes";
@@ -926,16 +926,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Mod not found" });
       }
 
-      const isRunning = continuousService.isRunning(modId);
+      // Get comprehensive statistics including circuit breaker status
       const stats = continuousService.getStatistics(modId);
-
+      
+      // Get the most recent builds to include in the status response
+      const recentBuilds = await storage.getBuildsByModId(modId);
+      const lastFiveBuilds = recentBuilds.slice(0, 5).map(build => ({
+        id: build.id,
+        buildNumber: build.buildNumber,
+        status: build.status,
+        errorCount: build.errorCount,
+        warningCount: build.warningCount,
+        timestamp: build.updatedAt || build.createdAt
+      }));
+      
+      // Get any in-progress builds
+      const inProgressBuilds = recentBuilds.filter(build => 
+        build.status === BuildStatus.InProgress || 
+        build.status === BuildStatus.Queued
+      );
+      
       res.json({
-        isRunning,
-        statistics: stats
+        success: true,
+        isRunning: stats.isRunning,
+        statistics: stats,
+        recentBuilds: lastFiveBuilds,
+        activeBuilds: inProgressBuilds.length,
+        circuitBreakerStatus: stats.circuitBreakerStatus
       });
     } catch (error) {
-      console.error("Error getting continuous development status:", error);
-      res.status(500).json({ message: "Failed to get continuous development status" });
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      console.error("Error getting continuous development status:", errorMessage);
+      res.status(500).json({ 
+        success: false, 
+        message: "Failed to get continuous development status",
+        error: errorMessage
+      });
     }
   });
 
@@ -1058,6 +1084,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Use feature routers
   app.use("/api/metrics", apiMetricsRouter);
+  
+  // Continuous service health endpoint
+  app.get("/api/system/continuous-service/health", async (req, res) => {
+    try {
+      const health = continuousService.getHealthStatus();
+      
+      // Get additional system information
+      const systemInfo = {
+        memory: process.memoryUsage(),
+        uptime: process.uptime(),
+        env: process.env.NODE_ENV,
+        timestamp: new Date().toISOString()
+      };
+      
+      res.json({
+        success: true,
+        health,
+        system: systemInfo
+      });
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      console.error("Error getting continuous service health:", errorMessage);
+      res.status(500).json({
+        success: false,
+        message: "Failed to get continuous service health",
+        error: errorMessage
+      });
+    }
+  });
+  
   app.use("/api/web-explorer", webExplorerRouter);
   app.use("/api/jar-analyzer", jarAnalyzerRouter);
   app.use("/api/pattern-learning", patternLearningRouter);
