@@ -42,9 +42,13 @@ public final class GitHubIntegrationService {
     private static final Logger LOG = Logger.getInstance(GitHubIntegrationService.class);
     private static final int POLL_INTERVAL_MINUTES = 5;
     private static final Gson GSON = new Gson();
+    private static final int MAX_RETRIES = 3;
+    private static final Duration RETRY_DELAY = Duration.ofSeconds(2);
     
     private final Project project;
-    private final ScheduledExecutorService scheduler = AppExecutorUtil.createBoundedScheduledExecutorService("ModForge GitHub Monitor", 1);
+    // Using virtual threads for better performance in IntelliJ 2025.1 (Java 21)
+    private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1, 
+        r -> Thread.ofVirtual().name("ModForge-GitHub-Monitor-").factory().newThread(r));
     private final Map<String, Instant> lastIssueResponseTime = new ConcurrentHashMap<>();
     private final Map<String, Instant> lastPrResponseTime = new ConcurrentHashMap<>();
     private ScheduledFuture<?> monitorTask;
@@ -106,12 +110,14 @@ public final class GitHubIntegrationService {
             boolean isPrivate,
             @Nullable Consumer<String> callback
     ) {
+        // Use virtual threads for better performance in IntelliJ 2025.1 (Java 21)
         return CompletableFuture.supplyAsync(() -> {
             try {
                 ModAuthenticationManager authManager = ModAuthenticationManager.getInstance();
                 String token = authManager.getGitHubToken();
                 
                 if (token == null || token.isEmpty()) {
+                    LOG.warn("GitHub token not available when attempting to push to GitHub");
                     return new GitHubPushResult(false, "GitHub token not available. Please authenticate with GitHub.");
                 }
                 
@@ -211,7 +217,7 @@ public final class GitHubIntegrationService {
                 LOG.error("Error pushing to GitHub: " + e.getMessage(), e);
                 return new GitHubPushResult(false, "Error pushing to GitHub: " + e.getMessage());
             }
-        }, AppExecutorUtil.getAppExecutorService());
+        }, Thread.ofVirtual().name("ModForge-GitHub-Push-").factory());
     }
     
     /**
@@ -279,11 +285,11 @@ public final class GitHubIntegrationService {
         yaml.append("  build:\n");
         yaml.append("    runs-on: ubuntu-latest\n\n");
         yaml.append("    steps:\n");
-        yaml.append("    - uses: actions/checkout@v3\n");
-        yaml.append("    - name: Set up JDK 17\n");
-        yaml.append("      uses: actions/setup-java@v3\n");
+        yaml.append("    - uses: actions/checkout@v4\n");
+        yaml.append("    - name: Set up JDK 21\n");
+        yaml.append("      uses: actions/setup-java@v4\n");
         yaml.append("      with:\n");
-        yaml.append("        java-version: '17'\n");
+        yaml.append("        java-version: '21'\n");
         yaml.append("        distribution: 'temurin'\n");
         
         // Customize build commands based on detected mod loader
@@ -512,32 +518,60 @@ public final class GitHubIntegrationService {
      * @param repository The repository name
      */
     private void monitorRepositoryActivity(@NotNull String owner, @NotNull String repository) {
-        try {
-            ModAuthenticationManager authManager = ModAuthenticationManager.getInstance();
-            String token = authManager.getGitHubToken();
-            
-            if (token == null || token.isEmpty()) {
-                LOG.info("GitHub token not available. Skipping repository monitoring.");
+        // Track retry attempts
+        for (int attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+            try {
+                ModAuthenticationManager authManager = ModAuthenticationManager.getInstance();
+                String token = authManager.getGitHubToken();
+                
+                if (token == null || token.isEmpty()) {
+                    LOG.info("GitHub token not available. Skipping repository monitoring.");
+                    return;
+                }
+                
+                // Create GitHub API client
+                GitHubApiClient client = new GitHubApiClient(token);
+                
+                // Check issues - wrapped in try/catch to continue even if issue monitoring fails
+                try {
+                    List<GitHubIssue> issues = client.getOpenIssues(owner, repository);
+                    for (GitHubIssue issue : issues) {
+                        processIssue(client, owner, repository, issue);
+                    }
+                } catch (Exception e) {
+                    LOG.warn("Error monitoring issues: " + e.getMessage(), e);
+                }
+                
+                // Check pull requests - wrapped in try/catch to continue even if PR monitoring fails
+                try {
+                    List<GitHubPullRequest> prs = client.getOpenPullRequests(owner, repository);
+                    for (GitHubPullRequest pr : prs) {
+                        processPullRequest(client, owner, repository, pr);
+                    }
+                } catch (Exception e) {
+                    LOG.warn("Error monitoring pull requests: " + e.getMessage(), e);
+                }
+                
+                // If we got here, everything worked, so we can return
                 return;
+                
+            } catch (Exception e) {
+                if (attempt < MAX_RETRIES) {
+                    LOG.warn("Error monitoring repository activity (attempt " + (attempt + 1) + 
+                          " of " + (MAX_RETRIES + 1) + "): " + e.getMessage() + ". Will retry.", e);
+                    try {
+                        // Exponential backoff
+                        Thread.sleep(RETRY_DELAY.toMillis() * (long)Math.pow(2, attempt));
+                    } catch (InterruptedException ie) {
+                        Thread.currentThread().interrupt();
+                        LOG.warn("Interrupted while waiting to retry repository monitoring", ie);
+                        return;
+                    }
+                } else {
+                    LOG.error("Error monitoring repository activity after " + (MAX_RETRIES + 1) + 
+                             " attempts: " + e.getMessage(), e);
+                }
             }
-            
-            // Create GitHub API client
-            GitHubApiClient client = new GitHubApiClient(token);
-            
-            // Check issues
-            List<GitHubIssue> issues = client.getOpenIssues(owner, repository);
-            for (GitHubIssue issue : issues) {
-                processIssue(client, owner, repository, issue);
-            }
-            
-            // Check pull requests
-            List<GitHubPullRequest> prs = client.getOpenPullRequests(owner, repository);
-            for (GitHubPullRequest pr : prs) {
-                processPullRequest(client, owner, repository, pr);
-            }
-            
-        } catch (Exception e) {
-            LOG.error("Error monitoring repository activity: " + e.getMessage(), e);
         }
     }
     
