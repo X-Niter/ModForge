@@ -7,7 +7,7 @@
 
 import { initializeNotificationSystem, sendTrackedErrorNotification, sendSystemStatusNotification, sendBackupStatusNotification } from './notification-manager';
 import { getLogger } from './logging';
-import { ErrorSeverity, ErrorCategory } from './error-tracker';
+import { ErrorSeverity, ErrorCategory } from './error-types';
 
 const logger = getLogger('notification-integration');
 

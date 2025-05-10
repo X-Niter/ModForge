@@ -1,6 +1,13 @@
 import { Request, Response, NextFunction } from 'express';
 import winston from 'winston';
 import { z } from 'zod';
+import { 
+  ErrorCategory,
+  ErrorSeverity,
+  StructuredError,
+  categoryFromString,
+  severityFromString
+} from './error-types';
 
 // Configure structured logger for error tracking
 const logger = winston.createLogger({
@@ -25,39 +32,7 @@ const logger = winston.createLogger({
   ]
 });
 
-// Error categories for better organization and alerting
-export enum ErrorCategory {
-  API = 'api_error',
-  DATABASE = 'database_error',
-  AUTHENTICATION = 'auth_error',
-  GITHUB = 'github_error',
-  COMPILATION = 'compilation_error',
-  AI_SERVICE = 'ai_service_error',
-  CONTINUOUS_DEVELOPMENT = 'continuous_dev_error',
-  VALIDATION = 'validation_error',
-  SYSTEM = 'system_error',
-  UNKNOWN = 'unknown_error'
-}
-
-// Severity levels for prioritizing errors
-export enum ErrorSeverity {
-  CRITICAL = 'critical',   // System-wide failure, requires immediate attention
-  HIGH = 'high',           // Affects multiple users or core functionality
-  MEDIUM = 'medium',       // Affects individual user experience
-  LOW = 'low',             // Minor issues, non-blocking
-  INFO = 'info'            // Informational errors
-}
-
-// Structured error type for consistent error handling
-export interface StructuredError {
-  message: string;
-  category: ErrorCategory;
-  severity: ErrorSeverity;
-  retryable: boolean;
-  context?: Record<string, any>;
-  originalError?: Error;
-  timestamp: string;
-}
+// Using centralized error type definitions from error-types.ts
 
 /**
  * Records a structured error in the error tracking system

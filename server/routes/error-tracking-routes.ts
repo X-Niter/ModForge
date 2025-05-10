@@ -11,10 +11,9 @@ import {
   resolveError,
   getTrackedErrors,
   getErrorStatistics,
-  purgeResolvedErrors,
-  ErrorCategory,
-  ErrorSeverity
+  purgeResolvedErrors
 } from '../error-tracker';
+import { ErrorCategory, ErrorSeverity } from '../error-types';
 import { getLogger } from '../logging';
 
 const router = express.Router();

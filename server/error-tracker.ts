@@ -17,27 +17,12 @@ import { sendTrackedErrorNotification } from "./notification-manager";
 // Set up logger
 const logger = getLogger("error-tracker");
 
-// Error severity levels
-export enum ErrorSeverity {
-  LOW = "low",         // Minor issues that don't affect functionality
-  MEDIUM = "medium",   // Issues that affect some functionality but not critical operations
-  HIGH = "high",       // Issues that affect critical functionality
-  CRITICAL = "critical" // System-breaking issues that need immediate attention
-}
-
-// Error categories
-export enum ErrorCategory {
-  API = "api",                 // API-related errors
-  DATABASE = "database",       // Database errors
-  AUTHENTICATION = "auth",     // Authentication/authorization errors
-  VALIDATION = "validation",   // Input validation errors
-  COMPILATION = "compilation", // Mod compilation errors
-  GITHUB = "github",           // GitHub integration errors
-  FILESYSTEM = "filesystem",   // File system errors
-  NETWORK = "network",         // Network-related errors
-  MEMORY = "memory",           // Memory-related errors
-  UNKNOWN = "unknown"          // Uncategorized errors
-}
+import { 
+  ErrorSeverity,
+  ErrorCategory,
+  categoryFromString,
+  severityFromString
+} from './error-types';
 
 // Error with additional metadata
 export interface TrackedError {

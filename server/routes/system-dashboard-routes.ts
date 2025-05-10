@@ -8,7 +8,8 @@
 import express from 'express';
 import { getLogger } from '../logging';
 import { checkSystemHealth } from '../health-check';
-import { getErrorStatistics, getTrackedErrors, ErrorSeverity } from '../error-tracker';
+import { getErrorStatistics, getTrackedErrors } from '../error-tracker';
+import { ErrorSeverity } from '../error-types';
 import { getScheduledJobsStatus } from '../scheduled-jobs';
 import { getUsageMetrics } from '../ai-service-manager';
 import { continuousService } from '../continuous-service';

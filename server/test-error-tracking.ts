@@ -6,14 +6,13 @@
  */
 
 import { 
-  trackError, 
-  ErrorCategory, 
-  ErrorSeverity,
+  trackError,
   getTrackedErrors,
   getErrorStatistics,
   resolveError,
   purgeResolvedErrors
 } from './error-tracker';
+import { ErrorCategory, ErrorSeverity } from './error-types';
 import { getLogger } from './logging';
 
 const logger = getLogger('error-tracking-test');

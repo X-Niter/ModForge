@@ -8,7 +8,7 @@
 import { getLogger } from './logging';
 import nodemailer from 'nodemailer';
 import axios from 'axios';
-import { ErrorSeverity, ErrorCategory } from './error-tracker';
+import { ErrorSeverity, ErrorCategory } from './error-types';
 
 // Setup logger
 const logger = getLogger('notification');

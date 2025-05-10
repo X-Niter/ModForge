@@ -4,6 +4,7 @@ import { fixCompilationErrors, addModFeatures } from './ai-service';
 import { EventEmitter } from 'events';
 import { recordError } from './error-handler';
 import { trackError } from './error-tracker';
+import { ErrorCategory, ErrorSeverity } from './error-types';
 
 // Map client-side BuildStatus enum to string values expected by the database
 enum BuildStatus {
@@ -143,8 +144,8 @@ class ContinuousService extends EventEmitter {
           error instanceof Error ? error : new Error(String(error)),
           { operation: 'circuitBreakerMaintenance' },
           { 
-            category: "continuous", 
-            severity: "medium"
+            category: ErrorCategory.CONTINUOUS_DEVELOPMENT, 
+            severity: ErrorSeverity.MEDIUM
           }
         );
       }
@@ -599,8 +600,8 @@ class ContinuousService extends EventEmitter {
             new Error(`Circuit breaker tripped for mod ${modId}`),
             { modId, failureCount: safeCount + 1 },
             { 
-              category: "continuous", // Using string value compatible with ErrorCategory
-              severity: "high"        // Using string value compatible with ErrorSeverity
+              category: ErrorCategory.CONTINUOUS_DEVELOPMENT,
+              severity: ErrorSeverity.HIGH
             }
           );
         }
