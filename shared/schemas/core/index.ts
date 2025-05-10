@@ -3,14 +3,11 @@
  * This file exports all core schemas to simplify imports
  */
 
-// User schema
+// Common types and enums
+export * from './types';
+
+// Entity schemas
 export * from './users';
-
-// Mod schema
 export * from './mods';
-
-// Build schema
 export * from './builds';
-
-// ModFile schema
 export * from './files';

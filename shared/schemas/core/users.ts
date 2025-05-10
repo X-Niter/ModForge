@@ -1,42 +1,53 @@
-import { pgTable, text, serial, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, boolean, timestamp } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 import { relations } from "drizzle-orm";
 import { mods } from "./mods";
 
 /**
- * User table schema
- * Central entity for authentication and user management
+ * Users schema
+ * Primary user account information
  */
 export const users = pgTable("users", {
   id: serial("id").primaryKey(),
   username: text("username").notNull().unique(),
-  password: text("password").notNull(),
   email: text("email").unique(),
-  fullName: text("full_name"),
-  role: text("role").default("user").notNull(),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-  updatedAt: timestamp("updated_at").notNull().defaultNow()
+  password: text("password").notNull(),
+  displayName: text("display_name"),
+  githubToken: text("github_token"),
+  stripeCustomerId: text("stripe_customer_id"),
+  stripeSubscriptionId: text("stripe_subscription_id"),
+  isAdmin: boolean("is_admin").default(false).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
+
+/**
+ * Define relations for the users table
+ */
+export const usersRelations = relations(users, ({ many }) => ({
+  // A user can have many mods
+  mods: many(mods),
+}));
 
 /**
  * Schema for user insertion validation
  */
 export const insertUserSchema = createInsertSchema(users)
-  .omit({ id: true, createdAt: true, updatedAt: true, role: true })
+  .omit({
+    id: true,
+    createdAt: true,
+    updatedAt: true,
+    isAdmin: true,
+    githubToken: true,
+    stripeCustomerId: true,
+    stripeSubscriptionId: true,
+  })
   .extend({
-    username: z.string().min(3).max(50),
+    username: z.string().min(3).max(20),
     password: z.string().min(8),
-    email: z.string().email().optional(),
-    fullName: z.string().optional()
+    email: z.string().email().optional().nullable(),
   });
-
-/**
- * User relationships
- */
-export const usersRelations = relations(users, ({ many }) => ({
-  mods: many(mods)
-}));
 
 // Type exports
 export type InsertUser = z.infer<typeof insertUserSchema>;

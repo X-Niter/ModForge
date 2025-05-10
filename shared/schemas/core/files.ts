@@ -1,24 +1,37 @@
-import { pgTable, text, serial, integer, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, timestamp, jsonb } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 import { relations } from "drizzle-orm";
 import { mods } from "./mods";
 
 /**
- * ModFile schema
- * Stores source code files associated with a mod
+ * ModFiles schema
+ * Information about mod files and their content
  */
 export const modFiles = pgTable("mod_files", {
   id: serial("id").primaryKey(),
-  modId: integer("mod_id").notNull(),
+  modId: integer("mod_id").notNull().references(() => mods.id),
   path: text("path").notNull(),
   content: text("content").notNull(),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  contentType: text("content_type").default("text/plain").notNull(),
+  metadata: jsonb("metadata").default({}).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
 /**
- * Schema for mod file insertion validation
+ * Define relations for the modFiles table
+ */
+export const modFilesRelations = relations(modFiles, ({ one }) => ({
+  // A file belongs to one mod
+  mod: one(mods, {
+    fields: [modFiles.modId],
+    references: [mods.id],
+  }),
+}));
+
+/**
+ * Schema for modFile insertion validation
  */
 export const insertModFileSchema = createInsertSchema(modFiles)
   .omit({
@@ -28,18 +41,10 @@ export const insertModFileSchema = createInsertSchema(modFiles)
   })
   .extend({
     path: z.string().min(1),
-    content: z.string()
+    content: z.string(),
+    contentType: z.string().default("text/plain"),
+    metadata: z.record(z.any()).default({}),
   });
-
-/**
- * ModFile relationships
- */
-export const modFilesRelations = relations(modFiles, ({ one }) => ({
-  mod: one(mods, {
-    fields: [modFiles.modId],
-    references: [mods.id],
-  }),
-}));
 
 // Type exports
 export type InsertModFile = z.infer<typeof insertModFileSchema>;

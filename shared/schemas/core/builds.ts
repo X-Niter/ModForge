@@ -1,36 +1,52 @@
-import { pgTable, text, serial, integer, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, jsonb, timestamp, boolean } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 import { relations } from "drizzle-orm";
 import { mods } from "./mods";
 
 /**
- * Build statuses enum
+ * BuildStatus enum
+ * Defines the possible states of a build
  */
-export const BuildStatus = {
-  InProgress: "in_progress",
-  Success: "success",
-  Failed: "failed",
-} as const;
-
-export type BuildStatus = typeof BuildStatus[keyof typeof BuildStatus];
+export enum BuildStatus {
+  Queued = "queued",
+  InProgress = "in_progress",
+  Success = "succeeded",
+  Failed = "failed"
+}
 
 /**
- * Build schema
- * Tracks build/compilation attempts for mods
+ * Builds schema
+ * Information about mod builds and their status
  */
 export const builds = pgTable("builds", {
   id: serial("id").primaryKey(),
-  modId: integer("mod_id").notNull(),
+  modId: integer("mod_id").notNull().references(() => mods.id),
   buildNumber: integer("build_number").notNull(),
-  status: text("status").notNull(), // success, failed, in_progress
-  errorCount: integer("error_count").notNull().default(0),
-  warningCount: integer("warning_count").notNull().default(0),
-  logs: text("logs").notNull(),
+  version: text("version").notNull(),
+  status: text("status").default(BuildStatus.Queued).notNull(),
+  logs: text("logs"),
+  errors: jsonb("errors").default([]).notNull(),
+  errorCount: integer("error_count").default(0).notNull(),
+  warningCount: integer("warning_count").default(0).notNull(),
+  isAutomatic: boolean("is_automatic").default(false).notNull(),
   downloadUrl: text("download_url"),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
+  metadata: jsonb("metadata").default({}).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
   completedAt: timestamp("completed_at"),
 });
+
+/**
+ * Define relations for the builds table
+ */
+export const buildsRelations = relations(builds, ({ one }) => ({
+  // A build belongs to one mod
+  mod: one(mods, {
+    fields: [builds.modId],
+    references: [mods.id],
+  }),
+}));
 
 /**
  * Schema for build insertion validation
@@ -39,22 +55,19 @@ export const insertBuildSchema = createInsertSchema(builds)
   .omit({
     id: true,
     createdAt: true,
+    updatedAt: true,
     completedAt: true,
   })
   .extend({
-    status: z.enum([BuildStatus.InProgress, BuildStatus.Success, BuildStatus.Failed]),
-    logs: z.string().default("")
+    buildNumber: z.number().int().positive(),
+    version: z.string().min(1),
+    status: z.nativeEnum(BuildStatus).default(BuildStatus.Queued),
+    errors: z.array(z.any()).default([]),
+    errorCount: z.number().int().min(0).default(0),
+    warningCount: z.number().int().min(0).default(0),
+    downloadUrl: z.string().nullable().optional(),
+    metadata: z.record(z.any()).default({}),
   });
-
-/**
- * Build relationships
- */
-export const buildsRelations = relations(builds, ({ one }) => ({
-  mod: one(mods, {
-    fields: [builds.modId],
-    references: [mods.id],
-  }),
-}));
 
 // Type exports
 export type InsertBuild = z.infer<typeof insertBuildSchema>;
