@@ -2,18 +2,17 @@ package com.modforge.intellij.plugin.ui.toolwindow;
 
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.project.Project;
-import com.intellij.openapi.ui.ComboBox;
 import com.intellij.openapi.wm.ToolWindow;
 import com.intellij.ui.components.JBLabel;
-import com.intellij.ui.components.JBPanel;
-import com.intellij.ui.components.JBScrollPane;
 import com.intellij.ui.components.JBTabbedPane;
-import com.intellij.ui.components.JBTextField;
 import com.intellij.util.ui.JBUI;
+import com.intellij.util.ui.UIUtil;
 import com.modforge.intellij.plugin.ai.PatternRecognitionService;
+import com.modforge.intellij.plugin.auth.ModAuthenticationManager;
 import com.modforge.intellij.plugin.services.AutonomousCodeGenerationService;
 import com.modforge.intellij.plugin.services.ContinuousDevelopmentService;
 import com.modforge.intellij.plugin.settings.ModForgeSettings;
+import org.json.simple.JSONObject;
 
 import javax.swing.*;
 import java.awt.*;
@@ -27,727 +26,335 @@ public class ModForgeToolWindowContent {
     private final Project project;
     private final ToolWindow toolWindow;
     private JPanel mainPanel;
+    private Timer refreshTimer;
     
-    /**
-     * Constructor.
-     * @param project The project
-     * @param toolWindow The tool window
-     */
+    // UI components
+    private JLabel authStatusLabel;
+    private JLabel usernameLabel;
+    private JLabel continuousDevelopmentStatusLabel;
+    private JLabel patternRecognitionStatusLabel;
+    private JLabel taskCountLabel;
+    private JLabel patternMatchesLabel;
+    private JLabel apiFallbacksLabel;
+    private JLabel patternSuccessRateLabel;
+    private JLabel uniquePatternsLabel;
+    
     public ModForgeToolWindowContent(Project project, ToolWindow toolWindow) {
         this.project = project;
         this.toolWindow = toolWindow;
         
-        LOG.info("Creating ModForge tool window content for project: " + project.getName());
-        
-        // Create content
-        createContent();
+        createUI();
+        startRefreshTimer();
     }
     
     /**
-     * Create the content.
+     * Create UI components.
      */
-    private void createContent() {
-        mainPanel = new JBPanel<>(new BorderLayout());
-        mainPanel.setBorder(JBUI.Borders.empty(10));
+    private void createUI() {
+        mainPanel = new JPanel(new BorderLayout());
         
+        // Create tabs
         JBTabbedPane tabbedPane = new JBTabbedPane();
         
-        // Add tabs
-        tabbedPane.addTab("Dashboard", createDashboardPanel());
-        tabbedPane.addTab("Continuous Development", createContinuousDevelopmentPanel());
-        tabbedPane.addTab("Code Generation", createCodeGenerationPanel());
-        tabbedPane.addTab("Pattern Recognition", createPatternRecognitionPanel());
-        tabbedPane.addTab("GitHub Integration", createGitHubIntegrationPanel());
+        // Dashboard tab
+        JPanel dashboardPanel = createDashboardPanel();
+        tabbedPane.addTab("Dashboard", dashboardPanel);
         
+        // Development tab
+        JPanel developmentPanel = createDevelopmentPanel();
+        tabbedPane.addTab("Development", developmentPanel);
+        
+        // Patterns tab
+        JPanel patternsPanel = createPatternsPanel();
+        tabbedPane.addTab("Patterns", patternsPanel);
+        
+        // Add tabs to main panel
         mainPanel.add(tabbedPane, BorderLayout.CENTER);
+        
+        // Initial update
+        updateUI();
     }
     
     /**
      * Create dashboard panel.
-     * @return The dashboard panel
+     * @return Dashboard panel
      */
     private JPanel createDashboardPanel() {
-        JPanel panel = new JBPanel<>(new BorderLayout());
+        JPanel panel = new JPanel(new GridBagLayout());
         panel.setBorder(JBUI.Borders.empty(10));
         
-        // Add title
-        JBLabel titleLabel = new JBLabel("ModForge Dashboard");
-        titleLabel.setFont(titleLabel.getFont().deriveFont(Font.BOLD, 16));
-        panel.add(titleLabel, BorderLayout.NORTH);
-        
-        // Add content
-        JPanel contentPanel = new JBPanel<>(new GridLayout(0, 1, 0, 10));
-        contentPanel.setBorder(JBUI.Borders.empty(10, 0, 0, 0));
-        
-        // Status
-        addStatusSection(contentPanel);
-        
-        // Quick actions
-        addQuickActionsSection(contentPanel);
-        
-        // Metrics
-        addMetricsSection(contentPanel);
-        
-        // Wrap in scroll pane
-        JBScrollPane scrollPane = new JBScrollPane(contentPanel);
-        scrollPane.setBorder(JBUI.Borders.empty());
-        panel.add(scrollPane, BorderLayout.CENTER);
-        
-        return panel;
-    }
-    
-    /**
-     * Add status section to panel.
-     * @param panel The panel to add to
-     */
-    private void addStatusSection(JPanel panel) {
-        JPanel statusPanel = new JBPanel<>(new GridLayout(0, 2, 10, 5));
-        statusPanel.setBorder(JBUI.Borders.emptyTop(10));
+        GridBagConstraints c = new GridBagConstraints();
+        c.fill = GridBagConstraints.HORIZONTAL;
+        c.weightx = 1.0;
+        c.insets = JBUI.insets(5);
         
         // Authentication status
-        statusPanel.add(new JBLabel("Authentication:"));
-        ModForgeSettings settings = ModForgeSettings.getInstance();
-        String authStatus = settings.isAuthenticated() ? "Authenticated" : "Not authenticated";
-        statusPanel.add(new JBLabel(authStatus));
+        c.gridx = 0;
+        c.gridy = 0;
+        c.gridwidth = 1;
+        panel.add(new JBLabel("Authentication Status:"), c);
+        
+        c.gridx = 1;
+        c.gridy = 0;
+        authStatusLabel = new JLabel("Unknown");
+        panel.add(authStatusLabel, c);
+        
+        // Username
+        c.gridx = 0;
+        c.gridy = 1;
+        panel.add(new JBLabel("Username:"), c);
+        
+        c.gridx = 1;
+        c.gridy = 1;
+        usernameLabel = new JLabel("Not logged in");
+        panel.add(usernameLabel, c);
         
         // Continuous development status
-        statusPanel.add(new JBLabel("Continuous Development:"));
-        ContinuousDevelopmentService continuousDevelopmentService = 
-                project.getService(ContinuousDevelopmentService.class);
-        String cdStatus = "Disabled";
-        if (continuousDevelopmentService != null) {
-            cdStatus = continuousDevelopmentService.isRunning() ? "Running" : "Stopped";
-        }
-        statusPanel.add(new JBLabel(cdStatus));
+        c.gridx = 0;
+        c.gridy = 2;
+        panel.add(new JBLabel("Continuous Development:"), c);
+        
+        c.gridx = 1;
+        c.gridy = 2;
+        continuousDevelopmentStatusLabel = new JLabel("Disabled");
+        panel.add(continuousDevelopmentStatusLabel, c);
         
         // Pattern recognition status
-        statusPanel.add(new JBLabel("Pattern Recognition:"));
-        PatternRecognitionService patternRecognitionService = 
-                PatternRecognitionService.getInstance();
-        String prStatus = "Disabled";
-        if (patternRecognitionService != null) {
-            prStatus = patternRecognitionService.isEnabled() ? "Enabled" : "Disabled";
-        }
-        statusPanel.add(new JBLabel(prStatus));
+        c.gridx = 0;
+        c.gridy = 3;
+        panel.add(new JBLabel("Pattern Recognition:"), c);
         
-        // Add title
-        JPanel titlePanel = new JBPanel<>(new BorderLayout());
-        JBLabel title = new JBLabel("Status");
-        title.setFont(title.getFont().deriveFont(Font.BOLD));
-        titlePanel.add(title, BorderLayout.NORTH);
-        titlePanel.add(statusPanel, BorderLayout.CENTER);
+        c.gridx = 1;
+        c.gridy = 3;
+        patternRecognitionStatusLabel = new JLabel("Disabled");
+        panel.add(patternRecognitionStatusLabel, c);
         
-        panel.add(titlePanel);
+        // Spacer
+        c.gridx = 0;
+        c.gridy = 4;
+        c.gridwidth = 2;
+        c.weighty = 1.0;
+        panel.add(Box.createVerticalGlue(), c);
+        
+        return panel;
     }
     
     /**
-     * Add quick actions section to panel.
-     * @param panel The panel to add to
+     * Create development panel.
+     * @return Development panel
      */
-    private void addQuickActionsSection(JPanel panel) {
-        JPanel actionsPanel = new JBPanel<>(new GridLayout(0, 1, 0, 5));
-        actionsPanel.setBorder(JBUI.Borders.emptyTop(10));
+    private JPanel createDevelopmentPanel() {
+        JPanel panel = new JPanel(new GridBagLayout());
+        panel.setBorder(JBUI.Borders.empty(10));
         
-        // Toggle continuous development
-        JButton toggleCdButton = new JButton("Toggle Continuous Development");
-        toggleCdButton.addActionListener(e -> {
-            ContinuousDevelopmentService continuousDevelopmentService = 
-                    project.getService(ContinuousDevelopmentService.class);
-            if (continuousDevelopmentService != null) {
-                boolean isRunning = continuousDevelopmentService.toggle();
-                toggleCdButton.setText((isRunning ? "Stop" : "Start") + " Continuous Development");
-            }
-        });
-        actionsPanel.add(toggleCdButton);
+        GridBagConstraints c = new GridBagConstraints();
+        c.fill = GridBagConstraints.HORIZONTAL;
+        c.weightx = 1.0;
+        c.insets = JBUI.insets(5);
         
-        // Toggle pattern recognition
-        JButton togglePrButton = new JButton("Toggle Pattern Recognition");
-        togglePrButton.addActionListener(e -> {
-            PatternRecognitionService patternRecognitionService = 
-                    PatternRecognitionService.getInstance();
-            if (patternRecognitionService != null) {
-                boolean isEnabled = patternRecognitionService.toggle();
-                togglePrButton.setText((isEnabled ? "Disable" : "Enable") + " Pattern Recognition");
-            }
-        });
-        actionsPanel.add(togglePrButton);
+        // Task count
+        c.gridx = 0;
+        c.gridy = 0;
+        c.gridwidth = 1;
+        panel.add(new JBLabel("Tasks Executed:"), c);
         
-        // Open settings
-        JButton settingsButton = new JButton("Open Settings");
-        settingsButton.addActionListener(e -> {
-            com.intellij.openapi.options.ShowSettingsUtil.getInstance().showSettingsDialog(
-                    project, "ModForge");
-        });
-        actionsPanel.add(settingsButton);
+        c.gridx = 1;
+        c.gridy = 0;
+        taskCountLabel = new JLabel("0");
+        panel.add(taskCountLabel, c);
         
-        // Add title
-        JPanel titlePanel = new JBPanel<>(new BorderLayout());
-        JBLabel title = new JBLabel("Quick Actions");
-        title.setFont(title.getFont().deriveFont(Font.BOLD));
-        titlePanel.add(title, BorderLayout.NORTH);
-        titlePanel.add(actionsPanel, BorderLayout.CENTER);
+        // Spacer
+        c.gridx = 0;
+        c.gridy = 1;
+        c.gridwidth = 2;
+        c.weighty = 1.0;
+        panel.add(Box.createVerticalGlue(), c);
         
-        panel.add(titlePanel);
+        return panel;
     }
     
     /**
-     * Add metrics section to panel.
-     * @param panel The panel to add to
+     * Create patterns panel.
+     * @return Patterns panel
      */
-    private void addMetricsSection(JPanel panel) {
-        JPanel metricsPanel = new JBPanel<>(new GridLayout(0, 2, 10, 5));
-        metricsPanel.setBorder(JBUI.Borders.emptyTop(10));
+    private JPanel createPatternsPanel() {
+        JPanel panel = new JPanel(new GridBagLayout());
+        panel.setBorder(JBUI.Borders.empty(10));
         
-        // Total API requests
-        metricsPanel.add(new JBLabel("Total API Requests:"));
-        metricsPanel.add(new JBLabel("0"));
+        GridBagConstraints c = new GridBagConstraints();
+        c.fill = GridBagConstraints.HORIZONTAL;
+        c.weightx = 1.0;
+        c.insets = JBUI.insets(5);
         
         // Pattern matches
-        metricsPanel.add(new JBLabel("Pattern Matches:"));
-        metricsPanel.add(new JBLabel("0"));
+        c.gridx = 0;
+        c.gridy = 0;
+        c.gridwidth = 1;
+        panel.add(new JBLabel("Pattern Matches:"), c);
         
-        // API calls
-        metricsPanel.add(new JBLabel("API Calls:"));
-        metricsPanel.add(new JBLabel("0"));
+        c.gridx = 1;
+        c.gridy = 0;
+        patternMatchesLabel = new JLabel("0");
+        panel.add(patternMatchesLabel, c);
         
-        // Estimated tokens saved
-        metricsPanel.add(new JBLabel("Estimated Tokens Saved:"));
-        metricsPanel.add(new JBLabel("0"));
+        // API fallbacks
+        c.gridx = 0;
+        c.gridy = 1;
+        panel.add(new JBLabel("API Fallbacks:"), c);
         
-        // Estimated cost saved
-        metricsPanel.add(new JBLabel("Estimated Cost Saved:"));
-        metricsPanel.add(new JBLabel("$0.00"));
+        c.gridx = 1;
+        c.gridy = 1;
+        apiFallbacksLabel = new JLabel("0");
+        panel.add(apiFallbacksLabel, c);
         
-        // Add title
-        JPanel titlePanel = new JBPanel<>(new BorderLayout());
-        JBLabel title = new JBLabel("Metrics");
-        title.setFont(title.getFont().deriveFont(Font.BOLD));
-        titlePanel.add(title, BorderLayout.NORTH);
-        titlePanel.add(metricsPanel, BorderLayout.CENTER);
+        // Pattern success rate
+        c.gridx = 0;
+        c.gridy = 2;
+        panel.add(new JBLabel("Pattern Success Rate:"), c);
         
-        panel.add(titlePanel);
-    }
-    
-    /**
-     * Create continuous development panel.
-     * @return The continuous development panel
-     */
-    private JPanel createContinuousDevelopmentPanel() {
-        JPanel panel = new JBPanel<>(new BorderLayout());
-        panel.setBorder(JBUI.Borders.empty(10));
+        c.gridx = 1;
+        c.gridy = 2;
+        patternSuccessRateLabel = new JLabel("0%");
+        panel.add(patternSuccessRateLabel, c);
         
-        // Add title
-        JBLabel titleLabel = new JBLabel("Continuous Development");
-        titleLabel.setFont(titleLabel.getFont().deriveFont(Font.BOLD, 16));
-        panel.add(titleLabel, BorderLayout.NORTH);
+        // Unique patterns
+        c.gridx = 0;
+        c.gridy = 3;
+        panel.add(new JBLabel("Unique Patterns:"), c);
         
-        // Add content
-        JPanel contentPanel = new JBPanel<>(new GridLayout(0, 1, 0, 10));
-        contentPanel.setBorder(JBUI.Borders.empty(10, 0, 0, 0));
+        c.gridx = 1;
+        c.gridy = 3;
+        uniquePatternsLabel = new JLabel("0");
+        panel.add(uniquePatternsLabel, c);
         
-        // Settings
-        addContinuousDevelopmentSettingsSection(contentPanel);
-        
-        // Status
-        addContinuousDevelopmentStatusSection(contentPanel);
-        
-        // Wrap in scroll pane
-        JBScrollPane scrollPane = new JBScrollPane(contentPanel);
-        scrollPane.setBorder(JBUI.Borders.empty());
-        panel.add(scrollPane, BorderLayout.CENTER);
+        // Spacer
+        c.gridx = 0;
+        c.gridy = 4;
+        c.gridwidth = 2;
+        c.weighty = 1.0;
+        panel.add(Box.createVerticalGlue(), c);
         
         return panel;
     }
     
     /**
-     * Add continuous development settings section to panel.
-     * @param panel The panel to add to
+     * Start refresh timer.
      */
-    private void addContinuousDevelopmentSettingsSection(JPanel panel) {
-        JPanel settingsPanel = new JBPanel<>(new GridLayout(0, 2, 10, 5));
-        settingsPanel.setBorder(JBUI.Borders.emptyTop(10));
-        
-        // Enable continuous development
-        settingsPanel.add(new JBLabel("Enable Continuous Development:"));
-        JCheckBox enableCdCheckBox = new JCheckBox();
-        ModForgeSettings settings = ModForgeSettings.getInstance();
-        enableCdCheckBox.setSelected(settings.isEnableContinuousDevelopment());
-        enableCdCheckBox.addActionListener(e -> {
-            settings.setEnableContinuousDevelopment(enableCdCheckBox.isSelected());
-        });
-        settingsPanel.add(enableCdCheckBox);
-        
-        // Frequency
-        settingsPanel.add(new JBLabel("Frequency (minutes):"));
-        JSpinner frequencySpinner = new JSpinner(new SpinnerNumberModel(
-                settings.getContinuousDevelopmentFrequency(), 1, 60, 1));
-        frequencySpinner.addChangeListener(e -> {
-            settings.setContinuousDevelopmentFrequency((Integer) frequencySpinner.getValue());
-        });
-        settingsPanel.add(frequencySpinner);
-        
-        // Add title
-        JPanel titlePanel = new JBPanel<>(new BorderLayout());
-        JBLabel title = new JBLabel("Settings");
-        title.setFont(title.getFont().deriveFont(Font.BOLD));
-        titlePanel.add(title, BorderLayout.NORTH);
-        titlePanel.add(settingsPanel, BorderLayout.CENTER);
-        
-        panel.add(titlePanel);
+    private void startRefreshTimer() {
+        // Create timer that refreshes UI every 5 seconds
+        refreshTimer = new Timer(5000, e -> updateUI());
+        refreshTimer.start();
     }
     
     /**
-     * Add continuous development status section to panel.
-     * @param panel The panel to add to
+     * Update UI with current data.
      */
-    private void addContinuousDevelopmentStatusSection(JPanel panel) {
-        JPanel statusPanel = new JBPanel<>(new GridLayout(0, 2, 10, 5));
-        statusPanel.setBorder(JBUI.Borders.emptyTop(10));
+    private void updateUI() {
+        // Update authentication status
+        ModAuthenticationManager authManager = ModAuthenticationManager.getInstance();
+        boolean isAuthenticated = authManager.isAuthenticated();
         
-        // Status
-        statusPanel.add(new JBLabel("Status:"));
-        ContinuousDevelopmentService continuousDevelopmentService = 
-                project.getService(ContinuousDevelopmentService.class);
-        String status = "Disabled";
-        if (continuousDevelopmentService != null) {
-            status = continuousDevelopmentService.isRunning() ? "Running" : "Stopped";
-        }
-        statusPanel.add(new JBLabel(status));
-        
-        // Last run
-        statusPanel.add(new JBLabel("Last Run:"));
-        statusPanel.add(new JBLabel("Never"));
-        
-        // Next run
-        statusPanel.add(new JBLabel("Next Run:"));
-        statusPanel.add(new JBLabel("N/A"));
-        
-        // Add title
-        JPanel titlePanel = new JBPanel<>(new BorderLayout());
-        JBLabel title = new JBLabel("Status");
-        title.setFont(title.getFont().deriveFont(Font.BOLD));
-        titlePanel.add(title, BorderLayout.NORTH);
-        titlePanel.add(statusPanel, BorderLayout.CENTER);
-        
-        panel.add(titlePanel);
-    }
-    
-    /**
-     * Create code generation panel.
-     * @return The code generation panel
-     */
-    private JPanel createCodeGenerationPanel() {
-        JPanel panel = new JBPanel<>(new BorderLayout());
-        panel.setBorder(JBUI.Borders.empty(10));
-        
-        // Add title
-        JBLabel titleLabel = new JBLabel("AI Code Generation");
-        titleLabel.setFont(titleLabel.getFont().deriveFont(Font.BOLD, 16));
-        panel.add(titleLabel, BorderLayout.NORTH);
-        
-        // Add content
-        JPanel contentPanel = new JBPanel<>(new GridLayout(0, 1, 0, 10));
-        contentPanel.setBorder(JBUI.Borders.empty(10, 0, 0, 0));
-        
-        // Settings
-        addCodeGenerationSettingsSection(contentPanel);
-        
-        // Generate code form
-        addGenerateCodeSection(contentPanel);
-        
-        // Fix code form
-        addFixCodeSection(contentPanel);
-        
-        // Wrap in scroll pane
-        JBScrollPane scrollPane = new JBScrollPane(contentPanel);
-        scrollPane.setBorder(JBUI.Borders.empty());
-        panel.add(scrollPane, BorderLayout.CENTER);
-        
-        return panel;
-    }
-    
-    /**
-     * Add code generation settings section to panel.
-     * @param panel The panel to add to
-     */
-    private void addCodeGenerationSettingsSection(JPanel panel) {
-        JPanel settingsPanel = new JBPanel<>(new GridLayout(0, 2, 10, 5));
-        settingsPanel.setBorder(JBUI.Borders.emptyTop(10));
-        
-        // Enable AI generation
-        settingsPanel.add(new JBLabel("Enable AI Generation:"));
-        JCheckBox enableAiCheckBox = new JCheckBox();
-        ModForgeSettings settings = ModForgeSettings.getInstance();
-        enableAiCheckBox.setSelected(settings.isEnableAIGeneration());
-        enableAiCheckBox.addActionListener(e -> {
-            settings.setEnableAIGeneration(enableAiCheckBox.isSelected());
-        });
-        settingsPanel.add(enableAiCheckBox);
-        
-        // Add title
-        JPanel titlePanel = new JBPanel<>(new BorderLayout());
-        JBLabel title = new JBLabel("Settings");
-        title.setFont(title.getFont().deriveFont(Font.BOLD));
-        titlePanel.add(title, BorderLayout.NORTH);
-        titlePanel.add(settingsPanel, BorderLayout.CENTER);
-        
-        panel.add(titlePanel);
-    }
-    
-    /**
-     * Add generate code section to panel.
-     * @param panel The panel to add to
-     */
-    private void addGenerateCodeSection(JPanel panel) {
-        JPanel generatePanel = new JBPanel<>(new BorderLayout());
-        generatePanel.setBorder(JBUI.Borders.emptyTop(10));
-        
-        // Form
-        JPanel formPanel = new JBPanel<>(new GridLayout(0, 1, 0, 5));
-        
-        // Prompt
-        formPanel.add(new JBLabel("Prompt:"));
-        JTextArea promptTextArea = new JTextArea(5, 0);
-        promptTextArea.setLineWrap(true);
-        promptTextArea.setWrapStyleWord(true);
-        JBScrollPane promptScrollPane = new JBScrollPane(promptTextArea);
-        formPanel.add(promptScrollPane);
-        
-        // Generate button
-        JButton generateButton = new JButton("Generate Code");
-        generateButton.addActionListener(e -> {
-            String prompt = promptTextArea.getText();
-            if (prompt.isEmpty()) {
-                return;
+        // Authentication status
+        if (isAuthenticated) {
+            authStatusLabel.setText("Authenticated");
+            authStatusLabel.setForeground(UIUtil.getContextHelpForeground());
+            
+            // Verify authentication
+            boolean isValid = authManager.verifyAuthentication();
+            
+            if (isValid) {
+                authStatusLabel.setText("Authenticated (Verified)");
+                authStatusLabel.setForeground(new Color(0, 150, 0)); // Green
+            } else {
+                authStatusLabel.setText("Authenticated (Invalid)");
+                authStatusLabel.setForeground(new Color(200, 0, 0)); // Red
             }
             
-            AutonomousCodeGenerationService codeGenerationService = 
-                    project.getService(AutonomousCodeGenerationService.class);
-            if (codeGenerationService != null) {
-                String code = codeGenerationService.generateCode(prompt);
-                if (code != null) {
-                    // TODO: Show generated code
+            // Username
+            String username = authManager.getUsername();
+            if (username != null) {
+                usernameLabel.setText(username);
+            } else {
+                // Try to get user data
+                JSONObject userData = authManager.getUserData();
+                
+                if (userData != null && userData.containsKey("username")) {
+                    usernameLabel.setText((String) userData.get("username"));
+                } else {
+                    usernameLabel.setText("Unknown");
                 }
             }
-        });
-        formPanel.add(generateButton);
-        
-        // Add title
-        JBLabel title = new JBLabel("Generate Code");
-        title.setFont(title.getFont().deriveFont(Font.BOLD));
-        generatePanel.add(title, BorderLayout.NORTH);
-        generatePanel.add(formPanel, BorderLayout.CENTER);
-        
-        panel.add(generatePanel);
-    }
-    
-    /**
-     * Add fix code section to panel.
-     * @param panel The panel to add to
-     */
-    private void addFixCodeSection(JPanel panel) {
-        JPanel fixPanel = new JBPanel<>(new BorderLayout());
-        fixPanel.setBorder(JBUI.Borders.emptyTop(10));
-        
-        // Form
-        JPanel formPanel = new JBPanel<>(new GridLayout(0, 1, 0, 5));
-        
-        // Code
-        formPanel.add(new JBLabel("Code:"));
-        JTextArea codeTextArea = new JTextArea(5, 0);
-        codeTextArea.setLineWrap(true);
-        codeTextArea.setWrapStyleWord(true);
-        JBScrollPane codeScrollPane = new JBScrollPane(codeTextArea);
-        formPanel.add(codeScrollPane);
-        
-        // Error message
-        formPanel.add(new JBLabel("Error Message:"));
-        JTextArea errorTextArea = new JTextArea(3, 0);
-        errorTextArea.setLineWrap(true);
-        errorTextArea.setWrapStyleWord(true);
-        JBScrollPane errorScrollPane = new JBScrollPane(errorTextArea);
-        formPanel.add(errorScrollPane);
-        
-        // Fix button
-        JButton fixButton = new JButton("Fix Code");
-        fixButton.addActionListener(e -> {
-            String code = codeTextArea.getText();
-            String errorMessage = errorTextArea.getText();
-            if (code.isEmpty()) {
-                return;
-            }
+        } else {
+            authStatusLabel.setText("Not authenticated");
+            authStatusLabel.setForeground(new Color(200, 0, 0)); // Red
             
-            AutonomousCodeGenerationService codeGenerationService = 
-                    project.getService(AutonomousCodeGenerationService.class);
-            if (codeGenerationService != null) {
-                String fixedCode = codeGenerationService.fixCode(code, errorMessage);
-                if (fixedCode != null) {
-                    // TODO: Show fixed code
-                }
-            }
-        });
-        formPanel.add(fixButton);
-        
-        // Add title
-        JBLabel title = new JBLabel("Fix Code");
-        title.setFont(title.getFont().deriveFont(Font.BOLD));
-        fixPanel.add(title, BorderLayout.NORTH);
-        fixPanel.add(formPanel, BorderLayout.CENTER);
-        
-        panel.add(fixPanel);
-    }
-    
-    /**
-     * Create pattern recognition panel.
-     * @return The pattern recognition panel
-     */
-    private JPanel createPatternRecognitionPanel() {
-        JPanel panel = new JBPanel<>(new BorderLayout());
-        panel.setBorder(JBUI.Borders.empty(10));
-        
-        // Add title
-        JBLabel titleLabel = new JBLabel("Pattern Recognition");
-        titleLabel.setFont(titleLabel.getFont().deriveFont(Font.BOLD, 16));
-        panel.add(titleLabel, BorderLayout.NORTH);
-        
-        // Add content
-        JPanel contentPanel = new JBPanel<>(new GridLayout(0, 1, 0, 10));
-        contentPanel.setBorder(JBUI.Borders.empty(10, 0, 0, 0));
-        
-        // Settings
-        addPatternRecognitionSettingsSection(contentPanel);
-        
-        // Status
-        addPatternRecognitionStatusSection(contentPanel);
-        
-        // Wrap in scroll pane
-        JBScrollPane scrollPane = new JBScrollPane(contentPanel);
-        scrollPane.setBorder(JBUI.Borders.empty());
-        panel.add(scrollPane, BorderLayout.CENTER);
-        
-        return panel;
-    }
-    
-    /**
-     * Add pattern recognition settings section to panel.
-     * @param panel The panel to add to
-     */
-    private void addPatternRecognitionSettingsSection(JPanel panel) {
-        JPanel settingsPanel = new JBPanel<>(new GridLayout(0, 2, 10, 5));
-        settingsPanel.setBorder(JBUI.Borders.emptyTop(10));
-        
-        // Enable pattern recognition
-        settingsPanel.add(new JBLabel("Use Pattern Learning:"));
-        JCheckBox enablePrCheckBox = new JCheckBox();
-        ModForgeSettings settings = ModForgeSettings.getInstance();
-        enablePrCheckBox.setSelected(settings.isUsePatternLearning());
-        enablePrCheckBox.addActionListener(e -> {
-            settings.setUsePatternLearning(enablePrCheckBox.isSelected());
-            
-            // Update service
-            PatternRecognitionService patternRecognitionService = 
-                    PatternRecognitionService.getInstance();
-            if (patternRecognitionService != null) {
-                patternRecognitionService.setEnabled(enablePrCheckBox.isSelected());
-            }
-        });
-        settingsPanel.add(enablePrCheckBox);
-        
-        // Add title
-        JPanel titlePanel = new JBPanel<>(new BorderLayout());
-        JBLabel title = new JBLabel("Settings");
-        title.setFont(title.getFont().deriveFont(Font.BOLD));
-        titlePanel.add(title, BorderLayout.NORTH);
-        titlePanel.add(settingsPanel, BorderLayout.CENTER);
-        
-        panel.add(titlePanel);
-    }
-    
-    /**
-     * Add pattern recognition status section to panel.
-     * @param panel The panel to add to
-     */
-    private void addPatternRecognitionStatusSection(JPanel panel) {
-        JPanel statusPanel = new JBPanel<>(new GridLayout(0, 2, 10, 5));
-        statusPanel.setBorder(JBUI.Borders.emptyTop(10));
-        
-        // Status
-        statusPanel.add(new JBLabel("Status:"));
-        PatternRecognitionService patternRecognitionService = 
-                PatternRecognitionService.getInstance();
-        String status = "Disabled";
-        if (patternRecognitionService != null) {
-            status = patternRecognitionService.isEnabled() ? "Enabled" : "Disabled";
+            usernameLabel.setText("Not logged in");
         }
-        statusPanel.add(new JBLabel(status));
         
-        // Total patterns
-        statusPanel.add(new JBLabel("Total Patterns:"));
-        statusPanel.add(new JBLabel("0"));
-        
-        // Pattern matches
-        statusPanel.add(new JBLabel("Pattern Matches:"));
-        statusPanel.add(new JBLabel("0"));
-        
-        // Add title
-        JPanel titlePanel = new JBPanel<>(new BorderLayout());
-        JBLabel title = new JBLabel("Status");
-        title.setFont(title.getFont().deriveFont(Font.BOLD));
-        titlePanel.add(title, BorderLayout.NORTH);
-        titlePanel.add(statusPanel, BorderLayout.CENTER);
-        
-        panel.add(titlePanel);
-    }
-    
-    /**
-     * Create GitHub integration panel.
-     * @return The GitHub integration panel
-     */
-    private JPanel createGitHubIntegrationPanel() {
-        JPanel panel = new JBPanel<>(new BorderLayout());
-        panel.setBorder(JBUI.Borders.empty(10));
-        
-        // Add title
-        JBLabel titleLabel = new JBLabel("GitHub Integration");
-        titleLabel.setFont(titleLabel.getFont().deriveFont(Font.BOLD, 16));
-        panel.add(titleLabel, BorderLayout.NORTH);
-        
-        // Add content
-        JPanel contentPanel = new JBPanel<>(new GridLayout(0, 1, 0, 10));
-        contentPanel.setBorder(JBUI.Borders.empty(10, 0, 0, 0));
-        
-        // Settings
-        addGitHubSettingsSection(contentPanel);
-        
-        // Repository
-        addGitHubRepositorySection(contentPanel);
-        
-        // Wrap in scroll pane
-        JBScrollPane scrollPane = new JBScrollPane(contentPanel);
-        scrollPane.setBorder(JBUI.Borders.empty());
-        panel.add(scrollPane, BorderLayout.CENTER);
-        
-        return panel;
-    }
-    
-    /**
-     * Add GitHub settings section to panel.
-     * @param panel The panel to add to
-     */
-    private void addGitHubSettingsSection(JPanel panel) {
-        JPanel settingsPanel = new JBPanel<>(new GridLayout(0, 2, 10, 5));
-        settingsPanel.setBorder(JBUI.Borders.emptyTop(10));
-        
-        // GitHub username
-        settingsPanel.add(new JBLabel("GitHub Username:"));
-        JBTextField usernameTextField = new JBTextField();
+        // Update continuous development status
         ModForgeSettings settings = ModForgeSettings.getInstance();
-        usernameTextField.setText(settings.getGithubUsername());
-        usernameTextField.getDocument().addDocumentListener(new javax.swing.event.DocumentListener() {
-            @Override
-            public void insertUpdate(javax.swing.event.DocumentEvent e) {
-                settings.setGithubUsername(usernameTextField.getText());
-            }
-            
-            @Override
-            public void removeUpdate(javax.swing.event.DocumentEvent e) {
-                settings.setGithubUsername(usernameTextField.getText());
-            }
-            
-            @Override
-            public void changedUpdate(javax.swing.event.DocumentEvent e) {
-                settings.setGithubUsername(usernameTextField.getText());
-            }
-        });
-        settingsPanel.add(usernameTextField);
+        boolean continuousDevelopment = settings.isContinuousDevelopment();
         
-        // GitHub token
-        settingsPanel.add(new JBLabel("GitHub Token:"));
-        JBTextField tokenTextField = new JBTextField();
-        tokenTextField.setText(settings.getGithubToken());
-        tokenTextField.getDocument().addDocumentListener(new javax.swing.event.DocumentListener() {
-            @Override
-            public void insertUpdate(javax.swing.event.DocumentEvent e) {
-                settings.setGithubToken(tokenTextField.getText());
-            }
+        if (continuousDevelopment) {
+            // Check if it's actually running
+            ContinuousDevelopmentService service = project.getService(ContinuousDevelopmentService.class);
             
-            @Override
-            public void removeUpdate(javax.swing.event.DocumentEvent e) {
-                settings.setGithubToken(tokenTextField.getText());
+            if (service.isRunning()) {
+                continuousDevelopmentStatusLabel.setText("Enabled (Running)");
+                continuousDevelopmentStatusLabel.setForeground(new Color(0, 150, 0)); // Green
+            } else {
+                continuousDevelopmentStatusLabel.setText("Enabled (Not Running)");
+                continuousDevelopmentStatusLabel.setForeground(new Color(200, 130, 0)); // Orange
             }
-            
-            @Override
-            public void changedUpdate(javax.swing.event.DocumentEvent e) {
-                settings.setGithubToken(tokenTextField.getText());
-            }
-        });
-        settingsPanel.add(tokenTextField);
+        } else {
+            continuousDevelopmentStatusLabel.setText("Disabled");
+            continuousDevelopmentStatusLabel.setForeground(UIUtil.getContextHelpForeground());
+        }
         
-        // Test button
-        settingsPanel.add(new JBLabel(""));
-        JButton testButton = new JButton("Test GitHub Connection");
-        testButton.addActionListener(e -> {
-            // TODO: Implement GitHub connection test
-        });
-        settingsPanel.add(testButton);
+        // Update pattern recognition status
+        boolean patternRecognition = settings.isPatternRecognition();
         
-        // Add title
-        JPanel titlePanel = new JBPanel<>(new BorderLayout());
-        JBLabel title = new JBLabel("Settings");
-        title.setFont(title.getFont().deriveFont(Font.BOLD));
-        titlePanel.add(title, BorderLayout.NORTH);
-        titlePanel.add(settingsPanel, BorderLayout.CENTER);
+        if (patternRecognition) {
+            patternRecognitionStatusLabel.setText("Enabled");
+            patternRecognitionStatusLabel.setForeground(new Color(0, 150, 0)); // Green
+        } else {
+            patternRecognitionStatusLabel.setText("Disabled");
+            patternRecognitionStatusLabel.setForeground(UIUtil.getContextHelpForeground());
+        }
         
-        panel.add(titlePanel);
+        // Update development metrics
+        ContinuousDevelopmentService devService = project.getService(ContinuousDevelopmentService.class);
+        taskCountLabel.setText(String.valueOf(devService.getTaskCount()));
+        
+        // Update pattern metrics
+        AutonomousCodeGenerationService autoService = project.getService(AutonomousCodeGenerationService.class);
+        patternMatchesLabel.setText(String.valueOf(autoService.getSuccessfulPatternMatches()));
+        apiFallbacksLabel.setText(String.valueOf(autoService.getTotalApiFallbacks()));
+        
+        double successRate = autoService.getPatternSuccessRate();
+        String successRateStr = String.format("%.1f%%", successRate * 100);
+        patternSuccessRateLabel.setText(successRateStr);
+        
+        // Update unique patterns
+        PatternRecognitionService patternService = project.getService(PatternRecognitionService.class);
+        uniquePatternsLabel.setText(String.valueOf(patternService.getUniquePatternCount()));
     }
     
     /**
-     * Add GitHub repository section to panel.
-     * @param panel The panel to add to
-     */
-    private void addGitHubRepositorySection(JPanel panel) {
-        JPanel repoPanel = new JBPanel<>(new GridLayout(0, 2, 10, 5));
-        repoPanel.setBorder(JBUI.Borders.emptyTop(10));
-        
-        // Repository owner
-        repoPanel.add(new JBLabel("Repository Owner:"));
-        JBTextField ownerTextField = new JBTextField();
-        repoPanel.add(ownerTextField);
-        
-        // Repository name
-        repoPanel.add(new JBLabel("Repository Name:"));
-        JBTextField nameTextField = new JBTextField();
-        repoPanel.add(nameTextField);
-        
-        // Repository branch
-        repoPanel.add(new JBLabel("Repository Branch:"));
-        JBTextField branchTextField = new JBTextField();
-        branchTextField.setText("main");
-        repoPanel.add(branchTextField);
-        
-        // Push button
-        repoPanel.add(new JBLabel(""));
-        JButton pushButton = new JButton("Push to GitHub");
-        pushButton.addActionListener(e -> {
-            // TODO: Implement push to GitHub
-        });
-        repoPanel.add(pushButton);
-        
-        // Add title
-        JPanel titlePanel = new JBPanel<>(new BorderLayout());
-        JBLabel title = new JBLabel("Repository");
-        title.setFont(title.getFont().deriveFont(Font.BOLD));
-        titlePanel.add(title, BorderLayout.NORTH);
-        titlePanel.add(repoPanel, BorderLayout.CENTER);
-        
-        panel.add(titlePanel);
-    }
-    
-    /**
-     * Get the content.
-     * @return The content panel
+     * Get the main panel.
+     * @return Main panel
      */
     public JPanel getContent() {
         return mainPanel;
+    }
+    
+    /**
+     * Dispose resources.
+     */
+    public void dispose() {
+        if (refreshTimer != null) {
+            refreshTimer.stop();
+            refreshTimer = null;
+        }
     }
 }

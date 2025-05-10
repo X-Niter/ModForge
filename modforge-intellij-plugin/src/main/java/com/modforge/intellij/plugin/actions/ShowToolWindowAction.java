@@ -17,28 +17,31 @@ public class ShowToolWindowAction extends AnAction {
     @Override
     public void actionPerformed(@NotNull AnActionEvent e) {
         Project project = e.getProject();
+        
         if (project == null) {
             return;
         }
         
         LOG.info("Showing ModForge tool window");
         
-        // Show tool window
+        // Get tool window manager
         ToolWindowManager toolWindowManager = ToolWindowManager.getInstance(project);
+        
+        // Get ModForge tool window
         ToolWindow toolWindow = toolWindowManager.getToolWindow("ModForge");
         
         if (toolWindow != null) {
+            // Show tool window
             toolWindow.show();
         } else {
-            LOG.error("Could not find ModForge tool window");
+            LOG.error("ModForge tool window not found");
         }
     }
     
     @Override
     public void update(@NotNull AnActionEvent e) {
-        Project project = e.getProject();
-        
         // Only enable if we have a project
+        Project project = e.getProject();
         e.getPresentation().setEnabledAndVisible(project != null);
     }
 }

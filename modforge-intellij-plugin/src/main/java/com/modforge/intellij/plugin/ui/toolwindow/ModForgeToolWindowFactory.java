@@ -19,13 +19,11 @@ public class ModForgeToolWindowFactory implements ToolWindowFactory {
         LOG.info("Creating ModForge tool window content");
         
         // Create tool window content
-        ModForgeToolWindowContent toolWindowContent = new ModForgeToolWindowContent(project, toolWindow);
-        
-        // Create content for tool window
-        ContentFactory contentFactory = ContentFactory.getInstance();
-        Content content = contentFactory.createContent(toolWindowContent.getContent(), "", false);
+        ModForgeToolWindowContent content = new ModForgeToolWindowContent(project, toolWindow);
         
         // Add content to tool window
-        toolWindow.getContentManager().addContent(content);
+        ContentFactory contentFactory = ContentFactory.getInstance();
+        Content toolWindowContent = contentFactory.createContent(content.getContent(), null, false);
+        toolWindow.getContentManager().addContent(toolWindowContent);
     }
 }

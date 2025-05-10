@@ -18,9 +18,20 @@ public class OpenSettingsAction extends AnAction {
     public void actionPerformed(@NotNull AnActionEvent e) {
         Project project = e.getProject();
         
+        if (project == null) {
+            return;
+        }
+        
         LOG.info("Opening ModForge settings");
         
         // Show settings dialog
         ShowSettingsUtil.getInstance().showSettingsDialog(project, ModForgeSettingsConfigurable.class);
+    }
+    
+    @Override
+    public void update(@NotNull AnActionEvent e) {
+        // Only enable if we have a project
+        Project project = e.getProject();
+        e.getPresentation().setEnabledAndVisible(project != null);
     }
 }
