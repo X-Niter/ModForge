@@ -102,13 +102,13 @@ export default function AuthPage() {
   }
 
   return (
-    <div className="container mx-auto grid min-h-screen items-center justify-center md:grid-cols-2 gap-6 py-8">
+    <div className="container mx-auto grid min-h-screen items-center justify-center md:grid-cols-2 gap-6 py-8 bg-background">
       <div className="mx-auto flex w-full flex-col justify-center space-y-6 sm:w-[350px]">
         <div className="flex flex-col space-y-2 text-center">
-          <h1 className="text-2xl font-semibold tracking-tight">
+          <h1 className="text-2xl font-bold tracking-tight bg-gradient-to-r from-primary to-blue-400 bg-clip-text text-transparent">
             Welcome to ModForge
           </h1>
-          <p className="text-sm text-muted-foreground">
+          <p className="text-base text-foreground">
             {activeTab === "login" 
               ? "Sign in to access your account" 
               : "Create an account to get started"}
@@ -152,7 +152,7 @@ export default function AuthPage() {
                 />
                 <Button 
                   type="submit" 
-                  className="w-full" 
+                  className="w-full bg-gradient-to-r from-primary to-blue-500 hover:from-primary/90 hover:to-blue-500/90 text-white" 
                   disabled={loginMutation.isPending}
                 >
                   {loginMutation.isPending ? (
@@ -238,7 +238,7 @@ export default function AuthPage() {
                 />
                 <Button 
                   type="submit" 
-                  className="w-full" 
+                  className="w-full bg-gradient-to-r from-primary to-blue-500 hover:from-primary/90 hover:to-blue-500/90 text-white" 
                   disabled={registerMutation.isPending}
                 >
                   {registerMutation.isPending ? (
@@ -269,41 +269,49 @@ export default function AuthPage() {
       </div>
 
       {/* Hero section */}
-      <div className="hidden bg-muted p-10 md:flex md:flex-col md:justify-center">
+      <div className="hidden bg-background border-l p-10 md:flex md:flex-col md:justify-center">
         <div className="space-y-6">
-          <h1 className="text-3xl font-bold">AI-Powered Minecraft Mod Development</h1>
-          <p className="text-xl">
+          <h1 className="text-3xl font-bold bg-gradient-to-r from-primary to-blue-400 bg-clip-text text-transparent">AI-Powered Minecraft Mod Development</h1>
+          <p className="text-xl text-foreground">
             Create, test, and improve Minecraft mods with AI assistance. 
             ModForge handles the complex details, letting you focus on creativity.
           </p>
-          <ul className="grid gap-2">
-            <li className="flex items-center gap-2 text-primary-foreground">
-              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5 text-primary">
-                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
-                <polyline points="22 4 12 14.01 9 11.01"></polyline>
-              </svg>
-              <span>Automatic compilation error fixing</span>
+          <ul className="grid gap-4">
+            <li className="flex items-center gap-3">
+              <div className="bg-primary/10 p-1 rounded-full">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5 text-primary">
+                  <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                  <polyline points="22 4 12 14.01 9 11.01"></polyline>
+                </svg>
+              </div>
+              <span className="text-foreground font-medium">Automatic compilation error fixing</span>
             </li>
-            <li className="flex items-center gap-2 text-primary-foreground">
-              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5 text-primary">
-                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
-                <polyline points="22 4 12 14.01 9 11.01"></polyline>
-              </svg>
-              <span>Support for multiple mod loaders</span>
+            <li className="flex items-center gap-3">
+              <div className="bg-primary/10 p-1 rounded-full">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5 text-primary">
+                  <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                  <polyline points="22 4 12 14.01 9 11.01"></polyline>
+                </svg>
+              </div>
+              <span className="text-foreground font-medium">Support for multiple mod loaders</span>
             </li>
-            <li className="flex items-center gap-2 text-primary-foreground">
-              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5 text-primary">
-                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
-                <polyline points="22 4 12 14.01 9 11.01"></polyline>
-              </svg>
-              <span>Continuous development with GitHub</span>
+            <li className="flex items-center gap-3">
+              <div className="bg-primary/10 p-1 rounded-full">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5 text-primary">
+                  <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                  <polyline points="22 4 12 14.01 9 11.01"></polyline>
+                </svg>
+              </div>
+              <span className="text-foreground font-medium">Continuous development with GitHub</span>
             </li>
-            <li className="flex items-center gap-2 text-primary-foreground">
-              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5 text-primary">
-                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
-                <polyline points="22 4 12 14.01 9 11.01"></polyline>
-              </svg>
-              <span>24/7 autonomous development</span>
+            <li className="flex items-center gap-3">
+              <div className="bg-primary/10 p-1 rounded-full">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5 text-primary">
+                  <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                  <polyline points="22 4 12 14.01 9 11.01"></polyline>
+                </svg>
+              </div>
+              <span className="text-foreground font-medium">24/7 autonomous development</span>
             </li>
           </ul>
         </div>

@@ -47,7 +47,7 @@ export function UserNav() {
           <Avatar className="h-8 w-8">
             <AvatarImage src={user.avatarUrl} alt={user.username} />
             <AvatarFallback>
-              {user.username.substring(0, 2).toUpperCase()}
+              {user.username ? user.username.substring(0, 2).toUpperCase() : 'U'}
             </AvatarFallback>
           </Avatar>
         </Button>
