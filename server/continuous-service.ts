@@ -35,6 +35,52 @@ class ContinuousService extends EventEmitter {
   private running: Map<number, boolean> = new Map();
   private intervals: Map<number, NodeJS.Timeout> = new Map();
   private buildCounts: Map<number, number> = new Map();
+  private circuitBreakerMaintenanceInterval: NodeJS.Timeout | null = null;
+  
+  constructor() {
+    super();
+    
+    // Set up periodic circuit breaker maintenance
+    this.startCircuitBreakerMaintenance();
+  }
+  
+  /**
+   * Start a periodic task to check for and reset expired circuit breakers
+   * This helps ensure that temporary issues don't permanently stop continuous development
+   */
+  private startCircuitBreakerMaintenance() {
+    // Check every 15 minutes
+    this.circuitBreakerMaintenanceInterval = setInterval(() => {
+      try {
+        const now = Date.now();
+        const circuitBreakerTimeKeys = Object.keys(process.env)
+          .filter(key => key.startsWith('circuit_breaker_') && key.endsWith('_time'));
+          
+        for (const timeKey of circuitBreakerTimeKeys) {
+          const tripTime = parseInt(process.env[timeKey] || '0', 10);
+          const resetThreshold = 60 * 60 * 1000; // 1 hour
+          
+          // If the circuit breaker has been tripped for more than the threshold, reset it
+          if (tripTime > 0 && now - tripTime >= resetThreshold) {
+            const modIdStr = timeKey.replace('circuit_breaker_', '').replace('_time', '');
+            const modId = parseInt(modIdStr, 10);
+            
+            if (!isNaN(modId)) {
+              const circuitBreakerKey = `circuit_breaker_${modId}`;
+              process.env[circuitBreakerKey] = '0';
+              delete process.env[timeKey];
+              
+              logContinuous(modId, "Circuit breaker automatically reset after timeout period", 'info');
+            }
+          }
+        }
+      } catch (error) {
+        // Don't let maintenance errors crash the service
+        console.error("Error in circuit breaker maintenance:", 
+          error instanceof Error ? error.message : String(error));
+      }
+    }, 15 * 60 * 1000);
+  }
   
   /**
    * Start continuous development for a mod
@@ -448,6 +494,33 @@ class ContinuousService extends EventEmitter {
       activeJobs: runningMods.length,
       timestamp: new Date().toISOString()
     };
+  }
+  
+  /**
+   * Cleanup resources when service is shutting down
+   * This should be called when the application is gracefully shutting down
+   */
+  public cleanup() {
+    // Clear the circuit breaker maintenance interval
+    if (this.circuitBreakerMaintenanceInterval) {
+      clearInterval(this.circuitBreakerMaintenanceInterval);
+      this.circuitBreakerMaintenanceInterval = null;
+    }
+    
+    // Shutdown all continuous development processes
+    this.shutdownAll("Application shutting down");
+    
+    // Clear all intervals
+    const modIds = Array.from(this.intervals.keys());
+    for (const modId of modIds) {
+      const interval = this.intervals.get(modId);
+      if (interval) {
+        clearInterval(interval);
+        this.intervals.delete(modId);
+      }
+    }
+    
+    console.log("[ContinuousService] Cleanup complete - all resources released");
   }
   
   /**

@@ -119,6 +119,37 @@ app.use((req, res, next) => {
   // this serves both the API and the client.
   // It is the only port that is not firewalled.
   const port = 5000;
+  // Setup graceful shutdown handlers
+  const gracefulShutdown = async (signal: string) => {
+    log(`${signal} received - starting graceful shutdown`);
+    
+    // Import the continuousService to clean it up
+    const { continuousService } = await import('./continuous-service');
+    
+    // Clean up resources
+    continuousService.cleanup();
+    
+    // Close database pool
+    await pool.end();
+    
+    // Close the server
+    server.close(() => {
+      log('HTTP server closed');
+      process.exit(0);
+    });
+    
+    // If server hasn't closed in 10 seconds, force exit
+    setTimeout(() => {
+      console.error('Server shutdown timed out, forcing exit');
+      process.exit(1);
+    }, 10000);
+  };
+  
+  // Attach shutdown handlers
+  process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+  process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+  
+  // Start the server
   server.listen({
     port,
     host: "0.0.0.0",
