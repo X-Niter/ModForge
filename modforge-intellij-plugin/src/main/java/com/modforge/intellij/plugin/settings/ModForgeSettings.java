@@ -20,6 +20,11 @@ public class ModForgeSettings implements PersistentStateComponent<ModForgeSettin
     private boolean continuousDevelopmentEnabled = false;
     private boolean patternRecognitionEnabled = true;
     private int updateFrequencyMinutes = 5;
+    private String serverUrl = "http://localhost:5000";
+    private String username = "";
+    private String password = "";
+    private String sessionToken = "";
+    private boolean authenticated = false;
     
     /**
      * Gets the instance of this settings.
@@ -104,6 +109,86 @@ public class ModForgeSettings implements PersistentStateComponent<ModForgeSettin
     }
     
     /**
+     * Gets the server URL.
+     * @return The server URL
+     */
+    public String getServerUrl() {
+        return serverUrl;
+    }
+    
+    /**
+     * Sets the server URL.
+     * @param serverUrl The server URL
+     */
+    public void setServerUrl(String serverUrl) {
+        this.serverUrl = serverUrl;
+    }
+    
+    /**
+     * Gets the username.
+     * @return The username
+     */
+    public String getUsername() {
+        return username;
+    }
+    
+    /**
+     * Sets the username.
+     * @param username The username
+     */
+    public void setUsername(String username) {
+        this.username = username;
+    }
+    
+    /**
+     * Gets the password.
+     * @return The password
+     */
+    public String getPassword() {
+        return password;
+    }
+    
+    /**
+     * Sets the password.
+     * @param password The password
+     */
+    public void setPassword(String password) {
+        this.password = password;
+    }
+    
+    /**
+     * Gets the session token.
+     * @return The session token
+     */
+    public String getSessionToken() {
+        return sessionToken;
+    }
+    
+    /**
+     * Sets the session token.
+     * @param sessionToken The session token
+     */
+    public void setSessionToken(String sessionToken) {
+        this.sessionToken = sessionToken;
+    }
+    
+    /**
+     * Checks if the user is authenticated.
+     * @return True if the user is authenticated, false otherwise
+     */
+    public boolean isAuthenticated() {
+        return authenticated;
+    }
+    
+    /**
+     * Sets whether the user is authenticated.
+     * @param authenticated Whether the user is authenticated
+     */
+    public void setAuthenticated(boolean authenticated) {
+        this.authenticated = authenticated;
+    }
+    
+    /**
      * Resets all settings to their default values.
      */
     public void resetToDefaults() {
@@ -111,5 +196,10 @@ public class ModForgeSettings implements PersistentStateComponent<ModForgeSettin
         continuousDevelopmentEnabled = false;
         patternRecognitionEnabled = true;
         updateFrequencyMinutes = 5;
+        serverUrl = "http://localhost:5000";
+        username = "";
+        password = "";
+        sessionToken = "";
+        authenticated = false;
     }
 }
