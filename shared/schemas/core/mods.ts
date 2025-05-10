@@ -34,16 +34,9 @@ export const mods = pgTable("mods", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
-/**
- * Schema for mod insertion validation
- */
-export const insertModSchema = createInsertSchema(mods)
-.omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
-})
-.extend({
+// Create a simplified version of the schema for validation
+const insertModValidationSchema = z.object({
+  userId: z.number(),
   name: z.string().min(3).max(50),
   modId: z.string().min(3).max(50),
   description: z.string().min(5),
@@ -56,9 +49,12 @@ export const insertModSchema = createInsertSchema(mods)
   codingStyle: z.string(),
   compileFrequency: z.nativeEnum(CompileFrequency),
   autoFixLevel: z.nativeEnum(AutoFixLevel),
-  autoPushToGithub: z.coerce.number(),
-  generateDocumentation: z.coerce.number(),
+  autoPushToGithub: z.boolean().transform(val => val ? 1 : 0),
+  generateDocumentation: z.boolean().transform(val => val ? 1 : 0),
+  githubRepo: z.string().optional(),
 });
+
+export const insertModSchema = insertModValidationSchema;
 
 // Type exports
 export type InsertMod = z.infer<typeof insertModSchema>;
