@@ -337,13 +337,69 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return `${days}d ${hours}h ${minutes}m ${remainingSeconds}s`;
       };
       
-      // Return comprehensive metrics
+      // Check for system problems that might need self-healing
+      const systemIssues = [];
+      let selfHealingActions = [];
+      
+      // Check for database issues
+      if (dbHealth.status !== 'healthy') {
+        systemIssues.push({
+          component: 'database',
+          issue: dbHealth.message,
+          severity: 'high'
+        });
+      }
+      
+      // Check for excessive circuit breakers
+      if (totalTrippedCircuitBreakers > 3) {
+        systemIssues.push({
+          component: 'continuous-development',
+          issue: `${totalTrippedCircuitBreakers} circuit breakers tripped`,
+          severity: 'medium'
+        });
+        
+        // Attempt to self-heal by resetting circuit breakers that have been tripped too long
+        const now = Date.now();
+        const TWO_HOURS = 2 * 60 * 60 * 1000;
+        
+        // Find long-tripped circuit breakers
+        const expiredCircuitBreakers = circuitBreakerStats.filter(cb => {
+          if (!cb.tripped || !cb.tripTime) return false;
+          const tripTime = new Date(cb.tripTime).getTime();
+          return now - tripTime > TWO_HOURS;
+        });
+        
+        // Reset expired circuit breakers
+        if (expiredCircuitBreakers.length > 0) {
+          expiredCircuitBreakers.forEach(cb => {
+            const circuitBreakerKey = `circuit_breaker_${cb.modId}`;
+            process.env[circuitBreakerKey] = '0';
+            delete process.env[`${circuitBreakerKey}_time`];
+            
+            selfHealingActions.push({
+              component: 'circuit-breaker',
+              action: `Reset circuit breaker for mod ${cb.modId}`,
+              timestamp: new Date().toISOString()
+            });
+          });
+        }
+      }
+      
+      // Return comprehensive metrics with self-healing information
       res.json({
         success: true,
         status: dbHealth.status === 'healthy' ? 'healthy' : 'unhealthy',
         database: dbHealth,
         continuousDevelopment: continuousHealth,
         usageMetrics,
+        systemHealth: {
+          issues: systemIssues,
+          selfHealing: {
+            enabled: true,
+            actionsPerformed: selfHealingActions,
+            lastChecked: new Date().toISOString()
+          }
+        },
         circuitBreakers: {
           total: circuitBreakerStats.length,
           tripped: totalTrippedCircuitBreakers,
