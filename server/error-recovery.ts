@@ -326,7 +326,8 @@ async function recoverFromMemoryIssues(): Promise<RecoveryResult> {
         };
       } catch (cleanupError) {
         logger.error("Failed to clean up memory through reference clearing", {
-          error: cleanupError
+          error: cleanupError instanceof Error ? cleanupError.message : String(cleanupError),
+          stack: cleanupError instanceof Error ? cleanupError.stack : undefined
         });
         
         return {
@@ -390,7 +391,10 @@ async function recoverFromStuckCompilations(): Promise<RecoveryResult> {
             try {
               process.kill(pid);
             } catch (killError) {
-              logger.error(`Failed to kill process ${pid}`, { error: killError });
+              logger.error(`Failed to kill process ${pid}`, { 
+                error: killError instanceof Error ? killError.message : String(killError),
+                stack: killError instanceof Error ? killError.stack : undefined 
+              });
             }
           }
         }
@@ -413,7 +417,10 @@ async function recoverFromStuckCompilations(): Promise<RecoveryResult> {
       timestamp: new Date().toISOString()
     };
   } catch (error) {
-    logger.error("Failed to recover from stuck compilations", { error });
+    logger.error("Failed to recover from stuck compilations", { 
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined 
+    });
     
     return {
       successful: false,

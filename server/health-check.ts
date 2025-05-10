@@ -233,7 +233,10 @@ async function checkFileSystem(): Promise<CheckResult & { fileSystemStatus?: Fil
             }
             throw new Error('Invalid or incomplete df output');
           } catch (err) {
-            logger.debug('df command method failed', { error: err });
+            logger.debug('df command method failed', { 
+              error: err instanceof Error ? err.message : String(err),
+              stack: err instanceof Error ? err.stack : undefined 
+            });
             throw err; // Pass to next method
           }
         });
