@@ -143,7 +143,10 @@ async function checkDatabase(): Promise<CheckResult & { databaseStatus?: Databas
       responseTime
     };
   } catch (error) {
-    logger.error('Database health check failed', { error });
+    logger.error('Database health check failed', { 
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined
+    });
     
     return {
       status: 'unhealthy',

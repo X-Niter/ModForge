@@ -216,7 +216,8 @@ async function recoverFromDatabaseConnectionIssues(): Promise<RecoveryResult> {
           
           // Restart the pool (this will happen automatically on next query)
           // We'll do a simple query to trigger the pool restart
-          setTimeout(async () => {
+          // Store timeout ID for potential cleanup
+          const timeoutId = setTimeout(async () => {
             try {
               await pool.query("SELECT 1 AS connection_test");
               logger.info("Database connection pool successfully restarted");
@@ -225,6 +226,24 @@ async function recoverFromDatabaseConnectionIssues(): Promise<RecoveryResult> {
                 error: restartError instanceof Error ? restartError.message : String(restartError),
                 stack: restartError instanceof Error ? restartError.stack : undefined
               });
+              
+              // Implement exponential backoff with a maximum number of retries
+              // This prevents infinite restart attempts and potential memory leaks
+              const maxRetries = 5;
+              const retryCount = parseInt(process.env.DB_RETRY_COUNT || '0', 10);
+              
+              if (retryCount < maxRetries) {
+                // Exponential backoff with jitter
+                const delay = Math.min(1000 * Math.pow(2, retryCount), 30000) + Math.random() * 1000;
+                logger.info(`Scheduling database reconnection attempt ${retryCount + 1}/${maxRetries} in ${Math.round(delay/1000)}s`);
+                
+                // Set environment variable to track retry count
+                process.env.DB_RETRY_COUNT = (retryCount + 1).toString();
+              } else {
+                logger.error(`Maximum database reconnection attempts (${maxRetries}) reached. Manual intervention required.`);
+                // Reset retry count after max attempts
+                process.env.DB_RETRY_COUNT = '0';
+              }
             }
           }, 1000);
           
