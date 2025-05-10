@@ -31,10 +31,10 @@ export default function ContinuousDevelopment() {
         
         <main className="flex-1 overflow-hidden flex flex-col">
           <div className="flex flex-col h-full">
-            <div className="bg-surface p-4 border-b border-gray-700 flex items-center justify-between">
+            <div className="p-4 border-b border-border/50 flex items-center justify-between">
               <div className="flex items-center">
-                <Brain className="h-5 w-5 text-purple-500 mr-2" />
-                <h2 className="text-lg font-medium text-white">Continuous Development</h2>
+                <Brain className="h-5 w-5 text-violet-500 mr-2" />
+                <h2 className="text-lg font-medium bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-violet-600">Continuous Development</h2>
               </div>
               
               <div className="flex items-center space-x-2">
@@ -131,8 +131,8 @@ export default function ContinuousDevelopment() {
                               </div>
                               
                               <div className="mt-6 flex justify-end">
-                                <button className="text-sm text-blue-500 flex items-center">
-                                  <Settings className="h-4 w-4 mr-1" /> Configure System
+                                <button className="text-sm flex items-center px-3 py-1.5 rounded-md bg-gradient-to-r from-blue-600 to-violet-600 text-white hover:from-blue-700 hover:to-violet-700 transition-colors">
+                                  <Settings className="h-4 w-4 mr-1.5" /> Configure System
                                 </button>
                               </div>
                             </CardContent>
@@ -184,8 +184,10 @@ export default function ContinuousDevelopment() {
               ) : (
                 <Card className="p-6 flex items-center justify-center">
                   <div className="text-center">
-                    <Brain className="h-12 w-12 text-purple-500 mx-auto mb-4" />
-                    <h3 className="text-xl font-medium mb-2">Select a Mod to Continue</h3>
+                    <div className="mx-auto mb-4 rounded-full w-16 h-16 bg-gradient-to-br from-blue-600 to-violet-600 flex items-center justify-center">
+                      <Brain className="h-8 w-8 text-white" />
+                    </div>
+                    <h3 className="text-xl font-medium mb-2 bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-violet-600">Select a Mod to Continue</h3>
                     <p className="text-muted-foreground mb-4">
                       Choose a mod to monitor and manage its continuous development
                     </p>
