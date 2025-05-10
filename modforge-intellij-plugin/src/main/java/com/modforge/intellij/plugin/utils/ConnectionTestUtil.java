@@ -2,52 +2,150 @@ package com.modforge.intellij.plugin.utils;
 
 import com.intellij.openapi.diagnostic.Logger;
 
+import java.io.IOException;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 /**
- * Utility for testing connection to the ModForge server.
- * @deprecated Use TokenAuthConnectionUtil for authenticated requests. This only does basic connection testing.
+ * Utility for testing connections to ModForge server.
  */
-@Deprecated
 public class ConnectionTestUtil {
     private static final Logger LOG = Logger.getInstance(ConnectionTestUtil.class);
-    private static final int TIMEOUT = 5000;
+    private static final int CONNECTION_TIMEOUT_MS = 5000;
     
     /**
      * Test connection to server.
+     *
      * @param serverUrl Server URL
-     * @return Whether connection was successful
+     * @return Connection result (true if successful, false otherwise)
      */
     public static boolean testConnection(String serverUrl) {
         try {
-            // Normalize URL
-            String normalizedUrl = serverUrl;
-            if (!normalizedUrl.endsWith("/")) {
-                normalizedUrl += "/";
+            // Create a task to test the connection
+            Callable<Boolean> connectionTask = () -> {
+                try {
+                    // Create connection to health API
+                    URL url = new URL(serverUrl + "/api/health");
+                    HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+                    
+                    // Set request method and timeout
+                    connection.setRequestMethod("GET");
+                    connection.setConnectTimeout(CONNECTION_TIMEOUT_MS);
+                    connection.setReadTimeout(CONNECTION_TIMEOUT_MS);
+                    
+                    // Check response
+                    int responseCode = connection.getResponseCode();
+                    
+                    if (responseCode == HttpURLConnection.HTTP_OK) {
+                        // Connection successful
+                        LOG.info("Connection successful to: " + serverUrl);
+                        return true;
+                    } else {
+                        // Connection failed
+                        LOG.info("Connection failed to: " + serverUrl + ", response code: " + responseCode);
+                        return false;
+                    }
+                } catch (IOException e) {
+                    LOG.error("Error testing connection", e);
+                    return false;
+                }
+            };
+            
+            // Execute the task with a timeout
+            ExecutorService executor = Executors.newSingleThreadExecutor();
+            Future<Boolean> future = executor.submit(connectionTask);
+            
+            try {
+                // Wait for the task to complete with timeout
+                boolean result = future.get(CONNECTION_TIMEOUT_MS, TimeUnit.MILLISECONDS);
+                return result;
+            } catch (TimeoutException e) {
+                // Connection timeout
+                LOG.error("Connection timeout to: " + serverUrl);
+                future.cancel(true);
+                return false;
+            } catch (Exception e) {
+                // Other error
+                LOG.error("Error testing connection", e);
+                return false;
+            } finally {
+                // Shutdown executor
+                executor.shutdownNow();
             }
-            
-            // Remove "api" if it's already in the URL to avoid duplication
-            if (normalizedUrl.endsWith("api/")) {
-                normalizedUrl = normalizedUrl.substring(0, normalizedUrl.length() - 4);
-            }
-            
-            // Use health endpoint which doesn't require auth
-            URL url = new URL(normalizedUrl + "api/health");
-            HttpURLConnection connection = (HttpURLConnection) url.openConnection();
-            connection.setRequestMethod("GET");
-            connection.setConnectTimeout(TIMEOUT);
-            connection.setReadTimeout(TIMEOUT);
-            
-            int responseCode = connection.getResponseCode();
-            boolean connected = responseCode >= 200 && responseCode < 300;
-            
-            LOG.info("Connection test to " + url + " returned " + responseCode);
-            
-            connection.disconnect();
-            return connected;
         } catch (Exception e) {
-            LOG.warn("Connection test failed: " + e.getMessage(), e);
+            LOG.error("Error testing connection", e);
+            return false;
+        }
+    }
+    
+    /**
+     * Test connection to server with custom timeout.
+     *
+     * @param serverUrl Server URL
+     * @param timeoutMs Timeout in milliseconds
+     * @return Connection result (true if successful, false otherwise)
+     */
+    public static boolean testConnection(String serverUrl, int timeoutMs) {
+        try {
+            // Create a task to test the connection
+            Callable<Boolean> connectionTask = () -> {
+                try {
+                    // Create connection to health API
+                    URL url = new URL(serverUrl + "/api/health");
+                    HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+                    
+                    // Set request method and timeout
+                    connection.setRequestMethod("GET");
+                    connection.setConnectTimeout(timeoutMs);
+                    connection.setReadTimeout(timeoutMs);
+                    
+                    // Check response
+                    int responseCode = connection.getResponseCode();
+                    
+                    if (responseCode == HttpURLConnection.HTTP_OK) {
+                        // Connection successful
+                        LOG.info("Connection successful to: " + serverUrl);
+                        return true;
+                    } else {
+                        // Connection failed
+                        LOG.info("Connection failed to: " + serverUrl + ", response code: " + responseCode);
+                        return false;
+                    }
+                } catch (IOException e) {
+                    LOG.error("Error testing connection", e);
+                    return false;
+                }
+            };
+            
+            // Execute the task with a timeout
+            ExecutorService executor = Executors.newSingleThreadExecutor();
+            Future<Boolean> future = executor.submit(connectionTask);
+            
+            try {
+                // Wait for the task to complete with timeout
+                boolean result = future.get(timeoutMs, TimeUnit.MILLISECONDS);
+                return result;
+            } catch (TimeoutException e) {
+                // Connection timeout
+                LOG.error("Connection timeout to: " + serverUrl);
+                future.cancel(true);
+                return false;
+            } catch (Exception e) {
+                // Other error
+                LOG.error("Error testing connection", e);
+                return false;
+            } finally {
+                // Shutdown executor
+                executor.shutdownNow();
+            }
+        } catch (Exception e) {
+            LOG.error("Error testing connection", e);
             return false;
         }
     }

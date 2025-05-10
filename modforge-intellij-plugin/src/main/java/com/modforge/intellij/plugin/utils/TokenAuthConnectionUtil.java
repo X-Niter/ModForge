@@ -1,214 +1,206 @@
 package com.modforge.intellij.plugin.utils;
 
 import com.intellij.openapi.diagnostic.Logger;
-import com.modforge.intellij.plugin.settings.ModForgeSettings;
+import org.json.simple.JSONObject;
+import org.json.simple.parser.JSONParser;
+import org.json.simple.parser.ParseException;
 
-import java.io.BufferedReader;
 import java.io.IOException;
-import java.io.InputStreamReader;
+import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
+import java.util.Scanner;
 
 /**
- * Utility for making HTTP requests with token-based authentication.
+ * Utility for making authenticated HTTP requests with token auth.
  */
 public class TokenAuthConnectionUtil {
     private static final Logger LOG = Logger.getInstance(TokenAuthConnectionUtil.class);
-    private static final int TIMEOUT = 5000; // 5 seconds
     
     /**
-     * Make an authenticated GET request.
-     * 
-     * @param endpoint The endpoint to request (e.g., "/api/user")
-     * @return Response as a string, or null if the request failed
+     * Make a GET request with token authentication.
+     *
+     * @param serverUrl Server URL
+     * @param path API path
+     * @param token Authentication token
+     * @return Response as JSONObject, or null if request failed
      */
-    public static String makeAuthenticatedGetRequest(String endpoint) {
-        ModForgeSettings settings = ModForgeSettings.getInstance();
-        
-        if (!settings.isAuthenticated() || settings.getAccessToken().isEmpty()) {
-            LOG.warn("Not authenticated or missing token");
-            return null;
-        }
-        
-        String serverUrl = settings.getServerUrl();
-        HttpURLConnection connection = null;
-        
+    public static JSONObject get(String serverUrl, String path, String token) {
         try {
-            // Normalize the URL
-            serverUrl = normalizeServerUrl(serverUrl);
+            // Create connection
+            URL url = new URL(serverUrl + path);
+            HttpURLConnection connection = (HttpURLConnection) url.openConnection();
             
-            // Make sure the endpoint starts with a slash
-            if (!endpoint.startsWith("/")) {
-                endpoint = "/" + endpoint;
-            }
-            
-            URL url = new URL(serverUrl + endpoint.substring(1));
-            connection = (HttpURLConnection) url.openConnection();
+            // Set request method and headers
             connection.setRequestMethod("GET");
-            connection.setConnectTimeout(TIMEOUT);
-            connection.setReadTimeout(TIMEOUT);
+            connection.setRequestProperty("Accept", "application/json");
+            connection.setRequestProperty("Authorization", "Bearer " + token);
             
-            // Set token-based authentication header
-            connection.setRequestProperty("Authorization", "Bearer " + settings.getAccessToken());
-            
-            // Get response code
+            // Check response
             int responseCode = connection.getResponseCode();
             
-            if (responseCode >= 200 && responseCode < 300) {
+            if (responseCode == HttpURLConnection.HTTP_OK) {
                 // Read response
-                StringBuilder response = new StringBuilder();
-                try (BufferedReader br = new BufferedReader(
-                        new InputStreamReader(connection.getInputStream(), StandardCharsets.UTF_8))) {
-                    String responseLine;
-                    while ((responseLine = br.readLine()) != null) {
-                        response.append(responseLine);
-                    }
-                }
-                
-                return response.toString();
+                return readResponse(connection);
             } else {
-                LOG.warn("Request failed with response code: " + responseCode);
-                
-                // Try to read error stream
-                StringBuilder errorResponse = new StringBuilder();
-                try (BufferedReader br = new BufferedReader(
-                        new InputStreamReader(connection.getErrorStream(), StandardCharsets.UTF_8))) {
-                    String responseLine;
-                    while ((responseLine = br.readLine()) != null) {
-                        errorResponse.append(responseLine);
-                    }
-                } catch (Exception e) {
-                    // Ignore error reading error stream
-                }
-                
-                LOG.warn("Error response: " + errorResponse);
+                // Request failed
+                LOG.info("GET request failed: " + path + ", response code: " + responseCode);
                 return null;
             }
         } catch (IOException e) {
-            LOG.warn("Request failed: " + e.getMessage());
+            LOG.error("Error making GET request", e);
             return null;
-        } finally {
-            if (connection != null) {
-                connection.disconnect();
-            }
         }
     }
     
     /**
-     * Make an authenticated POST request.
-     * 
-     * @param endpoint The endpoint to request (e.g., "/api/logout")
-     * @param jsonBody JSON body as string, or null for no body
-     * @return Response as a string, or null if the request failed
+     * Make a POST request with token authentication.
+     *
+     * @param serverUrl Server URL
+     * @param path API path
+     * @param token Authentication token
+     * @param body Request body as JSONObject
+     * @return Response as JSONObject, or null if request failed
      */
-    public static String makeAuthenticatedPostRequest(String endpoint, String jsonBody) {
-        ModForgeSettings settings = ModForgeSettings.getInstance();
-        
-        if (!settings.isAuthenticated() || settings.getAccessToken().isEmpty()) {
-            LOG.warn("Not authenticated or missing token");
-            return null;
-        }
-        
-        String serverUrl = settings.getServerUrl();
-        HttpURLConnection connection = null;
-        
+    public static JSONObject post(String serverUrl, String path, String token, JSONObject body) {
         try {
-            // Normalize the URL
-            serverUrl = normalizeServerUrl(serverUrl);
+            // Create connection
+            URL url = new URL(serverUrl + path);
+            HttpURLConnection connection = (HttpURLConnection) url.openConnection();
             
-            // Make sure the endpoint starts with a slash
-            if (!endpoint.startsWith("/")) {
-                endpoint = "/" + endpoint;
-            }
-            
-            URL url = new URL(serverUrl + endpoint.substring(1));
-            connection = (HttpURLConnection) url.openConnection();
+            // Set request method and headers
             connection.setRequestMethod("POST");
-            connection.setConnectTimeout(TIMEOUT);
-            connection.setReadTimeout(TIMEOUT);
+            connection.setRequestProperty("Content-Type", "application/json");
+            connection.setRequestProperty("Accept", "application/json");
+            connection.setRequestProperty("Authorization", "Bearer " + token);
+            connection.setDoOutput(true);
             
-            // Set token-based authentication header
-            connection.setRequestProperty("Authorization", "Bearer " + settings.getAccessToken());
-            
-            // If we have a body, set content type and write it
-            if (jsonBody != null && !jsonBody.isEmpty()) {
-                connection.setDoOutput(true);
-                connection.setRequestProperty("Content-Type", "application/json");
-                
-                try (OutputStream os = connection.getOutputStream()) {
-                    os.write(jsonBody.getBytes(StandardCharsets.UTF_8));
-                }
+            // Write request body
+            try (OutputStream os = connection.getOutputStream()) {
+                byte[] input = body.toJSONString().getBytes(StandardCharsets.UTF_8);
+                os.write(input, 0, input.length);
             }
             
-            // Get response code
+            // Check response
             int responseCode = connection.getResponseCode();
             
-            if (responseCode >= 200 && responseCode < 300) {
+            if (responseCode == HttpURLConnection.HTTP_OK || responseCode == HttpURLConnection.HTTP_CREATED) {
                 // Read response
-                StringBuilder response = new StringBuilder();
-                try (BufferedReader br = new BufferedReader(
-                        new InputStreamReader(connection.getInputStream(), StandardCharsets.UTF_8))) {
-                    String responseLine;
-                    while ((responseLine = br.readLine()) != null) {
-                        response.append(responseLine);
-                    }
-                }
-                
-                return response.toString();
+                return readResponse(connection);
             } else {
-                LOG.warn("Request failed with response code: " + responseCode);
-                
-                // Try to read error stream
-                StringBuilder errorResponse = new StringBuilder();
-                try (BufferedReader br = new BufferedReader(
-                        new InputStreamReader(connection.getErrorStream(), StandardCharsets.UTF_8))) {
-                    String responseLine;
-                    while ((responseLine = br.readLine()) != null) {
-                        errorResponse.append(responseLine);
-                    }
-                } catch (Exception e) {
-                    // Ignore error reading error stream
-                }
-                
-                LOG.warn("Error response: " + errorResponse);
+                // Request failed
+                LOG.info("POST request failed: " + path + ", response code: " + responseCode);
                 return null;
             }
         } catch (IOException e) {
-            LOG.warn("Request failed: " + e.getMessage());
+            LOG.error("Error making POST request", e);
             return null;
-        } finally {
-            if (connection != null) {
-                connection.disconnect();
+        }
+    }
+    
+    /**
+     * Make a PUT request with token authentication.
+     *
+     * @param serverUrl Server URL
+     * @param path API path
+     * @param token Authentication token
+     * @param body Request body as JSONObject
+     * @return Response as JSONObject, or null if request failed
+     */
+    public static JSONObject put(String serverUrl, String path, String token, JSONObject body) {
+        try {
+            // Create connection
+            URL url = new URL(serverUrl + path);
+            HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+            
+            // Set request method and headers
+            connection.setRequestMethod("PUT");
+            connection.setRequestProperty("Content-Type", "application/json");
+            connection.setRequestProperty("Accept", "application/json");
+            connection.setRequestProperty("Authorization", "Bearer " + token);
+            connection.setDoOutput(true);
+            
+            // Write request body
+            try (OutputStream os = connection.getOutputStream()) {
+                byte[] input = body.toJSONString().getBytes(StandardCharsets.UTF_8);
+                os.write(input, 0, input.length);
             }
+            
+            // Check response
+            int responseCode = connection.getResponseCode();
+            
+            if (responseCode == HttpURLConnection.HTTP_OK) {
+                // Read response
+                return readResponse(connection);
+            } else {
+                // Request failed
+                LOG.info("PUT request failed: " + path + ", response code: " + responseCode);
+                return null;
+            }
+        } catch (IOException e) {
+            LOG.error("Error making PUT request", e);
+            return null;
         }
     }
     
     /**
-     * Test token-based authentication.
-     * 
-     * @return Whether token authentication works
+     * Make a DELETE request with token authentication.
+     *
+     * @param serverUrl Server URL
+     * @param path API path
+     * @param token Authentication token
+     * @return true if successful, false otherwise
      */
-    public static boolean testTokenAuthentication() {
-        String response = makeAuthenticatedGetRequest("/api/auth/verify");
-        return response != null && response.contains("success");
+    public static boolean delete(String serverUrl, String path, String token) {
+        try {
+            // Create connection
+            URL url = new URL(serverUrl + path);
+            HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+            
+            // Set request method and headers
+            connection.setRequestMethod("DELETE");
+            connection.setRequestProperty("Accept", "application/json");
+            connection.setRequestProperty("Authorization", "Bearer " + token);
+            
+            // Check response
+            int responseCode = connection.getResponseCode();
+            
+            if (responseCode == HttpURLConnection.HTTP_OK || responseCode == HttpURLConnection.HTTP_NO_CONTENT) {
+                // Delete successful
+                return true;
+            } else {
+                // Request failed
+                LOG.info("DELETE request failed: " + path + ", response code: " + responseCode);
+                return false;
+            }
+        } catch (IOException e) {
+            LOG.error("Error making DELETE request", e);
+            return false;
+        }
     }
     
     /**
-     * Normalize server URL.
+     * Read response body as JSONObject.
+     *
+     * @param connection HTTP connection
+     * @return Response as JSONObject, or null if parsing failed
      */
-    private static String normalizeServerUrl(String serverUrl) {
-        // Add trailing slash if needed
-        if (!serverUrl.endsWith("/")) {
-            serverUrl += "/";
+    private static JSONObject readResponse(HttpURLConnection connection) {
+        try {
+            // Read response body
+            try (InputStream is = connection.getInputStream();
+                 Scanner scanner = new Scanner(is, StandardCharsets.UTF_8.name())) {
+                String response = scanner.useDelimiter("\\A").next();
+                
+                // Parse JSON
+                JSONParser parser = new JSONParser();
+                return (JSONObject) parser.parse(response);
+            }
+        } catch (IOException | ParseException e) {
+            LOG.error("Error reading response", e);
+            return null;
         }
-        
-        // Remove "api" if it's already in the URL to avoid duplication
-        if (serverUrl.endsWith("/api/")) {
-            serverUrl = serverUrl.substring(0, serverUrl.length() - 4);
-        }
-        
-        return serverUrl;
     }
 }

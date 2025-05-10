@@ -6,14 +6,12 @@ import com.intellij.openapi.actionSystem.AnAction;
 import com.intellij.openapi.actionSystem.AnActionEvent;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.project.Project;
-import com.intellij.openapi.ui.Messages;
 import com.modforge.intellij.plugin.settings.ModForgeSettings;
 import com.modforge.intellij.plugin.utils.AuthTestUtil;
 import org.jetbrains.annotations.NotNull;
 
 /**
- * Action to test token-based authentication with direct HTTP requests.
- * This provides a more comprehensive test than the verification action.
+ * Action to test token authentication with ModForge server.
  */
 public class TestTokenAuthAction extends AnAction {
     private static final Logger LOG = Logger.getInstance(TestTokenAuthAction.class);
@@ -21,43 +19,51 @@ public class TestTokenAuthAction extends AnAction {
     @Override
     public void actionPerformed(@NotNull AnActionEvent e) {
         Project project = e.getProject();
-        if (project == null) {
-            return;
-        }
+        
+        LOG.info("Testing token authentication with ModForge server");
         
         ModForgeSettings settings = ModForgeSettings.getInstance();
+        String token = settings.getAccessToken();
         
-        if (!settings.isAuthenticated() || settings.getAccessToken().isEmpty()) {
-            showNotification(project, "Not Authenticated", 
-                    "You are not authenticated with ModForge. Please log in first.", 
-                    NotificationType.WARNING);
+        if (token.isEmpty()) {
+            notifyError(project, "No access token found. Please log in first.");
             return;
         }
         
-        // Use the AuthTestUtil to test token-based authentication
-        String testResults = AuthTestUtil.testTokenAuthentication();
+        // Test authentication
+        boolean isAuthenticated = AuthTestUtil.verifyAuthentication(settings.getServerUrl(), token);
         
-        // Show dialog with results
-        Messages.showInfoMessage(project, testResults, "Token Authentication Test Results");
-        
-        LOG.info("Completed testing token authentication");
-        
-        showNotification(project, "Token Authentication Test Completed", 
-                "Token-based authentication test completed. Check the dialog for results.", 
-                NotificationType.INFORMATION);
+        if (isAuthenticated) {
+            notifySuccess(project, "Token authentication successful!");
+        } else {
+            notifyError(project, "Token authentication failed. Please log in again.");
+        }
     }
     
+    private void notifySuccess(Project project, String message) {
+        NotificationGroupManager.getInstance()
+                .getNotificationGroup("ModForge Notifications")
+                .createNotification(
+                        "Token Authentication Test",
+                        message,
+                        NotificationType.INFORMATION)
+                .notify(project);
+    }
+    
+    private void notifyError(Project project, String message) {
+        NotificationGroupManager.getInstance()
+                .getNotificationGroup("ModForge Notifications")
+                .createNotification(
+                        "Token Authentication Test",
+                        message,
+                        NotificationType.ERROR)
+                .notify(project);
+    }
     
     @Override
     public void update(@NotNull AnActionEvent e) {
-        // Only enable action if we have a project
-        e.getPresentation().setEnabledAndVisible(e.getProject() != null);
-    }
-    
-    private void showNotification(Project project, String title, String content, NotificationType type) {
-        NotificationGroupManager.getInstance()
-                .getNotificationGroup("ModForge Notifications")
-                .createNotification(title, content, type)
-                .notify(project);
+        // Only enable if we have a project
+        Project project = e.getProject();
+        e.getPresentation().setEnabledAndVisible(project != null);
     }
 }
