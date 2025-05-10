@@ -8,7 +8,7 @@ import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.Messages;
 import com.modforge.intellij.plugin.settings.ModForgeSettings;
-import com.modforge.intellij.plugin.utils.TokenAuthConnectionUtil;
+import com.modforge.intellij.plugin.utils.AuthTestUtil;
 import org.jetbrains.annotations.NotNull;
 
 /**
@@ -34,45 +34,11 @@ public class TestTokenAuthAction extends AnAction {
             return;
         }
         
-        // Test basic token auth
-        boolean tokenWorks = TokenAuthConnectionUtil.testTokenAuthentication();
-        
-        if (!tokenWorks) {
-            showNotification(project, "Token Authentication Failed", 
-                    "Your token is not valid or the server is not responding. Please log in again.", 
-                    NotificationType.ERROR);
-            return;
-        }
-        
-        // Test specific endpoints and build a report
-        StringBuilder results = new StringBuilder("Token Authentication Test Results:\n\n");
-        
-        // Test user endpoint
-        String userResponse = TokenAuthConnectionUtil.makeAuthenticatedGetRequest("/api/user");
-        results.append("GET /api/user:\n")
-               .append(userResponse != null ? "Success" : "Failed")
-               .append("\n");
-        
-        if (userResponse != null) {
-            results.append("Response: ").append(formatResponse(userResponse)).append("\n\n");
-        } else {
-            results.append("No response received\n\n");
-        }
-        
-        // Test auth/me endpoint
-        String authMeResponse = TokenAuthConnectionUtil.makeAuthenticatedGetRequest("/api/auth/me");
-        results.append("GET /api/auth/me:\n")
-               .append(authMeResponse != null ? "Success" : "Failed")
-               .append("\n");
-        
-        if (authMeResponse != null) {
-            results.append("Response: ").append(formatResponse(authMeResponse)).append("\n\n");
-        } else {
-            results.append("No response received\n\n");
-        }
+        // Use the AuthTestUtil to test token-based authentication
+        String testResults = AuthTestUtil.testTokenAuthentication();
         
         // Show dialog with results
-        Messages.showInfoMessage(project, results.toString(), "Token Authentication Test Results");
+        Messages.showInfoMessage(project, testResults, "Token Authentication Test Results");
         
         LOG.info("Completed testing token authentication");
         
@@ -81,15 +47,6 @@ public class TestTokenAuthAction extends AnAction {
                 NotificationType.INFORMATION);
     }
     
-    /**
-     * Format response for display - trim if too long.
-     */
-    private String formatResponse(String response) {
-        if (response.length() > 200) {
-            return response.substring(0, 197) + "...";
-        }
-        return response;
-    }
     
     @Override
     public void update(@NotNull AnActionEvent e) {

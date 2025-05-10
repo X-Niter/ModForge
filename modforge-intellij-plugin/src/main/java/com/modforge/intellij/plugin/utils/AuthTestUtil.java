@@ -4,286 +4,190 @@ import com.intellij.openapi.diagnostic.Logger;
 import com.modforge.intellij.plugin.auth.AuthenticationManager;
 import com.modforge.intellij.plugin.settings.ModForgeSettings;
 
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStreamReader;
-import java.io.OutputStream;
-import java.net.HttpURLConnection;
-import java.net.URL;
-import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
- * Utility for testing authentication endpoints with token-based authentication.
+ * Utility for testing authentication.
  */
 public class AuthTestUtil {
     private static final Logger LOG = Logger.getInstance(AuthTestUtil.class);
-    private static final int TIMEOUT = 5000; // 5 seconds
-    
-    public static enum Endpoint {
-        USER("/api/user"),
-        AUTH_ME("/api/auth/me"),
-        AUTH_VERIFY("/api/auth/verify");
-        
-        private final String path;
-        
-        Endpoint(String path) {
-            this.path = path;
-        }
-        
-        public String getPath() {
-            return path;
-        }
-    }
     
     /**
-     * Test authentication by calling various endpoints with token-based authentication.
-     * @param endpoint The endpoint to test.
-     * @return The result of the test including response code and body.
-     */
-    public static TestResult testEndpoint(Endpoint endpoint) {
-        ModForgeSettings settings = ModForgeSettings.getInstance();
-        
-        if (!settings.isAuthenticated() || settings.getAccessToken().isEmpty()) {
-            return new TestResult(false, 401, "Not authenticated");
-        }
-        
-        String serverUrl = settings.getServerUrl();
-        
-        if (serverUrl.isEmpty()) {
-            return new TestResult(false, 0, "Server URL is empty");
-        }
-        
-        // Use TokenAuthConnectionUtil to make the GET request
-        String response = TokenAuthConnectionUtil.makeAuthenticatedGetRequest(endpoint.getPath());
-        
-        if (response != null) {
-            return new TestResult(true, 200, response);
-        } else {
-            LOG.warn("Failed to test authentication endpoint: " + endpoint.getPath());
-            return new TestResult(false, 0, "Error: No response received");
-        }
-    }
-    
-    /**
-     * Test token login.
-     * @param username Username
-     * @param password Password
-     * @return Test result
-     */
-    public static TestResult testTokenLogin(String username, String password) {
-        ModForgeSettings settings = ModForgeSettings.getInstance();
-        String serverUrl = settings.getServerUrl();
-        
-        if (serverUrl.isEmpty()) {
-            return new TestResult(false, 0, "Server URL is empty");
-        }
-        
-        try {
-            // Create JSON payload
-            String jsonPayload = String.format("{\"username\":\"%s\",\"password\":\"%s\"}", 
-                    username, password);
-            
-            // Make the request manually since we can't use TokenAuthConnectionUtil
-            // (it requires existing authentication)
-            HttpURLConnection connection = null;
-            
-            try {
-                // Normalize the URL
-                serverUrl = normalizeServerUrl(serverUrl);
-                
-                URL url = new URL(serverUrl + "api/token");
-                connection = (HttpURLConnection) url.openConnection();
-                connection.setRequestMethod("POST");
-                connection.setConnectTimeout(TIMEOUT);
-                connection.setReadTimeout(TIMEOUT);
-                connection.setDoOutput(true);
-                connection.setRequestProperty("Content-Type", "application/json");
-                
-                // Write payload
-                try (OutputStream os = connection.getOutputStream()) {
-                    os.write(jsonPayload.getBytes(StandardCharsets.UTF_8));
-                }
-                
-                // Get response code
-                int responseCode = connection.getResponseCode();
-                
-                // Read response
-                StringBuilder response = new StringBuilder();
-                try (BufferedReader br = new BufferedReader(
-                        new InputStreamReader(
-                                responseCode >= 400 
-                                        ? connection.getErrorStream() 
-                                        : connection.getInputStream(), 
-                                StandardCharsets.UTF_8))) {
-                    String responseLine;
-                    while ((responseLine = br.readLine()) != null) {
-                        response.append(responseLine.trim());
-                    }
-                }
-                
-                return new TestResult(
-                        responseCode >= 200 && responseCode < 300,
-                        responseCode,
-                        response.toString()
-                );
-            } finally {
-                if (connection != null) {
-                    connection.disconnect();
-                }
-            }
-        } catch (IOException e) {
-            LOG.warn("Failed to test token login: " + e.getMessage());
-            return new TestResult(false, 0, "Error: " + e.getMessage());
-        }
-    }
-    
-    /**
-     * Test the complete authentication flow:
-     * 1. Login with username/password
-     * 2. Extract token
-     * 3. Test token with various endpoints
+     * Test the complete authentication flow.
      * 
-     * @param username Username
-     * @param password Password
-     * @return Test results with details about each step
+     * @param username Username to test
+     * @param password Password to test
+     * @return Results of the test as a multi-line string
      */
     public static String testCompleteAuthFlow(String username, String password) {
-        StringBuilder results = new StringBuilder("Complete Authentication Flow Test\n\n");
+        List<String> results = new ArrayList<>();
         
-        // Step 1: Login with username/password to get token
-        results.append("Step 1: Login to get token\n");
-        TestResult loginResult = testTokenLogin(username, password);
-        results.append("Status: ").append(loginResult.isSuccess() ? "Success" : "Failed")
-               .append(" (").append(loginResult.getResponseCode()).append(")\n");
+        results.add("=== Complete Authentication Flow Test ===");
+        results.add("");
         
-        if (!loginResult.isSuccess()) {
-            results.append("Error: Failed to login and get token\n");
-            results.append("Response: ").append(loginResult.getResponse()).append("\n\n");
-            return results.toString();
-        }
-        
-        // Extract token from response
-        String token = extractToken(loginResult.getResponse());
-        if (token == null) {
-            results.append("Error: Failed to extract token from response\n");
-            results.append("Response: ").append(loginResult.getResponse()).append("\n\n");
-            return results.toString();
-        }
-        
-        results.append("Token obtained successfully\n\n");
-        
-        // Step 2: Test token with authentication verification endpoint
-        results.append("Step 2: Test token with /api/auth/verify\n");
+        // Step 1: Test server connectivity
+        results.add("Step 1: Testing server connectivity...");
         ModForgeSettings settings = ModForgeSettings.getInstance();
+        String serverUrl = settings.getServerUrl();
         
-        // Temporarily set token in settings
-        String originalToken = settings.getAccessToken();
-        boolean originalAuthState = settings.isAuthenticated();
+        if (serverUrl == null || serverUrl.isEmpty()) {
+            results.add("ERROR: Server URL is not configured in settings.");
+            return String.join("\n", results);
+        }
         
-        settings.setAccessToken(token);
-        settings.setAuthenticated(true);
+        results.add("Server URL: " + serverUrl);
         
-        TestResult verifyResult = testEndpoint(Endpoint.AUTH_VERIFY);
-        results.append("Status: ").append(verifyResult.isSuccess() ? "Success" : "Failed")
-               .append(" (").append(verifyResult.getResponseCode()).append(")\n");
-        results.append("Response: ").append(verifyResult.getResponse()).append("\n\n");
-        
-        // Step 3: Test token with user endpoint
-        results.append("Step 3: Test token with /api/user\n");
-        TestResult userResult = testEndpoint(Endpoint.USER);
-        results.append("Status: ").append(userResult.isSuccess() ? "Success" : "Failed")
-               .append(" (").append(userResult.getResponseCode()).append(")\n");
-        results.append("Response: ").append(userResult.getResponse()).append("\n\n");
-        
-        // Restore original token
-        settings.setAccessToken(originalToken);
-        settings.setAuthenticated(originalAuthState);
-        
-        // Summary
-        results.append("Summary:\n");
-        results.append("- Login: ").append(loginResult.isSuccess() ? "Success" : "Failed").append("\n");
-        results.append("- Token Verification: ").append(verifyResult.isSuccess() ? "Success" : "Failed").append("\n");
-        results.append("- User Info: ").append(userResult.isSuccess() ? "Success" : "Failed").append("\n");
-        
-        if (loginResult.isSuccess() && verifyResult.isSuccess() && userResult.isSuccess()) {
-            results.append("\nAuthentication flow test passed successfully!");
+        boolean connectionResult = ConnectionTestUtil.testConnection(serverUrl);
+        if (connectionResult) {
+            results.add("✅ Server connection successful");
         } else {
-            results.append("\nAuthentication flow test failed. Check individual steps for details.");
+            results.add("❌ Server connection failed");
+            results.add("");
+            results.add("Test aborted due to server connection failure.");
+            return String.join("\n", results);
         }
         
-        return results.toString();
+        results.add("");
+        
+        // Step 2: Test username/password authentication
+        results.add("Step 2: Testing username/password authentication...");
+        results.add("Username: " + username);
+        results.add("Password: " + "********");
+        
+        AuthenticationManager authManager = new AuthenticationManager();
+        authManager.setCredentials(username, password);
+        
+        boolean authResult = authManager.authenticate();
+        if (authResult) {
+            results.add("✅ Authentication successful");
+            results.add("🔑 Got access token: " + 
+                    (settings.getAccessToken().isEmpty() ? "NONE" : settings.getAccessToken().substring(0, 10) + "..."));
+        } else {
+            results.add("❌ Authentication failed");
+            results.add("");
+            results.add("Test aborted due to authentication failure.");
+            return String.join("\n", results);
+        }
+        
+        results.add("");
+        
+        // Step 3: Test token verification
+        results.add("Step 3: Testing token verification...");
+        
+        boolean verifyResult = TokenAuthConnectionUtil.testTokenAuthentication();
+        if (verifyResult) {
+            results.add("✅ Token verification successful");
+        } else {
+            results.add("❌ Token verification failed");
+            results.add("");
+            results.add("Test aborted due to token verification failure.");
+            return String.join("\n", results);
+        }
+        
+        results.add("");
+        
+        // Step 4: Test specific authenticated endpoints
+        results.add("Step 4: Testing authenticated API calls...");
+        
+        String userResponse = TokenAuthConnectionUtil.makeAuthenticatedGetRequest("/api/user");
+        if (userResponse != null) {
+            results.add("✅ User API call successful");
+            results.add("   Response: " + (userResponse.length() > 100 ? userResponse.substring(0, 100) + "..." : userResponse));
+        } else {
+            results.add("❌ User API call failed");
+        }
+        
+        String meResponse = TokenAuthConnectionUtil.makeAuthenticatedGetRequest("/api/auth/me");
+        if (meResponse != null) {
+            results.add("✅ Auth/me API call successful");
+            results.add("   Response: " + (meResponse.length() > 100 ? meResponse.substring(0, 100) + "..." : meResponse));
+        } else {
+            results.add("❌ Auth/me API call failed");
+        }
+        
+        results.add("");
+        
+        // Step 5: Test logout
+        results.add("Step 5: Testing logout...");
+        
+        boolean logoutResult = authManager.logout();
+        if (logoutResult) {
+            results.add("✅ Logout successful");
+        } else {
+            results.add("❌ Logout failed");
+        }
+        
+        results.add("");
+        results.add("=== Test Complete ===");
+        
+        LOG.info("Completed authentication flow test with " + (authResult && verifyResult ? "SUCCESS" : "FAILURES"));
+        
+        return String.join("\n", results);
     }
     
     /**
-     * Extract token from JSON response.
+     * Test token-based authentication.
+     * 
+     * @return Results of the test as a multi-line string
      */
-    private static String extractToken(String jsonResponse) {
-        int tokenStart = jsonResponse.indexOf("\"token\":");
-        if (tokenStart == -1) {
-            return null;
+    public static String testTokenAuthentication() {
+        List<String> results = new ArrayList<>();
+        
+        results.add("=== Token Authentication Test ===");
+        results.add("");
+        
+        // Step 1: Check if we have a token
+        ModForgeSettings settings = ModForgeSettings.getInstance();
+        String token = settings.getAccessToken();
+        
+        if (token == null || token.isEmpty()) {
+            results.add("❌ No access token available. Please log in first.");
+            return String.join("\n", results);
         }
         
-        tokenStart = jsonResponse.indexOf("\"", tokenStart + 8) + 1;
-        int tokenEnd = jsonResponse.indexOf("\"", tokenStart);
+        results.add("Token: " + token.substring(0, Math.min(10, token.length())) + "...");
+        results.add("");
         
-        if (tokenStart == -1 || tokenEnd == -1) {
-            return null;
+        // Step 2: Test token verification
+        results.add("Step 2: Testing token verification...");
+        
+        boolean verifyResult = TokenAuthConnectionUtil.testTokenAuthentication();
+        if (verifyResult) {
+            results.add("✅ Token verification successful");
+        } else {
+            results.add("❌ Token verification failed");
+            results.add("");
+            results.add("Test aborted due to token verification failure.");
+            return String.join("\n", results);
         }
         
-        return jsonResponse.substring(tokenStart, tokenEnd);
-    }
-    
-    /**
-     * Normalize server URL.
-     */
-    private static String normalizeServerUrl(String serverUrl) {
-        // Add trailing slash if needed
-        if (!serverUrl.endsWith("/")) {
-            serverUrl += "/";
+        results.add("");
+        
+        // Step 3: Test specific authenticated endpoints
+        results.add("Step 3: Testing authenticated API calls...");
+        
+        String userResponse = TokenAuthConnectionUtil.makeAuthenticatedGetRequest("/api/user");
+        if (userResponse != null) {
+            results.add("✅ User API call successful");
+            results.add("   Response: " + (userResponse.length() > 100 ? userResponse.substring(0, 100) + "..." : userResponse));
+        } else {
+            results.add("❌ User API call failed");
         }
         
-        // Remove "api" if it's already in the URL to avoid duplication
-        if (serverUrl.endsWith("/api/")) {
-            serverUrl = serverUrl.substring(0, serverUrl.length() - 4);
+        String meResponse = TokenAuthConnectionUtil.makeAuthenticatedGetRequest("/api/auth/me");
+        if (meResponse != null) {
+            results.add("✅ Auth/me API call successful");
+            results.add("   Response: " + (meResponse.length() > 100 ? meResponse.substring(0, 100) + "..." : meResponse));
+        } else {
+            results.add("❌ Auth/me API call failed");
         }
         
-        return serverUrl;
-    }
-    
-    /**
-     * Result of testing an authentication endpoint.
-     */
-    public static class TestResult {
-        private final boolean success;
-        private final int responseCode;
-        private final String response;
+        results.add("");
+        results.add("=== Test Complete ===");
         
-        public TestResult(boolean success, int responseCode, String response) {
-            this.success = success;
-            this.responseCode = responseCode;
-            this.response = response != null ? response : "";
-        }
+        LOG.info("Completed token authentication test with " + (verifyResult ? "SUCCESS" : "FAILURES"));
         
-        public boolean isSuccess() {
-            return success;
-        }
-        
-        public int getResponseCode() {
-            return responseCode;
-        }
-        
-        public String getResponse() {
-            return response;
-        }
-        
-        @Override
-        public String toString() {
-            return String.format(
-                    "TestResult{success=%s, responseCode=%d, response='%s'}",
-                    success,
-                    responseCode,
-                    response
-            );
-        }
+        return String.join("\n", results);
     }
 }
