@@ -1,79 +1,106 @@
 package com.modforge.intellij.plugin.utils;
 
 import com.intellij.openapi.diagnostic.Logger;
-import com.google.gson.JsonObject;
-import com.google.gson.JsonParser;
-import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
+
+import java.io.IOException;
+import java.net.HttpURLConnection;
+import java.net.URL;
 
 /**
- * Utility for testing connections to the server.
+ * Utility for testing connection to ModForge server.
  */
 public class ConnectionTestUtil {
     private static final Logger LOG = Logger.getInstance(ConnectionTestUtil.class);
-    
-    private ConnectionTestUtil() {
-        // Utility class, no instantiation
-    }
+    private static final String HEALTH_CHECK_ENDPOINT = "/api/health";
+    private static final int TIMEOUT = 5000; // 5 seconds
     
     /**
-     * Tests the connection to the server.
-     * @param serverUrl The server URL
-     * @return Connection status: "OK" if connection is successful, error message otherwise
+     * Tests connection to the ModForge server.
+     * @param serverUrl Base URL of the server
+     * @return Whether the connection was successful
      */
-    @NotNull
-    public static String testServerConnection(@NotNull String serverUrl) {
+    public static boolean testConnection(String serverUrl) {
+        HttpURLConnection connection = null;
+        
         try {
-            String url = serverUrl + "/api/health";
-            String response = ApiRequestUtil.get(url);
-            
-            if (response == null) {
-                return "Failed to connect to server. Please check the URL and try again.";
+            // Normalize the URL (add trailing slash if needed)
+            if (!serverUrl.endsWith("/")) {
+                serverUrl += "/";
             }
             
-            JsonObject healthResponse = JsonParser.parseString(response).getAsJsonObject();
-            String status = healthResponse.get("status").getAsString();
-            
-            if ("healthy".equals(status)) {
-                return "OK";
-            } else {
-                String message = healthResponse.has("message") 
-                    ? healthResponse.get("message").getAsString() 
-                    : "Unknown error";
-                return "Server health check failed: " + message;
+            // Remove "api" if it's already in the URL to avoid duplication
+            if (serverUrl.endsWith("/api/")) {
+                serverUrl = serverUrl.substring(0, serverUrl.length() - 4);
             }
-        } catch (Exception e) {
-            LOG.error("Error testing server connection", e);
-            return "Error testing connection: " + e.getMessage();
+            
+            URL url = new URL(serverUrl + HEALTH_CHECK_ENDPOINT.substring(1));
+            connection = (HttpURLConnection) url.openConnection();
+            connection.setRequestMethod("GET");
+            connection.setConnectTimeout(TIMEOUT);
+            connection.setReadTimeout(TIMEOUT);
+            
+            // Get response code
+            int responseCode = connection.getResponseCode();
+            
+            // 200 OK means server is up and running
+            return responseCode == 200;
+        } catch (IOException e) {
+            LOG.warn("Failed to connect to ModForge server: " + e.getMessage());
+            return false;
+        } finally {
+            if (connection != null) {
+                connection.disconnect();
+            }
         }
     }
     
     /**
-     * Checks if OpenAI API is available on the server.
-     * @param serverUrl The server URL
-     * @return OpenAI API status: true if available, false otherwise
+     * Tests the authentication endpoint.
+     * @param serverUrl Base URL of the server
+     * @param username Username
+     * @param password Password
+     * @return Whether authentication was successful
      */
-    public static boolean isOpenAiApiAvailable(@NotNull String serverUrl) {
+    public static boolean testAuthentication(String serverUrl, String username, String password) {
+        HttpURLConnection connection = null;
+        
         try {
-            String url = serverUrl + "/api/health";
-            String response = ApiRequestUtil.get(url);
-            
-            if (response == null) {
-                return false;
+            // Normalize the URL (add trailing slash if needed)
+            if (!serverUrl.endsWith("/")) {
+                serverUrl += "/";
             }
             
-            JsonObject healthResponse = JsonParser.parseString(response).getAsJsonObject();
-            
-            // Check if AI section exists and has status
-            if (healthResponse.has("ai") && healthResponse.getAsJsonObject("ai").has("status")) {
-                String aiStatus = healthResponse.getAsJsonObject("ai").get("status").getAsString();
-                return "available".equals(aiStatus);
+            // Remove "api" if it's already in the URL to avoid duplication
+            if (serverUrl.endsWith("/api/")) {
+                serverUrl = serverUrl.substring(0, serverUrl.length() - 4);
             }
             
+            URL url = new URL(serverUrl + "api/auth/verify");
+            connection = (HttpURLConnection) url.openConnection();
+            connection.setRequestMethod("POST");
+            connection.setConnectTimeout(TIMEOUT);
+            connection.setReadTimeout(TIMEOUT);
+            connection.setDoOutput(true);
+            connection.setRequestProperty("Content-Type", "application/json");
+            
+            // Create JSON payload
+            String jsonPayload = "{\"username\":\"" + username + "\",\"password\":\"" + password + "\"}";
+            
+            // Write payload
+            connection.getOutputStream().write(jsonPayload.getBytes("UTF-8"));
+            
+            // Get response code
+            int responseCode = connection.getResponseCode();
+            
+            // 200 OK means authentication was successful
+            return responseCode == 200;
+        } catch (IOException e) {
+            LOG.warn("Failed to authenticate with ModForge server: " + e.getMessage());
             return false;
-        } catch (Exception e) {
-            LOG.error("Error checking OpenAI API availability", e);
-            return false;
+        } finally {
+            if (connection != null) {
+                connection.disconnect();
+            }
         }
     }
 }

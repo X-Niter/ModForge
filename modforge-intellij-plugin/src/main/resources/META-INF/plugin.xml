@@ -24,11 +24,15 @@
         <!-- Services -->
         <applicationService serviceImplementation="com.modforge.intellij.plugin.settings.ModForgeSettings"/>
         <applicationService serviceImplementation="com.modforge.intellij.plugin.ai.PatternRecognitionService"/>
+        <applicationService serviceImplementation="com.modforge.intellij.plugin.auth.AuthenticationManager"/>
 
         <projectService serviceImplementation="com.modforge.intellij.plugin.services.AutonomousCodeGenerationService"/>
         <projectService serviceImplementation="com.modforge.intellij.plugin.services.ContinuousDevelopmentService"/>
         <projectService serviceImplementation="com.modforge.intellij.plugin.services.ModForgeProjectService"/>
         <projectService serviceImplementation="com.modforge.intellij.plugin.listeners.ModForgeCompilationListener"/>
+        
+        <!-- Startup Activities -->
+        <postStartupActivity implementation="com.modforge.intellij.plugin.startup.AuthenticationStartupActivity"/>
 
         <!-- Tool Window -->
         <toolWindow id="ModForge" 
@@ -64,6 +68,18 @@
                     class="com.modforge.intellij.plugin.actions.OpenSettingsAction" 
                     text="Open ModForge Settings" 
                     description="Open ModForge settings"/>
+            <action id="ModForge.Login" 
+                    class="com.modforge.intellij.plugin.actions.LoginAction" 
+                    text="Login to ModForge" 
+                    description="Log in to ModForge server"/>
+            <action id="ModForge.Logout" 
+                    class="com.modforge.intellij.plugin.actions.LogoutAction" 
+                    text="Logout from ModForge" 
+                    description="Log out from ModForge server"/>
+            <action id="ModForge.VerifyAuthentication" 
+                    class="com.modforge.intellij.plugin.actions.VerifyAuthenticationAction" 
+                    text="Verify Authentication" 
+                    description="Verify authentication status with ModForge server"/>
             <separator/>
             <action id="ModForge.GenerateCode" 
                     class="com.modforge.intellij.plugin.actions.GenerateCodeAction" 
@@ -115,6 +131,17 @@
         
         <!-- Toolbar Actions -->
         <group id="ModForge.ToolbarActions" text="ModForge Toolbar Actions" description="ModForge toolbar actions">
+            <action id="ModForge.LoginToolbar" 
+                    class="com.modforge.intellij.plugin.actions.LoginAction" 
+                    text="Login to ModForge" 
+                    description="Log in to ModForge server"
+                    icon="AllIcons.General.User"/>
+            <action id="ModForge.LogoutToolbar" 
+                    class="com.modforge.intellij.plugin.actions.LogoutAction" 
+                    text="Logout from ModForge" 
+                    description="Log out from ModForge server"
+                    icon="AllIcons.Actions.Exit"/>
+            <separator/>
             <action id="ModForge.GenerateCodeToolbar" 
                     class="com.modforge.intellij.plugin.actions.GenerateCodeAction" 
                     text="Generate Code" 

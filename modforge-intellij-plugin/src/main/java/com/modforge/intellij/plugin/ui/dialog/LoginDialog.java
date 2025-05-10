@@ -9,6 +9,7 @@ import com.intellij.ui.components.JBTextField;
 import com.intellij.util.ui.JBUI;
 import com.modforge.intellij.plugin.auth.AuthenticationManager;
 import com.modforge.intellij.plugin.settings.ModForgeSettings;
+import com.modforge.intellij.plugin.utils.ConnectionTestUtil;
 import org.jetbrains.annotations.Nullable;
 
 import javax.swing.*;
@@ -18,46 +19,37 @@ import java.awt.*;
  * Dialog for logging in to the ModForge server.
  */
 public class LoginDialog extends DialogWrapper {
-    private final JBTextField serverUrlField = new JBTextField();
-    private final JBTextField usernameField = new JBTextField();
-    private final JBPasswordField passwordField = new JBPasswordField();
-    private final JLabel statusLabel = new JLabel();
-    
+    private final JBTextField usernameField;
+    private final JBPasswordField passwordField;
+    private final JBTextField serverUrlField;
+    private final JCheckBox rememberCredentialsCheckBox;
+    private final Project project;
+
     /**
-     * Creates a new login dialog.
+     * Constructor.
      * @param project The project
      */
     public LoginDialog(@Nullable Project project) {
         super(project);
-        setTitle("Login to ModForge");
-        setResizable(false);
+        this.project = project;
         
-        // Initialize fields with current settings
         ModForgeSettings settings = ModForgeSettings.getInstance();
-        serverUrlField.setText(settings.getServerUrl());
-        usernameField.setText(settings.getUsername());
-        passwordField.setText(settings.getPassword());
         
+        usernameField = new JBTextField(settings.getUsername());
+        passwordField = new JBPasswordField();
+        
+        if (!settings.getPassword().isEmpty()) {
+            passwordField.setText(settings.getPassword());
+        }
+        
+        serverUrlField = new JBTextField(settings.getServerUrl());
+        rememberCredentialsCheckBox = new JCheckBox("Remember credentials", settings.isRememberCredentials());
+        
+        setTitle("Login to ModForge");
+        setOKButtonText("Login");
         init();
     }
-    
-    @Override
-    protected @Nullable ValidationInfo doValidate() {
-        if (serverUrlField.getText().trim().isEmpty()) {
-            return new ValidationInfo("Server URL is required", serverUrlField);
-        }
-        
-        if (usernameField.getText().trim().isEmpty()) {
-            return new ValidationInfo("Username is required", usernameField);
-        }
-        
-        if (passwordField.getPassword().length == 0) {
-            return new ValidationInfo("Password is required", passwordField);
-        }
-        
-        return null;
-    }
-    
+
     @Override
     protected @Nullable JComponent createCenterPanel() {
         JPanel panel = new JPanel(new GridBagLayout());
@@ -74,56 +66,118 @@ public class LoginDialog extends DialogWrapper {
         
         c.gridx = 1;
         c.weightx = 1.0;
-        serverUrlField.setPreferredSize(new Dimension(300, serverUrlField.getPreferredSize().height));
         panel.add(serverUrlField, c);
+        
+        // Test Connection button
+        c.gridx = 2;
+        c.weightx = 0.0;
+        JButton testConnectionButton = new JButton("Test Connection");
+        panel.add(testConnectionButton, c);
         
         // Username
         c.gridx = 0;
         c.gridy = 1;
-        c.weightx = 0.0;
         panel.add(new JBLabel("Username:"), c);
         
         c.gridx = 1;
+        c.gridwidth = 2;
         c.weightx = 1.0;
         panel.add(usernameField, c);
         
         // Password
         c.gridx = 0;
         c.gridy = 2;
+        c.gridwidth = 1;
         c.weightx = 0.0;
         panel.add(new JBLabel("Password:"), c);
         
         c.gridx = 1;
+        c.gridwidth = 2;
         c.weightx = 1.0;
         panel.add(passwordField, c);
         
-        // Status label
-        c.gridx = 0;
+        // Remember credentials
+        c.gridx = 1;
         c.gridy = 3;
-        c.gridwidth = 2;
-        c.weightx = 1.0;
+        panel.add(rememberCredentialsCheckBox, c);
+        
+        // Status message
+        c.gridx = 0;
+        c.gridy = 4;
+        c.gridwidth = 3;
+        JLabel statusLabel = new JLabel(" ");
+        statusLabel.setForeground(Color.RED);
         panel.add(statusLabel, c);
+        
+        // Add action to test connection button
+        testConnectionButton.addActionListener(e -> {
+            String serverUrl = serverUrlField.getText().trim();
+            
+            if (serverUrl.isEmpty()) {
+                statusLabel.setText("Server URL cannot be empty");
+                return;
+            }
+            
+            statusLabel.setText("Testing connection...");
+            statusLabel.setForeground(Color.BLUE);
+            
+            SwingUtilities.invokeLater(() -> {
+                boolean connected = ConnectionTestUtil.testConnection(serverUrl);
+                
+                if (connected) {
+                    statusLabel.setText("Connection successful!");
+                    statusLabel.setForeground(new Color(0, 128, 0)); // Dark green
+                } else {
+                    statusLabel.setText("Connection failed. Please check server URL.");
+                    statusLabel.setForeground(Color.RED);
+                }
+            });
+        });
         
         return panel;
     }
-    
+
     @Override
     protected void doOKAction() {
         // Save settings
         ModForgeSettings settings = ModForgeSettings.getInstance();
         settings.setServerUrl(serverUrlField.getText().trim());
-        settings.setUsername(usernameField.getText().trim());
-        settings.setPassword(new String(passwordField.getPassword()));
+        settings.setRememberCredentials(rememberCredentialsCheckBox.isSelected());
+        
+        if (rememberCredentialsCheckBox.isSelected()) {
+            settings.setUsername(usernameField.getText().trim());
+            settings.setPassword(new String(passwordField.getPassword()));
+        } else {
+            settings.setUsername("");
+            settings.setPassword("");
+        }
         
         // Try to authenticate
-        statusLabel.setText("Authenticating...");
-        statusLabel.setForeground(UIManager.getColor("Label.foreground"));
+        AuthenticationManager authManager = AuthenticationManager.getInstance();
+        authManager.setCredentials(usernameField.getText().trim(), new String(passwordField.getPassword()));
+        boolean success = authManager.authenticate();
         
-        if (AuthenticationManager.getInstance().authenticate()) {
+        if (success) {
             super.doOKAction();
         } else {
-            statusLabel.setText("Authentication failed. Please check your credentials.");
-            statusLabel.setForeground(Color.RED);
+            setErrorText("Authentication failed. Please check your credentials.");
         }
+    }
+
+    @Override
+    protected @Nullable ValidationInfo doValidate() {
+        if (usernameField.getText().trim().isEmpty()) {
+            return new ValidationInfo("Username cannot be empty", usernameField);
+        }
+        
+        if (passwordField.getPassword().length == 0) {
+            return new ValidationInfo("Password cannot be empty", passwordField);
+        }
+        
+        if (serverUrlField.getText().trim().isEmpty()) {
+            return new ValidationInfo("Server URL cannot be empty", serverUrlField);
+        }
+        
+        return null;
     }
 }
