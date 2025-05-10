@@ -123,17 +123,30 @@ public final class ContinuousDevelopmentService {
      * @param response Response from server
      */
     private void processModsResponse(JSONObject response) {
-        // Check if we have pattern recognition enabled
-        ModForgeSettings settings = ModForgeSettings.getInstance();
-        boolean patternRecognition = settings.isPatternRecognition();
+        if (response == null) {
+            LOG.error("Cannot process null response");
+            return;
+        }
         
-        // Record pattern activity
-        if (patternRecognition) {
-            // Get pattern recognition service
-            AutonomousCodeGenerationService automatedService = project.getService(AutonomousCodeGenerationService.class);
-            automatedService.processMods(response);
-        } else {
-            LOG.info("Pattern recognition is disabled, skipping patterns");
+        try {
+            // Check if we have pattern recognition enabled
+            ModForgeSettings settings = ModForgeSettings.getInstance();
+            boolean patternRecognition = settings.isPatternRecognition();
+            
+            // Record pattern activity
+            if (patternRecognition) {
+                // Get pattern recognition service
+                AutonomousCodeGenerationService automatedService = project.getService(AutonomousCodeGenerationService.class);
+                if (automatedService != null) {
+                    automatedService.processMods(response);
+                } else {
+                    LOG.error("AutonomousCodeGenerationService is null");
+                }
+            } else {
+                LOG.info("Pattern recognition is disabled, skipping patterns");
+            }
+        } catch (Exception e) {
+            LOG.error("Error processing mods response", e);
         }
     }
     

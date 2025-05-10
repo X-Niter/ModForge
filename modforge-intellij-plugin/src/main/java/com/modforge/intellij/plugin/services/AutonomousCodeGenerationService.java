@@ -60,12 +60,44 @@ public final class AutonomousCodeGenerationService {
      * @param mod Mod data
      */
     private void processMod(JSONObject mod) {
-        long modId = (Long) mod.get("id");
-        LOG.info("Processing mod #" + modId);
+        if (mod == null) {
+            LOG.error("Cannot process null mod");
+            return;
+        }
         
-        // Check if development is needed
-        if (needsDevelopment(mod)) {
-            developMod(modId);
+        try {
+            if (!mod.containsKey("id")) {
+                LOG.error("Mod does not have an ID");
+                return;
+            }
+            
+            Object idObj = mod.get("id");
+            long modId;
+            
+            if (idObj instanceof Long) {
+                modId = (Long) idObj;
+            } else if (idObj instanceof Integer) {
+                modId = ((Integer) idObj).longValue();
+            } else if (idObj instanceof String) {
+                try {
+                    modId = Long.parseLong((String) idObj);
+                } catch (NumberFormatException e) {
+                    LOG.error("Invalid mod ID format: " + idObj, e);
+                    return;
+                }
+            } else {
+                LOG.error("Unexpected mod ID type: " + (idObj != null ? idObj.getClass().getName() : "null"));
+                return;
+            }
+            
+            LOG.info("Processing mod #" + modId);
+            
+            // Check if development is needed
+            if (needsDevelopment(mod)) {
+                developMod(modId);
+            }
+        } catch (Exception e) {
+            LOG.error("Error processing mod", e);
         }
     }
     
@@ -75,19 +107,34 @@ public final class AutonomousCodeGenerationService {
      * @return Whether the mod needs development
      */
     private boolean needsDevelopment(JSONObject mod) {
-        // Check for compilation errors
-        if (mod.containsKey("hasErrors") && (Boolean) mod.get("hasErrors")) {
-            LOG.info("Mod has compilation errors, needs development");
-            return true;
+        if (mod == null) {
+            return false;
         }
         
-        // Check if continuous development is requested
-        if (mod.containsKey("continuousDevelopment") && (Boolean) mod.get("continuousDevelopment")) {
-            LOG.info("Continuous development is requested for mod");
-            return true;
+        try {
+            // Check for compilation errors
+            if (mod.containsKey("hasErrors")) {
+                Object hasErrorsObj = mod.get("hasErrors");
+                if (hasErrorsObj instanceof Boolean && (Boolean) hasErrorsObj) {
+                    LOG.info("Mod has compilation errors, needs development");
+                    return true;
+                }
+            }
+            
+            // Check if continuous development is requested
+            if (mod.containsKey("continuousDevelopment")) {
+                Object contDevObj = mod.get("continuousDevelopment");
+                if (contDevObj instanceof Boolean && (Boolean) contDevObj) {
+                    LOG.info("Continuous development is requested for mod");
+                    return true;
+                }
+            }
+            
+            return false;
+        } catch (Exception e) {
+            LOG.error("Error checking if mod needs development", e);
+            return false;
         }
-        
-        return false;
     }
     
     /**
@@ -151,27 +198,55 @@ public final class AutonomousCodeGenerationService {
             return;
         }
         
-        // Check for success
-        if (response.containsKey("success") && (Boolean) response.get("success")) {
-            LOG.info("Development request was successful");
-            
-            // Check if pattern was used
-            if (response.containsKey("patternUsed") && (Boolean) response.get("patternUsed")) {
-                successfulPatternMatches++;
-                
-                if (patternService != null) {
-                    patternService.recordPatternSuccess((String) response.get("patternId"));
-                }
-            } else {
-                totalApiFallbacks++;
-                
-                // Record pattern failure if pattern recognition is enabled
-                if (patternService != null && response.containsKey("patternId")) {
-                    patternService.recordPatternFailure((String) response.get("patternId"));
+        try {
+            // Check for success
+            boolean isSuccess = false;
+            if (response.containsKey("success")) {
+                Object successObj = response.get("success");
+                if (successObj instanceof Boolean) {
+                    isSuccess = (Boolean) successObj;
                 }
             }
-        } else {
-            LOG.error("Development request failed: " + response.get("message"));
+            
+            if (isSuccess) {
+                LOG.info("Development request was successful");
+                
+                // Check if pattern was used
+                boolean patternUsed = false;
+                if (response.containsKey("patternUsed")) {
+                    Object patternUsedObj = response.get("patternUsed");
+                    if (patternUsedObj instanceof Boolean) {
+                        patternUsed = (Boolean) patternUsedObj;
+                    }
+                }
+                
+                if (patternUsed) {
+                    successfulPatternMatches++;
+                    
+                    if (patternService != null && response.containsKey("patternId")) {
+                        Object patternIdObj = response.get("patternId");
+                        if (patternIdObj instanceof String) {
+                            patternService.recordPatternSuccess((String) patternIdObj);
+                        }
+                    }
+                } else {
+                    totalApiFallbacks++;
+                    
+                    // Record pattern failure if pattern recognition is enabled
+                    if (patternService != null && response.containsKey("patternId")) {
+                        Object patternIdObj = response.get("patternId");
+                        if (patternIdObj instanceof String) {
+                            patternService.recordPatternFailure((String) patternIdObj);
+                        }
+                    }
+                }
+            } else {
+                Object messageObj = response.get("message");
+                String message = messageObj != null ? messageObj.toString() : "Unknown error";
+                LOG.error("Development request failed: " + message);
+            }
+        } catch (Exception e) {
+            LOG.error("Error processing development response", e);
         }
     }
     

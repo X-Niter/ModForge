@@ -250,45 +250,80 @@ public class ModForgeToolWindowContent {
      * Update UI with current data.
      */
     private void updateUI() {
-        // Update authentication status
-        ModAuthenticationManager authManager = ModAuthenticationManager.getInstance();
-        boolean isAuthenticated = authManager.isAuthenticated();
-        
-        // Authentication status
-        if (isAuthenticated) {
-            authStatusLabel.setText("Authenticated");
-            authStatusLabel.setForeground(UIUtil.getContextHelpForeground());
+        try {
+            // Update authentication status
+            ModAuthenticationManager authManager = ModAuthenticationManager.getInstance();
+            boolean isAuthenticated = false;
             
-            // Verify authentication
-            boolean isValid = authManager.verifyAuthentication();
-            
-            if (isValid) {
-                authStatusLabel.setText("Authenticated (Verified)");
-                authStatusLabel.setForeground(new Color(0, 150, 0)); // Green
-            } else {
-                authStatusLabel.setText("Authenticated (Invalid)");
-                authStatusLabel.setForeground(new Color(200, 0, 0)); // Red
+            if (authManager != null) {
+                isAuthenticated = authManager.isAuthenticated();
             }
             
-            // Username
-            String username = authManager.getUsername();
-            if (username != null) {
-                usernameLabel.setText(username);
-            } else {
-                // Try to get user data
-                JSONObject userData = authManager.getUserData();
+            // Authentication status
+            if (isAuthenticated) {
+                authStatusLabel.setText("Authenticated");
+                authStatusLabel.setForeground(UIUtil.getContextHelpForeground());
                 
-                if (userData != null && userData.containsKey("username")) {
-                    usernameLabel.setText((String) userData.get("username"));
-                } else {
-                    usernameLabel.setText("Unknown");
+                // Verify authentication
+                boolean isValid = false;
+                
+                try {
+                    isValid = authManager.verifyAuthentication();
+                } catch (Exception e) {
+                    LOG.error("Error verifying authentication", e);
                 }
+                
+                if (isValid) {
+                    authStatusLabel.setText("Authenticated (Verified)");
+                    authStatusLabel.setForeground(new Color(0, 150, 0)); // Green
+                } else {
+                    authStatusLabel.setText("Authenticated (Invalid)");
+                    authStatusLabel.setForeground(new Color(200, 0, 0)); // Red
+                }
+                
+                // Username
+                String username = null;
+                try {
+                    username = authManager.getUsername();
+                } catch (Exception e) {
+                    LOG.error("Error getting username", e);
+                }
+                
+                if (username != null) {
+                    usernameLabel.setText(username);
+                } else {
+                    // Try to get user data
+                    JSONObject userData = null;
+                    try {
+                        userData = authManager.getUserData();
+                    } catch (Exception e) {
+                        LOG.error("Error getting user data", e);
+                    }
+                    
+                    if (userData != null && userData.containsKey("username")) {
+                        Object usernameObj = userData.get("username");
+                        if (usernameObj instanceof String) {
+                            usernameLabel.setText((String) usernameObj);
+                        } else {
+                            usernameLabel.setText("Unknown");
+                        }
+                    } else {
+                        usernameLabel.setText("Unknown");
+                    }
+                }
+            } else {
+                authStatusLabel.setText("Not authenticated");
+                authStatusLabel.setForeground(new Color(200, 0, 0)); // Red
+                
+                usernameLabel.setText("Not logged in");
             }
-        } else {
-            authStatusLabel.setText("Not authenticated");
-            authStatusLabel.setForeground(new Color(200, 0, 0)); // Red
+        } catch (Exception e) {
+            LOG.error("Error updating authentication status", e);
             
-            usernameLabel.setText("Not logged in");
+            // Set safe defaults
+            authStatusLabel.setText("Error checking authentication");
+            authStatusLabel.setForeground(new Color(200, 0, 0)); // Red
+            usernameLabel.setText("Unknown");
         }
         
         // Update continuous development status

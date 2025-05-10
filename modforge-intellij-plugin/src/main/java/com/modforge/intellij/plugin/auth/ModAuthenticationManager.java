@@ -91,7 +91,14 @@ public class ModAuthenticationManager {
         }
         
         ModForgeSettings settings = ModForgeSettings.getInstance();
-        return TokenAuthConnectionUtil.get(settings.getServerUrl(), "/api/user", settings.getAccessToken());
+        JSONObject response = TokenAuthConnectionUtil.get(settings.getServerUrl(), "/api/user", settings.getAccessToken());
+        
+        if (response == null) {
+            LOG.warn("Failed to get user data");
+            return null;
+        }
+        
+        return response;
     }
     
     /**
@@ -101,11 +108,20 @@ public class ModAuthenticationManager {
     public String getUserId() {
         JSONObject userData = getUserData();
         
-        if (userData == null || !userData.containsKey("id")) {
+        if (userData == null) {
             return null;
         }
         
-        return userData.get("id").toString();
+        try {
+            if (userData.containsKey("id")) {
+                Object idObj = userData.get("id");
+                return idObj != null ? idObj.toString() : null;
+            }
+        } catch (Exception e) {
+            LOG.error("Error getting user ID", e);
+        }
+        
+        return null;
     }
     
     /**
@@ -115,10 +131,19 @@ public class ModAuthenticationManager {
     public String getUsername() {
         JSONObject userData = getUserData();
         
-        if (userData == null || !userData.containsKey("username")) {
+        if (userData == null) {
             return null;
         }
         
-        return (String) userData.get("username");
+        try {
+            if (userData.containsKey("username")) {
+                Object usernameObj = userData.get("username");
+                return usernameObj instanceof String ? (String) usernameObj : null;
+            }
+        } catch (Exception e) {
+            LOG.error("Error getting username", e);
+        }
+        
+        return null;
     }
 }

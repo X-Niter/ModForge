@@ -54,51 +54,77 @@ public final class PatternRecognitionService {
     private void syncPatternMetrics() {
         LOG.info("Synchronizing pattern metrics with server");
         
-        // Check authentication
-        ModAuthenticationManager authManager = ModAuthenticationManager.getInstance();
-        if (!authManager.isAuthenticated()) {
-            LOG.warn("Not authenticated, skipping pattern metrics sync");
-            return;
-        }
-        
-        // Check if there's anything to sync
-        if (totalSuccesses == 0 && totalFailures == 0) {
-            LOG.info("No pattern metrics to sync");
-            return;
-        }
-        
-        // Prepare metrics data
-        JSONObject metricsData = new JSONObject();
-        metricsData.put("successes", totalSuccesses);
-        metricsData.put("failures", totalFailures);
-        
-        JSONObject successPatterns = new JSONObject();
-        for (Map.Entry<String, Integer> entry : patternSuccessCount.entrySet()) {
-            successPatterns.put(entry.getKey(), entry.getValue());
-        }
-        metricsData.put("successPatterns", successPatterns);
-        
-        JSONObject failurePatterns = new JSONObject();
-        for (Map.Entry<String, Integer> entry : patternFailureCount.entrySet()) {
-            failurePatterns.put(entry.getKey(), entry.getValue());
-        }
-        metricsData.put("failurePatterns", failurePatterns);
-        
-        // Get server URL and token
-        ModForgeSettings settings = ModForgeSettings.getInstance();
-        String serverUrl = settings.getServerUrl();
-        String token = settings.getAccessToken();
-        
-        // Send metrics to server
-        JSONObject response = TokenAuthConnectionUtil.post(serverUrl, "/api/patterns/metrics", token, metricsData);
-        
-        if (response != null && response.containsKey("success") && (Boolean) response.get("success")) {
-            LOG.info("Pattern metrics synchronized successfully");
+        try {
+            // Check authentication
+            ModAuthenticationManager authManager = ModAuthenticationManager.getInstance();
+            if (!authManager.isAuthenticated()) {
+                LOG.warn("Not authenticated, skipping pattern metrics sync");
+                return;
+            }
             
-            // Reset local metrics
-            resetMetrics();
-        } else {
-            LOG.error("Failed to synchronize pattern metrics");
+            // Check if there's anything to sync
+            if (totalSuccesses == 0 && totalFailures == 0) {
+                LOG.info("No pattern metrics to sync");
+                return;
+            }
+            
+            // Prepare metrics data
+            JSONObject metricsData = new JSONObject();
+            metricsData.put("successes", totalSuccesses);
+            metricsData.put("failures", totalFailures);
+            
+            JSONObject successPatterns = new JSONObject();
+            for (Map.Entry<String, Integer> entry : patternSuccessCount.entrySet()) {
+                if (entry.getKey() != null) {
+                    successPatterns.put(entry.getKey(), entry.getValue());
+                }
+            }
+            metricsData.put("successPatterns", successPatterns);
+            
+            JSONObject failurePatterns = new JSONObject();
+            for (Map.Entry<String, Integer> entry : patternFailureCount.entrySet()) {
+                if (entry.getKey() != null) {
+                    failurePatterns.put(entry.getKey(), entry.getValue());
+                }
+            }
+            metricsData.put("failurePatterns", failurePatterns);
+            
+            // Get server URL and token
+            ModForgeSettings settings = ModForgeSettings.getInstance();
+            String serverUrl = settings.getServerUrl();
+            String token = settings.getAccessToken();
+            
+            if (serverUrl == null || serverUrl.isEmpty() || token == null || token.isEmpty()) {
+                LOG.error("Invalid server URL or token for syncing metrics");
+                return;
+            }
+            
+            // Send metrics to server
+            JSONObject response = TokenAuthConnectionUtil.post(serverUrl, "/api/patterns/metrics", token, metricsData);
+            
+            if (response != null) {
+                boolean success = false;
+                if (response.containsKey("success")) {
+                    Object successObj = response.get("success");
+                    if (successObj instanceof Boolean) {
+                        success = (Boolean) successObj;
+                    }
+                }
+                
+                if (success) {
+                    LOG.info("Pattern metrics synchronized successfully");
+                    
+                    // Reset local metrics
+                    resetMetrics();
+                } else {
+                    LOG.error("Failed to synchronize pattern metrics: " + 
+                              (response.containsKey("message") ? response.get("message") : "Unknown error"));
+                }
+            } else {
+                LOG.error("No response when synchronizing pattern metrics");
+            }
+        } catch (Exception e) {
+            LOG.error("Error synchronizing pattern metrics", e);
         }
     }
     
