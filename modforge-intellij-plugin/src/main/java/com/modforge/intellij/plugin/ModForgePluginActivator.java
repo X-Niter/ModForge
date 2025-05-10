@@ -11,6 +11,7 @@ import com.intellij.openapi.project.Project;
 import com.intellij.openapi.project.ProjectManagerListener;
 import com.intellij.openapi.startup.StartupActivity;
 import com.modforge.intellij.plugin.utils.CompatibilityValidator;
+import com.modforge.intellij.plugin.utils.EnvironmentValidator;
 import org.jetbrains.annotations.NotNull;
 
 /**
@@ -56,6 +57,7 @@ public class ModForgePluginActivator implements StartupActivity.DumbAware {
         try {
             LOG.info("Checking ModForge plugin compatibility...");
             
+            // Check basic compatibility first
             boolean isCompatible = CompatibilityValidator.checkAllCompatibility();
             
             if (!isCompatible) {
@@ -76,6 +78,9 @@ public class ModForgePluginActivator implements StartupActivity.DumbAware {
                 LOG.warn("ModForge plugin compatibility check failed. Plugin may not function correctly.");
             } else {
                 LOG.info("ModForge plugin compatibility check passed.");
+                
+                // Also check JDK and IDE version with the more comprehensive validator
+                EnvironmentValidator.validateEnvironment(project);
             }
         } catch (Exception e) {
             LOG.error("Error checking compatibility: " + e.getMessage(), e);

@@ -78,7 +78,7 @@ latest_zip=$(basename "$plugin_zip")
 
 echo "====================================================="
 echo "✅ Build successful!"
-echo "Plugin ZIP file created: dist/$latest_zip"
+echo "Plugin ZIP file created: $(pwd)/dist/$latest_zip"
 echo ""
 echo "Installation Instructions:"
 echo "1. Open IntelliJ IDEA 2025.1"

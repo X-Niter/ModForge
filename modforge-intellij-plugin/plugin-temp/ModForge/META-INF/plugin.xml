@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<idea-plugin require-restart="true">
+    <id>com.modforge.intellij.plugin</id>
+    <name>ModForge AI</name>
+    <vendor email="support@modforge.dev" url="https://www.modforge.dev">ModForge</vendor>
+    <idea-version since-build="251.23774" until-build="252.*"/>
+    
+    <description><![CDATA[
+    <p>ModForge AI - Smart Minecraft Mod Development</p>
+    <p><b>Optimized for IntelliJ IDEA 2025.1 with Java 21 support</b></p>
+    <p>This plugin provides AI-powered assistance for Minecraft mod development.</p>
+    <p>Features:</p>
+    <ul>
+        <li>Multi-mod loader support (Forge, Fabric, Quilt, Architectury)</li>
+        <li>AI-driven code generation</li>
+        <li>Automatic error detection and fixing</li>
+        <li>Java 21 virtual thread optimization for improved performance</li>
+        <li>Full compatibility with IntelliJ IDEA 2025.1</li>
+    </ul>
+    ]]></description>
+    
+    <depends>com.intellij.modules.platform</depends>
+    <depends>com.intellij.modules.java</depends>
+    
+    <extensions defaultExtensionNs="com.intellij">
+        <toolWindow id="ModForge AI" 
+                    anchor="right" 
+                    factoryClass="com.modforge.intellij.plugin.ui.ModForgeToolWindowFactory" 
+                    icon="/META-INF/icons/modforge.svg"/>
+        
+        <notificationGroup id="ModForge Notifications" 
+                          displayType="BALLOON"/>
+                          
+        <postStartupActivity implementation="com.modforge.intellij.plugin.ModForgePluginActivator"/>
+    </extensions>
+</idea-plugin>
