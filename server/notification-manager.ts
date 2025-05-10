@@ -398,6 +398,62 @@ async function sendSlackNotification(
 }
 
 /**
+ * Send a webhook notification
+ */
+async function sendWebhookNotification(
+  message: NotificationMessage,
+  config: NotificationConfigType
+): Promise<boolean> {
+  // Type guard to check if config is a WebhookNotificationConfig
+  function isWebhookConfig(cfg: NotificationConfigType): cfg is WebhookNotificationConfig {
+    return 'url' in cfg;
+  }
+  
+  // Validate config is Webhook config
+  if (!isWebhookConfig(config)) {
+    logger.error('Invalid webhook notification config', { config });
+    return false;
+  }
+  
+  try {
+    const { url, method = 'POST', headers = {} } = config;
+    
+    if (!url) {
+      logger.warn('Missing webhook URL', { config });
+      return false;
+    }
+    
+    // Create a webhook payload from the notification message
+    const payload = {
+      title: message.title,
+      message: message.message,
+      severity: message.severity,
+      type: message.type,
+      timestamp: message.timestamp.toISOString(),
+      details: message.details || {}
+    };
+
+    // Send to webhook endpoint
+    await axios({
+      method: method,
+      url: url,
+      headers: {
+        'Content-Type': 'application/json',
+        ...headers
+      },
+      data: payload
+    });
+    
+    logger.info('Webhook notification sent', { url });
+    
+    return true;
+  } catch (error) {
+    logger.error('Failed to send webhook notification', { error });
+    return false;
+  }
+}
+
+/**
  * Send a log notification
  */
 function sendLogNotification(
@@ -613,6 +669,9 @@ async function sendNotificationToAllChannels(message: NotificationMessage): Prom
           break;
         case NotificationChannel.SLACK:
           success = await sendSlackNotification(message, channelConfig.config);
+          break;
+        case NotificationChannel.WEBHOOK:
+          success = await sendWebhookNotification(message, channelConfig.config);
           break;
         case NotificationChannel.LOG:
           success = sendLogNotification(message, channelConfig.config);
