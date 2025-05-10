@@ -101,6 +101,10 @@
                     class="com.modforge.intellij.plugin.actions.TestTokenAuthAction" 
                     text="Test Token Authentication" 
                     description="Test token-based authentication with direct HTTP requests"/>
+            <action id="ModForge.TestCompleteAuthFlow" 
+                    class="com.modforge.intellij.plugin.actions.TestCompleteAuthFlowAction" 
+                    text="Test Complete Auth Flow" 
+                    description="Test the complete authentication flow from username/password to token"/>
             <separator/>
             <action id="ModForge.GenerateCode" 
                     class="com.modforge.intellij.plugin.actions.GenerateCodeAction" 
@@ -172,6 +176,11 @@
                     text="Test Token Authentication" 
                     description="Test token-based authentication with direct HTTP requests"
                     icon="AllIcons.General.Web"/>
+            <action id="ModForge.TestCompleteAuthFlowToolbar" 
+                    class="com.modforge.intellij.plugin.actions.TestCompleteAuthFlowAction" 
+                    text="Test Complete Auth Flow" 
+                    description="Test the complete authentication flow from username/password to token"
+                    icon="AllIcons.General.ExternalTools"/>
             <separator/>
             <action id="ModForge.GenerateCodeToolbar" 
                     class="com.modforge.intellij.plugin.actions.GenerateCodeAction" 
