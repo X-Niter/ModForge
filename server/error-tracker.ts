@@ -12,6 +12,7 @@
 import { getLogger } from "./logging";
 import { performance } from "perf_hooks";
 import crypto from "crypto";
+import { sendTrackedErrorNotification } from "./notification-manager";
 
 // Set up logger
 const logger = getLogger("error-tracker");
@@ -379,6 +380,33 @@ export function trackError(
         count: trackedError.count,
         tracking_ms: perfDuration.toFixed(2)
       });
+      
+      // Send notification for critical errors
+      try {
+        sendTrackedErrorNotification(
+          trackedError.id,
+          errorMessage,
+          ErrorSeverity.CRITICAL,
+          category,
+          trackedError.count,
+          {
+            stack: errorStack,
+            fingerprint,
+            ...context
+          }
+        ).catch(notificationError => {
+          logger.error("Failed to send critical error notification", { 
+            error: notificationError,
+            originalErrorId: trackedError.id
+          });
+        });
+      } catch (notificationError) {
+        logger.error("Failed to send critical error notification", { 
+          error: notificationError,
+          originalErrorId: trackedError.id
+        });
+      }
+      
       break;
       
     case ErrorSeverity.HIGH:
@@ -389,6 +417,33 @@ export function trackError(
         count: trackedError.count,
         tracking_ms: perfDuration.toFixed(2)
       });
+      
+      // Send notification for high severity errors
+      try {
+        sendTrackedErrorNotification(
+          trackedError.id,
+          errorMessage,
+          ErrorSeverity.HIGH,
+          category,
+          trackedError.count,
+          {
+            stack: errorStack,
+            fingerprint,
+            ...context
+          }
+        ).catch(notificationError => {
+          logger.error("Failed to send high severity error notification", { 
+            error: notificationError,
+            originalErrorId: trackedError.id
+          });
+        });
+      } catch (notificationError) {
+        logger.error("Failed to send high severity error notification", { 
+          error: notificationError,
+          originalErrorId: trackedError.id
+        });
+      }
+      
       break;
       
     case ErrorSeverity.MEDIUM:
