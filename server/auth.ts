@@ -46,23 +46,27 @@ export const loginSchema = z.object({
 
 export type LoginData = z.infer<typeof loginSchema>;
 
-// User database type (for reference, avoiding usage directly)
-type DbUser = {
-  id: number;
-  username: string;
-  email: string | null;
-  password: string;
-  displayName: string | null;
-  avatarUrl: string | null;
-  githubId: string | null;
-  githubToken: string | null;
-  stripeCustomerId: string | null;
-  stripeSubscriptionId: string | null;
-  isAdmin: boolean;
-  metadata: Record<string, unknown>;
-  createdAt: Date;
-  updatedAt: Date;
-};
+// Extending Express.User to include our user properties
+declare global {
+  namespace Express {
+    interface User {
+      id: number;
+      username: string;
+      email: string | null;
+      password: string;
+      displayName: string | null;
+      avatarUrl: string | null;
+      githubId: string | null;
+      githubToken: string | null;
+      stripeCustomerId: string | null;
+      stripeSubscriptionId: string | null;
+      isAdmin: boolean;
+      metadata: Record<string, unknown>;
+      createdAt: Date;
+      updatedAt: Date;
+    }
+  }
+}
 
 /**
  * Set up authentication for the application
