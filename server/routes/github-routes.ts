@@ -151,7 +151,7 @@ router.post('/save-token', async (req, res) => {
 // 1. Session token (from OAuth or saved token)
 // 2. Token from request
 // 3. Environment variable token
-router.post('/get-credentials', async (req, res) => {
+router.get('/get-credentials', async (req, res) => {
   const { token: requestToken } = req.body;
   let source = null;
   let token = null;

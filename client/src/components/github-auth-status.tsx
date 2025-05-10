@@ -21,9 +21,29 @@ export function GitHubAuthStatus({ className }: GitHubAuthStatusProps) {
     };
   }
   
-  // Check authentication status
-  const { data: authData, isLoading } = useQuery<AuthResponse>({
+  // Interface for GitHub status response
+  interface GitHubStatusResponse {
+    success: boolean;
+    source?: string;
+    username?: string;
+    avatar_url?: string;
+    message?: string;
+  }
+  
+  // Check GitHub authentication status using both methods
+  const { 
+    data: authData, 
+    isLoading: authLoading 
+  } = useQuery<AuthResponse>({
     queryKey: ['/api/auth/me'],
+    staleTime: 60 * 1000, // 1 minute
+  });
+  
+  const { 
+    data: githubStatus, 
+    isLoading: githubLoading 
+  } = useQuery<GitHubStatusResponse>({
+    queryKey: ['/api/github/get-credentials'],
     staleTime: 60 * 1000, // 1 minute
   });
   
@@ -60,27 +80,30 @@ export function GitHubAuthStatus({ className }: GitHubAuthStatusProps) {
         </CardDescription>
       </CardHeader>
       <CardContent>
-        {isLoading ? (
+        {authLoading || githubLoading ? (
           <div className="space-y-2">
             <Skeleton className="h-4 w-[250px]" />
             <Skeleton className="h-4 w-[200px]" />
             <Skeleton className="h-4 w-[150px]" />
           </div>
-        ) : authData?.authenticated ? (
+        ) : githubStatus?.success ? (
+          // GitHub authenticated via any method (OAuth, token, or environment)
           <div className="space-y-4">
             <div className="flex items-center space-x-3">
-              {authData.user?.avatarUrl && (
+              {githubStatus.avatar_url && (
                 <img 
-                  src={authData.user.avatarUrl} 
+                  src={githubStatus.avatar_url} 
                   alt="GitHub Avatar" 
                   className="w-10 h-10 rounded-full border border-gray-600"
                 />
               )}
               <div>
-                <h4 className="text-white font-medium">{authData.user?.username}</h4>
-                {authData.user?.email && (
-                  <p className="text-gray-400 text-sm">{authData.user.email}</p>
-                )}
+                <h4 className="text-white font-medium">{githubStatus.username || "GitHub User"}</h4>
+                <p className="text-gray-400 text-sm">
+                  {githubStatus.source === 'session' ? 'OAuth Authentication' : 
+                   githubStatus.source === 'request' ? 'Token Authentication' : 
+                   'Environment Authentication'}
+                </p>
               </div>
             </div>
             
@@ -103,15 +126,18 @@ export function GitHubAuthStatus({ className }: GitHubAuthStatusProps) {
               <span className="text-green-400 text-sm">Successfully authenticated with GitHub</span>
             </div>
             
-            <Button 
-              variant="outline" 
-              className="w-full mt-4"
-              onClick={handleLogout}
-            >
-              Sign Out from GitHub
-            </Button>
+            {githubStatus.source === 'session' && (
+              <Button 
+                variant="outline" 
+                className="w-full mt-4"
+                onClick={handleLogout}
+              >
+                Sign Out from GitHub
+              </Button>
+            )}
           </div>
         ) : (
+          // No GitHub authentication available
           <div className="space-y-4">
             <div className="flex items-center space-x-2 bg-amber-950/30 p-3 rounded-md border border-amber-800">
               <svg
@@ -130,11 +156,12 @@ export function GitHubAuthStatus({ className }: GitHubAuthStatusProps) {
                 <line x1="12" y1="9" x2="12" y2="13"></line>
                 <line x1="12" y1="17" x2="12.01" y2="17"></line>
               </svg>
-              <span className="text-amber-400 text-sm">Not logged in with GitHub</span>
+              <span className="text-amber-400 text-sm">Not connected to GitHub</span>
             </div>
             
             <p className="text-gray-400 text-sm">
-              Log in with GitHub to automate repository creation and updates without entering a token.
+              Connect to GitHub to automate repository creation and updates. 
+              You can use OAuth or a personal access token.
             </p>
           </div>
         )}
