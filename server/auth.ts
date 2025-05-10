@@ -20,15 +20,20 @@ declare module 'express-session' {
   }
 }
 
+// Type guard to check if a value is a Record<string, unknown>
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object';
+}
+
 // Define a utility function to ensure metadata is the correct type
-function ensureMetadataType<T extends { metadata?: any }>(user: T): T {
+function ensureMetadataType<T extends { metadata?: any }>(user: T): T & { metadata: Record<string, unknown> } {
   if (user) {
     // Make sure metadata is always a proper object
-    if (user.metadata === null || typeof user.metadata !== 'object') {
-      user.metadata = {} as Record<string, unknown>;
+    if (!isRecord(user.metadata)) {
+      user.metadata = {};
     }
   }
-  return user;
+  return user as T & { metadata: Record<string, unknown> };
 }
 
 // Extend Express to include User type
@@ -157,6 +162,33 @@ export function setupAuth(app: Express) {
       done(error);
     }
   });
+  
+  // Set up JWT Bearer strategy for token-based authentication (IDE plugin)
+  passport.use(
+    new BearerStrategy(async (token, done) => {
+      try {
+        // Verify the token
+        const decoded = jwt.verify(
+          token, 
+          process.env.JWT_SECRET || "fallback-secret-change-in-production"
+        ) as { sub: string, username: string };
+        
+        // Get the user
+        const userId = parseInt(decoded.sub, 10);
+        const [user] = await db.select().from(users).where(eq(users.id, userId));
+        
+        if (!user) {
+          return done(null, false, "User not found");
+        }
+        
+        // Use our utility to ensure metadata is valid
+        return done(null, ensureMetadataType(user));
+      } catch (error) {
+        // Token verification failed
+        return done(null, false, "Invalid token");
+      }
+    })
+  );
 
   // Registration endpoint
   app.post("/api/register", async (req: Request, res: Response) => {
@@ -189,12 +221,10 @@ export function setupAuth(app: Express) {
           return res.status(500).json({ message: "Login failed after registration" });
         }
         
-        // Generate a token for API access
-        const token = jwt.sign(
-          { sub: newUser.id.toString(), username: newUser.username },
-          process.env.JWT_SECRET || "fallback-secret-change-in-production",
-          { expiresIn: '30d' }
-        );
+        // Generate a token for API access with proper permissions
+        const token = generateToken(ensureMetadataType(newUser), {
+          purpose: 'registration'
+        });
         
         // Return user without password, including token
         const { password, ...userWithoutPassword } = newUser;
@@ -280,6 +310,83 @@ export function setupAuth(app: Express) {
     })(req, res, next);
   });
 
+  // Generate a token with customizable expiration
+  function generateToken(
+    user: Express.User, 
+    options: { 
+      expiresIn?: string | number,
+      isAdmin?: boolean,
+      scope?: string,
+      purpose?: string 
+    } = {}
+  ): string {
+    const expiry = options.expiresIn || '30d';
+    
+    // Create payload with optional fields for specific purposes
+    const payload: Record<string, any> = {
+      sub: user.id.toString(),
+      username: user.username,
+      iat: Math.floor(Date.now() / 1000)
+    };
+    
+    // Add optional fields
+    if (options.isAdmin) {
+      payload.isAdmin = true;
+    }
+    
+    if (options.scope) {
+      payload.scope = options.scope;
+    }
+    
+    if (options.purpose) {
+      payload.purpose = options.purpose;
+    }
+    
+    return jwt.sign(
+      payload,
+      process.env.JWT_SECRET || "fallback-secret-change-in-production",
+      { expiresIn: expiry as string }
+    );
+  }
+  
+  // Generate a short-lived JIT (Just-In-Time) token for automated operations
+  function generateJitToken(userId: number, username: string, purpose: string): string {
+    // Short-lived token (1 hour) for automation purposes
+    return jwt.sign(
+      { 
+        sub: userId.toString(), 
+        username,
+        purpose,
+        jit: true,
+        iat: Math.floor(Date.now() / 1000)
+      },
+      process.env.JWT_SECRET || "fallback-secret-change-in-production",
+      { expiresIn: '1h' }
+    );
+  }
+
+  // Token generation endpoint for IDE plugin
+  app.post("/api/token", (req: Request, res: Response, next: NextFunction) => {
+    passport.authenticate("local", (err: Error, user: Express.User | false | null | undefined, info: any) => {
+      if (err) {
+        return next(err);
+      }
+      if (!user) {
+        return res.status(401).json({ message: info?.message || "Invalid credentials" });
+      }
+      
+      // Generate token
+      const token = generateToken(user);
+      
+      return res.status(200).json({
+        token,
+        userId: user.id,
+        username: user.username,
+        expiresIn: 30 * 24 * 60 * 60 // 30 days in seconds
+      });
+    })(req, res, next);
+  });
+
   // Logout endpoint
   app.post("/api/logout", (req: Request, res: Response) => {
     req.logout((err) => {
@@ -292,22 +399,97 @@ export function setupAuth(app: Express) {
     });
   });
 
-  // User info endpoint
-  app.get("/api/user", (req: Request, res: Response) => {
-    if (!req.isAuthenticated()) {
-      return res.status(401).json({ message: "Not authenticated" });
+  // User info endpoint - supports both session and token auth
+  app.get("/api/user", (req: Request, res: Response, next: NextFunction) => {
+    // Try session auth first
+    if (req.isAuthenticated()) {
+      const { password, ...userWithoutPassword } = req.user as Express.User;
+      return res.status(200).json(userWithoutPassword);
     }
     
-    // Return user without password
-    const { password, ...userWithoutPassword } = req.user as Express.User;
-    return res.status(200).json(userWithoutPassword);
+    // Fall back to token auth
+    passport.authenticate('bearer', { session: false }, 
+      (err: Error | null, user: Express.User | false | null, info: string | undefined) => {
+        if (err) {
+          return next(err);
+        }
+        if (!user) {
+          return res.status(401).json({ message: "Not authenticated" });
+        }
+        
+        const { password, ...userWithoutPassword } = user;
+        return res.status(200).json(userWithoutPassword);
+      }
+    )(req, res, next);
+  });
+  
+  // Token verification endpoint
+  app.get("/api/auth/verify", (req: Request, res: Response, next: NextFunction) => {
+    passport.authenticate('bearer', { session: false }, 
+      (err: Error | null, user: Express.User | false | null, info: string | undefined) => {
+        if (err) {
+          return next(err);
+        }
+        if (!user) {
+          return res.status(401).json({ 
+            authenticated: false,
+            message: info || "Token verification failed"
+          });
+        }
+        
+        return res.status(200).json({
+          authenticated: true,
+          message: "Authentication valid (token)",
+          userId: user.id,
+          username: user.username
+        });
+      }
+    )(req, res, next);
+  });
+  
+  // Verification endpoint that accepts username/password directly
+  app.post("/api/auth/verify", (req: Request, res: Response, next: NextFunction) => {
+    passport.authenticate("local", (err: Error | null, user: Express.User | false | null | undefined, info: any) => {
+      if (err) {
+        return next(err);
+      }
+      
+      if (!user) {
+        return res.status(401).json({ 
+          authenticated: false,
+          message: info?.message || "Invalid credentials" 
+        });
+      }
+      
+      return res.status(200).json({
+        authenticated: true,
+        message: "Authentication valid (credentials)",
+        userId: user.id,
+        username: user.username
+      });
+    })(req, res, next);
   });
 
-  // Authentication check middleware
+  // Authentication check middleware - supports both session and token auth
   return function requireAuth(req: Request, res: Response, next: NextFunction) {
+    // First check session auth
     if (req.isAuthenticated()) {
       return next();
     }
-    return res.status(401).json({ message: "Authentication required" });
+    
+    // Then try token auth
+    passport.authenticate('bearer', { session: false }, (err: Error | null, user: Express.User | false | null, info: string | undefined) => {
+      if (err) {
+        return res.status(500).json({ message: "Authentication error", error: err.message });
+      }
+      
+      if (!user) {
+        return res.status(401).json({ message: "Authentication required" });
+      }
+      
+      // Set user manually since we're not using sessions with bearer auth
+      req.user = user;
+      return next();
+    })(req, res, next);
   };
 }
