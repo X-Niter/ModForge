@@ -26,6 +26,7 @@ import apiMetricsRouter from "./routes/api-metrics";
 import webExplorerRouter from "./routes/web-explorer-routes";
 import jarAnalyzerRouter from "./routes/jar-analyzer-routes";
 import patternLearningRouter from "./routes/pattern-learning-metrics";
+import authRoutes from "./routes/auth-routes";
 import axios from "axios";
 import rateLimit from "express-rate-limit";
 
@@ -1019,6 +1020,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/web-explorer", webExplorerRouter);
   app.use("/api/jar-analyzer", jarAnalyzerRouter);
   app.use("/api/pattern-learning", patternLearningRouter);
+  app.use("/api/auth", authRoutes);
 
   return httpServer;
 }
