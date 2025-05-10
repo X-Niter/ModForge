@@ -1,15 +1,35 @@
 import passport from "passport";
 import { Strategy as LocalStrategy } from "passport-local";
+import { Strategy as BearerStrategy } from "passport-http-bearer";
 import { Express, Request, Response, NextFunction } from "express";
 import session from "express-session";
 import { scrypt, randomBytes, timingSafeEqual } from "crypto";
 import { promisify } from "util";
+import jwt from "jsonwebtoken";
 import { storage } from "./storage";
 import { InsertUser } from "@shared/schema";
 import { z } from "zod";
 import { db } from "./db";
 import { users } from "@shared/schema";
 import { eq } from "drizzle-orm";
+
+// Extend express-session with custom properties
+declare module 'express-session' {
+  interface SessionData {
+    loginAttempts?: Record<string, { count: number, lastAttempt: number }>;
+  }
+}
+
+// Define a utility function to ensure metadata is the correct type
+function ensureMetadataType<T extends { metadata?: any }>(user: T): T {
+  if (user) {
+    // Make sure metadata is always a proper object
+    if (user.metadata === null || typeof user.metadata !== 'object') {
+      user.metadata = {} as Record<string, unknown>;
+    }
+  }
+  return user;
+}
 
 // Extend Express to include User type
 declare global {
@@ -95,6 +115,11 @@ export function setupAuth(app: Express) {
   passport.use(
     new LocalStrategy(async (username, password, done) => {
       try {
+        // Security: always validate input length to prevent excessive load
+        if (username.length > 100 || password.length > 100) {
+          return done(null, false, { message: "Invalid credentials format" });
+        }
+        
         const [user] = await db.select().from(users).where(eq(users.username, username));
         
         if (!user) {
@@ -106,7 +131,8 @@ export function setupAuth(app: Express) {
           return done(null, false, { message: "Invalid username or password" });
         }
         
-        return done(null, user);
+        // Use our utility to ensure metadata is valid
+        return done(null, ensureMetadataType(user));
       } catch (error) {
         return done(error);
       }
@@ -124,7 +150,9 @@ export function setupAuth(app: Express) {
       if (!user) {
         return done(null, false);
       }
-      done(null, user);
+      
+      // Use our utility to ensure metadata is valid
+      done(null, ensureMetadataType(user));
     } catch (error) {
       done(error);
     }
@@ -144,25 +172,33 @@ export function setupAuth(app: Express) {
       // Hash password
       const hashedPassword = await hashPassword(validatedData.password);
       
-      // Create user
+      // Create user with sanitized inputs
       const [newUser] = await db.insert(users)
         .values({
-          username: validatedData.username,
+          username: validatedData.username.trim(),
           password: hashedPassword,
-          email: req.body.email,
-          displayName: req.body.displayName,
+          email: req.body.email ? req.body.email.trim() : null,
+          displayName: req.body.displayName ? req.body.displayName.trim() : null,
+          metadata: {} as Record<string, unknown>,
         })
         .returning();
       
-      // Log in the new user
-      req.login(newUser, (err) => {
+      // Log in the new user (ensure the metadata is properly typed)
+      req.login(ensureMetadataType(newUser), (err) => {
         if (err) {
           return res.status(500).json({ message: "Login failed after registration" });
         }
         
-        // Return user without password
+        // Generate a token for API access
+        const token = jwt.sign(
+          { sub: newUser.id.toString(), username: newUser.username },
+          process.env.JWT_SECRET || "fallback-secret-change-in-production",
+          { expiresIn: '30d' }
+        );
+        
+        // Return user without password, including token
         const { password, ...userWithoutPassword } = newUser;
-        return res.status(201).json(userWithoutPassword);
+        return res.status(201).json({ ...userWithoutPassword, token });
       });
       
     } catch (error: any) {
@@ -173,25 +209,73 @@ export function setupAuth(app: Express) {
     }
   });
 
-  // Login endpoint
+  // Login endpoint with enhanced security and rate limiting
   app.post("/api/login", (req: Request, res: Response, next: NextFunction) => {
+    // Validate login input first using Zod
+    const validationResult = loginSchema.safeParse(req.body);
+    if (!validationResult.success) {
+      return res.status(400).json({ 
+        message: "Invalid login credentials format", 
+        errors: validationResult.error.errors 
+      });
+    }
+
+    // Rate limiting check
+    const ipAddress = req.ip || req.socket.remoteAddress || 'unknown';
+    const loginAttemptsStore: Record<string, { count: number, lastAttempt: number }> = 
+      req.session.loginAttempts || {};
+    
+    const now = Date.now();
+    const attempts = loginAttemptsStore[ipAddress] || { count: 0, lastAttempt: 0 };
+    
+    // Implement increasing delays for repeated failed attempts
+    if (attempts.count >= 5) {
+      const timeElapsed = now - attempts.lastAttempt;
+      const requiredDelay = Math.min(30000, Math.pow(2, attempts.count - 5) * 1000);
+      
+      if (timeElapsed < requiredDelay) {
+        return res.status(429).json({ 
+          message: `Too many login attempts. Please try again in ${Math.ceil((requiredDelay - timeElapsed) / 1000)} seconds.` 
+        });
+      }
+    }
+    
+    // Authenticate user with passport
     passport.authenticate("local", (err: Error, user: Express.User | false | null | undefined, info: any) => {
       if (err) {
         return next(err);
       }
       
+      // Failed login
       if (!user) {
-        return res.status(401).json({ message: info?.message || "Login failed" });
+        // Track failed attempts
+        attempts.count += 1;
+        attempts.lastAttempt = now;
+        loginAttemptsStore[ipAddress] = attempts;
+        req.session.loginAttempts = loginAttemptsStore;
+        
+        return res.status(401).json({ message: info?.message || "Invalid username or password" });
       }
+      
+      // Successful login - reset attempts counter
+      delete loginAttemptsStore[ipAddress];
+      req.session.loginAttempts = loginAttemptsStore;
       
       req.login(user, (loginErr) => {
         if (loginErr) {
           return next(loginErr);
         }
         
-        // Return user without password
+        // Generate a JSON Web Token for API access
+        const token = jwt.sign(
+          { sub: user.id.toString(), username: user.username },
+          process.env.JWT_SECRET || "fallback-secret-change-in-production",
+          { expiresIn: '30d' }
+        );
+        
+        // Return user without password, including token
         const { password, ...userWithoutPassword } = user;
-        return res.status(200).json(userWithoutPassword);
+        return res.status(200).json({ ...userWithoutPassword, token });
       });
     })(req, res, next);
   });
