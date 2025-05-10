@@ -44,10 +44,8 @@ export async function expandModIdea(params: {
 }) {
   try {
     // Call our server API endpoint instead of OpenAI directly
-    return apiRequest("/api/ai/expand-idea", {
-      method: "POST",
-      data: params
-    });
+    const response = await apiRequest("POST", "/api/ai/expand-idea", params);
+    return response.json();
   } catch (error) {
     console.error("Error in expandModIdea:", error);
     throw error;
@@ -64,10 +62,8 @@ export async function generateModCode(params: {
 }) {
   try {
     // Call our server API endpoint instead of OpenAI directly
-    return apiRequest("/api/ai/generate-code", {
-      method: "POST",
-      data: params
-    });
+    const response = await apiRequest("POST", "/api/ai/generate-code", params);
+    return response.json();
   } catch (error) {
     console.error("Error in generateModCode:", error);
     throw error;
@@ -82,10 +78,8 @@ export async function fixCompilationErrors(params: {
 }) {
   try {
     // Call our server API endpoint instead of OpenAI directly
-    return apiRequest("/api/ai/fix-errors", {
-      method: "POST",
-      data: params
-    });
+    const response = await apiRequest("POST", "/api/ai/fix-errors", params);
+    return response.json();
   } catch (error) {
     console.error("Error in fixCompilationErrors:", error);
     throw error;
@@ -100,10 +94,8 @@ export async function generateDocumentation(params: {
 }) {
   try {
     // Call our server API endpoint instead of OpenAI directly
-    return apiRequest("/api/ai/generate-docs", {
-      method: "POST",
-      data: params
-    });
+    const response = await apiRequest("POST", "/api/ai/generate-docs", params);
+    return response.json();
   } catch (error) {
     console.error("Error in generateDocumentation:", error);
     throw error;
@@ -118,10 +110,8 @@ export async function addFeatures(params: {
 }) {
   try {
     // Call our server API endpoint instead of OpenAI directly
-    return apiRequest("/api/ai/add-features", {
-      method: "POST",
-      data: params
-    });
+    const response = await apiRequest("POST", "/api/ai/add-features", params);
+    return response.json();
   } catch (error) {
     console.error("Error in addFeatures:", error);
     throw error;
@@ -137,10 +127,8 @@ export async function generateGenericCode(params: {
 }) {
   try {
     // Call our server API endpoint instead of OpenAI directly
-    return apiRequest("/api/ai/generate-generic-code", {
-      method: "POST",
-      data: params
-    });
+    const response = await apiRequest("POST", "/api/ai/generate-generic-code", params);
+    return response.json();
   } catch (error) {
     console.error("Error in generateGenericCode:", error);
     throw error;
