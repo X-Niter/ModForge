@@ -12,6 +12,22 @@ enum BuildStatus {
 }
 
 /**
+ * Custom logger for the continuous development service
+ */
+function logContinuous(modId: number, message: string, type: 'info' | 'warn' | 'error' = 'info') {
+  const timestamp = new Date().toISOString();
+  const prefix = `[ContinuousDev:${modId}]`;
+  
+  if (type === 'error') {
+    console.error(`${timestamp} ${prefix} ERROR: ${message}`);
+  } else if (type === 'warn') {
+    console.warn(`${timestamp} ${prefix} WARN: ${message}`);
+  } else {
+    console.log(`${timestamp} ${prefix} ${message}`);
+  }
+}
+
+/**
  * Service that manages continuous mod development
  * Runs in the background to continuously compile, fix errors, and improve mods
  */
@@ -99,17 +115,18 @@ class ContinuousService extends EventEmitter {
     // Check if circuit breaker is tripped
     const circuitBreakerCount = parseInt(process.env[circuitBreakerKey] || '0', 10);
     if (circuitBreakerCount >= 5) {
-      console.warn(`Circuit breaker tripped for mod ${modId}. Too many failures in a short period.`);
+      logContinuous(modId, `Circuit breaker tripped. Too many failures in a short period.`, 'warn');
       // Wait for at least an hour before trying again
       const lastTripTime = parseInt(process.env[`${circuitBreakerKey}_time`] || '0', 10);
       const now = Date.now();
       if (now - lastTripTime < 60 * 60 * 1000) {
-        console.warn(`Skipping processing for mod ${modId} until circuit breaker resets.`);
+        logContinuous(modId, `Skipping processing until circuit breaker resets.`, 'warn');
         return;
       } else {
         // Reset circuit breaker
         process.env[circuitBreakerKey] = '0';
         delete process.env[`${circuitBreakerKey}_time`];
+        logContinuous(modId, `Circuit breaker reset after timeout period.`);
       }
     }
     
@@ -117,7 +134,7 @@ class ContinuousService extends EventEmitter {
       // Get the mod
       const mod = await storage.getMod(modId);
       if (!mod) {
-        console.error(`Mod ${modId} not found`);
+        logContinuous(modId, `Mod not found`, 'error');
         this.stopContinuousDevelopment(modId);
         return;
       }
@@ -126,7 +143,7 @@ class ContinuousService extends EventEmitter {
       const buildCount = (this.buildCounts.get(modId) || 0) + 1;
       this.buildCounts.set(modId, buildCount);
       
-      console.log(`Starting build #${buildCount} for mod ${mod.name} (${modId})`);
+      logContinuous(modId, `Starting build #${buildCount} for mod ${mod.name}`);
       
       // Create a new build
       const build = await storage.createBuild({
@@ -144,7 +161,7 @@ class ContinuousService extends EventEmitter {
       });
       
       // Compile the mod
-      console.log(`Compiling mod ${mod.name} (${modId})`);
+      logContinuous(modId, `Compiling mod ${mod.name}`);
       const compileResult = await compileMod(modId);
       
       // Update build logs
@@ -170,7 +187,7 @@ class ContinuousService extends EventEmitter {
         
         // Fix errors with retry logic
         attempts++;
-        console.log(`Fixing errors for mod ${mod.name} (${modId}) - Attempt ${attempts}/${maxRetries}`);
+        logContinuous(modId, `Fixing errors for mod ${mod.name} - Attempt ${attempts}/${maxRetries}`);
         
         let fixResult;
         try {
@@ -178,7 +195,7 @@ class ContinuousService extends EventEmitter {
         } catch (error) {
           // Type-safe error handling 
           const fixError = error as Error;
-          console.error(`Error fixing compilation errors for mod ${modId}:`, fixError);
+          logContinuous(modId, `Error fixing compilation errors: ${fixError.message}`, 'error');
           currentLogs += `\nError during auto-fix attempt: ${fixError.message || String(fixError)}\n`;
           await storage.updateBuild(build.id, { 
             logs: currentLogs,
@@ -213,7 +230,7 @@ class ContinuousService extends EventEmitter {
         currentLogs += "\nRetrying compilation after fixes...\n";
         await storage.updateBuild(build.id, { logs: currentLogs });
         
-        console.log(`Recompiling mod ${mod.name} (${modId}) after fixes`);
+        logContinuous(modId, `Recompiling mod ${mod.name} after fixes`);
         const retryResult = await compileMod(modId);
         
         // Update build with new compilation results
@@ -232,7 +249,7 @@ class ContinuousService extends EventEmitter {
         if (newStatus === BuildStatus.Failed && mod.autoFixLevel === "Aggressive") {
           // We might add more advanced feature development here
           // For now, we'll just report the continuous cycle
-          console.log(`Continuous development cycle for mod ${mod.name} completed with errors`);
+          logContinuous(modId, `Continuous development cycle for mod ${mod.name} completed with errors`, 'warn');
           
           // Emit the build completed event with success status
           this.emit('buildCompleted', {
@@ -242,7 +259,14 @@ class ContinuousService extends EventEmitter {
             buildNumber: buildCount
           });
         } else {
-          console.log(`Continuous development cycle for mod ${mod.name} completed successfully`);
+          logContinuous(modId, `Continuous development cycle for mod ${mod.name} completed successfully`);
+          
+          // Reset circuit breaker on successful build
+          const circuitBreakerKey = `circuit_breaker_${modId}`;
+          process.env[circuitBreakerKey] = '0';
+          if (process.env[`${circuitBreakerKey}_time`]) {
+            delete process.env[`${circuitBreakerKey}_time`];
+          }
           
           // Emit the build completed event with success status
           this.emit('buildCompleted', {
@@ -265,6 +289,15 @@ class ContinuousService extends EventEmitter {
         });
         
         console.log(`Continuous development cycle for mod ${mod.name} completed with status: ${status}`);
+        
+        // Reset circuit breaker if build is successful
+        if (compileResult.success) {
+          const circuitBreakerKey = `circuit_breaker_${modId}`;
+          process.env[circuitBreakerKey] = '0';
+          if (process.env[`${circuitBreakerKey}_time`]) {
+            delete process.env[`${circuitBreakerKey}_time`];
+          }
+        }
         
         // Emit the build completed event with success status
         this.emit('buildCompleted', {
