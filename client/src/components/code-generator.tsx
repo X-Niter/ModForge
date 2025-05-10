@@ -320,7 +320,6 @@ export function CodeGenerator() {
               error={error}
               generatedCode={generatedCode}
               explanation={explanation}
-              isGenerating={isGenerating}
               onCopyCode={handleCopyCode}
             />
           </div>
@@ -441,7 +440,6 @@ export function CodeGenerator() {
               generatedCode={generatedCode}
               explanation={explanation}
               isGenerating={isGenerating}
-              onCopyCode={handleCopyCode}
             />
           </div>
         </TabsContent>
@@ -469,7 +467,7 @@ function OutputCard({
           <CardTitle>Generated Code</CardTitle>
           <CardDescription>AI-generated code based on your requirements</CardDescription>
         </div>
-        {generatedCode && !isGenerating && (
+        {generatedCode && (
           <Button variant="outline" size="sm" onClick={onCopyCode}>
             <Code className="h-4 w-4 mr-2" />
             Copy Code
