@@ -282,6 +282,8 @@ class ContinuousService extends EventEmitter {
    * @param modId The mod ID to process
    * @param retryCount Current retry attempt (for internal use)
    */
+
+
   private async processMod(modId: number, retryCount: number = 0): Promise<void> {
     // Update the activity timestamp for watchdog monitoring
     this.lastActivityTimestamps.set(modId, Date.now());
@@ -502,8 +504,19 @@ class ContinuousService extends EventEmitter {
       logContinuous(modId, `Error in continuous development cycle: ${errorMessage} (retry ${retryCount}/${maxRetries})`, 'error');
       
       // Categorize error by analyzing error message and stack trace
-      const isTransient = this.isTransientError(errorMessage, errorObj);
-      const errorSeverity = this.determineErrorSeverity(errorMessage, errorObj, retryCount);
+      // Determine if error is transient
+      const isTransient = 
+        errorMessage.includes('timeout') || 
+        errorMessage.includes('rate limit') || 
+        errorMessage.includes('connection') || 
+        errorObj.name === 'FetchError' || 
+        errorObj.name === 'NetworkError';
+      
+      // Determine error severity based on content and retry count
+      const errorSeverity = 
+        errorMessage.includes('corruption') || retryCount >= 2 ? 
+          ErrorSeverity.HIGH : 
+          ErrorSeverity.MEDIUM;
       
       // Enhanced error context for better debugging
       const enhancedContext = {
@@ -526,21 +539,27 @@ class ContinuousService extends EventEmitter {
         enhancedContext
       );
       
-      // Implement retry for transient errors before incrementing circuit breaker
-      // Only retry for specific transient errors that might resolve themselves
-      const isTransientError = error instanceof Error && (
-        error.message.includes('ECONNREFUSED') ||
-        error.message.includes('ETIMEDOUT') ||
-        error.message.includes('network') ||
-        error.message.includes('temporary')
-      );
+      // Enhanced retry logic with more comprehensive transient error detection
+      // Using the previously determined isTransient flag for consistent behavior
       
-      // Retry logic for transient errors
-      if (isTransientError && retryCount < 2) {
+      // Maximum retries and exponential backoff configuration
+      const MAX_RETRIES = 3;
+      
+      // Decide whether to retry based on:
+      // 1. If it's a transient error
+      // 2. If we haven't exceeded max retries
+      // 3. If the circuit breaker allows retries
+      if (isTransient && retryCount < MAX_RETRIES) {
+        // Calculate delay with exponential backoff (2^retry * 1000ms)
         const nextRetry = retryCount + 1;
-        const delayMs = nextRetry * 5000; // Exponential backoff: 5s, 10s
+        const baseDelay = 1000; // 1 second base
+        const jitter = Math.floor(Math.random() * 500); // Add randomness to prevent thundering herd
+        const delayMs = Math.min(
+          (Math.pow(2, nextRetry) * baseDelay) + jitter, 
+          60000 // Cap at 60 seconds
+        );
         
-        logContinuous(modId, `Transient error detected. Retry ${nextRetry}/2 scheduled in ${delayMs/1000}s`, 'warn');
+        logContinuous(modId, `Transient error detected. Retry ${nextRetry}/${MAX_RETRIES} scheduled in ${(delayMs/1000).toFixed(1)}s`, 'warn');
         
         // Schedule retry with delay
         setTimeout(() => {
