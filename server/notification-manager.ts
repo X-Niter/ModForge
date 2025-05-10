@@ -874,7 +874,8 @@ export async function sendNotification(
     logger.warn('Failed to send notification, adding to retry queue', {
       type: fullMessage.type,
       severity: fullMessage.severity,
-      error: error instanceof Error ? error.message : String(error)
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined
     });
     
     // Add to the retry queue, with priority based on severity
@@ -1106,7 +1107,8 @@ async function processFailedNotificationsQueue(): Promise<void> {
       logger.info('Successfully resent notification on retry');
     } catch (error) {
       logger.warn(`Failed to resend notification (attempt ${item.attempts}/${item.maxAttempts})`, {
-        error,
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
         type: item.message.type,
         severity: item.message.severity
       });
@@ -1175,7 +1177,10 @@ export function initializeNotificationSystem(): () => void {
     try {
       await processFailedNotificationsQueue();
     } catch (error) {
-      logger.error('Error processing failed notifications queue', { error });
+      logger.error('Error processing failed notifications queue', { 
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined
+      });
     }
   }, 60 * 1000); // Check every minute
   
@@ -1184,7 +1189,10 @@ export function initializeNotificationSystem(): () => void {
     startupTime: new Date().toISOString(),
     environment: process.env.NODE_ENV || 'development'
   }).catch(error => {
-    logger.error('Failed to send startup notification', { error });
+    logger.error('Failed to send startup notification', { 
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined 
+    });
     
     // Even if this fails, it will be added to the retry queue by the sendNotification function
   });
@@ -1201,7 +1209,8 @@ export function initializeNotificationSystem(): () => void {
       processBatch(key).catch(error => {
         logger.error('Failed to process notification batch during shutdown', { 
           key, 
-          error 
+          error: error instanceof Error ? error.message : String(error),
+          stack: error instanceof Error ? error.stack : undefined
         });
       });
     });
