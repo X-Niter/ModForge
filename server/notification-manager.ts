@@ -915,7 +915,7 @@ export async function sendErrorNotification(
       stack: error.stack,
       ...context
     }
-  });
+  }, false);
 }
 
 /**
@@ -948,7 +948,7 @@ export async function sendSystemStatusNotification(
     title: `System Status: ${status.toUpperCase()}`,
     message,
     details
-  });
+  }, false);
 }
 
 /**
