@@ -61,7 +61,7 @@ declare global {
       stripeCustomerId: string | null;
       stripeSubscriptionId: string | null;
       isAdmin: boolean;
-      metadata: Record<string, unknown>;
+      metadata: Record<string, unknown> | any;
       createdAt: Date;
       updatedAt: Date;
     }
@@ -121,6 +121,9 @@ export function setupAuth(app: Express) {
   passport.deserializeUser(async (id: number, done) => {
     try {
       const [user] = await db.select().from(users).where(eq(users.id, id));
+      if (user && typeof user.metadata !== 'object') {
+        user.metadata = {};
+      }
       if (!user) {
         return done(null, false);
       }
@@ -151,6 +154,7 @@ export function setupAuth(app: Express) {
           password: hashedPassword,
           email: req.body.email || null,
           displayName: req.body.displayName || null,
+          metadata: {} as Record<string, unknown>,
         })
         .returning();
       
