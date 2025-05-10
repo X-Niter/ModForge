@@ -697,14 +697,26 @@ function calculateErrorImportance(error: TrackedError): number {
   // Start with a base score
   let score = 0;
   
-  // Severity is the most important factor (0-3 for LOW to CRITICAL)
-  const severityValues = {
-    [ErrorSeverity.LOW]: 0,
-    [ErrorSeverity.MEDIUM]: 25,
-    [ErrorSeverity.HIGH]: 50,
-    [ErrorSeverity.CRITICAL]: 100
+  // Severity is the most important factor (0-4 for INFO to CRITICAL)
+  // Use a function to map severity to score to avoid TypeScript index issues
+  const getSeverityScore = (severity: ErrorSeverity): number => {
+    switch (severity) {
+      case ErrorSeverity.INFO:
+        return 0;
+      case ErrorSeverity.LOW:
+        return 10;
+      case ErrorSeverity.MEDIUM:
+        return 25;
+      case ErrorSeverity.HIGH:
+        return 50;
+      case ErrorSeverity.CRITICAL:
+        return 100;
+      default:
+        return 0;
+    }
   };
-  score += severityValues[error.severity] || 0;
+  
+  score += getSeverityScore(error.severity);
   
   // Recent errors are more important (1-10 based on recency)
   // Newer errors get higher scores

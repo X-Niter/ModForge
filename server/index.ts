@@ -11,6 +11,7 @@ import { rootLogger, getLogger } from "./logging";
 import { initializeErrorRecovery, cleanupScheduledJobs } from "./index-error-recovery";
 import { initializeBackupSystem } from "./backup-integration";
 import { initializeNotifications } from "./notification-integration";
+import { scheduleErrorStoreCleanup } from "./error-tracker";
 
 const app = express();
 // Enable trust proxy to work correctly with express-rate-limit behind a proxy (like in Replit)
@@ -198,6 +199,9 @@ process.on('unhandledRejection', (reason, promise) => {
   
   // Initialize notification system
   const cleanupNotifications = initializeNotifications();
+  
+  // Initialize error tracking cleanup to prevent memory leaks
+  const cleanupErrorStore = scheduleErrorStoreCleanup();
   
   const server = await registerRoutes(app);
 
