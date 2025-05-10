@@ -79,14 +79,23 @@ public class ModForgeSettingsComponent {
         
         // Create main panel
         mainPanel = FormBuilder.createFormBuilder()
+                // General settings
                 .addLabeledComponent(new JBLabel("Server URL:"), serverUrlField, 1, false)
                 .addComponent(useDarkModeCheckbox, 1)
                 .addComponent(enableContinuousDevelopmentCheckbox, 1)
                 .addComponent(enablePatternRecognitionCheckbox, 1)
                 .addSeparator(10)
+                
+                // GitHub integration settings
                 .addComponent(enableGitHubIntegrationCheckbox, 1)
                 .addLabeledComponent(new JBLabel("GitHub Token:"), githubTokenField, 1, false)
+                .addLabeledComponent(new JBLabel("GitHub Username:"), githubUsernameField, 1, false)
+                .addLabeledComponent(new JBLabel("Default Repository:"), githubRepositoryField, 1, false)
+                .addComponent(autoMonitorRepositoryCheckbox, 1)
+                .addComponent(autoRespondToIssuesCheckbox, 1)
                 .addSeparator(10)
+                
+                // API settings
                 .addLabeledComponent(new JBLabel("Max API requests per day:"), maxApiRequestsSpinner, 1, false)
                 .addSeparator(10)
                 .addComponentFillVertically(new JPanel(), 0)
@@ -101,7 +110,12 @@ public class ModForgeSettingsComponent {
         mainPanel.add(buttonPanel, BorderLayout.SOUTH);
         
         // Set initial state
-        githubTokenField.setEnabled(enableGitHubIntegrationCheckbox.isSelected());
+        boolean githubEnabled = enableGitHubIntegrationCheckbox.isSelected();
+        githubTokenField.setEnabled(githubEnabled);
+        githubUsernameField.setEnabled(githubEnabled);
+        githubRepositoryField.setEnabled(githubEnabled);
+        autoMonitorRepositoryCheckbox.setEnabled(githubEnabled);
+        autoRespondToIssuesCheckbox.setEnabled(githubEnabled);
     }
     
     /**
@@ -308,6 +322,80 @@ public class ModForgeSettingsComponent {
     }
     
     /**
+     * Get the GitHub username.
+     *
+     * @return The GitHub username
+     */
+    @NotNull
+    public String getGitHubUsername() {
+        return githubUsernameField.getText().trim();
+    }
+    
+    /**
+     * Set the GitHub username.
+     *
+     * @param username The GitHub username
+     */
+    public void setGitHubUsername(@NotNull String username) {
+        githubUsernameField.setText(username);
+    }
+    
+    /**
+     * Get the GitHub repository.
+     *
+     * @return The GitHub repository
+     */
+    @NotNull
+    public String getGitHubRepository() {
+        return githubRepositoryField.getText().trim();
+    }
+    
+    /**
+     * Set the GitHub repository.
+     *
+     * @param repository The GitHub repository
+     */
+    public void setGitHubRepository(@NotNull String repository) {
+        githubRepositoryField.setText(repository);
+    }
+    
+    /**
+     * Check if auto-monitor repository is enabled.
+     *
+     * @return True if enabled, false otherwise
+     */
+    public boolean isAutoMonitorRepository() {
+        return autoMonitorRepositoryCheckbox.isSelected();
+    }
+    
+    /**
+     * Set if auto-monitor repository is enabled.
+     *
+     * @param autoMonitor True to enable, false to disable
+     */
+    public void setAutoMonitorRepository(boolean autoMonitor) {
+        autoMonitorRepositoryCheckbox.setSelected(autoMonitor);
+    }
+    
+    /**
+     * Check if auto-respond to issues is enabled.
+     *
+     * @return True if enabled, false otherwise
+     */
+    public boolean isAutoRespondToIssues() {
+        return autoRespondToIssuesCheckbox.isSelected();
+    }
+    
+    /**
+     * Set if auto-respond to issues is enabled.
+     *
+     * @param autoRespond True to enable, false to disable
+     */
+    public void setAutoRespondToIssues(boolean autoRespond) {
+        autoRespondToIssuesCheckbox.setSelected(autoRespond);
+    }
+    
+    /**
      * Reset settings to defaults.
      */
     private void resetToDefaults() {
@@ -328,6 +416,10 @@ public class ModForgeSettingsComponent {
             setEnablePatternRecognition(settings.isEnablePatternRecognition());
             setEnableGitHubIntegration(settings.isEnableGitHubIntegration());
             setGithubToken(settings.getGithubToken());
+            setGitHubUsername(settings.getGitHubUsername());
+            setGitHubRepository(settings.getGitHubRepository());
+            setAutoMonitorRepository(settings.isAutoMonitorRepository());
+            setAutoRespondToIssues(settings.isAutoRespondToIssues());
             setMaxApiRequestsPerDay(settings.getMaxApiRequestsPerDay());
         }
     }

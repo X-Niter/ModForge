@@ -45,6 +45,10 @@ public class ModForgeSettingsConfigurable implements Configurable {
                 || mySettingsComponent.isEnablePatternRecognition() != settings.isEnablePatternRecognition()
                 || mySettingsComponent.isEnableGitHubIntegration() != settings.isEnableGitHubIntegration()
                 || !mySettingsComponent.getGithubToken().equals(settings.getGithubToken())
+                || !mySettingsComponent.getGitHubUsername().equals(settings.getGitHubUsername())
+                || !mySettingsComponent.getGitHubRepository().equals(settings.getGitHubRepository())
+                || mySettingsComponent.isAutoMonitorRepository() != settings.isAutoMonitorRepository()
+                || mySettingsComponent.isAutoRespondToIssues() != settings.isAutoRespondToIssues()
                 || mySettingsComponent.getMaxApiRequestsPerDay() != settings.getMaxApiRequestsPerDay();
     }
     
@@ -57,9 +61,15 @@ public class ModForgeSettingsConfigurable implements Configurable {
             throw new ConfigurationException("Server URL cannot be empty");
         }
         
-        // Validate GitHub token if GitHub integration is enabled
-        if (mySettingsComponent.isEnableGitHubIntegration() && mySettingsComponent.getGithubToken().isEmpty()) {
-            throw new ConfigurationException("GitHub token cannot be empty when GitHub integration is enabled");
+        // Validate GitHub settings if GitHub integration is enabled
+        if (mySettingsComponent.isEnableGitHubIntegration()) {
+            if (mySettingsComponent.getGithubToken().isEmpty()) {
+                throw new ConfigurationException("GitHub token cannot be empty when GitHub integration is enabled");
+            }
+            
+            if (mySettingsComponent.getGitHubUsername().isEmpty()) {
+                throw new ConfigurationException("GitHub username cannot be empty when GitHub integration is enabled");
+            }
         }
         
         // Apply changes
@@ -69,6 +79,10 @@ public class ModForgeSettingsConfigurable implements Configurable {
         settings.setEnablePatternRecognition(mySettingsComponent.isEnablePatternRecognition());
         settings.setEnableGitHubIntegration(mySettingsComponent.isEnableGitHubIntegration());
         settings.setGithubToken(mySettingsComponent.getGithubToken());
+        settings.setGitHubUsername(mySettingsComponent.getGitHubUsername());
+        settings.setGitHubRepository(mySettingsComponent.getGitHubRepository());
+        settings.setAutoMonitorRepository(mySettingsComponent.isAutoMonitorRepository());
+        settings.setAutoRespondToIssues(mySettingsComponent.isAutoRespondToIssues());
         settings.setMaxApiRequestsPerDay(mySettingsComponent.getMaxApiRequestsPerDay());
     }
     
@@ -81,6 +95,10 @@ public class ModForgeSettingsConfigurable implements Configurable {
         mySettingsComponent.setEnablePatternRecognition(settings.isEnablePatternRecognition());
         mySettingsComponent.setEnableGitHubIntegration(settings.isEnableGitHubIntegration());
         mySettingsComponent.setGithubToken(settings.getGithubToken());
+        mySettingsComponent.setGitHubUsername(settings.getGitHubUsername());
+        mySettingsComponent.setGitHubRepository(settings.getGitHubRepository());
+        mySettingsComponent.setAutoMonitorRepository(settings.isAutoMonitorRepository());
+        mySettingsComponent.setAutoRespondToIssues(settings.isAutoRespondToIssues());
         mySettingsComponent.setMaxApiRequestsPerDay(settings.getMaxApiRequestsPerDay());
     }
     
