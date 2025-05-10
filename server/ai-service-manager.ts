@@ -86,7 +86,7 @@ export function getUsageMetrics(): UsageMetrics & {
 export async function smartGenerateDocumentation(
   code: string, 
   language: string = 'java', 
-  style: string = 'standard'
+  style: string = 'javadoc'
 ): Promise<{ text: string }> {
   try {
     // First try to find a pattern match
@@ -133,7 +133,7 @@ export async function smartGenerateCode(
   prompt: string,
   language: string = 'javascript',
   context: string = '',
-  complexity: string = 'medium'
+  complexity: "simple" | "medium" | "complex" = 'medium'
 ): Promise<{ code: string; explanation: string; suggestedFileName?: string }> {
   try {
     // First try to find a pattern match
@@ -156,10 +156,16 @@ export async function smartGenerateCode(
     console.log('No suitable code pattern found, using OpenAI API');
     recordApiFallback();
     
+    // Convert complexity string to valid type
+    const validComplexity: "simple" | "medium" | "complex" = 
+      (complexity === "simple" || complexity === "medium" || complexity === "complex")
+        ? complexity
+        : "medium";
+        
     return await generateCode(prompt, {
       language,
       context,
-      complexity
+      complexity: validComplexity
     });
   } catch (error) {
     console.error('Error in smartGenerateCode:', error);
