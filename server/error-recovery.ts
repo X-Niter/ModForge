@@ -125,7 +125,10 @@ async function recoverFromDiskSpaceIssues(): Promise<RecoveryResult> {
           deletedCount++;
           deletedSize += fileStats[i].size;
         } catch (err) {
-          logger.error(`Failed to delete file ${fileStats[i].name}`, { error: err });
+          logger.error(`Failed to delete file ${fileStats[i].name}`, { 
+            error: err instanceof Error ? err.message : String(err),
+            stack: err instanceof Error ? err.stack : undefined
+          });
         }
       }
     }
@@ -144,7 +147,10 @@ async function recoverFromDiskSpaceIssues(): Promise<RecoveryResult> {
       timestamp: new Date().toISOString()
     };
   } catch (error) {
-    logger.error("Failed to recover from disk space issues", { error });
+    logger.error("Failed to recover from disk space issues", { 
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined
+    });
     
     return {
       successful: false,
@@ -191,7 +197,8 @@ async function recoverFromDatabaseConnectionIssues(): Promise<RecoveryResult> {
         }
       } catch (queryError) {
         logger.error("Database test query failed, forcing connection pool reset", {
-          error: queryError
+          error: queryError instanceof Error ? queryError.message : String(queryError),
+          stack: queryError instanceof Error ? queryError.stack : undefined
         });
         
         // Force a pool drain and reset
