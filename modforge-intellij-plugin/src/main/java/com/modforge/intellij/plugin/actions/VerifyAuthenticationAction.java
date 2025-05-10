@@ -11,12 +11,10 @@ import com.modforge.intellij.plugin.settings.ModForgeSettings;
 import org.jetbrains.annotations.NotNull;
 
 /**
- * Action to verify the authentication status with the ModForge server.
- * Useful for debugging and ensuring the token-based authentication is working.
+ * Action to verify authentication with the ModForge server.
  */
 public class VerifyAuthenticationAction extends AnAction {
     private static final Logger LOG = Logger.getInstance(VerifyAuthenticationAction.class);
-    private final AuthenticationManager authManager = new AuthenticationManager();
     
     @Override
     public void actionPerformed(@NotNull AnActionEvent e) {
@@ -29,21 +27,24 @@ public class VerifyAuthenticationAction extends AnAction {
         
         if (!settings.isAuthenticated() || settings.getAccessToken().isEmpty()) {
             showNotification(project, "Not Authenticated", 
-                    "You are not currently authenticated with ModForge. Please log in first.", 
+                    "You are not authenticated with ModForge. Please log in first.", 
                     NotificationType.WARNING);
             return;
         }
         
-        // Attempt to verify authentication
-        boolean isVerified = authManager.verifyAuthentication();
+        LOG.info("Verifying authentication status with ModForge server");
         
-        if (isVerified) {
-            showNotification(project, "Authentication Verified", 
-                    "Successfully verified authentication with ModForge server. User ID: " + settings.getUserId(), 
+        // Create a non-singleton AuthenticationManager instance
+        AuthenticationManager authManager = new AuthenticationManager();
+        boolean isValid = authManager.verifyAuthentication();
+        
+        if (isValid) {
+            showNotification(project, "Authentication Valid", 
+                    "Your authentication with ModForge is valid.", 
                     NotificationType.INFORMATION);
         } else {
-            showNotification(project, "Authentication Failed", 
-                    "Failed to verify authentication with ModForge server. Please try logging in again.", 
+            showNotification(project, "Authentication Invalid", 
+                    "Your authentication with ModForge is no longer valid. Please log in again.", 
                     NotificationType.ERROR);
         }
     }
@@ -51,7 +52,11 @@ public class VerifyAuthenticationAction extends AnAction {
     @Override
     public void update(@NotNull AnActionEvent e) {
         // Only enable action if we have a project
-        e.getPresentation().setEnabledAndVisible(e.getProject() != null);
+        Project project = e.getProject();
+        ModForgeSettings settings = ModForgeSettings.getInstance();
+        
+        boolean enabled = project != null && settings.isAuthenticated();
+        e.getPresentation().setEnabledAndVisible(enabled);
     }
     
     private void showNotification(Project project, String title, String content, NotificationType type) {

@@ -3,8 +3,6 @@
     <id>com.modforge.intellij.plugin</id>
     <name>ModForge</name>
     <vendor email="support@modforge.dev" url="https://modforge.dev">ModForge</vendor>
-    <name>ModForge</name>
-    <vendor email="support@modforge.dev" url="https://modforge.dev">ModForge</vendor>
     <description><![CDATA[
         <p>ModForge is an AI-powered development platform for Minecraft mods.</p>
         <p>Features:</p>
@@ -33,14 +31,6 @@
         <!-- Startup Activities -->
         <postStartupActivity implementation="com.modforge.intellij.plugin.startup.AuthenticationStartupActivity"/>
         
-        <!-- Settings -->
-        <applicationConfigurable 
-            parentId="tools" 
-            instance="com.modforge.intellij.plugin.settings.ModForgeSettingsConfigurable" 
-            id="com.modforge.intellij.plugin.settings.ModForgeSettingsConfigurable" 
-            displayName="ModForge" 
-            nonDefaultProject="true"/>
-            
         <!-- Notification Groups -->
         <notificationGroup id="ModForge Notifications" 
                           displayType="BALLOON" 
@@ -53,12 +43,6 @@
                     anchor="right" 
                     factoryClass="com.modforge.intellij.plugin.ui.toolwindow.ModForgeToolWindowFactory"/>
 
-        <!-- Settings -->
-        <applicationConfigurable parentId="tools" 
-                                 instance="com.modforge.intellij.plugin.settings.ModForgeSettingsConfigurable" 
-                                 id="com.modforge.intellij.plugin.settings.ModForgeSettingsConfigurable" 
-                                 displayName="ModForge"/>
-                                 
         <!-- Startup Activity -->
         <postStartupActivity implementation="com.modforge.intellij.plugin.services.ModForgeProjectService$ProjectStartupActivity"/>
     </extensions>
@@ -93,10 +77,6 @@
                     class="com.modforge.intellij.plugin.actions.VerifyAuthenticationAction" 
                     text="Verify Authentication" 
                     description="Verify authentication status with ModForge server"/>
-            <action id="ModForge.TestAuthEndpoints" 
-                    class="com.modforge.intellij.plugin.actions.TestAuthEndpointsAction" 
-                    text="Test Authentication Endpoints" 
-                    description="Test all authentication endpoints with token auth"/>
             <action id="ModForge.TestTokenAuth" 
                     class="com.modforge.intellij.plugin.actions.TestTokenAuthAction" 
                     text="Test Token Authentication" 

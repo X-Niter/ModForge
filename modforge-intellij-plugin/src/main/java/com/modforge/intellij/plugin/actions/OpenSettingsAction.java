@@ -7,13 +7,13 @@ import com.modforge.intellij.plugin.settings.ModForgeSettingsConfigurable;
 import org.jetbrains.annotations.NotNull;
 
 /**
- * Action for opening ModForge settings.
+ * Action to open the ModForge settings.
  */
 public class OpenSettingsAction extends AnAction {
     @Override
     public void actionPerformed(@NotNull AnActionEvent e) {
         ShowSettingsUtil.getInstance().showSettingsDialog(
-                e.getProject(),
+                e.getProject(), 
                 ModForgeSettingsConfigurable.class
         );
     }
