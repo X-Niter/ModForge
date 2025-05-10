@@ -4,18 +4,16 @@ import {
   useMutation,
   UseMutationResult,
 } from "@tanstack/react-query";
-import { apiRequest, queryClient } from "../lib/queryClient";
+import { getQueryFn, apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 
-type User = {
+export interface User {
   id: number;
   username: string;
   email?: string;
   displayName?: string;
   avatarUrl?: string;
-  githubId?: string;
-  isAdmin: boolean;
-};
+}
 
 type AuthContextType = {
   user: User | null;
@@ -34,88 +32,76 @@ type LoginData = {
 type RegisterData = {
   username: string;
   password: string;
-  confirmPassword: string;
   email?: string;
   displayName?: string;
 };
-
-// Interface for the auth response
-interface AuthResponse {
-  authenticated: boolean;
-  user?: User;
-}
 
 export const AuthContext = createContext<AuthContextType | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const { toast } = useToast();
-
+  
   const {
-    data: authData,
+    data: user,
     error,
     isLoading,
-  } = useQuery<AuthResponse, Error>({
-    queryKey: ['/api/auth/me'],
-    queryFn: async () => {
-      const res = await apiRequest("GET", "/api/auth/me");
-      if (!res.ok) {
-        throw new Error("Failed to fetch authentication status");
-      }
-      return res.json();
-    },
-    staleTime: 60 * 1000, // 1 minute
+  } = useQuery<User | null, Error>({
+    queryKey: ['/api/user'],
+    queryFn: getQueryFn({ on401: "returnNull" }),
   });
 
   const loginMutation = useMutation({
     mutationFn: async (credentials: LoginData) => {
-      const res = await apiRequest("POST", "/api/auth/login", credentials);
-      if (!res.ok) {
-        const errorData = await res.json();
-        throw new Error(errorData.message || "Login failed");
-      }
-      const data = await res.json();
-      return data.user;
+      const res = await apiRequest("POST", "/api/login", credentials);
+      return await res.json();
     },
     onSuccess: (user: User) => {
-      queryClient.setQueryData(['/api/auth/me'], { authenticated: true, user });
+      queryClient.setQueryData(['/api/user'], user);
       toast({
         title: "Login successful",
-        description: `Welcome back, ${user.displayName || user.username}!`,
+        description: `Welcome back, ${user.username}!`,
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Login failed",
+        description: error.message,
+        variant: "destructive",
       });
     },
   });
 
   const registerMutation = useMutation({
-    mutationFn: async (userData: RegisterData) => {
-      const res = await apiRequest("POST", "/api/auth/register", userData);
-      if (!res.ok) {
-        const errorData = await res.json();
-        throw new Error(errorData.message || "Registration failed");
-      }
-      const data = await res.json();
-      return data.user;
+    mutationFn: async (credentials: RegisterData) => {
+      const res = await apiRequest("POST", "/api/register", credentials);
+      return await res.json();
     },
     onSuccess: (user: User) => {
-      queryClient.setQueryData(['/api/auth/me'], { authenticated: true, user });
+      queryClient.setQueryData(['/api/user'], user);
       toast({
         title: "Registration successful",
-        description: `Welcome to ModForge, ${user.displayName || user.username}!`,
+        description: `Welcome to ModForge, ${user.username}!`,
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Registration failed",
+        description: error.message,
+        variant: "destructive",
       });
     },
   });
 
   const logoutMutation = useMutation({
     mutationFn: async () => {
-      const res = await apiRequest("POST", "/api/auth/logout");
-      if (!res.ok) {
-        const errorData = await res.json();
-        throw new Error(errorData.message || "Logout failed");
-      }
+      await apiRequest("POST", "/api/logout");
     },
     onSuccess: () => {
-      queryClient.setQueryData(['/api/auth/me'], { authenticated: false, user: null });
-      // Redirect to login page
-      window.location.href = '/auth';
+      queryClient.setQueryData(['/api/user'], null);
+      toast({
+        title: "Logged out",
+        description: "You have been logged out successfully.",
+      });
     },
     onError: (error: Error) => {
       toast({
@@ -129,7 +115,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   return (
     <AuthContext.Provider
       value={{
-        user: authData?.authenticated ? authData.user ?? null : null,
+        user: user ?? null,
         isLoading,
         error,
         loginMutation,

@@ -40,21 +40,13 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
-
-// Mock authentication for now
-const useAuth = () => {
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
-  return {
-    isLoggedIn,
-    login: () => setIsLoggedIn(true),
-    logout: () => setIsLoggedIn(false),
-    user: isLoggedIn ? { name: "Demo User" } : null
-  };
-};
+import { UserNav } from "@/components/user-nav";
+import { useAuth } from "@/hooks/use-auth";
 
 export function Navbar() {
   const [location] = useLocation();
-  const { isLoggedIn, login, logout, user } = useAuth();
+  const { user, isLoading } = useAuth();
+  const isLoggedIn = !!user;
   
   const navItems = [
     {
@@ -165,32 +157,7 @@ export function Navbar() {
         
         {/* Authentication */}
         <div className="flex items-center gap-2">
-          {isLoggedIn ? (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" className="relative h-8 w-8 rounded-full">
-                  <LucideUser className="h-4 w-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuLabel>My Account</DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => window.location.href = "/settings"}>
-                  <LucideSettings className="mr-2 h-4 w-4" />
-                  <span>Settings</span>
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={logout}>
-                  <LucideLogOut className="mr-2 h-4 w-4" />
-                  <span>Log out</span>
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          ) : (
-            <Button variant="outline" size="sm" onClick={login}>
-              <LucideLogIn className="mr-2 h-4 w-4" />
-              Log in
-            </Button>
-          )}
+          <UserNav />
         </div>
         
         {/* Mobile Navigation */}
@@ -254,24 +221,40 @@ export function Navbar() {
                   {isLoggedIn ? (
                     <>
                       <div className="px-4 py-2 text-sm text-muted-foreground">
-                        Signed in as <span className="font-medium">{user?.name}</span>
+                        Signed in as <span className="font-medium">{user?.username}</span>
                       </div>
-                      <Button variant="ghost" className="w-full justify-start" onClick={() => {
-                          window.location.href = "/settings";
-                        }}>
-                        <LucideSettings className="mr-2 h-4 w-4" />
-                        Settings
-                      </Button>
-                      <Button variant="ghost" className="w-full justify-start" onClick={logout}>
+                      <Link href="/settings">
+                        <Button variant="ghost" className="w-full justify-start">
+                          <LucideSettings className="mr-2 h-4 w-4" />
+                          Settings
+                        </Button>
+                      </Link>
+                      <Link href="/github-integration">
+                        <Button variant="ghost" className="w-full justify-start">
+                          <LucideGithub className="mr-2 h-4 w-4" />
+                          GitHub Integration
+                        </Button>
+                      </Link>
+                      <Button 
+                        variant="ghost" 
+                        className="w-full justify-start" 
+                        onClick={() => {
+                          // Using the logout mutation from useAuth
+                          const { logoutMutation } = useAuth();
+                          logoutMutation.mutate();
+                        }}
+                      >
                         <LucideLogOut className="mr-2 h-4 w-4" />
                         Log out
                       </Button>
                     </>
                   ) : (
-                    <Button className="w-full" onClick={login}>
-                      <LucideLogIn className="mr-2 h-4 w-4" />
-                      Log in
-                    </Button>
+                    <Link href="/auth">
+                      <Button className="w-full">
+                        <LucideLogIn className="mr-2 h-4 w-4" />
+                        Log in
+                      </Button>
+                    </Link>
                   )}
                 </div>
               </div>
