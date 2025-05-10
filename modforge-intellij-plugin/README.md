@@ -1,5 +1,7 @@
 # ModForge IntelliJ Plugin
 
+> **IMPORTANT UPDATE**: This plugin has been completely updated for compatibility with IntelliJ IDEA 2025.1 (Build #IC-251.23774.435) and Java 21. If you're using an older version of IntelliJ IDEA, please use an older version of this plugin. See [INTELLIJ_2025_COMPATIBILITY.md](INTELLIJ_2025_COMPATIBILITY.md) for details.
+
 ## Overview
 
 ModForge IntelliJ Plugin is an AI-powered assistant for Minecraft mod development. The plugin integrates with the IntelliJ IDEA development environment to provide intelligent code generation, error detection and fixing, and continuous development capabilities.
@@ -12,6 +14,8 @@ ModForge IntelliJ Plugin is an AI-powered assistant for Minecraft mod developmen
 - **Pattern recognition** - Reduces API costs by learning from patterns
 - **Continuous development** - Keep working on your mods even when you're not
 - **GitHub integration** - Automatic workflows for continuous improvement
+- **Full IntelliJ IDEA 2025.1 compatibility** - Optimized for the latest IDE version
+- **Java 21 optimization** - Uses virtual threads for improved performance
 
 ## System Requirements
 

@@ -66,6 +66,9 @@
         <notificationGroup id="ModForge Notifications" 
                           displayType="BALLOON"/>
                           
+        <!-- Startup Activities -->
+        <postStartupActivity implementation="com.modforge.intellij.plugin.ModForgePluginActivator"/>
+                          
         <!-- Mod Loader Contributors -->
         <com.modforge.intellij.plugin.modLoaderContributor implementation="com.modforge.intellij.plugin.loaders.ForgeLoaderContributor"/>
         <com.modforge.intellij.plugin.modLoaderContributor implementation="com.modforge.intellij.plugin.loaders.FabricLoaderContributor"/>

@@ -377,13 +377,13 @@ public final class GitHubIntegrationService {
         yaml.append("      pull-requests: write\n");
         yaml.append("      issues: write\n\n");
         yaml.append("    steps:\n");
-        yaml.append("    - uses: actions/checkout@v3\n");
+        yaml.append("    - uses: actions/checkout@v4\n");
         yaml.append("      with:\n");
         yaml.append("        fetch-depth: 0\n\n");
-        yaml.append("    - name: Set up JDK 17\n");
-        yaml.append("      uses: actions/setup-java@v3\n");
+        yaml.append("    - name: Set up JDK 21\n");
+        yaml.append("      uses: actions/setup-java@v4\n");
         yaml.append("      with:\n");
-        yaml.append("        java-version: '17'\n");
+        yaml.append("        java-version: '21'\n");
         yaml.append("        distribution: 'temurin'\n\n");
             
         // Add ModForge AI analysis
