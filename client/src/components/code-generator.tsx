@@ -32,7 +32,6 @@ export function CodeGenerator() {
   const [ideaDescription, setIdeaDescription] = useState("");
   
   // Shared state
-  const [isGenerating, setIsGenerating] = useState(false);
   const [generatedCode, setGeneratedCode] = useState("");
   const [explanation, setExplanation] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -419,10 +418,10 @@ export function CodeGenerator() {
               <CardFooter>
                 <Button 
                   onClick={handleGenerateModCode} 
-                  disabled={isGenerating || !modName || !modDescription} 
+                  disabled={modCodeMutation.isPending || !modName || !modDescription} 
                   className="w-full"
                 >
-                  {isGenerating ? (
+                  {modCodeMutation.isPending ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                       Generating mod code...
@@ -456,13 +455,11 @@ function OutputCard({
   error, 
   generatedCode, 
   explanation,
-  isGenerating,
   onCopyCode
 }: { 
   error: string | null; 
   generatedCode: string; 
   explanation: string;
-  isGenerating: boolean;
   onCopyCode: () => void;
 }) {
   return (
