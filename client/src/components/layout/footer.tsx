@@ -87,10 +87,8 @@ function FooterSection({ title, links }: { title: string, links: { name: string,
       <ul className="space-y-2">
         {links.map((link) => (
           <li key={link.name} className="text-sm">
-            <Link href={link.href}>
-              <a className="text-muted-foreground hover:text-foreground transition-colors">
-                {link.name}
-              </a>
+            <Link href={link.href} className="text-muted-foreground hover:text-foreground transition-colors">
+              {link.name}
             </Link>
           </li>
         ))}

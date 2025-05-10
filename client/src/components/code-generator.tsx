@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { generateCode } from "@/lib/openai";
+import { generateGenericCode } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
@@ -25,7 +25,8 @@ export function CodeGenerator() {
     setError(null);
     
     try {
-      const result = await generateCode(prompt, {
+      const result = await generateGenericCode({
+        prompt,
         language,
         complexity,
         context: context || undefined

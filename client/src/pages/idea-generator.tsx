@@ -1,14 +1,47 @@
 import { useState } from "react";
-import { useLocation } from "wouter";
-import { IdeaGeneratorForm } from "@/components/idea-generator-form";
-import { IdeaCard } from "@/components/idea-card";
-import { insertModSchema, type Mod } from "@shared/schema";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
-import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
+import { useForm } from "react-hook-form";
+import { z } from "zod";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Lightbulb, RefreshCw, Sparkles } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Badge } from "@/components/ui/badge";
+import { 
+  LucideBrain, 
+  LucideSparkles, 
+  LucideLightbulb, 
+  LucideChevronRight, 
+  LucideArrowRight, 
+  LucideLoader2, 
+  LucideDownload 
+} from "lucide-react";
+
+const ideaGenerationFormSchema = z.object({
+  theme: z.string().optional(),
+  complexity: z.enum(["simple", "medium", "complex"]).default("medium"),
+  category: z.string().optional(),
+  modLoader: z.enum(["forge", "fabric", "quilt", "any"]).default("any"),
+  mcVersion: z.string().optional(),
+  includeItems: z.boolean().default(true),
+  includeBlocks: z.boolean().default(true),
+  includeEntities: z.boolean().default(false),
+  includeWorldGen: z.boolean().default(false),
+  includeStructures: z.boolean().default(false),
+  includeGameplayMechanics: z.boolean().default(true),
+  additionalNotes: z.string().optional(),
+});
+
+type IdeaGenerationFormValues = z.infer<typeof ideaGenerationFormSchema>;
 
 interface ModIdea {
   title: string;
@@ -21,166 +54,759 @@ interface ModIdea {
   compatibilityNotes?: string;
 }
 
-export default function IdeaGeneratorPage() {
-  const [generatedIdeas, setGeneratedIdeas] = useState<ModIdea[]>([]);
-  const [inspirations, setInspirations] = useState<string[]>([]);
-  const [selectedIdea, setSelectedIdea] = useState<ModIdea | null>(null);
-  const [isCreating, setIsCreating] = useState(false);
-  const [, setLocation] = useLocation();
-  const { toast } = useToast();
+interface GenerateIdeasResponse {
+  ideas: ModIdea[];
+  inspirations: string[];
+}
 
-  const handleGenerationSuccess = (response: { ideas: ModIdea[], inspirations: string[] }) => {
-    setGeneratedIdeas(response.ideas);
-    setInspirations(response.inspirations || []);
-    setSelectedIdea(null);
+interface ExpandedIdeaResponse {
+  title: string;
+  description: string;
+  detailedDescription: string;
+  features: Array<{
+    name: string;
+    description: string;
+    implementation: string;
+  }>;
+  technicalDetails: {
+    requiredDependencies: string[];
+    suggestedModLoader: string;
+    recommendedMcVersions: string[];
+    difficulty: string;
+    estimatedDevTime: string;
+  };
+  compatibility: {
+    compatibleWith: string[];
+    potentialConflicts: string[];
+    notes: string;
+  };
+  fileStructure: string[];
+  nextSteps: string[];
+}
+
+export default function IdeaGeneratorPage() {
+  const { toast } = useToast();
+  const [selectedIdea, setSelectedIdea] = useState<ModIdea | null>(null);
+  const [expandedIdea, setExpandedIdea] = useState<ExpandedIdeaResponse | null>(null);
+  const [activeTab, setActiveTab] = useState("form");
+
+  const form = useForm<IdeaGenerationFormValues>({
+    resolver: zodResolver(ideaGenerationFormSchema),
+    defaultValues: {
+      complexity: "medium",
+      modLoader: "any",
+      includeItems: true,
+      includeBlocks: true,
+      includeEntities: false,
+      includeWorldGen: false,
+      includeStructures: false,
+      includeGameplayMechanics: true,
+    },
+  });
+
+  const generateIdeasMutation = useMutation({
+    mutationFn: async (data: IdeaGenerationFormValues) => {
+      const response = await apiRequest("POST", "/api/ai/generate-ideas", data);
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || "Failed to generate ideas");
+      }
+      return await response.json() as GenerateIdeasResponse;
+    },
+    onSuccess: (data) => {
+      setSelectedIdea(null);
+      setExpandedIdea(null);
+      setActiveTab("ideas");
+      toast({
+        title: "Ideas generated successfully",
+        description: `Generated ${data.ideas.length} mod ideas based on your criteria.`
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Failed to generate ideas",
+        description: error instanceof Error ? error.message : "An unexpected error occurred",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const expandIdeaMutation = useMutation({
+    mutationFn: async ({ title, description }: { title: string; description: string }) => {
+      const response = await apiRequest("POST", "/api/ai/expand-idea", { title, description });
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || "Failed to expand idea");
+      }
+      return await response.json() as ExpandedIdeaResponse;
+    },
+    onSuccess: (data) => {
+      setExpandedIdea(data);
+      setActiveTab("expanded");
+      toast({
+        title: "Idea expanded successfully",
+        description: "Your mod idea has been expanded with detailed features and implementation notes.",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Failed to expand idea",
+        description: error instanceof Error ? error.message : "An unexpected error occurred",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const onSubmit = (data: IdeaGenerationFormValues) => {
+    generateIdeasMutation.mutate(data);
   };
 
-  const selectIdea = (idea: ModIdea) => {
+  const handleSelectIdea = (idea: ModIdea) => {
     setSelectedIdea(idea);
   };
 
-  const createModFromIdea = async () => {
-    if (!selectedIdea) return;
-    
-    setIsCreating(true);
-    try {
-      // Extract features into a string
-      const featuresStr = selectedIdea.features.join("\n• ");
-      
-      // Create a mod from the selected idea
-      const modData = {
-        name: selectedIdea.title,
+  const handleExpandIdea = () => {
+    if (selectedIdea) {
+      expandIdeaMutation.mutate({
+        title: selectedIdea.title,
         description: selectedIdea.description,
-        idea: `${selectedIdea.description}\n\nFeatures:\n• ${featuresStr}`,
-        modLoader: selectedIdea.suggestedModLoader === "Any" ? "Forge" : selectedIdea.suggestedModLoader,
-        minecraftVersion: "1.20.4", // Default to latest
-        autoFixLevel: "Balanced",
-        compileFrequency: "Every 5 Minutes",
-      };
-      
-      // Validate the mod data
-      const validationResult = insertModSchema.safeParse(modData);
-      if (!validationResult.success) {
-        throw new Error("Invalid mod data: " + JSON.stringify(validationResult.error.errors));
-      }
-      
-      // Create the mod
-      const response = await apiRequest<Mod>("/api/mods", {
-        method: "POST", 
-        body: JSON.stringify(modData),
       });
-      
+    }
+  };
+
+  const handleCreateMod = () => {
+    if (expandedIdea) {
       toast({
-        title: "Mod Created",
-        description: `Successfully created mod: ${selectedIdea.title}`,
+        title: "Redirecting to mod creation",
+        description: "Taking you to the code generator to create your mod.",
       });
-      
-      // Navigate to the home page or the mod details page
-      setLocation(`/`);
-      
-    } catch (error) {
-      console.error("Error creating mod:", error);
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "Failed to create mod from idea. Please try again.",
-      });
-    } finally {
-      setIsCreating(false);
+      // In a real implementation, we would navigate to the code generator page with the expanded idea
     }
   };
 
   return (
-    <div className="container mx-auto py-6">
-      <div className="flex items-center justify-between mb-6">
+    <div className="container mx-auto py-10">
+      <div className="flex items-center mb-6">
+        <LucideBrain className="h-8 w-8 mr-3 text-blue-500" />
         <div>
-          <h1 className="text-3xl font-bold text-gradient-to-r from-blue-600 to-purple-600">Mod Idea Generator</h1>
-          <p className="text-lg text-muted-foreground">
-            Let AI help you brainstorm your next Minecraft mod
-          </p>
+          <h1 className="text-3xl font-bold">Mod Idea Generator</h1>
+          <p className="text-muted-foreground">Generate Minecraft mod ideas with AI assistance</p>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-1">
-          <IdeaGeneratorForm onSuccess={handleGenerationSuccess} />
-          
-          {selectedIdea && (
-            <div className="mt-6 space-y-4">
-              <Alert>
-                <Sparkles className="h-4 w-4" />
-                <AlertTitle>Idea Selected</AlertTitle>
-                <AlertDescription>
-                  You selected: <strong>{selectedIdea.title}</strong>
-                </AlertDescription>
-              </Alert>
-              
-              <Button 
-                className="w-full"
-                disabled={isCreating}
-                onClick={createModFromIdea}
-              >
-                {isCreating ? (
-                  <>
-                    <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
-                    Creating Mod...
-                  </>
-                ) : (
-                  <>
-                    Create Mod From This Idea
-                  </>
-                )}
-              </Button>
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+        <TabsList className="grid grid-cols-3 w-full">
+          <TabsTrigger value="form" disabled={generateIdeasMutation.isPending}>
+            <LucideSparkles className="h-4 w-4 mr-2" />
+            Generate Ideas
+          </TabsTrigger>
+          <TabsTrigger 
+            value="ideas" 
+            disabled={!generateIdeasMutation.data || generateIdeasMutation.isPending}
+          >
+            <LucideLightbulb className="h-4 w-4 mr-2" />
+            Browse Ideas
+          </TabsTrigger>
+          <TabsTrigger 
+            value="expanded" 
+            disabled={!expandedIdea || expandIdeaMutation.isPending}
+          >
+            <LucideChevronRight className="h-4 w-4 mr-2" />
+            Expanded Idea
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="form" className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="md:col-span-2">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Generate Mod Ideas</CardTitle>
+                  <CardDescription>
+                    Fill out the form below to generate custom Minecraft mod ideas
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <Form {...form}>
+                    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                      <FormField
+                        control={form.control}
+                        name="theme"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Theme</FormLabel>
+                            <FormControl>
+                              <Input
+                                placeholder="e.g., Magic, Technology, Nature, Adventure"
+                                {...field}
+                              />
+                            </FormControl>
+                            <FormDescription>
+                              Enter a theme or leave blank for random ideas
+                            </FormDescription>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <FormField
+                          control={form.control}
+                          name="complexity"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Complexity</FormLabel>
+                              <Select
+                                onValueChange={field.onChange}
+                                defaultValue={field.value}
+                              >
+                                <FormControl>
+                                  <SelectTrigger>
+                                    <SelectValue placeholder="Select complexity" />
+                                  </SelectTrigger>
+                                </FormControl>
+                                <SelectContent>
+                                  <SelectItem value="simple">Simple</SelectItem>
+                                  <SelectItem value="medium">Medium</SelectItem>
+                                  <SelectItem value="complex">Complex</SelectItem>
+                                </SelectContent>
+                              </Select>
+                              <FormDescription>
+                                How complex should the mod be?
+                              </FormDescription>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+
+                        <FormField
+                          control={form.control}
+                          name="modLoader"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Mod Loader</FormLabel>
+                              <Select
+                                onValueChange={field.onChange}
+                                defaultValue={field.value}
+                              >
+                                <FormControl>
+                                  <SelectTrigger>
+                                    <SelectValue placeholder="Select mod loader" />
+                                  </SelectTrigger>
+                                </FormControl>
+                                <SelectContent>
+                                  <SelectItem value="any">Any</SelectItem>
+                                  <SelectItem value="forge">Forge</SelectItem>
+                                  <SelectItem value="fabric">Fabric</SelectItem>
+                                  <SelectItem value="quilt">Quilt</SelectItem>
+                                </SelectContent>
+                              </Select>
+                              <FormDescription>
+                                Preferred mod loader
+                              </FormDescription>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+
+                      <FormField
+                        control={form.control}
+                        name="mcVersion"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Minecraft Version</FormLabel>
+                            <FormControl>
+                              <Input
+                                placeholder="e.g., 1.19.4, 1.18.2"
+                                {...field}
+                              />
+                            </FormControl>
+                            <FormDescription>
+                              Target Minecraft version (optional)
+                            </FormDescription>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <div>
+                        <h3 className="text-sm font-medium mb-2">Include Features</h3>
+                        <div className="grid grid-cols-2 gap-2">
+                          <FormField
+                            control={form.control}
+                            name="includeItems"
+                            render={({ field }) => (
+                              <FormItem className="flex items-center space-x-2 space-y-0">
+                                <FormControl>
+                                  <Checkbox
+                                    checked={field.value}
+                                    onCheckedChange={field.onChange}
+                                  />
+                                </FormControl>
+                                <FormLabel className="text-sm font-normal">Items</FormLabel>
+                              </FormItem>
+                            )}
+                          />
+                          <FormField
+                            control={form.control}
+                            name="includeBlocks"
+                            render={({ field }) => (
+                              <FormItem className="flex items-center space-x-2 space-y-0">
+                                <FormControl>
+                                  <Checkbox
+                                    checked={field.value}
+                                    onCheckedChange={field.onChange}
+                                  />
+                                </FormControl>
+                                <FormLabel className="text-sm font-normal">Blocks</FormLabel>
+                              </FormItem>
+                            )}
+                          />
+                          <FormField
+                            control={form.control}
+                            name="includeEntities"
+                            render={({ field }) => (
+                              <FormItem className="flex items-center space-x-2 space-y-0">
+                                <FormControl>
+                                  <Checkbox
+                                    checked={field.value}
+                                    onCheckedChange={field.onChange}
+                                  />
+                                </FormControl>
+                                <FormLabel className="text-sm font-normal">Entities</FormLabel>
+                              </FormItem>
+                            )}
+                          />
+                          <FormField
+                            control={form.control}
+                            name="includeWorldGen"
+                            render={({ field }) => (
+                              <FormItem className="flex items-center space-x-2 space-y-0">
+                                <FormControl>
+                                  <Checkbox
+                                    checked={field.value}
+                                    onCheckedChange={field.onChange}
+                                  />
+                                </FormControl>
+                                <FormLabel className="text-sm font-normal">World Generation</FormLabel>
+                              </FormItem>
+                            )}
+                          />
+                          <FormField
+                            control={form.control}
+                            name="includeStructures"
+                            render={({ field }) => (
+                              <FormItem className="flex items-center space-x-2 space-y-0">
+                                <FormControl>
+                                  <Checkbox
+                                    checked={field.value}
+                                    onCheckedChange={field.onChange}
+                                  />
+                                </FormControl>
+                                <FormLabel className="text-sm font-normal">Structures</FormLabel>
+                              </FormItem>
+                            )}
+                          />
+                          <FormField
+                            control={form.control}
+                            name="includeGameplayMechanics"
+                            render={({ field }) => (
+                              <FormItem className="flex items-center space-x-2 space-y-0">
+                                <FormControl>
+                                  <Checkbox
+                                    checked={field.value}
+                                    onCheckedChange={field.onChange}
+                                  />
+                                </FormControl>
+                                <FormLabel className="text-sm font-normal">Gameplay Mechanics</FormLabel>
+                              </FormItem>
+                            )}
+                          />
+                        </div>
+                      </div>
+
+                      <FormField
+                        control={form.control}
+                        name="additionalNotes"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Additional Notes</FormLabel>
+                            <FormControl>
+                              <Textarea
+                                placeholder="Any additional requirements or ideas..."
+                                className="min-h-[100px]"
+                                {...field}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <Button 
+                        type="submit" 
+                        className="w-full bg-gradient-to-r from-blue-600 to-violet-600"
+                        disabled={generateIdeasMutation.isPending}
+                      >
+                        {generateIdeasMutation.isPending ? (
+                          <>
+                            <LucideLoader2 className="mr-2 h-4 w-4 animate-spin" />
+                            Generating Ideas...
+                          </>
+                        ) : (
+                          <>
+                            <LucideSparkles className="mr-2 h-4 w-4" />
+                            Generate Ideas
+                          </>
+                        )}
+                      </Button>
+                    </form>
+                  </Form>
+                </CardContent>
+              </Card>
             </div>
-          )}
-          
-          {inspirations.length > 0 && (
-            <div className="mt-6">
-              <h3 className="text-lg font-semibold mb-2 flex items-center">
-                <Lightbulb className="mr-2 h-5 w-5 text-yellow-500" />
-                Additional Inspirations
-              </h3>
-              <ul className="space-y-2">
-                {inspirations.map((inspiration, index) => (
-                  <li key={index} className="text-sm bg-slate-50 dark:bg-slate-800 p-3 rounded-md">
-                    {inspiration}
-                  </li>
+
+            <div>
+              <Card>
+                <CardHeader>
+                  <CardTitle>Tips</CardTitle>
+                  <CardDescription>
+                    How to get the best results
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div>
+                    <h3 className="text-sm font-medium">Be Specific</h3>
+                    <p className="text-sm text-muted-foreground">
+                      The more specific your theme, the more focused your results will be.
+                    </p>
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-medium">Complexity Matters</h3>
+                    <p className="text-sm text-muted-foreground">
+                      Choose a complexity level that matches your development experience.
+                    </p>
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-medium">Include Features</h3>
+                    <p className="text-sm text-muted-foreground">
+                      Select the types of features you're interested in implementing.
+                    </p>
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-medium">Additional Notes</h3>
+                    <p className="text-sm text-muted-foreground">
+                      Add specific requirements like "compatible with mod X" or "focus on peaceful gameplay".
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="ideas" className="space-y-6">
+          {generateIdeasMutation.data && (
+            <div className="grid grid-cols-1 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {generateIdeasMutation.data.ideas.map((idea, index) => (
+                  <Card
+                    key={index}
+                    className={`cursor-pointer hover:shadow-md transition-shadow ${
+                      selectedIdea === idea ? "ring-2 ring-blue-500" : ""
+                    }`}
+                    onClick={() => handleSelectIdea(idea)}
+                  >
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-lg">{idea.title}</CardTitle>
+                      <div className="flex flex-wrap gap-1 mt-1">
+                        {idea.tags.slice(0, 3).map((tag, tagIndex) => (
+                          <Badge key={tagIndex} variant="outline" className="text-xs">
+                            {tag}
+                          </Badge>
+                        ))}
+                      </div>
+                    </CardHeader>
+                    <CardContent className="pb-2">
+                      <p className="text-sm text-muted-foreground line-clamp-3">
+                        {idea.description}
+                      </p>
+                    </CardContent>
+                    <CardFooter className="flex justify-between text-xs text-muted-foreground pt-0">
+                      <span>Complexity: {idea.complexity}</span>
+                      <span>{idea.suggestedModLoader}</span>
+                    </CardFooter>
+                  </Card>
                 ))}
-              </ul>
+              </div>
+
+              {selectedIdea && (
+                <Card>
+                  <CardHeader>
+                    <div className="flex justify-between items-start">
+                      <CardTitle>{selectedIdea.title}</CardTitle>
+                      <div className="flex gap-1">
+                        {selectedIdea.tags.map((tag, index) => (
+                          <Badge key={index} variant="outline">
+                            {tag}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                    <CardDescription>
+                      Complexity: {selectedIdea.complexity} • Dev Time: {selectedIdea.estimatedDevTime} • 
+                      Mod Loader: {selectedIdea.suggestedModLoader}
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div>
+                      <h3 className="text-sm font-medium mb-2">Description</h3>
+                      <p className="text-sm text-muted-foreground">{selectedIdea.description}</p>
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-medium mb-2">Features</h3>
+                      <ul className="list-disc pl-5 space-y-1">
+                        {selectedIdea.features.map((feature, index) => (
+                          <li key={index} className="text-sm text-muted-foreground">
+                            {feature}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                    {selectedIdea.compatibilityNotes && (
+                      <div>
+                        <h3 className="text-sm font-medium mb-2">Compatibility Notes</h3>
+                        <p className="text-sm text-muted-foreground">{selectedIdea.compatibilityNotes}</p>
+                      </div>
+                    )}
+                  </CardContent>
+                  <CardFooter>
+                    <Button
+                      className="w-full bg-gradient-to-r from-blue-600 to-violet-600"
+                      onClick={handleExpandIdea}
+                      disabled={expandIdeaMutation.isPending}
+                    >
+                      {expandIdeaMutation.isPending ? (
+                        <>
+                          <LucideLoader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Expanding Idea...
+                        </>
+                      ) : (
+                        <>
+                          <LucideChevronRight className="mr-2 h-4 w-4" />
+                          Expand This Idea
+                        </>
+                      )}
+                    </Button>
+                  </CardFooter>
+                </Card>
+              )}
+
+              {generateIdeasMutation.data.inspirations.length > 0 && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg">Inspirations</CardTitle>
+                    <CardDescription>
+                      Other mods that might inspire your project
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <ul className="list-disc pl-5 space-y-1">
+                      {generateIdeasMutation.data.inspirations.map((inspiration, index) => (
+                        <li key={index} className="text-sm">
+                          {inspiration}
+                        </li>
+                      ))}
+                    </ul>
+                  </CardContent>
+                </Card>
+              )}
             </div>
           )}
-        </div>
-        
-        <div className="lg:col-span-2">
-          {generatedIdeas.length > 0 ? (
-            <>
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-xl font-semibold">Generated Ideas</h2>
-                <span className="text-sm text-muted-foreground">
-                  {generatedIdeas.length} ideas generated
-                </span>
+        </TabsContent>
+
+        <TabsContent value="expanded" className="space-y-6">
+          {expandedIdea && (
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              <div className="lg:col-span-2 space-y-6">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>{expandedIdea.title}</CardTitle>
+                    <CardDescription>
+                      {expandedIdea.description}
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div>
+                      <h3 className="text-sm font-medium mb-2">Detailed Description</h3>
+                      <div className="text-sm text-muted-foreground space-y-2">
+                        {expandedIdea.detailedDescription.split('\n\n').map((paragraph, idx) => (
+                          <p key={idx}>{paragraph}</p>
+                        ))}
+                      </div>
+                    </div>
+
+                    <Separator />
+
+                    <div>
+                      <h3 className="text-sm font-medium mb-4">Features</h3>
+                      <div className="space-y-4">
+                        {expandedIdea.features.map((feature, index) => (
+                          <div key={index} className="space-y-2">
+                            <h4 className="font-medium">{feature.name}</h4>
+                            <p className="text-sm text-muted-foreground">{feature.description}</p>
+                            <div className="text-xs bg-muted rounded-md p-3">
+                              <p className="font-medium mb-1">Implementation Notes:</p>
+                              <p className="text-muted-foreground">{feature.implementation}</p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg">File Structure</CardTitle>
+                    <CardDescription>
+                      Suggested organization for your mod
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <pre className="text-xs bg-muted rounded-md p-4 overflow-x-auto">
+                      {expandedIdea.fileStructure.join('\n')}
+                    </pre>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg">Next Steps</CardTitle>
+                    <CardDescription>
+                      Recommended actions to start developing this mod
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <ol className="list-decimal pl-5 space-y-2">
+                      {expandedIdea.nextSteps.map((step, index) => (
+                        <li key={index} className="text-sm">
+                          {step}
+                        </li>
+                      ))}
+                    </ol>
+                  </CardContent>
+                  <CardFooter>
+                    <Button 
+                      className="w-full bg-gradient-to-r from-blue-600 to-violet-600"
+                      onClick={handleCreateMod}
+                    >
+                      <LucideArrowRight className="mr-2 h-4 w-4" />
+                      Create This Mod
+                    </Button>
+                  </CardFooter>
+                </Card>
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {generatedIdeas.map((idea, index) => (
-                  <IdeaCard 
-                    key={index} 
-                    idea={idea}
-                    onSelected={selectIdea}
-                  />
-                ))}
+
+              <div className="space-y-6">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg">Technical Details</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div>
+                      <h3 className="text-sm font-medium">Difficulty</h3>
+                      <p className="text-sm text-muted-foreground">
+                        {expandedIdea.technicalDetails.difficulty}
+                      </p>
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-medium">Estimated Development Time</h3>
+                      <p className="text-sm text-muted-foreground">
+                        {expandedIdea.technicalDetails.estimatedDevTime}
+                      </p>
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-medium">Suggested Mod Loader</h3>
+                      <p className="text-sm text-muted-foreground">
+                        {expandedIdea.technicalDetails.suggestedModLoader}
+                      </p>
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-medium">Recommended MC Versions</h3>
+                      <div className="flex flex-wrap gap-1 mt-1">
+                        {expandedIdea.technicalDetails.recommendedMcVersions.map((version, idx) => (
+                          <Badge key={idx} variant="outline" className="text-xs">
+                            {version}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-medium">Required Dependencies</h3>
+                      {expandedIdea.technicalDetails.requiredDependencies.length > 0 ? (
+                        <ul className="list-disc pl-5 mt-1">
+                          {expandedIdea.technicalDetails.requiredDependencies.map((dep, idx) => (
+                            <li key={idx} className="text-sm text-muted-foreground">{dep}</li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <p className="text-sm text-muted-foreground">No additional dependencies required</p>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg">Compatibility</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div>
+                      <h3 className="text-sm font-medium">Compatible With</h3>
+                      {expandedIdea.compatibility.compatibleWith.length > 0 ? (
+                        <ul className="list-disc pl-5 mt-1">
+                          {expandedIdea.compatibility.compatibleWith.map((mod, idx) => (
+                            <li key={idx} className="text-sm text-muted-foreground">{mod}</li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <p className="text-sm text-muted-foreground">No specific compatibility notes</p>
+                      )}
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-medium">Potential Conflicts</h3>
+                      {expandedIdea.compatibility.potentialConflicts.length > 0 ? (
+                        <ul className="list-disc pl-5 mt-1">
+                          {expandedIdea.compatibility.potentialConflicts.map((mod, idx) => (
+                            <li key={idx} className="text-sm text-muted-foreground">{mod}</li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <p className="text-sm text-muted-foreground">No known conflicts</p>
+                      )}
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-medium">Notes</h3>
+                      <p className="text-sm text-muted-foreground">
+                        {expandedIdea.compatibility.notes}
+                      </p>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <div className="flex gap-4">
+                  <Button variant="outline" className="flex-1">
+                    <LucideDownload className="mr-2 h-4 w-4" />
+                    Export as JSON
+                  </Button>
+                </div>
               </div>
-            </>
-          ) : (
-            <div className="flex flex-col items-center justify-center h-full min-h-[400px] bg-slate-50 dark:bg-slate-800 rounded-lg">
-              <Sparkles className="h-12 w-12 text-muted-foreground mb-4" />
-              <h3 className="text-xl font-medium mb-2">No Ideas Generated Yet</h3>
-              <p className="text-muted-foreground text-center max-w-md">
-                Fill out the form to the left and click "Generate Mod Ideas" to have AI suggest some creative mod concepts for you.
-              </p>
             </div>
           )}
-        </div>
-      </div>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
