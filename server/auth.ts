@@ -118,10 +118,35 @@ export async function hashPassword(password: string): Promise<string> {
  * @returns Whether passwords match
  */
 export async function comparePasswords(supplied: string, stored: string): Promise<boolean> {
-  const [hashed, salt] = stored.split(".");
-  const hashedBuf = Buffer.from(hashed, "hex");
-  const suppliedBuf = (await scryptAsync(supplied, salt, 64)) as Buffer;
-  return timingSafeEqual(hashedBuf, suppliedBuf);
+  try {
+    // Check if the stored password is in the correct format (hash.salt)
+    if (!stored.includes('.')) {
+      console.warn('Password in incorrect format - missing salt separator');
+      // For non-hashed passwords (like 'admin'), do a simple comparison for development only
+      // In production, this should always return false for security
+      return process.env.NODE_ENV !== 'production' && supplied === stored;
+    }
+    
+    const [hashed, salt] = stored.split(".");
+    
+    // Validate that both hash and salt are present
+    if (!hashed || !salt) {
+      console.warn('Password hash or salt is missing');
+      return false;
+    }
+    
+    // Convert the stored hash to a buffer
+    const hashedBuf = Buffer.from(hashed, "hex");
+    
+    // Hash the supplied password with the same salt
+    const suppliedBuf = (await scryptAsync(supplied, salt, 64)) as Buffer;
+    
+    // Compare using a timing-safe comparison to prevent timing attacks
+    return timingSafeEqual(hashedBuf, suppliedBuf);
+  } catch (error) {
+    console.error('Error comparing passwords:', error);
+    return false;
+  }
 }
 
 // Login and registration validation schemas
@@ -205,15 +230,35 @@ export function setupAuth(app: Express) {
   // Set up JWT Bearer strategy for token-based authentication (IDE plugin)
   passport.use(
     new BearerStrategy(async (token, done) => {
+      if (!token || typeof token !== 'string' || token.length < 10) {
+        return done(null, false, "Invalid token format");
+      }
+      
       try {
-        // Verify the token
-        const decoded = jwt.verify(
-          token, 
-          process.env.JWT_SECRET || "fallback-secret-change-in-production"
-        ) as { sub: string, username: string };
+        // Get the JWT secret
+        const jwtSecret = process.env.JWT_SECRET || "fallback-secret-change-in-production";
         
-        // Get the user
-        const userId = parseInt(decoded.sub, 10);
+        // Verify the token with better type handling
+        let decoded: any;
+        try {
+          decoded = jwt.verify(token, jwtSecret);
+        } catch (tokenError) {
+          console.warn('Token verification failed:', tokenError instanceof Error ? tokenError.message : 'Unknown error');
+          return done(null, false, "Invalid or expired token");
+        }
+        
+        // Validate decoded token has the expected fields
+        if (!decoded || typeof decoded !== 'object' || !decoded.sub) {
+          return done(null, false, "Malformed token payload");
+        }
+        
+        // Get the user ID from the token subject
+        const userId = parseInt(decoded.sub.toString(), 10);
+        if (isNaN(userId)) {
+          return done(null, false, "Invalid user ID in token");
+        }
+        
+        // Get the user from the database
         const [user] = await db.select().from(users).where(eq(users.id, userId));
         
         if (!user) {
@@ -223,8 +268,9 @@ export function setupAuth(app: Express) {
         // Use our utility to ensure metadata is valid
         return done(null, ensureMetadataType(user));
       } catch (error) {
+        console.error('Bearer strategy error:', error);
         // Token verification failed
-        return done(null, false, "Invalid token");
+        return done(null, false, "Authentication error");
       }
     })
   );
@@ -289,22 +335,55 @@ export function setupAuth(app: Express) {
       });
     }
 
-    // Rate limiting check
-    const ipAddress = req.ip || req.socket.remoteAddress || 'unknown';
+    // Enhanced rate limiting with improved IP detection and exponential backoff
+    // Get client IP with multiple fallbacks, handling various formats
+    const rawIpAddress = req.headers['x-forwarded-for'] || 
+                      req.ip || 
+                      req.socket.remoteAddress || 
+                      'unknown';
+    
+    // Convert IP to string safely, handling all possible types
+    let clientIp: string = 'unknown';
+    
+    if (typeof rawIpAddress === 'string') {
+      // Handle comma-separated list (common in x-forwarded-for)
+      clientIp = rawIpAddress.split(',')[0].trim();
+    } else if (Array.isArray(rawIpAddress)) {
+      // Handle array of IPs
+      clientIp = typeof rawIpAddress[0] === 'string' ? rawIpAddress[0] : 'unknown';
+    }
+    
+    // Setup tracking for login attempts with safeguards for missing session data
+    if (!req.session) {
+      console.error('Session not available in login endpoint');
+      return res.status(500).json({ message: "Authentication service temporarily unavailable" });
+    }
+    
     const loginAttemptsStore: Record<string, { count: number, lastAttempt: number }> = 
       req.session.loginAttempts || {};
     
     const now = Date.now();
-    const attempts = loginAttemptsStore[ipAddress] || { count: 0, lastAttempt: 0 };
+    const attempts = loginAttemptsStore[clientIp] || { count: 0, lastAttempt: 0 };
     
-    // Implement increasing delays for repeated failed attempts
+    // Implement increasing delays for repeated failed attempts with exponential backoff
     if (attempts.count >= 5) {
       const timeElapsed = now - attempts.lastAttempt;
-      const requiredDelay = Math.min(30000, Math.pow(2, attempts.count - 5) * 1000);
+      
+      // Exponential backoff with a maximum delay cap
+      const exponentialDelay = Math.pow(2, attempts.count - 5) * 1000;
+      const requiredDelay = Math.min(30 * 60 * 1000, exponentialDelay); // Max 30 minutes
       
       if (timeElapsed < requiredDelay) {
+        const waitSeconds = Math.ceil((requiredDelay - timeElapsed) / 1000);
+        const waitMinutes = Math.floor(waitSeconds / 60);
+        
+        const waitMessage = waitMinutes > 0 
+          ? `${waitMinutes} minute${waitMinutes > 1 ? 's' : ''} and ${waitSeconds % 60} second${waitSeconds % 60 !== 1 ? 's' : ''}` 
+          : `${waitSeconds} second${waitSeconds !== 1 ? 's' : ''}`;
+          
         return res.status(429).json({ 
-          message: `Too many login attempts. Please try again in ${Math.ceil((requiredDelay - timeElapsed) / 1000)} seconds.` 
+          message: `Too many login attempts. Please try again in ${waitMessage}.`,
+          retryAfter: waitSeconds
         });
       }
     }
@@ -317,18 +396,20 @@ export function setupAuth(app: Express) {
       
       // Failed login
       if (!user) {
-        // Track failed attempts
+        // Track failed attempts with the client IP
         attempts.count += 1;
         attempts.lastAttempt = now;
-        loginAttemptsStore[ipAddress] = attempts;
+        loginAttemptsStore[clientIp] = attempts;
         req.session.loginAttempts = loginAttemptsStore;
         
         return res.status(401).json({ message: info?.message || "Invalid username or password" });
       }
       
       // Successful login - reset attempts counter
-      delete loginAttemptsStore[ipAddress];
-      req.session.loginAttempts = loginAttemptsStore;
+      if (clientIp && loginAttemptsStore[clientIp]) {
+        delete loginAttemptsStore[clientIp];
+        req.session.loginAttempts = loginAttemptsStore;
+      }
       
       req.login(user, (loginErr) => {
         if (loginErr) {
