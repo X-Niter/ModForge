@@ -390,10 +390,10 @@ class ContinuousService extends EventEmitter {
         try {
           fixResult = await fixCompilationErrors(files, compileResult.errors);
         } catch (error) {
-          // Type-safe error handling 
-          const fixError = error as Error;
-          logContinuous(modId, `Error fixing compilation errors: ${fixError.message}`, 'error');
-          currentLogs += `\nError during auto-fix attempt: ${fixError.message || String(fixError)}\n`;
+          // Type-safe error handling
+          const errorMessage = error instanceof Error ? error.message : String(error);
+          logContinuous(modId, `Error fixing compilation errors: ${errorMessage}`, 'error');
+          currentLogs += `\nError during auto-fix attempt: ${errorMessage}\n`;
           await storage.updateBuild(build.id, { 
             logs: currentLogs,
             status: BuildStatus.Failed
