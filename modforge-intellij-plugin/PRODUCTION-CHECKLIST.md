@@ -1,100 +1,99 @@
-# ModForge IntelliJ Plugin - Production Checklist
+# ModForge IntelliJ Plugin Production Deployment Checklist
 
-Use this checklist to ensure your ModForge IntelliJ Plugin is properly configured for production use.
+This checklist helps ensure that the ModForge IntelliJ Plugin is properly validated and ready for production deployment. Follow these steps to verify that all critical components are functioning correctly before distributing the plugin to users.
 
-## 🔍 Pre-Production Checklist
+## System Requirements Verification
 
-### Configuration
-- [ ] Server URL is properly configured in settings
-- [ ] OpenAI API key is set in ModForge settings
-- [ ] GitHub token is set (if using GitHub integration)
-- [ ] All connection settings have been tested
-- [ ] Proper error logging is enabled
+- [ ] Java JDK 21.0.6 or newer is installed and set as the project SDK
+- [ ] IntelliJ IDEA 2025.1 (Build #IC-251.23774.435) or compatible version is being used
+- [ ] Gradle version 8.6 or newer is being used
+- [ ] All required dependencies are resolved without conflicts
 
-### Build Configuration
-- [ ] Plugin version is set correctly in `build.gradle`
-- [ ] Plugin compatibility range is set (currently 2023.2 - 2024.1)
-- [ ] All dependencies are up-to-date
-- [ ] Plugin description and change notes are accurate
+## Build Verification
 
-### Features
-- [ ] All mod loaders are properly detected (Forge, Fabric, Quilt, Architectury)
-- [ ] GitHub integration works properly
-- [ ] Code generation and error fixing works
-- [ ] Continuous development features work
-- [ ] Pattern recognition for API cost optimization works
+- [ ] Project compiles successfully without errors
+- [ ] All unit tests pass successfully
+- [ ] The plugin builds successfully with `./gradlew buildPlugin`
+- [ ] The plugin validation task completes successfully with `./gradlew validatePluginForProduction`
+- [ ] Plugin ZIP artifact is created in the `build/distributions` directory
 
-## 📋 Production Deployment Steps
+## Feature Validation
 
-1. **Build the Plugin**
-   - Run `./build-plugin.sh` from the plugin directory
-   - Verify the plugin zip file was created successfully
+- [ ] ModForge tool window appears correctly in the IDE
+- [ ] GitHub authentication works correctly with tokens 
+- [ ] Compatibility validation runs at startup and displays appropriate warnings if needed
+- [ ] Project creation templates generate valid Minecraft mod projects
+- [ ] AI code generation feature works with proper API key configuration
+- [ ] Continuous development features operate without errors
+- [ ] GitHub workflow generation produces valid workflow files
 
-2. **Install the Plugin in IntelliJ IDEA**
-   - Open IntelliJ IDEA
-   - Go to Settings/Preferences → Plugins
-   - Click the gear icon → Install Plugin from Disk...
-   - Select the zip file from the `build/distributions` directory
-   - Restart IntelliJ IDEA when prompted
+## Performance and Reliability
 
-3. **Configure the Plugin**
-   - Open Settings/Preferences → Tools → ModForge AI Settings
-   - Enter your ModForge server URL
-   - Enter your OpenAI API key
-   - Enter your GitHub token (if using GitHub integration)
-   - Click "Test Connection" to verify everything works
+- [ ] Plugin startup time is reasonable (under 5 seconds)
+- [ ] Background operations use virtual threads properly
+- [ ] Network operations include proper retry mechanisms
+- [ ] Circuit breakers prevent cascading failures on API errors
+- [ ] Memory usage is stable during extended usage sessions
+- [ ] No UI freezes occur during network operations
 
-4. **Verify Features**
-   - Create a new mod project to verify templates work
-   - Test code generation with a simple prompt
-   - Verify GitHub integration by pushing to a test repository
-   - Try continuous development on a test project
+## Security
 
-## 🔄 Update Process
+- [ ] All API keys and sensitive information are stored securely
+- [ ] No credentials are stored in plaintext
+- [ ] Network connections use HTTPS
+- [ ] OAuth token handling follows security best practices
+- [ ] No sensitive information is logged or exposed in error messages
 
-When updating the plugin, follow these steps:
+## Documentation and Metadata
 
-1. **Update Dependencies**
-   - Check for new versions of dependencies in `build.gradle`
-   - Update to the latest compatible versions
+- [ ] Plugin metadata in `plugin.xml` is up-to-date and accurate
+- [ ] Version number follows semantic versioning guidelines (MAJOR.MINOR.PATCH)
+- [ ] README contains up-to-date installation and usage instructions
+- [ ] Change notes in `patchPluginXml` accurately reflect the latest changes
+- [ ] Support contact information is current and valid
 
-2. **Update IntelliJ Compatibility**
-   - Check the latest IntelliJ version supported
-   - Update the compatibility range in `patchPluginXml` if needed
+## Distribution Preparation
 
-3. **Update ModForge Server Connection**
-   - Ensure the plugin works with the latest ModForge server API
+- [ ] License information is accurate and included in the distribution
+- [ ] Third-party licenses are acknowledged appropriately
+- [ ] Plugin icon is provided in appropriate resolutions
+- [ ] Screenshots for marketplace listing are prepared and up-to-date
+- [ ] Plugin description for marketplace is prepared and compelling
+- [ ] Final plugin ZIP file has been inspected to ensure only required files are included
 
-4. **Update Version Number**
-   - Increment the version number in `build.gradle`
-   - Update the change notes with new features and fixes
+## Post-Deployment Verification
 
-5. **Test Thoroughly**
-   - Test all features with all supported mod loaders
-   - Verify GitHub integration works
-   - Check error handling and recovery
+- [ ] Plugin installs successfully from ZIP file in a clean IntelliJ IDEA instance
+- [ ] Plugin appears correctly in the installed plugins list
+- [ ] No errors appear in the IDE log after installation
+- [ ] All features function correctly in the installed version
+- [ ] Plugin can be uninstalled cleanly without errors or debris
 
-6. **Rebuild and Deploy**
-   - Run `./build-plugin.sh` to create the updated plugin
-   - Install in IntelliJ IDEA for final testing
-   - Distribute to users
+---
 
-## 🚨 Troubleshooting
+## Troubleshooting Common Issues
 
-If you encounter issues:
+### Plugin Fails to Load
 
-1. **Check Logs**
-   - Look in the IntelliJ IDEA log (Help → Show Log)
-   - Check for errors related to ModForge
+- Check IDE compatibility range in plugin.xml
+- Verify all dependencies are properly declared
+- Check IDE logs for detailed error messages
+- Ensure Java 21 compatibility is maintained
 
-2. **Verify Settings**
-   - Make sure all settings are correctly configured
-   - Test the connection to the ModForge server
+### GitHub Integration Issues
 
-3. **Clear Caches**
-   - Try File → Invalidate Caches / Restart...
-   - Restart IntelliJ IDEA
+- Verify token validity and permissions
+- Check network connectivity to GitHub
+- Examine logs for specific API error responses
+- Verify circuit breaker status for operations
 
-4. **Reinstall Plugin**
-   - Uninstall and reinstall the plugin
-   - Verify you have the latest version
+### Memory and Performance Issues
+
+- Check for resource leaks in long-running services
+- Verify thread management and proper executor shutdown
+- Examine heap usage patterns during extended operation
+- Ensure virtual threads are being used appropriately
+
+---
+
+Use this checklist before each production release to ensure a high-quality, reliable plugin for users.

@@ -7,6 +7,7 @@
     
     <description><![CDATA[
     <p>ModForge AI - Smart Minecraft Mod Development</p>
+    <p><b>Optimized for IntelliJ IDEA 2025.1 with Java 21 support</b></p>
     <p>This plugin provides AI-powered assistance for Minecraft mod development:</p>
     <ul>
         <li>Multi-mod loader support (Forge, Fabric, Quilt, Architectury)</li>
@@ -14,6 +15,8 @@
         <li>Automatic error detection and fixing</li>
         <li>Pattern recognition to reduce API costs</li>
         <li>Continuous development for 24/7 improvement</li>
+        <li>Java 21 virtual thread optimization for improved performance</li>
+        <li>Full compatibility with IntelliJ IDEA 2025.1</li>
     </ul>
     <p>Features:</p>
     <ul>
@@ -22,6 +25,14 @@
         <li>Continuous development that keeps working even when you're not</li>
         <li>Cost optimization through pattern recognition</li>
         <li>GitHub integration for version control</li>
+        <li>Enhanced network operations with smart retry logic</li>
+        <li>Circuit breaker protection to prevent cascading failures</li>
+    </ul>
+    <p><b>System Requirements:</b></p>
+    <ul>
+        <li>IntelliJ IDEA 2025.1 (Build #IC-251.23774.435) or compatible</li>
+        <li>Java Development Kit (JDK) 21.0.6 or later</li>
+        <li>Minecraft Development plugin (latest version)</li>
     </ul>
     ]]></description>
     

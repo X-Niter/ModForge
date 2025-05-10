@@ -39,9 +39,9 @@ ModForge IntelliJ Plugin is an AI-powered assistant for Minecraft mod developmen
 
 1. Clone this repository
 2. Navigate to the plugin directory
-3. Run the build script:
+3. Run the production build script:
    ```
-   ./build-plugin.sh
+   ./build-production-plugin.sh
    ```
 4. The script will output the location of the generated plugin file
 5. Follow the installation steps above to install the plugin

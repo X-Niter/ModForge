@@ -1,7 +1,9 @@
 package com.modforge.intellij.plugin.auth;
 
-import com.google.gson.Gson;
-import com.google.gson.reflect.TypeToken;
+import com.intellij.credentialStore.CredentialAttributes;
+import com.intellij.credentialStore.CredentialAttributesKt;
+import com.intellij.credentialStore.Credentials;
+import com.intellij.ide.passwordSafe.PasswordSafe;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.components.PersistentStateComponent;
 import com.intellij.openapi.components.Service;
@@ -9,266 +11,245 @@ import com.intellij.openapi.components.State;
 import com.intellij.openapi.components.Storage;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.util.xmlb.XmlSerializerUtil;
-import com.modforge.intellij.plugin.settings.ModForgeSettings;
+import com.intellij.util.xmlb.annotations.Transient;
+import com.modforge.intellij.plugin.github.GitHubIntegrationService;
 import com.modforge.intellij.plugin.utils.ConnectionTestUtil;
 import com.modforge.intellij.plugin.utils.TokenAuthConnectionUtil;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-import java.lang.reflect.Type;
-import java.util.HashMap;
-import java.util.Map;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.Consumer;
 
 /**
- * Manager for ModForge authentication.
+ * Authentication manager for ModForge plugin, providing secure token storage
+ * and GitHub/API authentication. Optimized for IntelliJ IDEA 2025.1.
  */
-@Service
+@Service(Service.Level.APP)
 @State(
-        name = "com.modforge.intellij.plugin.auth.ModAuthenticationManager",
-        storages = {@Storage("ModForgeAuth.xml")}
+    name = "ModForgeAuthenticationManager",
+    storages = @Storage("modForgeAuth.xml")
 )
 public final class ModAuthenticationManager implements PersistentStateComponent<ModAuthenticationManager> {
     private static final Logger LOG = Logger.getInstance(ModAuthenticationManager.class);
-    private static final Gson GSON = new Gson();
-    private static final Type USER_MAP_TYPE = new TypeToken<Map<String, Object>>() {}.getType();
     
-    private String token = "";
-    private String githubToken = "";
-    private Map<String, Object> user = new HashMap<>();
-    private boolean authenticated = false;
+    // Credential keys for various services
+    private static final String GITHUB_TOKEN_KEY = "ModForge:GitHubToken";
+    private static final String OPENAI_API_KEY = "ModForge:OpenAIApiKey";
+    
+    // GitHub APIs
+    private static final String GITHUB_API_TEST_URL = "https://api.github.com/rate_limit";
+    
+    // State refresh intervals
+    private static final long TOKEN_VALIDATION_INTERVAL_MS = TimeUnit.MINUTES.toMillis(10);
+    
+    // Token validation timestamps
+    private final AtomicLong lastGitHubTokenValidation = new AtomicLong(0);
+    
+    // Persistent state
+    private String gitHubUsername = "";
+    private boolean rememberGitHubCredentials = true;
+    
+    // Transient state
+    @Transient
+    private boolean gitHubTokenValid = false;
+    
+    @Transient
+    private boolean openAIKeyValid = false;
     
     /**
-     * Get the instance of ModAuthenticationManager.
-     *
-     * @return The instance
+     * Get the instance of the authentication manager
+     * 
+     * @return The authentication manager instance
      */
     public static ModAuthenticationManager getInstance() {
         return ApplicationManager.getApplication().getService(ModAuthenticationManager.class);
     }
     
     /**
-     * Login to ModForge with username and password.
-     *
-     * @param username The username
-     * @param password The password
-     * @return A CompletableFuture that will be resolved to true if the login is successful, false otherwise
-     */
-    public CompletableFuture<Boolean> login(String username, String password) {
-        ModForgeSettings settings = ModForgeSettings.getInstance();
-        String serverUrl = settings.getServerUrl();
-        String loginUrl = serverUrl.endsWith("/") ? serverUrl + "login" : serverUrl + "/login";
-        
-        return TokenAuthConnectionUtil.executeLogin(loginUrl, username, password)
-                .thenApply(response -> {
-                    if (response != null) {
-                        Object tokenObj = response.get("token");
-                        if (tokenObj != null) {
-                            token = tokenObj.toString();
-                            user = response;
-                            user.remove("token"); // Don't store token in user info
-                            authenticated = true;
-                            return true;
-                        }
-                    }
-                    
-                    LOG.error("Login failed: response did not contain token");
-                    return false;
-                })
-                .exceptionally(e -> {
-                    LOG.error("Error during login", e);
-                    return false;
-                });
-    }
-    
-    /**
-     * Login to ModForge with a token.
-     *
-     * @param authToken The authentication token
-     * @return A CompletableFuture that will be resolved to true if the login is successful, false otherwise
-     */
-    public CompletableFuture<Boolean> loginWithToken(String authToken) {
-        ModForgeSettings settings = ModForgeSettings.getInstance();
-        String serverUrl = settings.getServerUrl();
-        String userUrl = serverUrl.endsWith("/") ? serverUrl + "user" : serverUrl + "/user";
-        
-        return TokenAuthConnectionUtil.executeGet(userUrl, authToken)
-                .thenApply(response -> {
-                    if (response != null && !response.isEmpty()) {
-                        try {
-                            Map<String, Object> userMap = GSON.fromJson(response, USER_MAP_TYPE);
-                            if (userMap != null && userMap.containsKey("id")) {
-                                token = authToken;
-                                user = userMap;
-                                authenticated = true;
-                                return true;
-                            }
-                        } catch (Exception e) {
-                            LOG.error("Error parsing user data", e);
-                        }
-                    }
-                    
-                    LOG.error("Login with token failed: could not retrieve user information");
-                    return false;
-                })
-                .exceptionally(e -> {
-                    LOG.error("Error during login with token", e);
-                    return false;
-                });
-    }
-    
-    /**
-     * Logout from ModForge.
-     */
-    public void logout() {
-        token = "";
-        githubToken = "";
-        user = new HashMap<>();
-        authenticated = false;
-    }
-    
-    /**
-     * Verify if the current token is valid.
-     *
-     * @return A CompletableFuture that will be resolved to true if the token is valid, false otherwise
-     */
-    public CompletableFuture<Boolean> verifyToken() {
-        if (token.isEmpty()) {
-            return CompletableFuture.completedFuture(false);
-        }
-        
-        ModForgeSettings settings = ModForgeSettings.getInstance();
-        String serverUrl = settings.getServerUrl();
-        
-        return ConnectionTestUtil.testAuthentication(serverUrl, token)
-                .thenApply(valid -> {
-                    if (!valid) {
-                        // Token is invalid, logout
-                        logout();
-                    }
-                    
-                    return valid;
-                })
-                .exceptionally(e -> {
-                    LOG.error("Error verifying token", e);
-                    return false;
-                });
-    }
-    
-    /**
-     * Check if the user is authenticated.
-     *
-     * @return True if authenticated, false otherwise
-     */
-    public boolean isAuthenticated() {
-        return authenticated && !token.isEmpty();
-    }
-    
-    /**
-     * Get the authentication token.
-     *
-     * @return The token
-     */
-    @NotNull
-    public String getToken() {
-        return token;
-    }
-    
-    /**
-     * Get the authenticated user information.
-     *
-     * @return The user information
-     */
-    @NotNull
-    public Map<String, Object> getUser() {
-        return new HashMap<>(user);
-    }
-    
-    /**
-     * Get the server URL.
-     * 
-     * @return The server URL from settings
-     */
-    @NotNull
-    public String getServerUrl() {
-        ModForgeSettings settings = ModForgeSettings.getInstance();
-        return settings.getServerUrl();
-    }
-    
-    /**
-     * Get the GitHub token.
-     * 
-     * @return The GitHub token, or an empty string if not available
-     */
-    @NotNull
-    public String getGitHubToken() {
-        if (githubToken != null && !githubToken.isEmpty()) {
-            return githubToken;
-        }
-        
-        // Try to get from user object if available
-        if (isAuthenticated() && user.containsKey("githubToken")) {
-            Object tokenObj = user.get("githubToken");
-            if (tokenObj != null) {
-                githubToken = tokenObj.toString();
-                return githubToken;
-            }
-        }
-        
-        // Fallback to settings
-        ModForgeSettings settings = ModForgeSettings.getInstance();
-        return settings.getGitHubToken();
-    }
-    
-    /**
-     * Set the GitHub token.
+     * Set the GitHub token
      * 
      * @param token The GitHub token
+     * @param remember Whether to remember the token
      */
-    public void setGitHubToken(@NotNull String token) {
-        this.githubToken = token;
+    public void setGitHubToken(String token, boolean remember) {
+        if (token == null || token.isEmpty()) {
+            clearGitHubToken();
+            return;
+        }
+        
+        rememberGitHubCredentials = remember;
+        
+        // Store token securely
+        CredentialAttributes attributes = createCredentialAttributes(GITHUB_TOKEN_KEY);
+        Credentials credentials = new Credentials(gitHubUsername, token);
+        PasswordSafe.getInstance().set(attributes, credentials);
+        
+        // Reset validation state
+        gitHubTokenValid = false;
+        lastGitHubTokenValidation.set(0);
+        
+        LOG.info("GitHub token updated" + (remember ? " (remembered)" : ""));
     }
     
     /**
-     * Get the user ID.
-     *
-     * @return The user ID, or -1 if not authenticated
+     * Get the GitHub token
+     * 
+     * @return The GitHub token or null if not set
      */
-    public int getUserId() {
-        if (!isAuthenticated() || !user.containsKey("id")) {
-            return -1;
-        }
-        
-        try {
-            Object idObj = user.get("id");
-            if (idObj instanceof Number) {
-                return ((Number) idObj).intValue();
-            } else if (idObj instanceof String) {
-                return Integer.parseInt((String) idObj);
-            }
-        } catch (Exception e) {
-            LOG.error("Error getting user ID", e);
-        }
-        
-        return -1;
-    }
-    
-    /**
-     * Get the username.
-     *
-     * @return The username, or an empty string if not authenticated
-     */
-    @NotNull
-    public String getUsername() {
-        if (!isAuthenticated() || !user.containsKey("username")) {
-            return "";
-        }
-        
-        Object usernameObj = user.get("username");
-        return usernameObj != null ? usernameObj.toString() : "";
-    }
-    
     @Nullable
+    public String getGitHubToken() {
+        CredentialAttributes attributes = createCredentialAttributes(GITHUB_TOKEN_KEY);
+        Credentials credentials = PasswordSafe.getInstance().get(attributes);
+        return credentials != null ? credentials.getPasswordAsString() : null;
+    }
+    
+    /**
+     * Set the OpenAI API key
+     * 
+     * @param apiKey The OpenAI API key
+     */
+    public void setOpenAIApiKey(String apiKey) {
+        if (apiKey == null || apiKey.isEmpty()) {
+            clearOpenAIApiKey();
+            return;
+        }
+        
+        // Store API key securely
+        CredentialAttributes attributes = createCredentialAttributes(OPENAI_API_KEY);
+        Credentials credentials = new Credentials("openai", apiKey);
+        PasswordSafe.getInstance().set(attributes, credentials);
+        
+        // Reset validation state
+        openAIKeyValid = false;
+        
+        LOG.info("OpenAI API key updated");
+    }
+    
+    /**
+     * Get the OpenAI API key
+     * 
+     * @return The OpenAI API key or null if not set
+     */
+    @Nullable
+    public String getOpenAIApiKey() {
+        CredentialAttributes attributes = createCredentialAttributes(OPENAI_API_KEY);
+        Credentials credentials = PasswordSafe.getInstance().get(attributes);
+        return credentials != null ? credentials.getPasswordAsString() : null;
+    }
+    
+    /**
+     * Check if the GitHub token is valid
+     * 
+     * @return true if token is valid, false otherwise
+     */
+    public boolean isGitHubTokenValid() {
+        if (!gitHubTokenValid) {
+            validateGitHubToken();
+        }
+        return gitHubTokenValid;
+    }
+    
+    /**
+     * Check if the OpenAI API key is valid
+     * 
+     * @return true if API key is valid, false otherwise
+     */
+    public boolean isOpenAIApiKeyValid() {
+        return openAIKeyValid;
+    }
+    
+    /**
+     * Validate the GitHub token
+     */
+    public void validateGitHubToken() {
+        String token = getGitHubToken();
+        if (token == null || token.isEmpty()) {
+            gitHubTokenValid = false;
+            return;
+        }
+        
+        // Avoid too frequent validations
+        long now = System.currentTimeMillis();
+        long lastValidation = lastGitHubTokenValidation.get();
+        if (gitHubTokenValid && now - lastValidation < TOKEN_VALIDATION_INTERVAL_MS) {
+            return;
+        }
+        
+        gitHubTokenValid = TokenAuthConnectionUtil.testToken(GITHUB_API_TEST_URL, token);
+        lastGitHubTokenValidation.set(now);
+        
+        LOG.info("GitHub token validation: " + (gitHubTokenValid ? "valid" : "invalid"));
+    }
+    
+    /**
+     * Validate the GitHub token asynchronously
+     * 
+     * @param callback Callback for validation result
+     */
+    public void validateGitHubTokenAsync(Consumer<Boolean> callback) {
+        String token = getGitHubToken();
+        if (token == null || token.isEmpty()) {
+            gitHubTokenValid = false;
+            callback.accept(false);
+            return;
+        }
+        
+        // Avoid too frequent validations
+        long now = System.currentTimeMillis();
+        long lastValidation = lastGitHubTokenValidation.get();
+        if (gitHubTokenValid && now - lastValidation < TOKEN_VALIDATION_INTERVAL_MS) {
+            callback.accept(true);
+            return;
+        }
+        
+        CompletableFuture.supplyAsync(() -> {
+            boolean valid = TokenAuthConnectionUtil.testToken(GITHUB_API_TEST_URL, token);
+            if (valid) {
+                gitHubTokenValid = true;
+                lastGitHubTokenValidation.set(System.currentTimeMillis());
+            }
+            return valid;
+        }, Executors.newVirtualThreadPerTaskExecutor()).thenAccept(valid -> {
+            ApplicationManager.getApplication().invokeLater(() -> callback.accept(valid));
+        });
+    }
+    
+    /**
+     * Clear the GitHub token
+     */
+    public void clearGitHubToken() {
+        CredentialAttributes attributes = createCredentialAttributes(GITHUB_TOKEN_KEY);
+        PasswordSafe.getInstance().set(attributes, null);
+        gitHubTokenValid = false;
+        LOG.info("GitHub token cleared");
+    }
+    
+    /**
+     * Clear the OpenAI API key
+     */
+    public void clearOpenAIApiKey() {
+        CredentialAttributes attributes = createCredentialAttributes(OPENAI_API_KEY);
+        PasswordSafe.getInstance().set(attributes, null);
+        openAIKeyValid = false;
+        LOG.info("OpenAI API key cleared");
+    }
+    
+    /**
+     * Create credential attributes for secure storage
+     * 
+     * @param key The credential key
+     * @return The credential attributes
+     */
+    private CredentialAttributes createCredentialAttributes(String key) {
+        return new CredentialAttributes(
+            CredentialAttributesKt.generateServiceName("ModForge", key)
+        );
+    }
+    
     @Override
     public ModAuthenticationManager getState() {
         return this;
@@ -277,17 +258,41 @@ public final class ModAuthenticationManager implements PersistentStateComponent<
     @Override
     public void loadState(@NotNull ModAuthenticationManager state) {
         XmlSerializerUtil.copyBean(state, this);
-        
-        // Verify token on load
-        if (authenticated && !token.isEmpty()) {
-            verifyToken()
-                    .thenAccept(valid -> {
-                        if (!valid) {
-                            LOG.info("Token verification failed on load, logging out");
-                        } else {
-                            LOG.info("Token verified on load");
-                        }
-                    });
-        }
+    }
+    
+    /**
+     * Get the GitHub username
+     * 
+     * @return The GitHub username
+     */
+    public String getGitHubUsername() {
+        return gitHubUsername;
+    }
+    
+    /**
+     * Set the GitHub username
+     * 
+     * @param gitHubUsername The GitHub username
+     */
+    public void setGitHubUsername(String gitHubUsername) {
+        this.gitHubUsername = gitHubUsername;
+    }
+    
+    /**
+     * Check if GitHub credentials should be remembered
+     * 
+     * @return true if credentials should be remembered, false otherwise
+     */
+    public boolean isRememberGitHubCredentials() {
+        return rememberGitHubCredentials;
+    }
+    
+    /**
+     * Set whether GitHub credentials should be remembered
+     * 
+     * @param rememberGitHubCredentials true if credentials should be remembered, false otherwise
+     */
+    public void setRememberGitHubCredentials(boolean rememberGitHubCredentials) {
+        this.rememberGitHubCredentials = rememberGitHubCredentials;
     }
 }
