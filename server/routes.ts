@@ -33,6 +33,7 @@ import githubRoutes from "./routes/github-routes";
 import errorMonitoringRouter from "./routes/error-monitoring";
 import axios from "axios";
 import rateLimit from "express-rate-limit";
+import path from "path";
 
 // Function declarations
 async function generateModCodeAsync(mod: any, build: any): Promise<void> {
@@ -338,8 +339,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       };
       
       // Check for system problems that might need self-healing
-      const systemIssues = [];
-      let selfHealingActions = [];
+      const systemIssues: Array<{component: string, issue: string, severity: string}> = [];
+      const selfHealingActions: Array<{component: string, action: string, timestamp: string}> = [];
       
       // Check for database issues
       if (dbHealth.status !== 'healthy') {
@@ -1396,6 +1397,47 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/pattern-learning", patternLearningRouter);
   app.use("/api/github", githubRoutes);
   app.use("/api/error-monitoring", requireAuth, errorMonitoringRouter);
+  
+  // Maintenance endpoint for manual system maintenance
+  app.post("/api/maintenance/run", requireAuth, async (req, res) => {
+    try {
+      // Only allow admin users to trigger maintenance
+      if (!req.user?.isAdmin) {
+        return res.status(403).json({
+          success: false,
+          message: "Only administrators can trigger maintenance tasks"
+        });
+      }
+      
+      // Import maintenance tasks
+      const { cleanupTempFiles, cleanupCompiledModules } = await import('./maintenance-tasks');
+      
+      // Run maintenance tasks
+      const tempCleanupResult = await cleanupTempFiles(
+        path.join(__dirname, '../.temp'), 
+        req.body.maxAgeHours || 24
+      );
+      
+      const moduleCleanupResult = await cleanupCompiledModules();
+      
+      // Return results
+      res.json({
+        success: true,
+        message: "Maintenance tasks completed",
+        results: {
+          tempFiles: tempCleanupResult,
+          compiledModules: moduleCleanupResult
+        },
+        timestamp: new Date().toISOString()
+      });
+    } catch (error) {
+      res.status(500).json({
+        success: false,
+        message: "Failed to run maintenance tasks",
+        error: error instanceof Error ? error.message : String(error)
+      });
+    }
+  });
   
   // Register global error handler as the last middleware
   app.use(errorHandlerMiddleware);

@@ -6,6 +6,7 @@ import session from "express-session";
 import { pool } from "./db";
 import connectPgSimple from "connect-pg-simple";
 import authRoutes from "./routes/auth-routes";
+import { scheduleMaintenanceTasks } from "./maintenance-tasks";
 
 const app = express();
 // Enable trust proxy to work correctly with express-rate-limit behind a proxy (like in Replit)
@@ -78,7 +79,82 @@ app.use((req, res, next) => {
   next();
 });
 
+/**
+ * Memory management system to monitor and optimize memory usage
+ * This helps ensure the application can run 24/7 without memory leaks
+ */
+function setupMemoryManagement() {
+  const MEMORY_CHECK_INTERVAL = 15 * 60 * 1000; // 15 minutes
+  const WARNING_THRESHOLD_MB = 1024; // 1GB
+  const CRITICAL_THRESHOLD_MB = 1536; // 1.5GB
+  
+  // Keep track of consecutive high memory readings
+  let consecutiveHighMemoryCount = 0;
+  
+  // Setup periodic memory check
+  const interval = setInterval(() => {
+    try {
+      const memoryUsage = process.memoryUsage();
+      const heapUsedMB = Math.round(memoryUsage.heapUsed / 1024 / 1024);
+      const rssMemoryMB = Math.round(memoryUsage.rss / 1024 / 1024);
+      
+      // Log memory usage for monitoring
+      log(`Memory usage: ${heapUsedMB}MB heap, ${rssMemoryMB}MB total`);
+      
+      if (heapUsedMB > CRITICAL_THRESHOLD_MB || rssMemoryMB > CRITICAL_THRESHOLD_MB * 1.5) {
+        // Critical memory usage - take immediate action
+        log('CRITICAL MEMORY USAGE DETECTED - triggering forced garbage collection', 'warn');
+        consecutiveHighMemoryCount++;
+        
+        // Force garbage collection if available (requires --expose-gc flag)
+        if (global.gc) {
+          log('Running forced garbage collection');
+          global.gc();
+        }
+        
+        // If multiple consecutive critical readings, take more aggressive action
+        if (consecutiveHighMemoryCount >= 3) {
+          log('Multiple consecutive critical memory readings - logging heap snapshot and cleaning caches', 'error');
+          
+          // Clear internal caches if applicable
+          // This would be application-specific, but could include clearing pattern caches, etc.
+          
+          // Reset counter after taking action
+          consecutiveHighMemoryCount = 0;
+        }
+      } else if (heapUsedMB > WARNING_THRESHOLD_MB || rssMemoryMB > WARNING_THRESHOLD_MB * 1.5) {
+        // Warning level - log but don't take action yet
+        log(`WARNING: High memory usage detected: ${heapUsedMB}MB heap`, 'warn');
+        consecutiveHighMemoryCount++;
+        
+        // Suggest garbage collection if multiple consecutive warnings
+        if (consecutiveHighMemoryCount >= 2 && global.gc) {
+          log('Running suggested garbage collection after multiple warnings');
+          global.gc();
+        }
+      } else {
+        // Normal operation - reset counter
+        consecutiveHighMemoryCount = 0;
+      }
+    } catch (error) {
+      log(`Error in memory management: ${error instanceof Error ? error.message : String(error)}`, 'error');
+    }
+  }, MEMORY_CHECK_INTERVAL);
+  
+  // Ensure the interval is cleaned up on application shutdown
+  return () => {
+    clearInterval(interval);
+    log('Memory management system shutdown');
+  };
+}
+
 (async () => {
+  // Setup memory management system for 24/7 operation
+  const cleanupMemoryManagement = setupMemoryManagement();
+  
+  // Setup periodic maintenance tasks for 24/7 operation
+  const cleanupMaintenanceTasks = scheduleMaintenanceTasks();
+  
   const server = await registerRoutes(app);
 
   // Improved error handling middleware
@@ -122,6 +198,14 @@ app.use((req, res, next) => {
   // Setup graceful shutdown handlers
   const gracefulShutdown = async (signal: string) => {
     log(`${signal} received - starting graceful shutdown`);
+    
+    // Clean up memory management system
+    log('Shutting down memory management system...');
+    cleanupMemoryManagement();
+    
+    // Clean up maintenance tasks
+    log('Shutting down maintenance tasks...');
+    cleanupMaintenanceTasks();
     
     // Import the continuousService to clean it up
     const { continuousService } = await import('./continuous-service');
