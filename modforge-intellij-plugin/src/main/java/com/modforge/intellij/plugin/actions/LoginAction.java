@@ -14,7 +14,6 @@ import com.intellij.util.ui.FormBuilder;
 import com.intellij.util.ui.JBUI;
 import com.modforge.intellij.plugin.auth.ModAuthenticationManager;
 import com.modforge.intellij.plugin.settings.ModForgeSettings;
-import com.modforge.intellij.plugin.utils.ConnectionTestUtil;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -40,21 +39,12 @@ public class LoginAction extends AnAction {
             // Check if already authenticated
             ModAuthenticationManager authManager = ModAuthenticationManager.getInstance();
             if (authManager.isAuthenticated()) {
-                int option = Messages.showYesNoDialog(
+                Messages.showInfoMessage(
                         project,
-                        "You are already logged in. Do you want to log out and log in again?",
-                        "Already Logged In",
-                        "Logout and Login Again",
-                        "Cancel",
-                        Messages.getQuestionIcon()
+                        "You are already logged in as " + authManager.getUsername(),
+                        "Already Authenticated"
                 );
-                
-                if (option != Messages.YES) {
-                    return;
-                }
-                
-                // Logout
-                authManager.logout();
+                return;
             }
             
             // Show login dialog
@@ -65,49 +55,35 @@ public class LoginAction extends AnAction {
                 return;
             }
             
-            // Get login data
             String username = dialog.getUsername();
             String password = dialog.getPassword();
-            String serverUrl = dialog.getServerUrl();
+            boolean rememberMe = dialog.isRememberMe();
             
-            // Save server URL
+            // Save remember me setting
             ModForgeSettings settings = ModForgeSettings.getInstance();
-            settings.setServerUrl(serverUrl);
+            settings.setRememberMe(rememberMe);
             
-            // Test connection to server
-            if (!ConnectionTestUtil.testConnection(serverUrl)) {
-                Messages.showErrorDialog(
-                        project,
-                        "Could not connect to server. Please check the server URL and try again.",
-                        "Connection Error"
-                );
-                return;
-            }
-            
-            // Try to login
-            boolean success = false;
-            String errorMessage = "Unknown error";
-            
-            try {
-                success = authManager.login(username, password);
-            } catch (Exception ex) {
-                LOG.error("Error during login", ex);
-                errorMessage = ex.getMessage();
-            }
-            
-            if (success) {
-                Messages.showInfoMessage(
-                        project,
-                        "Successfully logged in as " + username,
-                        "Login Successful"
-                );
-            } else {
-                Messages.showErrorDialog(
-                        project,
-                        "Login failed: " + errorMessage,
-                        "Login Failed"
-                );
-            }
+            // Perform login
+            authManager.login(username, password)
+                    .thenAccept(success -> {
+                        if (success) {
+                            SwingUtilities.invokeLater(() -> {
+                                Messages.showInfoMessage(
+                                        project,
+                                        "Successfully logged in as " + username,
+                                        "Login Successful"
+                                );
+                            });
+                        } else {
+                            SwingUtilities.invokeLater(() -> {
+                                Messages.showErrorDialog(
+                                        project,
+                                        "Failed to log in. Please check your credentials.",
+                                        "Login Failed"
+                                );
+                            });
+                        }
+                    });
         } catch (Exception ex) {
             LOG.error("Error in login action", ex);
             
@@ -121,27 +97,31 @@ public class LoginAction extends AnAction {
     
     @Override
     public void update(@NotNull AnActionEvent e) {
-        // Always enable action
-        e.getPresentation().setEnabled(true);
+        // Only enable if not authenticated
+        ModAuthenticationManager authManager = ModAuthenticationManager.getInstance();
+        
+        e.getPresentation().setEnabled(!authManager.isAuthenticated());
     }
     
     /**
-     * Dialog for entering login data.
+     * Dialog for entering login credentials.
      */
     private static class LoginDialog extends DialogWrapper {
         private final JBTextField usernameField;
         private final JBPasswordField passwordField;
-        private final JBTextField serverUrlField;
+        private final JCheckBox rememberMeCheckbox;
         
         public LoginDialog(Project project) {
             super(project, true);
             
-            usernameField = new JBTextField(20);
-            passwordField = new JBPasswordField();
-            
-            // Set default server URL
+            // Get last username from settings
             ModForgeSettings settings = ModForgeSettings.getInstance();
-            serverUrlField = new JBTextField(settings.getServerUrl(), 30);
+            String lastUsername = settings.getLastUsername();
+            boolean rememberMe = settings.isRememberMe();
+            
+            usernameField = new JBTextField(lastUsername, 20);
+            passwordField = new JBPasswordField();
+            rememberMeCheckbox = new JCheckBox("Remember me", rememberMe);
             
             setTitle("Login to ModForge");
             init();
@@ -157,10 +137,6 @@ public class LoginAction extends AnAction {
                 return new ValidationInfo("Password is required", passwordField);
             }
             
-            if (serverUrlField.getText().trim().isEmpty()) {
-                return new ValidationInfo("Server URL is required", serverUrlField);
-            }
-            
             return null;
         }
         
@@ -172,11 +148,10 @@ public class LoginAction extends AnAction {
             FormBuilder formBuilder = FormBuilder.createFormBuilder()
                     .addLabeledComponent(new JBLabel("Username:"), usernameField)
                     .addLabeledComponent(new JBLabel("Password:"), passwordField)
-                    .addLabeledComponent(new JBLabel("Server URL:"), serverUrlField)
-                    .addComponentFillVertically(new JPanel(), 0);
+                    .addComponent(rememberMeCheckbox);
             
             panel.add(formBuilder.getPanel(), BorderLayout.CENTER);
-            panel.setPreferredSize(new Dimension(400, 150));
+            panel.setPreferredSize(new Dimension(300, 150));
             
             return JBUI.Panels.simplePanel()
                     .addToCenter(panel);
@@ -190,8 +165,8 @@ public class LoginAction extends AnAction {
             return new String(passwordField.getPassword());
         }
         
-        public String getServerUrl() {
-            return serverUrlField.getText().trim();
+        public boolean isRememberMe() {
+            return rememberMeCheckbox.isSelected();
         }
     }
 }

@@ -6,92 +6,132 @@ import org.jetbrains.annotations.NotNull;
 import java.io.IOException;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
 
 /**
- * Utility for testing connection to the ModForge server.
+ * Utility class for testing connections to ModForge servers.
  */
 public class ConnectionTestUtil {
     private static final Logger LOG = Logger.getInstance(ConnectionTestUtil.class);
-    
+    private static final int CONNECTION_TIMEOUT = 5000; // 5 seconds
+    private static final int READ_TIMEOUT = 5000; // 5 seconds
+
     /**
-     * Test connection to the ModForge server.
+     * Test a connection to a ModForge server.
      *
      * @param serverUrl The server URL to test
-     * @return Whether the connection was successful
+     * @return A future with the result of the test (true if successful)
      */
-    public static boolean testConnection(@NotNull String serverUrl) {
-        try {
-            // Ensure serverUrl ends with /
-            if (!serverUrl.endsWith("/")) {
-                serverUrl = serverUrl + "/";
+    @NotNull
+    public static CompletableFuture<Boolean> testConnection(@NotNull String serverUrl) {
+        CompletableFuture<Boolean> future = new CompletableFuture<>();
+        
+        // Run the test asynchronously
+        CompletableFuture.runAsync(() -> {
+            try {
+                // Build URL for health check endpoint
+                String healthUrl = serverUrl;
+                if (!healthUrl.endsWith("/")) {
+                    healthUrl += "/";
+                }
+                healthUrl += "api/health";
+                
+                // Open connection
+                URL url = new URL(healthUrl);
+                HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+                connection.setRequestMethod("GET");
+                connection.setConnectTimeout(CONNECTION_TIMEOUT);
+                connection.setReadTimeout(READ_TIMEOUT);
+                
+                // Get response
+                int responseCode = connection.getResponseCode();
+                
+                // Check if response is successful
+                boolean success = responseCode >= 200 && responseCode < 300;
+                
+                if (success) {
+                    LOG.info("Connection test successful: " + serverUrl);
+                } else {
+                    LOG.error("Connection test failed: " + serverUrl + ", response code: " + responseCode);
+                }
+                
+                future.complete(success);
+            } catch (IOException e) {
+                LOG.error("Connection test exception: " + e.getMessage(), e);
+                future.complete(false);
+            } catch (Exception e) {
+                LOG.error("Unexpected error in connection test", e);
+                future.complete(false);
             }
-            
-            // Create health check URL
-            URL url = new URL(serverUrl + "api/health");
-            
-            // Create connection
-            HttpURLConnection connection = (HttpURLConnection) url.openConnection();
-            connection.setRequestMethod("GET");
-            connection.setConnectTimeout(5000);
-            connection.setReadTimeout(5000);
-            
-            // Check response code
-            int responseCode = connection.getResponseCode();
-            
-            boolean success = responseCode == 200;
-            
-            if (!success) {
-                LOG.warn("Connection test failed with response code: " + responseCode);
-            }
-            
-            return success;
-        } catch (IOException e) {
-            LOG.error("Error testing connection", e);
-            return false;
-        }
+        });
+        
+        // Add a timeout to the future
+        return future.orTimeout(10, TimeUnit.SECONDS)
+                .exceptionally(ex -> {
+                    LOG.error("Connection test timed out or failed", ex);
+                    return false;
+                });
     }
     
     /**
-     * Get server version from the ModForge server.
+     * Check if a ModForge server has a specific feature.
      *
-     * @param serverUrl The server URL
-     * @return The server version, or null if the request fails
+     * @param serverUrl The server URL to check
+     * @param feature   The feature to check for (e.g., "pattern-recognition")
+     * @return A future with the result of the check (true if feature is supported)
      */
-    public static String getServerVersion(@NotNull String serverUrl) {
-        try {
-            // Ensure serverUrl ends with /
-            if (!serverUrl.endsWith("/")) {
-                serverUrl = serverUrl + "/";
-            }
-            
-            // Create health check URL
-            URL url = new URL(serverUrl + "api/health");
-            
-            // Create connection
-            HttpURLConnection connection = (HttpURLConnection) url.openConnection();
-            connection.setRequestMethod("GET");
-            connection.setConnectTimeout(5000);
-            connection.setReadTimeout(5000);
-            
-            // Check response code
-            int responseCode = connection.getResponseCode();
-            
-            if (responseCode == 200) {
-                String response = TokenAuthConnectionUtil.readResponse(connection);
-                
-                if (response != null && !response.isEmpty()) {
-                    // Try to find version in response (simple approach - might need improvement)
-                    if (response.contains("\"version\":")) {
-                        return response.split("\"version\":")[1].split("\"")[1];
-                    }
+    @NotNull
+    public static CompletableFuture<Boolean> checkFeatureSupport(
+            @NotNull String serverUrl, 
+            @NotNull String feature) {
+        
+        CompletableFuture<Boolean> future = new CompletableFuture<>();
+        
+        // Run the check asynchronously
+        CompletableFuture.runAsync(() -> {
+            try {
+                // Build URL for feature check endpoint
+                String featureUrl = serverUrl;
+                if (!featureUrl.endsWith("/")) {
+                    featureUrl += "/";
                 }
+                featureUrl += "api/features/" + feature;
+                
+                // Open connection
+                URL url = new URL(featureUrl);
+                HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+                connection.setRequestMethod("GET");
+                connection.setConnectTimeout(CONNECTION_TIMEOUT);
+                connection.setReadTimeout(READ_TIMEOUT);
+                
+                // Get response
+                int responseCode = connection.getResponseCode();
+                
+                // Check if response is successful
+                boolean supported = responseCode == HttpURLConnection.HTTP_OK;
+                
+                if (supported) {
+                    LOG.info("Feature supported: " + feature);
+                } else {
+                    LOG.info("Feature not supported: " + feature);
+                }
+                
+                future.complete(supported);
+            } catch (IOException e) {
+                LOG.error("Feature check exception: " + e.getMessage(), e);
+                future.complete(false);
+            } catch (Exception e) {
+                LOG.error("Unexpected error in feature check", e);
+                future.complete(false);
             }
-            
-            LOG.warn("Failed to get server version with response code: " + responseCode);
-            return null;
-        } catch (IOException e) {
-            LOG.error("Error getting server version", e);
-            return null;
-        }
+        });
+        
+        // Add a timeout to the future
+        return future.orTimeout(10, TimeUnit.SECONDS)
+                .exceptionally(ex -> {
+                    LOG.error("Feature check timed out or failed", ex);
+                    return false;
+                });
     }
 }

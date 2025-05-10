@@ -1,168 +1,69 @@
 package com.modforge.intellij.plugin.auth;
 
 import com.intellij.openapi.application.ApplicationManager;
-import com.intellij.openapi.components.Service;
+import com.intellij.openapi.components.ServiceManager;
 import com.intellij.openapi.diagnostic.Logger;
-import com.intellij.util.Base64;
+import com.intellij.util.net.HttpConfigurable;
 import com.modforge.intellij.plugin.settings.ModForgeSettings;
+import com.modforge.intellij.plugin.utils.ConnectionTestUtil;
 import com.modforge.intellij.plugin.utils.TokenAuthConnectionUtil;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-import java.io.IOException;
-import java.net.HttpURLConnection;
-import java.net.URL;
-import java.nio.charset.StandardCharsets;
+import java.util.Base64;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
- * Manager for ModForge authentication.
- * Handles login, logout, and token management.
+ * Manager for authentication with the ModForge service.
  */
-@Service
-public final class ModAuthenticationManager {
+public class ModAuthenticationManager {
     private static final Logger LOG = Logger.getInstance(ModAuthenticationManager.class);
     
-    private String authToken;
-    private String username;
-    private boolean authenticated = false;
-    
+    private final AtomicBoolean authenticated = new AtomicBoolean(false);
+    private String authToken = null;
+    private String username = null;
+
+    /**
+     * Get the authentication manager instance.
+     *
+     * @return The authentication manager instance
+     */
     public static ModAuthenticationManager getInstance() {
         return ApplicationManager.getApplication().getService(ModAuthenticationManager.class);
     }
-    
+
     /**
-     * Login to ModForge.
+     * Check if the user is authenticated.
      *
-     * @param username The username
-     * @param password The password
-     * @return Whether the login was successful
-     */
-    public boolean login(@NotNull String username, @NotNull String password) {
-        try {
-            ModForgeSettings settings = ModForgeSettings.getInstance();
-            String serverUrl = settings.getServerUrl();
-            
-            if (serverUrl.isEmpty()) {
-                LOG.warn("Server URL is empty");
-                return false;
-            }
-            
-            // Create login URL
-            URL url = new URL(serverUrl + "/api/login");
-            
-            // Create connection
-            HttpURLConnection connection = (HttpURLConnection) url.openConnection();
-            connection.setRequestMethod("POST");
-            connection.setRequestProperty("Content-Type", "application/json");
-            connection.setRequestProperty("Accept", "application/json");
-            connection.setDoOutput(true);
-            
-            // Create request body
-            String jsonInputString = String.format("{\"username\":\"%s\",\"password\":\"%s\"}", 
-                    username.replace("\"", "\\\""), 
-                    password.replace("\"", "\\\""));
-            
-            // Send request
-            try (var os = connection.getOutputStream()) {
-                byte[] input = jsonInputString.getBytes(StandardCharsets.UTF_8);
-                os.write(input, 0, input.length);
-            }
-            
-            // Check response code
-            int responseCode = connection.getResponseCode();
-            
-            if (responseCode == 200) {
-                // Read token from response
-                String response = TokenAuthConnectionUtil.readResponse(connection);
-                if (response != null && !response.isEmpty()) {
-                    // Try to find token in response (simple approach - might need improvement)
-                    if (response.contains("\"token\":")) {
-                        String token = response.split("\"token\":")[1].split("\"")[1];
-                        this.authToken = token;
-                        this.username = username;
-                        this.authenticated = true;
-                        return true;
-                    }
-                }
-            }
-            
-            LOG.warn("Login failed with response code: " + responseCode);
-            return false;
-        } catch (IOException e) {
-            LOG.error("Error during login", e);
-            return false;
-        }
-    }
-    
-    /**
-     * Verify authentication with server.
-     *
-     * @return Whether the authentication is valid
-     */
-    public boolean verifyAuthentication() {
-        if (!authenticated || authToken == null) {
-            return false;
-        }
-        
-        try {
-            ModForgeSettings settings = ModForgeSettings.getInstance();
-            String serverUrl = settings.getServerUrl();
-            
-            if (serverUrl.isEmpty()) {
-                LOG.warn("Server URL is empty");
-                return false;
-            }
-            
-            // Create verify URL
-            URL url = new URL(serverUrl + "/api/auth/verify");
-            
-            // Create connection
-            HttpURLConnection connection = (HttpURLConnection) url.openConnection();
-            connection.setRequestMethod("GET");
-            connection.setRequestProperty("Authorization", "Bearer " + authToken);
-            
-            // Check response code
-            int responseCode = connection.getResponseCode();
-            
-            return responseCode == 200;
-        } catch (IOException e) {
-            LOG.error("Error during authentication verification", e);
-            return false;
-        }
-    }
-    
-    /**
-     * Get the authorization header value for API requests.
-     *
-     * @return The authorization header value, or null if not authenticated
-     */
-    @Nullable
-    public String getAuthorizationHeader() {
-        if (!authenticated || authToken == null) {
-            return null;
-        }
-        
-        return "Bearer " + authToken;
-    }
-    
-    /**
-     * Logout from ModForge.
-     */
-    public void logout() {
-        authenticated = false;
-        authToken = null;
-        username = null;
-    }
-    
-    /**
-     * Check if authenticated.
-     *
-     * @return Whether authenticated
+     * @return True if authenticated, false otherwise
      */
     public boolean isAuthenticated() {
-        return authenticated && authToken != null;
+        // Check token validity if authenticated
+        if (authenticated.get() && authToken != null) {
+            // Check token expiration
+            if (isTokenExpired(authToken)) {
+                logout();
+                return false;
+            }
+            return true;
+        }
+        return false;
     }
-    
+
+    /**
+     * Get the authentication token.
+     *
+     * @return The authentication token, or null if not authenticated
+     */
+    @Nullable
+    public String getAuthToken() {
+        if (isAuthenticated()) {
+            return authToken;
+        }
+        return null;
+    }
+
     /**
      * Get the username.
      *
@@ -170,16 +71,225 @@ public final class ModAuthenticationManager {
      */
     @Nullable
     public String getUsername() {
-        return username;
+        if (isAuthenticated()) {
+            return username;
+        }
+        return null;
     }
-    
+
     /**
-     * Get the auth token.
+     * Login to the ModForge service.
      *
-     * @return The auth token, or null if not authenticated
+     * @param username The username
+     * @param password The password
+     * @return A future with the result of the login attempt
+     */
+    @NotNull
+    public CompletableFuture<Boolean> login(@NotNull String username, @NotNull String password) {
+        CompletableFuture<Boolean> future = new CompletableFuture<>();
+
+        try {
+            // Get server URL from settings
+            ModForgeSettings settings = ModForgeSettings.getInstance();
+            String serverUrl = settings.getServerUrl();
+            
+            if (serverUrl == null || serverUrl.isEmpty()) {
+                LOG.error("Server URL is not set in settings");
+                future.complete(false);
+                return future;
+            }
+
+            // Test connection to server
+            ConnectionTestUtil.testConnection(serverUrl)
+                .thenAcceptAsync(connectionOk -> {
+                    if (!connectionOk) {
+                        LOG.error("Connection test failed");
+                        future.complete(false);
+                        return;
+                    }
+
+                    // Perform login
+                    TokenAuthConnectionUtil.getAuthToken(serverUrl, username, password)
+                        .thenAcceptAsync(loginResponse -> {
+                            if (loginResponse == null || loginResponse.token == null) {
+                                LOG.error("Login response or token is null");
+                                future.complete(false);
+                                return;
+                            }
+
+                            // Store token
+                            this.authToken = loginResponse.token;
+                            this.username = username;
+                            this.authenticated.set(true);
+                            
+                            // Save settings if "Remember me" is checked
+                            settings.setLastUsername(username);
+                            
+                            LOG.info("Login successful for user: " + username);
+                            future.complete(true);
+                        })
+                        .exceptionally(ex -> {
+                            LOG.error("Error during login", ex);
+                            future.complete(false);
+                            return null;
+                        });
+                })
+                .exceptionally(ex -> {
+                    LOG.error("Error testing connection", ex);
+                    future.complete(false);
+                    return null;
+                });
+        } catch (Exception e) {
+            LOG.error("Exception during login", e);
+            future.complete(false);
+        }
+
+        return future;
+    }
+
+    /**
+     * Login using a token.
+     *
+     * @param token The token
+     * @return A future with the result of the login attempt
+     */
+    @NotNull
+    public CompletableFuture<Boolean> loginWithToken(@NotNull String token) {
+        CompletableFuture<Boolean> future = new CompletableFuture<>();
+
+        try {
+            // Get server URL from settings
+            ModForgeSettings settings = ModForgeSettings.getInstance();
+            String serverUrl = settings.getServerUrl();
+            
+            if (serverUrl == null || serverUrl.isEmpty()) {
+                LOG.error("Server URL is not set in settings");
+                future.complete(false);
+                return future;
+            }
+
+            // Test connection to server
+            ConnectionTestUtil.testConnection(serverUrl)
+                .thenAcceptAsync(connectionOk -> {
+                    if (!connectionOk) {
+                        LOG.error("Connection test failed");
+                        future.complete(false);
+                        return;
+                    }
+
+                    // Verify token
+                    TokenAuthConnectionUtil.verifyToken(serverUrl, token)
+                        .thenAcceptAsync(verified -> {
+                            if (!verified) {
+                                LOG.error("Token verification failed");
+                                future.complete(false);
+                                return;
+                            }
+
+                            // Get username from token (assuming JWT)
+                            String usernameFromToken = extractUsernameFromToken(token);
+                            if (usernameFromToken == null) {
+                                LOG.error("Failed to extract username from token");
+                                future.complete(false);
+                                return;
+                            }
+
+                            // Store token
+                            this.authToken = token;
+                            this.username = usernameFromToken;
+                            this.authenticated.set(true);
+                            
+                            LOG.info("Login with token successful for user: " + usernameFromToken);
+                            future.complete(true);
+                        })
+                        .exceptionally(ex -> {
+                            LOG.error("Error during token verification", ex);
+                            future.complete(false);
+                            return null;
+                        });
+                })
+                .exceptionally(ex -> {
+                    LOG.error("Error testing connection", ex);
+                    future.complete(false);
+                    return null;
+                });
+        } catch (Exception e) {
+            LOG.error("Exception during login with token", e);
+            future.complete(false);
+        }
+
+        return future;
+    }
+
+    /**
+     * Logout from the ModForge service.
+     */
+    public void logout() {
+        this.authToken = null;
+        this.username = null;
+        this.authenticated.set(false);
+        LOG.info("Logout successful");
+    }
+
+    /**
+     * Check if a token is expired.
+     *
+     * @param token The token to check
+     * @return True if expired, false otherwise
+     */
+    private boolean isTokenExpired(String token) {
+        try {
+            // Basic check for token expiration (assuming JWT)
+            String[] parts = token.split("\\.");
+            if (parts.length != 3) {
+                return true; // Invalid token format
+            }
+
+            // Decode payload
+            String payload = new String(Base64.getDecoder().decode(parts[1]));
+            
+            // Check for "exp" claim (simplified approach)
+            if (payload.contains("\"exp\":")) {
+                long exp = Long.parseLong(payload.split("\"exp\":")[1].split("[,}]")[0].trim());
+                return System.currentTimeMillis() / 1000 > exp;
+            }
+            
+            return false; // No expiration found
+        } catch (Exception e) {
+            LOG.error("Error checking token expiration", e);
+            return true; // Assume expired on error
+        }
+    }
+
+    /**
+     * Extract username from token.
+     *
+     * @param token The token
+     * @return The username, or null if not found
      */
     @Nullable
-    public String getAuthToken() {
-        return authToken;
+    private String extractUsernameFromToken(String token) {
+        try {
+            // Extract username from JWT token
+            String[] parts = token.split("\\.");
+            if (parts.length != 3) {
+                return null; // Invalid token format
+            }
+
+            // Decode payload
+            String payload = new String(Base64.getDecoder().decode(parts[1]));
+            
+            // Extract username
+            if (payload.contains("\"username\":")) {
+                return payload.split("\"username\":")[1].split("\"")[1];
+            } else if (payload.contains("\"sub\":")) {
+                return payload.split("\"sub\":")[1].split("\"")[1];
+            }
+            
+            return null;
+        } catch (Exception e) {
+            LOG.error("Error extracting username from token", e);
+            return null;
+        }
     }
 }

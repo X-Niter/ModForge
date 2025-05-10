@@ -2,28 +2,34 @@ package com.modforge.intellij.plugin.actions;
 
 import com.intellij.openapi.actionSystem.AnAction;
 import com.intellij.openapi.actionSystem.AnActionEvent;
+import com.intellij.openapi.actionSystem.CommonDataKeys;
 import com.intellij.openapi.diagnostic.Logger;
+import com.intellij.openapi.editor.Document;
+import com.intellij.openapi.editor.Editor;
+import com.intellij.openapi.editor.SelectionModel;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.DialogWrapper;
 import com.intellij.openapi.ui.Messages;
 import com.intellij.openapi.ui.ValidationInfo;
+import com.intellij.psi.PsiDocumentManager;
+import com.intellij.psi.PsiFile;
 import com.intellij.ui.components.JBLabel;
 import com.intellij.ui.components.JBScrollPane;
 import com.intellij.ui.components.JBTextArea;
-import com.intellij.ui.components.JBTextField;
 import com.intellij.util.ui.FormBuilder;
 import com.intellij.util.ui.JBUI;
+import com.modforge.intellij.plugin.ai.PatternRecognitionService;
 import com.modforge.intellij.plugin.auth.ModAuthenticationManager;
-import com.modforge.intellij.plugin.settings.ModForgeSettings;
+import com.modforge.intellij.plugin.services.AutonomousCodeGenerationService;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
-import org.json.simple.JSONObject;
 
 import javax.swing.*;
 import java.awt.*;
+import java.util.concurrent.CompletableFuture;
 
 /**
- * Action for generating code with AI assistance.
+ * Action for generating code using AI.
  */
 public class GenerateCodeAction extends AnAction {
     private static final Logger LOG = Logger.getInstance(GenerateCodeAction.class);
@@ -31,72 +37,74 @@ public class GenerateCodeAction extends AnAction {
     @Override
     public void actionPerformed(@NotNull AnActionEvent e) {
         Project project = e.getProject();
+        Editor editor = e.getData(CommonDataKeys.EDITOR);
         
-        if (project == null) {
-            LOG.warn("Project is null");
+        if (project == null || editor == null) {
+            LOG.warn("Project or editor is null");
             return;
         }
         
         try {
-            // Check authentication
+            // Check if authenticated
             ModAuthenticationManager authManager = ModAuthenticationManager.getInstance();
             if (!authManager.isAuthenticated()) {
                 Messages.showErrorDialog(
                         project,
-                        "You must be logged in to ModForge to generate code.",
+                        "You must be logged in to generate code.",
                         "Authentication Required"
                 );
                 return;
             }
             
-            // Show code generation dialog
-            CodeGenerationDialog dialog = new CodeGenerationDialog(project);
+            // Show dialog to enter prompt
+            GenerateCodeDialog dialog = new GenerateCodeDialog(project);
             boolean proceed = dialog.showAndGet();
             
             if (!proceed) {
-                // User cancelled
                 return;
             }
             
-            // Get input data
-            String codeDescription = dialog.getCodeDescription();
-            String className = dialog.getClassName();
-            String fileName = dialog.getFileName();
+            String prompt = dialog.getPrompt();
             
-            // Check if description is empty
-            if (codeDescription == null || codeDescription.trim().isEmpty()) {
-                Messages.showErrorDialog(
+            // Try to recognize a pattern first
+            PatternRecognitionService patternRecognitionService = project.getService(PatternRecognitionService.class);
+            String generatedCode = patternRecognitionService.recognizeCodeGenerationPattern(prompt);
+            
+            if (generatedCode == null) {
+                // No pattern recognized, use AI service
+                AutonomousCodeGenerationService codeGenerationService = project.getService(AutonomousCodeGenerationService.class);
+                CompletableFuture<String> future = codeGenerationService.generateCode(prompt);
+                
+                // Show loading dialog
+                Messages.showInfoMessage(
                         project,
-                        "Code description cannot be empty.",
-                        "Empty Description"
+                        "Generating code...",
+                        "Code Generation"
                 );
-                return;
+                
+                // Process result when available
+                future.thenAccept(code -> {
+                    if (code != null) {
+                        SwingUtilities.invokeLater(() -> {
+                            insertCodeIntoEditor(editor, code);
+                        });
+                    } else {
+                        SwingUtilities.invokeLater(() -> {
+                            Messages.showErrorDialog(
+                                    project,
+                                    "Failed to generate code.",
+                                    "Code Generation Error"
+                            );
+                        });
+                    }
+                });
+            } else {
+                // Pattern recognized, insert directly
+                insertCodeIntoEditor(editor, generatedCode);
             }
-            
-            // Create input data for code generation
-            JSONObject inputData = new JSONObject();
-            inputData.put("description", codeDescription);
-            inputData.put("className", className);
-            inputData.put("fileName", fileName);
-            
-            // Get settings
-            ModForgeSettings settings = ModForgeSettings.getInstance();
-            boolean usePatterns = settings.isPatternRecognition();
-            inputData.put("usePatterns", usePatterns);
-            
-            // TODO: Implement code generation using API
-            // This would be replaced with actual API call when implemented
-            
-            // Show success message
-            Messages.showInfoMessage(
-                    project,
-                    "Code generation requested. This may take some time.",
-                    "Code Generation"
-            );
         } catch (Exception ex) {
             LOG.error("Error in generate code action", ex);
             
-            // Show error
             Messages.showErrorDialog(
                     project,
                     "An error occurred: " + ex.getMessage(),
@@ -107,30 +115,48 @@ public class GenerateCodeAction extends AnAction {
     
     @Override
     public void update(@NotNull AnActionEvent e) {
-        // Only enable if authenticated and project is available
+        // Only enable if authenticated and editor is available
         ModAuthenticationManager authManager = ModAuthenticationManager.getInstance();
         
-        // Enable if authenticated and project is available
-        e.getPresentation().setEnabled(authManager.isAuthenticated() && e.getProject() != null);
+        e.getPresentation().setEnabled(authManager.isAuthenticated() && 
+                e.getProject() != null && 
+                e.getData(CommonDataKeys.EDITOR) != null);
     }
     
     /**
-     * Dialog for entering code generation parameters.
+     * Insert code into the editor.
+     *
+     * @param editor The editor
+     * @param code   The code to insert
      */
-    private static class CodeGenerationDialog extends DialogWrapper {
-        private final JBTextArea descriptionField;
-        private final JBTextField classNameField;
-        private final JBTextField fileNameField;
+    private void insertCodeIntoEditor(Editor editor, String code) {
+        Document document = editor.getDocument();
+        SelectionModel selectionModel = editor.getSelectionModel();
         
-        public CodeGenerationDialog(Project project) {
+        if (selectionModel.hasSelection()) {
+            // Replace selection
+            int startOffset = selectionModel.getSelectionStart();
+            int endOffset = selectionModel.getSelectionEnd();
+            document.replaceString(startOffset, endOffset, code);
+        } else {
+            // Insert at cursor
+            int offset = editor.getCaretModel().getOffset();
+            document.insertString(offset, code);
+        }
+    }
+    
+    /**
+     * Dialog for entering a prompt for code generation.
+     */
+    private static class GenerateCodeDialog extends DialogWrapper {
+        private final JBTextArea promptField;
+        
+        public GenerateCodeDialog(Project project) {
             super(project, true);
             
-            descriptionField = new JBTextArea(10, 50);
-            descriptionField.setLineWrap(true);
-            descriptionField.setWrapStyleWord(true);
-            
-            classNameField = new JBTextField(30);
-            fileNameField = new JBTextField(30);
+            promptField = new JBTextArea(10, 50);
+            promptField.setLineWrap(true);
+            promptField.setWrapStyleWord(true);
             
             setTitle("Generate Code");
             init();
@@ -138,21 +164,8 @@ public class GenerateCodeAction extends AnAction {
         
         @Override
         protected @Nullable ValidationInfo doValidate() {
-            // Validate description
-            if (descriptionField.getText().trim().isEmpty()) {
-                return new ValidationInfo("Description is required", descriptionField);
-            }
-            
-            // Validate class name if provided
-            String className = classNameField.getText().trim();
-            if (!className.isEmpty() && !className.matches("[A-Za-z_][A-Za-z0-9_]*")) {
-                return new ValidationInfo("Invalid class name", classNameField);
-            }
-            
-            // Validate file name if provided
-            String fileName = fileNameField.getText().trim();
-            if (!fileName.isEmpty() && !fileName.matches("[A-Za-z_][A-Za-z0-9_]*\\.[A-Za-z0-9]+")) {
-                return new ValidationInfo("Invalid file name (example: MyClass.java)", fileNameField);
+            if (promptField.getText().trim().isEmpty()) {
+                return new ValidationInfo("Prompt is required", promptField);
             }
             
             return null;
@@ -160,31 +173,22 @@ public class GenerateCodeAction extends AnAction {
         
         @Override
         protected @Nullable JComponent createCenterPanel() {
-            // Create scroll pane for description
-            JBScrollPane scrollPane = new JBScrollPane(descriptionField);
-            scrollPane.setPreferredSize(new Dimension(400, 200));
+            JPanel panel = new JPanel(new BorderLayout());
             
             // Build form
             FormBuilder formBuilder = FormBuilder.createFormBuilder()
-                    .addComponent(new JBLabel("Describe the code you want to generate:"))
-                    .addComponent(scrollPane)
-                    .addLabeledComponent(new JBLabel("Class name (optional):"), classNameField)
-                    .addLabeledComponent(new JBLabel("File name (optional):"), fileNameField)
+                    .addLabeledComponent(new JBLabel("Enter prompt:"), new JBScrollPane(promptField))
                     .addComponentFillVertically(new JPanel(), 0);
             
-            return JBUI.Panels.simplePanel().addToCenter(formBuilder.getPanel());
+            panel.add(formBuilder.getPanel(), BorderLayout.CENTER);
+            panel.setPreferredSize(new Dimension(500, 300));
+            
+            return JBUI.Panels.simplePanel()
+                    .addToCenter(panel);
         }
         
-        public String getCodeDescription() {
-            return descriptionField.getText();
-        }
-        
-        public String getClassName() {
-            return classNameField.getText().trim();
-        }
-        
-        public String getFileName() {
-            return fileNameField.getText().trim();
+        public String getPrompt() {
+            return promptField.getText().trim();
         }
     }
 }

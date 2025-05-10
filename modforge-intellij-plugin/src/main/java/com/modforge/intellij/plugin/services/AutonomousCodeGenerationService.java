@@ -1,246 +1,245 @@
 package com.modforge.intellij.plugin.services;
 
+import com.google.gson.Gson;
+import com.google.gson.JsonObject;
 import com.intellij.openapi.components.Service;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.project.Project;
-import com.intellij.util.concurrency.AppExecutorUtil;
+import com.modforge.intellij.plugin.ai.PatternRecognitionService;
 import com.modforge.intellij.plugin.auth.ModAuthenticationManager;
+import com.modforge.intellij.plugin.settings.ModForgeSettings;
 import com.modforge.intellij.plugin.utils.TokenAuthConnectionUtil;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-import java.util.HashMap;
-import java.util.Map;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutorService;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
- * Service for autonomous code generation.
- * Provides methods for generating, enhancing, and fixing code using AI.
+ * Service for generating code autonomously using AI.
  */
 @Service(Service.Level.PROJECT)
 public final class AutonomousCodeGenerationService {
     private static final Logger LOG = Logger.getInstance(AutonomousCodeGenerationService.class);
+    private static final Gson GSON = new Gson();
     
     private final Project project;
-    private final ExecutorService executor;
+    private final AtomicInteger requestCount = new AtomicInteger(0);
     
     /**
-     * Construct the autonomous code generation service.
+     * Create a new autonomous code generation service.
      *
      * @param project The project
      */
-    public AutonomousCodeGenerationService(@NotNull Project project) {
+    public AutonomousCodeGenerationService(Project project) {
         this.project = project;
-        this.executor = AppExecutorUtil.createBoundedApplicationPoolExecutor("ModForge Code Generation", 2);
     }
     
     /**
      * Generate code from a prompt.
      *
      * @param prompt The prompt
-     * @return A future that completes with the generated code, or null if generation fails
+     * @return A future with the generated code
      */
     @NotNull
     public CompletableFuture<String> generateCode(@NotNull String prompt) {
-        return CompletableFuture.supplyAsync(() -> {
-            try {
-                // Check if authenticated
-                ModAuthenticationManager authManager = ModAuthenticationManager.getInstance();
-                if (!authManager.isAuthenticated()) {
-                    LOG.warn("Not authenticated");
-                    return null;
-                }
-                
-                // Call API to generate code
-                String requestBody = String.format("{\"prompt\":\"%s\"}", 
-                        prompt.replace("\"", "\\\"").replace("\n", "\\n"));
-                String response = TokenAuthConnectionUtil.executePost("/api/code/generate", requestBody);
-                
-                if (response != null && !response.isEmpty()) {
-                    // Try to extract code from response
-                    if (response.contains("\"code\":")) {
-                        return response.split("\"code\":")[1].split("\"")[1]
-                                .replace("\\n", "\n")
-                                .replace("\\\"", "\"")
-                                .replace("\\\\", "\\");
-                    }
-                }
-                
-                LOG.warn("Code generation failed");
-                return null;
-            } catch (Exception e) {
-                LOG.error("Error generating code", e);
-                return null;
+        // Create a future to return
+        CompletableFuture<String> future = new CompletableFuture<>();
+        
+        try {
+            // Check if we're authenticated
+            ModAuthenticationManager authManager = ModAuthenticationManager.getInstance();
+            if (!authManager.isAuthenticated()) {
+                LOG.error("Not authenticated");
+                future.complete(null);
+                return future;
             }
-        }, executor);
+            
+            // Check if we've hit the daily request limit
+            ModForgeSettings settings = ModForgeSettings.getInstance();
+            int maxRequests = settings.getMaxApiRequestsPerDay();
+            int currentRequests = requestCount.get();
+            
+            if (currentRequests >= maxRequests) {
+                LOG.error("Daily request limit reached");
+                future.complete(null);
+                return future;
+            }
+            
+            // Get the server URL
+            String serverUrl = settings.getServerUrl();
+            if (serverUrl == null || serverUrl.isEmpty()) {
+                LOG.error("Server URL is not set");
+                future.complete(null);
+                return future;
+            }
+            
+            // Get the authentication token
+            String token = authManager.getAuthToken();
+            if (token == null) {
+                LOG.error("Auth token is null");
+                future.complete(null);
+                return future;
+            }
+            
+            // Create request body
+            JsonObject requestBody = new JsonObject();
+            requestBody.addProperty("prompt", prompt);
+            
+            // Send the request
+            TokenAuthConnectionUtil.makeAuthenticatedRequest(
+                    serverUrl,
+                    "api/ai/generate-code",
+                    "POST",
+                    token,
+                    requestBody.toString()
+            ).thenAccept(response -> {
+                if (response != null) {
+                    // Parse the response
+                    try {
+                        JsonObject jsonResponse = GSON.fromJson(response, JsonObject.class);
+                        String code = jsonResponse.get("code").getAsString();
+                        
+                        // Store the pattern
+                        PatternRecognitionService patternService = project.getService(PatternRecognitionService.class);
+                        patternService.storeCodeGenerationPattern(prompt, code);
+                        
+                        // Increment the request count
+                        requestCount.incrementAndGet();
+                        
+                        // Complete the future
+                        future.complete(code);
+                    } catch (Exception e) {
+                        LOG.error("Error parsing response", e);
+                        future.complete(null);
+                    }
+                } else {
+                    LOG.error("Failed to generate code");
+                    future.complete(null);
+                }
+            }).exceptionally(ex -> {
+                LOG.error("Exception generating code", ex);
+                future.complete(null);
+                return null;
+            });
+        } catch (Exception e) {
+            LOG.error("Error in generate code", e);
+            future.complete(null);
+        }
+        
+        return future;
     }
     
     /**
-     * Fix code errors.
+     * Fix code with errors.
      *
      * @param code   The code with errors
      * @param errors The error messages
-     * @return A future that completes with the fixed code, or null if fixing fails
+     * @return A future with the fixed code
      */
     @NotNull
     public CompletableFuture<String> fixCode(@NotNull String code, @NotNull String errors) {
-        return CompletableFuture.supplyAsync(() -> {
-            try {
-                // Check if authenticated
-                ModAuthenticationManager authManager = ModAuthenticationManager.getInstance();
-                if (!authManager.isAuthenticated()) {
-                    LOG.warn("Not authenticated");
-                    return null;
-                }
-                
-                // Call API to fix code
-                String requestBody = String.format("{\"code\":\"%s\",\"errors\":\"%s\"}", 
-                        code.replace("\"", "\\\"").replace("\n", "\\n"),
-                        errors.replace("\"", "\\\"").replace("\n", "\\n"));
-                String response = TokenAuthConnectionUtil.executePost("/api/code/fix", requestBody);
-                
-                if (response != null && !response.isEmpty()) {
-                    // Try to extract fixed code from response
-                    if (response.contains("\"code\":")) {
-                        return response.split("\"code\":")[1].split("\"")[1]
-                                .replace("\\n", "\n")
-                                .replace("\\\"", "\"")
-                                .replace("\\\\", "\\");
-                    }
-                }
-                
-                LOG.warn("Code fixing failed");
-                return null;
-            } catch (Exception e) {
-                LOG.error("Error fixing code", e);
-                return null;
+        // Create a future to return
+        CompletableFuture<String> future = new CompletableFuture<>();
+        
+        try {
+            // Check if we're authenticated
+            ModAuthenticationManager authManager = ModAuthenticationManager.getInstance();
+            if (!authManager.isAuthenticated()) {
+                LOG.error("Not authenticated");
+                future.complete(null);
+                return future;
             }
-        }, executor);
+            
+            // Check if we've hit the daily request limit
+            ModForgeSettings settings = ModForgeSettings.getInstance();
+            int maxRequests = settings.getMaxApiRequestsPerDay();
+            int currentRequests = requestCount.get();
+            
+            if (currentRequests >= maxRequests) {
+                LOG.error("Daily request limit reached");
+                future.complete(null);
+                return future;
+            }
+            
+            // Get the server URL
+            String serverUrl = settings.getServerUrl();
+            if (serverUrl == null || serverUrl.isEmpty()) {
+                LOG.error("Server URL is not set");
+                future.complete(null);
+                return future;
+            }
+            
+            // Get the authentication token
+            String token = authManager.getAuthToken();
+            if (token == null) {
+                LOG.error("Auth token is null");
+                future.complete(null);
+                return future;
+            }
+            
+            // Create request body
+            JsonObject requestBody = new JsonObject();
+            requestBody.addProperty("code", code);
+            requestBody.addProperty("errors", errors);
+            
+            // Send the request
+            TokenAuthConnectionUtil.makeAuthenticatedRequest(
+                    serverUrl,
+                    "api/ai/fix-code",
+                    "POST",
+                    token,
+                    requestBody.toString()
+            ).thenAccept(response -> {
+                if (response != null) {
+                    // Parse the response
+                    try {
+                        JsonObject jsonResponse = GSON.fromJson(response, JsonObject.class);
+                        String fixedCode = jsonResponse.get("code").getAsString();
+                        
+                        // Store the pattern
+                        PatternRecognitionService patternService = project.getService(PatternRecognitionService.class);
+                        patternService.storeErrorFixingPattern(code, errors, fixedCode);
+                        
+                        // Increment the request count
+                        requestCount.incrementAndGet();
+                        
+                        // Complete the future
+                        future.complete(fixedCode);
+                    } catch (Exception e) {
+                        LOG.error("Error parsing response", e);
+                        future.complete(null);
+                    }
+                } else {
+                    LOG.error("Failed to fix code");
+                    future.complete(null);
+                }
+            }).exceptionally(ex -> {
+                LOG.error("Exception fixing code", ex);
+                future.complete(null);
+                return null;
+            });
+        } catch (Exception e) {
+            LOG.error("Error in fix code", e);
+            future.complete(null);
+        }
+        
+        return future;
     }
     
     /**
-     * Enhance code with improvements.
+     * Get the current request count.
      *
-     * @param code The code to enhance
-     * @return A future that completes with the enhanced code, or null if enhancement fails
+     * @return The current request count
      */
-    @NotNull
-    public CompletableFuture<String> enhanceCode(@NotNull String code) {
-        return CompletableFuture.supplyAsync(() -> {
-            try {
-                // Check if authenticated
-                ModAuthenticationManager authManager = ModAuthenticationManager.getInstance();
-                if (!authManager.isAuthenticated()) {
-                    LOG.warn("Not authenticated");
-                    return null;
-                }
-                
-                // Call API to enhance code
-                String requestBody = String.format("{\"code\":\"%s\"}", 
-                        code.replace("\"", "\\\"").replace("\n", "\\n"));
-                String response = TokenAuthConnectionUtil.executePost("/api/code/enhance", requestBody);
-                
-                if (response != null && !response.isEmpty()) {
-                    // Try to extract enhanced code from response
-                    if (response.contains("\"code\":")) {
-                        return response.split("\"code\":")[1].split("\"")[1]
-                                .replace("\\n", "\n")
-                                .replace("\\\"", "\"")
-                                .replace("\\\\", "\\");
-                    }
-                }
-                
-                LOG.warn("Code enhancement failed");
-                return null;
-            } catch (Exception e) {
-                LOG.error("Error enhancing code", e);
-                return null;
-            }
-        }, executor);
+    public int getRequestCount() {
+        return requestCount.get();
     }
     
     /**
-     * Add features to code.
-     *
-     * @param code        The code to add features to
-     * @param description The description of the features to add
-     * @return A future that completes with the updated code, or null if feature addition fails
+     * Reset the request count.
      */
-    @NotNull
-    public CompletableFuture<String> addFeatures(@NotNull String code, @NotNull String description) {
-        return CompletableFuture.supplyAsync(() -> {
-            try {
-                // Check if authenticated
-                ModAuthenticationManager authManager = ModAuthenticationManager.getInstance();
-                if (!authManager.isAuthenticated()) {
-                    LOG.warn("Not authenticated");
-                    return null;
-                }
-                
-                // Call API to add features
-                String requestBody = String.format("{\"code\":\"%s\",\"description\":\"%s\"}", 
-                        code.replace("\"", "\\\"").replace("\n", "\\n"),
-                        description.replace("\"", "\\\"").replace("\n", "\\n"));
-                String response = TokenAuthConnectionUtil.executePost("/api/code/add-features", requestBody);
-                
-                if (response != null && !response.isEmpty()) {
-                    // Try to extract updated code from response
-                    if (response.contains("\"code\":")) {
-                        return response.split("\"code\":")[1].split("\"")[1]
-                                .replace("\\n", "\n")
-                                .replace("\\\"", "\"")
-                                .replace("\\\\", "\\");
-                    }
-                }
-                
-                LOG.warn("Feature addition failed");
-                return null;
-            } catch (Exception e) {
-                LOG.error("Error adding features", e);
-                return null;
-            }
-        }, executor);
-    }
-    
-    /**
-     * Generate documentation for code.
-     *
-     * @param code The code to generate documentation for
-     * @return A future that completes with the documentation, or null if documentation generation fails
-     */
-    @NotNull
-    public CompletableFuture<String> generateDocumentation(@NotNull String code) {
-        return CompletableFuture.supplyAsync(() -> {
-            try {
-                // Check if authenticated
-                ModAuthenticationManager authManager = ModAuthenticationManager.getInstance();
-                if (!authManager.isAuthenticated()) {
-                    LOG.warn("Not authenticated");
-                    return null;
-                }
-                
-                // Call API to generate documentation
-                String requestBody = String.format("{\"code\":\"%s\"}", 
-                        code.replace("\"", "\\\"").replace("\n", "\\n"));
-                String response = TokenAuthConnectionUtil.executePost("/api/code/document", requestBody);
-                
-                if (response != null && !response.isEmpty()) {
-                    // Try to extract documentation from response
-                    if (response.contains("\"documentation\":")) {
-                        return response.split("\"documentation\":")[1].split("\"")[1]
-                                .replace("\\n", "\n")
-                                .replace("\\\"", "\"")
-                                .replace("\\\\", "\\");
-                    }
-                }
-                
-                LOG.warn("Documentation generation failed");
-                return null;
-            } catch (Exception e) {
-                LOG.error("Error generating documentation", e);
-                return null;
-            }
-        }, executor);
+    public void resetRequestCount() {
+        requestCount.set(0);
     }
 }
