@@ -1,8 +1,15 @@
 import { storage } from './storage';
 import { compileMod } from './compiler';
 import { fixCompilationErrors, addModFeatures } from './ai-service';
-import { BuildStatus } from '@/types';
 import { EventEmitter } from 'events';
+
+// Map client-side BuildStatus enum to string values expected by the database
+enum BuildStatus {
+  Queued = "queued",
+  InProgress = "in_progress",
+  Success = "succeeded",
+  Failed = "failed"
+}
 
 /**
  * Service that manages continuous mod development
@@ -84,6 +91,10 @@ class ContinuousService extends EventEmitter {
    * @param modId The mod ID to process
    */
   private async processMod(modId: number): Promise<void> {
+    // Track attempts to prevent infinite loops
+    const maxRetries = 3;
+    let attempts = 0;
+    
     try {
       // Get the mod
       const mod = await storage.getMod(modId);
@@ -103,11 +114,15 @@ class ContinuousService extends EventEmitter {
       const build = await storage.createBuild({
         modId: mod.id,
         buildNumber: buildCount,
+        version: mod.version || "0.1.0", // Use mod version or default
         status: BuildStatus.InProgress,
+        errors: [],
         errorCount: 0,
         warningCount: 0,
         logs: `Starting continuous build #${buildCount} for ${mod.name}...\n`,
-        downloadUrl: null
+        downloadUrl: null,
+        metadata: {},
+        isAutomatic: true
       });
       
       // Compile the mod
@@ -135,9 +150,24 @@ class ContinuousService extends EventEmitter {
           content: file.content
         }));
         
-        // Fix errors
-        console.log(`Fixing errors for mod ${mod.name} (${modId})`);
-        const fixResult = await fixCompilationErrors(files, compileResult.errors);
+        // Fix errors with retry logic
+        attempts++;
+        console.log(`Fixing errors for mod ${mod.name} (${modId}) - Attempt ${attempts}/${maxRetries}`);
+        
+        let fixResult;
+        try {
+          fixResult = await fixCompilationErrors(files, compileResult.errors);
+        } catch (error) {
+          // Type-safe error handling 
+          const fixError = error as Error;
+          console.error(`Error fixing compilation errors for mod ${modId}:`, fixError);
+          currentLogs += `\nError during auto-fix attempt: ${fixError.message || String(fixError)}\n`;
+          await storage.updateBuild(build.id, { 
+            logs: currentLogs,
+            status: BuildStatus.Failed
+          });
+          throw fixError;
+        }
         
         // Update logs
         currentLogs += fixResult.logs;
