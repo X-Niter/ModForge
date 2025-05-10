@@ -177,6 +177,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Setup authentication system
   const requireAuth = setupAuth(app);
   
+  // Protected routes that require authentication
+  app.use([
+    '/api/mods',
+    '/api/github', 
+    '/api/settings',
+    '/api/metrics/private'
+  ], requireAuth);
+  
   // Create HTTP server
   const httpServer = createServer(app);
   
