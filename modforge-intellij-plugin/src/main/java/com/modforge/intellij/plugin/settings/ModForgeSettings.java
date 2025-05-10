@@ -22,6 +22,7 @@ public class ModForgeSettings implements PersistentStateComponent<ModForgeSettin
     private boolean rememberCredentials = true;
     private boolean authenticated = false;
     private String accessToken = "";
+    private String userId = "";
     
     // Settings for continuous development
     private boolean enableContinuousDevelopment = true;
@@ -103,6 +104,14 @@ public class ModForgeSettings implements PersistentStateComponent<ModForgeSettin
     
     public void setAccessToken(String accessToken) {
         this.accessToken = accessToken;
+    }
+    
+    public String getUserId() {
+        return userId;
+    }
+    
+    public void setUserId(String userId) {
+        this.userId = userId;
     }
     
     // Continuous development settings

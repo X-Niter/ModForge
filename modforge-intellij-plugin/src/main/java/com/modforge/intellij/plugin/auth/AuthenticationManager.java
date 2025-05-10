@@ -21,7 +21,7 @@ import java.nio.charset.StandardCharsets;
 @Service
 public final class AuthenticationManager {
     private static final Logger LOG = Logger.getInstance(AuthenticationManager.class);
-    private static final String AUTH_ENDPOINT = "/api/login";
+    private static final String AUTH_ENDPOINT = "/api/token";
     private static final String LOGOUT_ENDPOINT = "/api/logout";
     private static final String VERIFY_ENDPOINT = "/api/auth/verify";
     private static final int TIMEOUT = 5000; // 5 seconds
@@ -130,6 +130,21 @@ public final class AuthenticationManager {
                         String token = responseStr.substring(tokenStart, tokenEnd);
                         settings.setAccessToken(token);
                         settings.setAuthenticated(true);
+                        
+                        // Extract user ID and username if available
+                        int userIdStart = responseStr.indexOf("\"userId\":");
+                        if (userIdStart != -1) {
+                            userIdStart += 9; // Length of "\"userId\":"
+                            int userIdEnd = responseStr.indexOf(",", userIdStart);
+                            if (userIdEnd == -1) {
+                                userIdEnd = responseStr.indexOf("}", userIdStart);
+                            }
+                            if (userIdEnd != -1) {
+                                String userId = responseStr.substring(userIdStart, userIdEnd).trim();
+                                settings.setUserId(userId);
+                            }
+                        }
+                        
                         LOG.info("Successfully authenticated with ModForge server");
                         return true;
                     }

@@ -1,9 +1,11 @@
 import passport from "passport";
 import { Strategy as LocalStrategy } from "passport-local";
+import { Strategy as BearerStrategy } from "passport-http-bearer";
 import { Express, Request, Response, NextFunction } from "express";
 import session from "express-session";
 import { scrypt, randomBytes, timingSafeEqual } from "crypto";
 import { promisify } from "util";
+import jwt from "jsonwebtoken";
 import { storage } from "./storage";
 import { InsertUser } from "@shared/schema";
 import { z } from "zod";
@@ -13,6 +15,25 @@ import { eq } from "drizzle-orm";
 
 // Create async version of scrypt
 const scryptAsync = promisify(scrypt);
+
+// JWT secret for token generation
+const JWT_SECRET = process.env.JWT_SECRET || randomBytes(32).toString("hex");
+const TOKEN_EXPIRY = '30d';  // 30 days expiry for token
+
+/**
+ * Generate a JWT token for a user
+ * @param user User object
+ * @returns JWT token
+ */
+export function generateToken(user: Express.User): string {
+  const payload = {
+    sub: user.id.toString(),
+    username: user.username,
+    iat: Math.floor(Date.now() / 1000),
+  };
+  
+  return jwt.sign(payload, JWT_SECRET, { expiresIn: TOKEN_EXPIRY });
+}
 
 /**
  * Hash a password for storage
@@ -112,6 +133,34 @@ export function setupAuth(app: Express) {
       }
     })
   );
+  
+  // Set up the Bearer token strategy
+  passport.use(
+    new BearerStrategy(async (token, done) => {
+      try {
+        // Verify the token
+        const payload = jwt.verify(token, JWT_SECRET) as jwt.JwtPayload;
+        
+        if (!payload || !payload.sub) {
+          return done(null, false);
+        }
+        
+        // Extract the user ID from the token
+        const userId = parseInt(payload.sub, 10);
+        
+        // Get the user from the database
+        const [user] = await db.select().from(users).where(eq(users.id, userId));
+        
+        if (!user) {
+          return done(null, false);
+        }
+        
+        return done(null, user);
+      } catch (error) {
+        return done(error);
+      }
+    })
+  );
 
   // Serialize and deserialize user
   passport.serializeUser((user: Express.User, done) => {
@@ -193,9 +242,36 @@ export function setupAuth(app: Express) {
           return next(loginErr);
         }
         
-        // Return user without password
+        // Generate a token for the user
+        const token = generateToken(user);
+        
+        // Return user without password, including token
         const { password, ...userWithoutPassword } = user;
-        return res.status(200).json(userWithoutPassword);
+        return res.status(200).json({ ...userWithoutPassword, token });
+      });
+    })(req, res, next);
+  });
+  
+  // Token generation endpoint for IDE plugin
+  app.post("/api/token", (req: Request, res: Response, next: NextFunction) => {
+    passport.authenticate("local", (err: Error | null, user: Express.User | false | null | undefined, info: any) => {
+      if (err) {
+        return res.status(500).json({ success: false, message: "Authentication error", error: err.message });
+      }
+      
+      if (!user) {
+        return res.status(401).json({ success: false, message: info?.message || "Invalid credentials" });
+      }
+      
+      // Generate a token for the user
+      const token = generateToken(user);
+      
+      return res.status(200).json({
+        success: true,
+        message: "Token generated successfully",
+        token,
+        userId: user.id,
+        username: user.username
       });
     })(req, res, next);
   });
@@ -223,7 +299,7 @@ export function setupAuth(app: Express) {
     return res.status(200).json(userWithoutPassword);
   });
   
-  // IntelliJ plugin specific auth endpoint
+  // IntelliJ plugin specific auth endpoints
   app.get("/api/auth/me", (req: Request, res: Response) => {
     if (!req.isAuthenticated()) {
       return res.status(401).json({ success: false, message: "Not authenticated" });
@@ -236,12 +312,62 @@ export function setupAuth(app: Express) {
       user: userWithoutPassword
     });
   });
+  
+  // Verification endpoint for IntelliJ plugin token authentication
+  app.get("/api/auth/verify", (req: Request, res: Response) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ success: false, message: "Not authenticated" });
+    }
+    
+    // Return basic verification response
+    return res.status(200).json({
+      success: true,
+      message: "Authentication valid",
+      userId: req.user.id,
+      username: req.user.username
+    });
+  });
+  
+  // Verification endpoint that accepts username/password directly
+  app.post("/api/auth/verify", (req: Request, res: Response, next: NextFunction) => {
+    passport.authenticate("local", (err: Error | null, user: Express.User | false | null | undefined, info: any) => {
+      if (err) {
+        return res.status(500).json({ success: false, message: "Authentication error", error: err.message });
+      }
+      
+      if (!user) {
+        return res.status(401).json({ success: false, message: info?.message || "Invalid credentials" });
+      }
+      
+      return res.status(200).json({
+        success: true,
+        message: "Authentication valid",
+        userId: user.id,
+        username: user.username
+      });
+    })(req, res, next);
+  });
 
-  // Authentication check middleware
+  // Authentication check middleware that supports both session and token-based auth
   return function requireAuth(req: Request, res: Response, next: NextFunction) {
+    // First check if the user is already authenticated via session
     if (req.isAuthenticated()) {
       return next();
     }
-    return res.status(401).json({ message: "Authentication required" });
+    
+    // If not, check for Bearer token authentication
+    passport.authenticate('bearer', { session: false }, (err: Error | null, user: Express.User | false | null | undefined, info: any) => {
+      if (err) {
+        return next(err);
+      }
+      
+      if (!user) {
+        return res.status(401).json({ message: "Authentication required" });
+      }
+      
+      // User authenticated via token, attach to request
+      req.user = user;
+      return next();
+    })(req, res, next);
   };
 }
