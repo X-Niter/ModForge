@@ -78,59 +78,62 @@ public class AuthTestUtil {
             return new TestResult(false, 0, "Server URL is empty");
         }
         
-        HttpURLConnection connection = null;
-        
         try {
-            // Normalize the URL
-            serverUrl = normalizeServerUrl(serverUrl);
-            
-            URL url = new URL(serverUrl + "api/token");
-            connection = (HttpURLConnection) url.openConnection();
-            connection.setRequestMethod("POST");
-            connection.setConnectTimeout(TIMEOUT);
-            connection.setReadTimeout(TIMEOUT);
-            connection.setDoOutput(true);
-            connection.setRequestProperty("Content-Type", "application/json");
-            
             // Create JSON payload
             String jsonPayload = String.format("{\"username\":\"%s\",\"password\":\"%s\"}", 
                     username, password);
             
-            // Write payload
-            try (OutputStream os = connection.getOutputStream()) {
-                os.write(jsonPayload.getBytes(StandardCharsets.UTF_8));
-            }
+            // Make the request manually since we can't use TokenAuthConnectionUtil
+            // (it requires existing authentication)
+            HttpURLConnection connection = null;
             
-            // Get response code
-            int responseCode = connection.getResponseCode();
-            
-            // Read response
-            StringBuilder response = new StringBuilder();
-            try (BufferedReader br = new BufferedReader(
-                    new InputStreamReader(
-                            responseCode >= 400 
-                                    ? connection.getErrorStream() 
-                                    : connection.getInputStream(), 
-                            StandardCharsets.UTF_8))) {
-                String responseLine;
-                while ((responseLine = br.readLine()) != null) {
-                    response.append(responseLine.trim());
+            try {
+                // Normalize the URL
+                serverUrl = normalizeServerUrl(serverUrl);
+                
+                URL url = new URL(serverUrl + "api/token");
+                connection = (HttpURLConnection) url.openConnection();
+                connection.setRequestMethod("POST");
+                connection.setConnectTimeout(TIMEOUT);
+                connection.setReadTimeout(TIMEOUT);
+                connection.setDoOutput(true);
+                connection.setRequestProperty("Content-Type", "application/json");
+                
+                // Write payload
+                try (OutputStream os = connection.getOutputStream()) {
+                    os.write(jsonPayload.getBytes(StandardCharsets.UTF_8));
+                }
+                
+                // Get response code
+                int responseCode = connection.getResponseCode();
+                
+                // Read response
+                StringBuilder response = new StringBuilder();
+                try (BufferedReader br = new BufferedReader(
+                        new InputStreamReader(
+                                responseCode >= 400 
+                                        ? connection.getErrorStream() 
+                                        : connection.getInputStream(), 
+                                StandardCharsets.UTF_8))) {
+                    String responseLine;
+                    while ((responseLine = br.readLine()) != null) {
+                        response.append(responseLine.trim());
+                    }
+                }
+                
+                return new TestResult(
+                        responseCode >= 200 && responseCode < 300,
+                        responseCode,
+                        response.toString()
+                );
+            } finally {
+                if (connection != null) {
+                    connection.disconnect();
                 }
             }
-            
-            return new TestResult(
-                    responseCode >= 200 && responseCode < 300,
-                    responseCode,
-                    response.toString()
-            );
-            
         } catch (IOException e) {
             LOG.warn("Failed to test token login: " + e.getMessage());
             return new TestResult(false, 0, "Error: " + e.getMessage());
-        } finally {
-            if (connection != null) {
-                connection.disconnect();
-            }
         }
     }
     
@@ -258,7 +261,7 @@ public class AuthTestUtil {
         public TestResult(boolean success, int responseCode, String response) {
             this.success = success;
             this.responseCode = responseCode;
-            this.response = response;
+            this.response = response != null ? response : "";
         }
         
         public boolean isSuccess() {
