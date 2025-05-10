@@ -87,12 +87,20 @@ export interface SmsNotificationConfig {
   apiKey: string;
 }
 
+// Type definition for log notification config
+export interface LogNotificationConfig {
+  logLevel?: string;
+  includeDetails?: boolean;
+  format?: string;
+}
+
 // Union type for all notification configs
 export type NotificationConfigType = 
   | EmailNotificationConfig 
   | SlackNotificationConfig 
   | WebhookNotificationConfig 
-  | SmsNotificationConfig 
+  | SmsNotificationConfig
+  | LogNotificationConfig
   | Record<string, unknown>;
 
 export interface NotificationChannelConfig {
@@ -394,14 +402,31 @@ async function sendSlackNotification(
  */
 function sendLogNotification(
   message: NotificationMessage,
-  config: Record<string, any>
+  config: NotificationConfigType
 ): boolean {
+  // Type guard for log config
+  function isLogConfig(cfg: NotificationConfigType): cfg is LogNotificationConfig {
+    // Log config can be empty, so just check it's an object
+    return typeof cfg === 'object' && cfg !== null;
+  }
+  
+  // Even if config isn't a proper LogNotificationConfig, we can still log
+  const logConfig = isLogConfig(config) ? config : {};
   try {
     // Log the notification based on severity
     const { title, severity, type } = message;
-    const details = message.details ? JSON.stringify(message.details) : '';
+    // Use the includeDetails config option if available
+    const includeDetails = logConfig.includeDetails !== false;
+    const details = includeDetails && message.details ? JSON.stringify(message.details) : '';
     
-    const logMessage = `[${type}] ${title}: ${message.message} ${details}`;
+    // Use the format config option if available
+    const format = logConfig.format || `[${type}] ${title}: ${message.message} ${details}`;
+    const logMessage = logConfig.format ? 
+      format.replace('{type}', type)
+            .replace('{title}', title)
+            .replace('{message}', message.message)
+            .replace('{details}', details) 
+      : `[${type}] ${title}: ${message.message} ${details}`;
     
     switch (severity) {
       case NotificationSeverity.CRITICAL:
