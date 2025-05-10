@@ -53,7 +53,12 @@ export const insertBuildSchema = createInsertSchema(builds)
   .extend({
     buildNumber: z.number().int().positive(),
     version: z.string().min(1),
-    status: z.nativeEnum(BuildStatus).default(BuildStatus.Queued),
+    status: z.union([
+      z.literal("queued"), 
+      z.literal("in_progress"), 
+      z.literal("succeeded"), 
+      z.literal("failed")
+    ]).default("queued"),
     errors: z.array(z.any()).default([]),
     errorCount: z.number().int().min(0).default(0),
     warningCount: z.number().int().min(0).default(0),

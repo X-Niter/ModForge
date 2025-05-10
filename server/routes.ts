@@ -149,7 +149,7 @@ async function compileModAsync(mod: any, build: any): Promise<void> {
       const recompileResult = await compileMod(mod.id);
       
       // Update build with recompilation results
-      const finalStatus = recompileResult.success ? BuildStatus.Success : BuildStatus.Failed;
+      const finalStatus = recompileResult.success ? "succeeded" : "failed"; // Using string literals
       currentLogs += recompileResult.logs;
       
       await storage.updateBuild(build.id, {
@@ -339,7 +339,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const build = await storage.createBuild({
         modId: mod.id,
         buildNumber: 1,
-        status: BuildStatus.InProgress,
+        status: "in_progress",
         errorCount: 0,
         warningCount: 0,
         logs: `Starting build #1 for ${mod.name}...\n`,
@@ -455,7 +455,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const build = await storage.createBuild({
         modId: mod.id,
         buildNumber,
-        status: BuildStatus.InProgress,
+        status: "in_progress",
         errorCount: 0,
         warningCount: 0,
         logs: `Starting build #${buildNumber} for ${mod.name}...\n`,
