@@ -2,64 +2,88 @@
 <idea-plugin>
     <id>com.modforge.intellij.plugin</id>
     <name>ModForge</name>
-    <vendor email="support@modforge.ai" url="https://modforge.ai">ModForge</vendor>
+    <vendor>ModForge</vendor>
     <description><![CDATA[
-    ModForge is an AI-powered Minecraft mod development platform. This plugin provides:
-    <ul>
-      <li>AI-assisted code generation for Minecraft mods</li>
-      <li>Automatic error fixing and code enhancement</li>
-      <li>Continuous development features</li>
-      <li>Integration with multiple mod loaders (Forge, Fabric, Quilt)</li>
-      <li>Pattern recognition for efficient API usage</li>
-    </ul>
+        <p>ModForge - Autonomous Minecraft Mod Development</p>
+        <p>This plugin provides tools for automated Minecraft mod development using AI technologies.</p>
+        <p>Features:</p>
+        <ul>
+            <li>Continuous mod development with automatic error fixing</li>
+            <li>Pattern recognition for optimized API usage</li>
+            <li>Code generation for common mod features</li>
+            <li>Multi-mod loader support (Forge, Fabric, Quilt, Architectury)</li>
+        </ul>
     ]]></description>
 
-    <idea-version since-build="211.0"/>
-
+    <!-- Product and plugin compatibility requirements -->
     <depends>com.intellij.modules.platform</depends>
     <depends>com.intellij.modules.java</depends>
 
     <extensions defaultExtensionNs="com.intellij">
-        <!-- Services -->
+        <!-- Configuration -->
         <applicationService serviceImplementation="com.modforge.intellij.plugin.settings.ModForgeSettings"/>
+        <applicationService serviceImplementation="com.modforge.intellij.plugin.auth.ModAuthenticationManager"/>
+        
+        <!-- Project-level services -->
         <projectService serviceImplementation="com.modforge.intellij.plugin.services.ContinuousDevelopmentService"/>
         <projectService serviceImplementation="com.modforge.intellij.plugin.services.AutonomousCodeGenerationService"/>
         <projectService serviceImplementation="com.modforge.intellij.plugin.ai.PatternRecognitionService"/>
-
-        <!-- Settings -->
-        <applicationConfigurable parentId="tools" instance="com.modforge.intellij.plugin.settings.ModForgeSettingsConfigurable"
-                                 id="com.modforge.intellij.plugin.settings.ModForgeSettingsConfigurable"
-                                 displayName="ModForge"/>
-
+        
+        <!-- Settings UI -->
+        <applicationConfigurable
+                parentId="tools"
+                instance="com.modforge.intellij.plugin.settings.ModForgeSettingsConfigurable"
+                id="com.modforge.intellij.plugin.settings.ModForgeSettingsConfigurable"
+                displayName="ModForge"/>
+        
         <!-- Tool Window -->
-        <toolWindow id="ModForge" secondary="true" icon="modforge.svg" anchor="right"
+        <toolWindow id="ModForge"
+                    anchor="right"
+                    icon="AllIcons.Toolwindows.ToolWindowModuleSettings"
                     factoryClass="com.modforge.intellij.plugin.ui.toolwindow.ModForgeToolWindowFactory"/>
-
-        <!-- Startup Activity -->
-        <postStartupActivity implementation="com.modforge.intellij.plugin.services.ContinuousDevelopmentService$ContinuousDevelopmentStartupActivity"/>
     </extensions>
 
     <actions>
-        <!-- Main Action Group -->
-        <group id="ModForge.ActionGroup" text="ModForge" description="ModForge actions" popup="true">
+        <!-- Login -->
+        <action id="ModForge.Login"
+                class="com.modforge.intellij.plugin.actions.LoginAction"
+                text="Login to ModForge"
+                description="Login to ModForge"
+                icon="AllIcons.Ide.Link">
+        </action>
+        
+        <!-- Logout -->
+        <action id="ModForge.Logout"
+                class="com.modforge.intellij.plugin.actions.LogoutAction"
+                text="Logout from ModForge"
+                description="Logout from ModForge"
+                icon="AllIcons.Ide.Unlink">
+        </action>
+        
+        <!-- Toggle Continuous Development -->
+        <action id="ModForge.ToggleContinuousDevelopment"
+                class="com.modforge.intellij.plugin.actions.ToggleContinuousDevelopmentAction"
+                text="Toggle Continuous Development"
+                description="Toggle continuous development"
+                icon="AllIcons.Actions.BuildAutoReloadChanges">
+        </action>
+        
+        <!-- Toggle Pattern Recognition -->
+        <action id="ModForge.TogglePatternRecognition"
+                class="com.modforge.intellij.plugin.actions.TogglePatternRecognitionAction"
+                text="Toggle Pattern Recognition"
+                description="Toggle pattern recognition"
+                icon="AllIcons.Actions.Lightning">
+        </action>
+        
+        <!-- Action Group for ModForge -->
+        <group id="ModForge.ActionGroup" text="ModForge" description="ModForge Actions" popup="true">
             <add-to-group group-id="ToolsMenu" anchor="last"/>
-            <add-to-group group-id="EditorPopupMenu" anchor="last"/>
-            
-            <!-- Authentication Actions -->
-            <action id="ModForge.Login" class="com.modforge.intellij.plugin.actions.LoginAction" text="Login to ModForge" description="Login to ModForge"/>
-            <action id="ModForge.Logout" class="com.modforge.intellij.plugin.actions.LogoutAction" text="Logout from ModForge" description="Logout from ModForge"/>
+            <reference ref="ModForge.Login"/>
+            <reference ref="ModForge.Logout"/>
             <separator/>
-            
-            <!-- Feature Actions -->
-            <action id="ModForge.GenerateCode" class="com.modforge.intellij.plugin.actions.GenerateCodeAction" text="Generate Code" description="Generate code with ModForge AI"/>
-            <action id="ModForge.EnhanceCode" class="com.modforge.intellij.plugin.actions.EnhanceCodeAction" text="Enhance Code" description="Enhance selected code with ModForge AI"/>
-            <action id="ModForge.FixErrors" class="com.modforge.intellij.plugin.actions.FixErrorsAction" text="Fix Errors" description="Fix errors in selected code with ModForge AI"/>
-            <action id="ModForge.AddFeatures" class="com.modforge.intellij.plugin.actions.AddFeaturesAction" text="Add Features" description="Add features to mod with ModForge AI"/>
-            <separator/>
-            
-            <!-- Toggle Actions -->
-            <action id="ModForge.ToggleContinuousDevelopment" class="com.modforge.intellij.plugin.actions.ToggleContinuousDevelopmentAction" text="Toggle Continuous Development" description="Toggle continuous development"/>
-            <action id="ModForge.TogglePatternRecognition" class="com.modforge.intellij.plugin.actions.TogglePatternRecognitionAction" text="Toggle Pattern Recognition" description="Toggle pattern recognition"/>
+            <reference ref="ModForge.ToggleContinuousDevelopment"/>
+            <reference ref="ModForge.TogglePatternRecognition"/>
         </group>
     </actions>
 </idea-plugin>

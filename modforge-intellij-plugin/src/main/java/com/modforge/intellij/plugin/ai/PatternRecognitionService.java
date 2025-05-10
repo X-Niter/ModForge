@@ -1,149 +1,60 @@
 package com.modforge.intellij.plugin.ai;
 
+import com.intellij.openapi.components.Service;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.project.Project;
-import com.intellij.openapi.components.Service;
+import com.intellij.util.concurrency.AppExecutorUtil;
 import com.modforge.intellij.plugin.auth.ModAuthenticationManager;
 import com.modforge.intellij.plugin.settings.ModForgeSettings;
 import com.modforge.intellij.plugin.utils.TokenAuthConnectionUtil;
-import com.modforge.intellij.plugin.utils.ConnectionTestUtil;
-import org.json.simple.JSONObject;
-import org.json.simple.parser.JSONParser;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
-import java.net.HttpURLConnection;
-import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.ExecutorService;
 
 /**
- * Service for pattern recognition in AI tasks.
+ * Service for pattern recognition.
+ * Uses AI-based pattern recognition to optimize API usage.
  */
 @Service(Service.Level.PROJECT)
 public final class PatternRecognitionService {
     private static final Logger LOG = Logger.getInstance(PatternRecognitionService.class);
     
     private final Project project;
-    
-    // Metrics
-    private final AtomicInteger patternMatches = new AtomicInteger(0);
-    private final AtomicInteger patternStorageCount = new AtomicInteger(0);
+    private final ExecutorService executor;
     
     /**
-     * Create PatternRecognitionService.
-     * @param project Project
+     * Construct the pattern recognition service.
+     *
+     * @param project The project
      */
-    public PatternRecognitionService(Project project) {
+    public PatternRecognitionService(@NotNull Project project) {
         this.project = project;
+        this.executor = AppExecutorUtil.createBoundedApplicationPoolExecutor("ModForge Pattern Recognition", 1);
     }
     
     /**
-     * Store a pattern for future use.
-     * @param patternType Type of pattern (code, error, feature, etc.)
-     * @param inputData Input data for pattern
-     * @param outputData Output data for pattern
-     * @return Whether pattern was stored successfully
+     * Check if pattern recognition is enabled.
+     *
+     * @return Whether pattern recognition is enabled
      */
-    public boolean storePattern(String patternType, JSONObject inputData, JSONObject outputData) {
-        try {
-            // Check if pattern recognition is enabled
-            ModForgeSettings settings = ModForgeSettings.getInstance();
-            if (!settings.isPatternRecognition()) {
-                LOG.info("Pattern recognition is disabled");
-                return false;
-            }
-            
-            // Check if authenticated
-            ModAuthenticationManager authManager = ModAuthenticationManager.getInstance();
-            if (!authManager.isAuthenticated()) {
-                LOG.warn("Not authenticated");
-                return false;
-            }
-            
-            // Create pattern data
-            JSONObject patternData = new JSONObject();
-            patternData.put("patternType", patternType);
-            patternData.put("inputData", inputData);
-            patternData.put("outputData", outputData);
-            
-            // Call API
-            String serverUrl = settings.getServerUrl();
-            String token = settings.getAccessToken();
-            
-            if (serverUrl == null || serverUrl.isEmpty() || token == null || token.isEmpty()) {
-                LOG.warn("Server URL or token is empty");
-                return false;
-            }
-            
-            // Call store pattern API
-            String storePatternUrl = serverUrl + "/api/store-pattern";
-            HttpURLConnection connection = TokenAuthConnectionUtil.createTokenAuthConnection(storePatternUrl, "POST", token);
-            
-            if (connection == null) {
-                LOG.warn("Failed to create connection to " + storePatternUrl);
-                return false;
-            }
-            
-            // Set content type
-            connection.setRequestProperty("Content-Type", "application/json");
-            
-            // Write pattern data
-            ConnectionTestUtil.writeJsonToConnection(connection, patternData);
-            
-            // Get response
-            int responseCode = connection.getResponseCode();
-            
-            if (responseCode == HttpURLConnection.HTTP_OK) {
-                // Parse response
-                String response = ConnectionTestUtil.readResponseFromConnection(connection);
-                
-                if (response == null || response.isEmpty()) {
-                    LOG.warn("Empty response from store pattern API");
-                    return false;
-                }
-                
-                // Parse JSON
-                JSONParser parser = new JSONParser();
-                Object responseObj = parser.parse(response);
-                
-                if (responseObj instanceof JSONObject) {
-                    JSONObject responseJson = (JSONObject) responseObj;
-                    
-                    // Get success status
-                    Object successObj = responseJson.get("success");
-                    if (successObj instanceof Boolean && (Boolean) successObj) {
-                        // Increment pattern storage count
-                        patternStorageCount.incrementAndGet();
-                        return true;
-                    } else {
-                        return false;
-                    }
-                } else {
-                    LOG.warn("Response is not a JSON object");
-                    return false;
-                }
-            } else {
-                LOG.warn("Store pattern failed with response code " + responseCode);
-                return false;
-            }
-        } catch (Exception e) {
-            LOG.error("Error storing pattern", e);
-            return false;
+    public boolean isEnabled() {
+        return ModForgeSettings.getInstance().isPatternRecognition();
+    }
+    
+    /**
+     * Try to recognize a pattern for code generation.
+     *
+     * @param prompt The prompt
+     * @return The generated code, or null if no pattern is recognized
+     */
+    @Nullable
+    public String recognizeCodeGenerationPattern(@NotNull String prompt) {
+        if (!isEnabled()) {
+            return null;
         }
-    }
-    
-    /**
-     * Find a pattern for given input data.
-     * @param patternType Type of pattern (code, error, feature, etc.)
-     * @param inputData Input data for pattern
-     * @return Output data for pattern or null if no pattern found
-     */
-    public JSONObject findPattern(String patternType, JSONObject inputData) {
+        
         try {
-            // Check if pattern recognition is enabled
-            ModForgeSettings settings = ModForgeSettings.getInstance();
-            if (!settings.isPatternRecognition()) {
-                LOG.info("Pattern recognition is disabled");
-                return null;
-            }
-            
             // Check if authenticated
             ModAuthenticationManager authManager = ModAuthenticationManager.getInstance();
             if (!authManager.isAuthenticated()) {
@@ -151,109 +62,128 @@ public final class PatternRecognitionService {
                 return null;
             }
             
-            // Create search data
-            JSONObject searchData = new JSONObject();
-            searchData.put("patternType", patternType);
-            searchData.put("inputData", inputData);
+            // Call API to recognize pattern
+            String requestBody = String.format("{\"prompt\":\"%s\",\"usePattern\":true}", 
+                    prompt.replace("\"", "\\\"").replace("\n", "\\n"));
+            String response = TokenAuthConnectionUtil.executePost("/api/code/generate", requestBody);
             
-            // Call API
-            String serverUrl = settings.getServerUrl();
-            String token = settings.getAccessToken();
-            
-            if (serverUrl == null || serverUrl.isEmpty() || token == null || token.isEmpty()) {
-                LOG.warn("Server URL or token is empty");
-                return null;
-            }
-            
-            // Call find pattern API
-            String findPatternUrl = serverUrl + "/api/find-pattern";
-            HttpURLConnection connection = TokenAuthConnectionUtil.createTokenAuthConnection(findPatternUrl, "POST", token);
-            
-            if (connection == null) {
-                LOG.warn("Failed to create connection to " + findPatternUrl);
-                return null;
-            }
-            
-            // Set content type
-            connection.setRequestProperty("Content-Type", "application/json");
-            
-            // Write search data
-            ConnectionTestUtil.writeJsonToConnection(connection, searchData);
-            
-            // Get response
-            int responseCode = connection.getResponseCode();
-            
-            if (responseCode == HttpURLConnection.HTTP_OK) {
-                // Parse response
-                String response = ConnectionTestUtil.readResponseFromConnection(connection);
+            if (response != null && !response.isEmpty()) {
+                // Try to extract patternMatched flag from response
+                boolean patternMatched = response.contains("\"patternMatched\":true");
                 
-                if (response == null || response.isEmpty()) {
-                    LOG.warn("Empty response from find pattern API");
-                    return null;
-                }
-                
-                // Parse JSON
-                JSONParser parser = new JSONParser();
-                Object responseObj = parser.parse(response);
-                
-                if (responseObj instanceof JSONObject) {
-                    JSONObject responseJson = (JSONObject) responseObj;
-                    
-                    // Get pattern found status
-                    Object patternFoundObj = responseJson.get("patternFound");
-                    if (patternFoundObj instanceof Boolean && (Boolean) patternFoundObj) {
-                        // Increment pattern matches count
-                        patternMatches.incrementAndGet();
-                        
-                        // Get output data
-                        Object outputDataObj = responseJson.get("outputData");
-                        if (outputDataObj instanceof JSONObject) {
-                            return (JSONObject) outputDataObj;
-                        } else {
-                            LOG.warn("Output data not found in response");
-                            return null;
-                        }
-                    } else {
-                        return null;
+                if (patternMatched) {
+                    // Try to extract code from response
+                    if (response.contains("\"code\":")) {
+                        return response.split("\"code\":")[1].split("\"")[1]
+                                .replace("\\n", "\n")
+                                .replace("\\\"", "\"")
+                                .replace("\\\\", "\\");
                     }
-                } else {
-                    LOG.warn("Response is not a JSON object");
-                    return null;
                 }
-            } else if (responseCode == HttpURLConnection.HTTP_NOT_FOUND) {
-                // No pattern found
-                return null;
-            } else {
-                LOG.warn("Find pattern failed with response code " + responseCode);
-                return null;
             }
+            
+            return null;
         } catch (Exception e) {
-            LOG.error("Error finding pattern", e);
+            LOG.error("Error recognizing code generation pattern", e);
             return null;
         }
     }
     
     /**
-     * Get number of pattern matches.
-     * @return Number of pattern matches
+     * Try to recognize a pattern for error fixing.
+     *
+     * @param code   The code with errors
+     * @param errors The error messages
+     * @return The fixed code, or null if no pattern is recognized
      */
-    public int getPatternMatches() {
-        return patternMatches.get();
+    @Nullable
+    public String recognizeErrorFixingPattern(@NotNull String code, @NotNull String errors) {
+        if (!isEnabled()) {
+            return null;
+        }
+        
+        try {
+            // Check if authenticated
+            ModAuthenticationManager authManager = ModAuthenticationManager.getInstance();
+            if (!authManager.isAuthenticated()) {
+                LOG.warn("Not authenticated");
+                return null;
+            }
+            
+            // Call API to recognize pattern
+            String requestBody = String.format("{\"code\":\"%s\",\"errors\":\"%s\",\"usePattern\":true}", 
+                    code.replace("\"", "\\\"").replace("\n", "\\n"),
+                    errors.replace("\"", "\\\"").replace("\n", "\\n"));
+            String response = TokenAuthConnectionUtil.executePost("/api/code/fix", requestBody);
+            
+            if (response != null && !response.isEmpty()) {
+                // Try to extract patternMatched flag from response
+                boolean patternMatched = response.contains("\"patternMatched\":true");
+                
+                if (patternMatched) {
+                    // Try to extract code from response
+                    if (response.contains("\"code\":")) {
+                        return response.split("\"code\":")[1].split("\"")[1]
+                                .replace("\\n", "\n")
+                                .replace("\\\"", "\"")
+                                .replace("\\\\", "\\");
+                    }
+                }
+            }
+            
+            return null;
+        } catch (Exception e) {
+            LOG.error("Error recognizing error fixing pattern", e);
+            return null;
+        }
     }
     
     /**
-     * Get number of patterns stored.
-     * @return Number of patterns stored
+     * Try to recognize a pattern for feature addition.
+     *
+     * @param code        The code to add features to
+     * @param description The description of the features to add
+     * @return The updated code, or null if no pattern is recognized
      */
-    public int getPatternStorageCount() {
-        return patternStorageCount.get();
-    }
-    
-    /**
-     * Reset pattern match count.
-     */
-    public void resetMetrics() {
-        patternMatches.set(0);
-        patternStorageCount.set(0);
+    @Nullable
+    public String recognizeFeatureAdditionPattern(@NotNull String code, @NotNull String description) {
+        if (!isEnabled()) {
+            return null;
+        }
+        
+        try {
+            // Check if authenticated
+            ModAuthenticationManager authManager = ModAuthenticationManager.getInstance();
+            if (!authManager.isAuthenticated()) {
+                LOG.warn("Not authenticated");
+                return null;
+            }
+            
+            // Call API to recognize pattern
+            String requestBody = String.format("{\"code\":\"%s\",\"description\":\"%s\",\"usePattern\":true}", 
+                    code.replace("\"", "\\\"").replace("\n", "\\n"),
+                    description.replace("\"", "\\\"").replace("\n", "\\n"));
+            String response = TokenAuthConnectionUtil.executePost("/api/code/add-features", requestBody);
+            
+            if (response != null && !response.isEmpty()) {
+                // Try to extract patternMatched flag from response
+                boolean patternMatched = response.contains("\"patternMatched\":true");
+                
+                if (patternMatched) {
+                    // Try to extract code from response
+                    if (response.contains("\"code\":")) {
+                        return response.split("\"code\":")[1].split("\"")[1]
+                                .replace("\\n", "\n")
+                                .replace("\\\"", "\"")
+                                .replace("\\\\", "\\");
+                    }
+                }
+            }
+            
+            return null;
+        } catch (Exception e) {
+            LOG.error("Error recognizing feature addition pattern", e);
+            return null;
+        }
     }
 }

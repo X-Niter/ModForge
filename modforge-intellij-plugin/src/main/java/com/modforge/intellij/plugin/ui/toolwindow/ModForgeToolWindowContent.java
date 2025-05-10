@@ -1,396 +1,210 @@
 package com.modforge.intellij.plugin.ui.toolwindow;
 
+import com.intellij.icons.AllIcons;
+import com.intellij.openapi.actionSystem.ActionManager;
+import com.intellij.openapi.actionSystem.ActionToolbar;
+import com.intellij.openapi.actionSystem.DefaultActionGroup;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.project.Project;
-import com.intellij.openapi.ui.SimpleToolWindowPanel;
 import com.intellij.openapi.wm.ToolWindow;
 import com.intellij.ui.JBColor;
+import com.intellij.ui.SimpleTextAttributes;
 import com.intellij.ui.components.JBLabel;
 import com.intellij.ui.components.JBPanel;
 import com.intellij.ui.components.JBScrollPane;
-import com.intellij.ui.components.JBTabbedPane;
+import com.intellij.ui.content.Content;
+import com.intellij.ui.content.ContentFactory;
 import com.intellij.util.ui.JBUI;
 import com.intellij.util.ui.UIUtil;
-import com.modforge.intellij.plugin.ai.PatternRecognitionService;
+import com.modforge.intellij.plugin.actions.LoginAction;
+import com.modforge.intellij.plugin.actions.LogoutAction;
+import com.modforge.intellij.plugin.actions.ToggleContinuousDevelopmentAction;
+import com.modforge.intellij.plugin.actions.TogglePatternRecognitionAction;
 import com.modforge.intellij.plugin.auth.ModAuthenticationManager;
-import com.modforge.intellij.plugin.services.AutonomousCodeGenerationService;
-import com.modforge.intellij.plugin.services.ContinuousDevelopmentService;
 import com.modforge.intellij.plugin.settings.ModForgeSettings;
-import org.json.simple.JSONObject;
+import com.modforge.intellij.plugin.utils.ConnectionTestUtil;
+import org.jetbrains.annotations.NotNull;
 
 import javax.swing.*;
 import java.awt.*;
-import java.text.NumberFormat;
 
 /**
- * Content for ModForge tool window.
+ * Content for the ModForge tool window.
  */
 public class ModForgeToolWindowContent {
     private static final Logger LOG = Logger.getInstance(ModForgeToolWindowContent.class);
     
-    private final JPanel mainPanel;
     private final Project project;
-    
-    // Status labels
-    private final JLabel authStatusLabel = new JLabel("Not authenticated");
-    private final JLabel usernameLabel = new JLabel("Not logged in");
-    private final JLabel continuousDevelopmentLabel = new JLabel("Disabled");
-    private final JLabel patternRecognitionLabel = new JLabel("Disabled");
-    
-    // Metrics labels
-    private final JLabel taskCountLabel = new JLabel("0");
-    private final JLabel patternMatchesLabel = new JLabel("0");
-    private final JLabel apiFallbacksLabel = new JLabel("0");
-    private final JLabel costSavingsLabel = new JLabel("$0.00");
-    
-    // Refresh timer
-    private Timer refreshTimer;
+    private final ToolWindow toolWindow;
+    private final JPanel contentPanel;
     
     /**
-     * Create ModForge tool window content.
-     * @param project Project
-     * @param toolWindow Tool window
+     * Construct the tool window content.
+     *
+     * @param project    The project
+     * @param toolWindow The tool window
      */
-    public ModForgeToolWindowContent(Project project, ToolWindow toolWindow) {
+    public ModForgeToolWindowContent(@NotNull Project project, @NotNull ToolWindow toolWindow) {
         this.project = project;
+        this.toolWindow = toolWindow;
         
-        // Create main panel
-        mainPanel = new SimpleToolWindowPanel(true, true);
+        // Create content panel
+        contentPanel = new JBPanel<>(new BorderLayout());
         
-        // Create and add content
-        JBTabbedPane tabbedPane = new JBTabbedPane();
-        tabbedPane.addTab("Status", createStatusPanel());
-        tabbedPane.addTab("Metrics", createMetricsPanel());
+        // Create toolbar
+        DefaultActionGroup actionGroup = new DefaultActionGroup();
+        actionGroup.add(new LoginAction());
+        actionGroup.add(new LogoutAction());
+        actionGroup.addSeparator();
+        actionGroup.add(new ToggleContinuousDevelopmentAction());
+        actionGroup.add(new TogglePatternRecognitionAction());
         
-        mainPanel.add(tabbedPane, BorderLayout.CENTER);
+        ActionToolbar toolbar = ActionManager.getInstance().createActionToolbar("ModForgeToolbar", actionGroup, false);
+        toolbar.setTargetComponent(contentPanel);
         
-        // Initial UI update
-        updateUI();
+        contentPanel.add(toolbar.getComponent(), BorderLayout.NORTH);
         
-        // Set up refresh timer (5 seconds)
-        refreshTimer = new Timer(5000, e -> updateUI());
-        refreshTimer.start();
+        // Create status panel
+        JPanel statusPanel = createStatusPanel();
+        contentPanel.add(statusPanel, BorderLayout.CENTER);
+        
+        // Refresh content
+        refreshContent();
     }
     
     /**
-     * Update UI with current data.
-     */
-    private void updateUI() {
-        try {
-            // Update authentication status
-            ModAuthenticationManager authManager = ModAuthenticationManager.getInstance();
-            boolean isAuthenticated = false;
-            
-            if (authManager != null) {
-                isAuthenticated = authManager.isAuthenticated();
-            }
-            
-            // Authentication status
-            if (isAuthenticated) {
-                authStatusLabel.setText("Authenticated");
-                authStatusLabel.setForeground(UIUtil.getContextHelpForeground());
-                
-                // Verify authentication
-                boolean isValid = false;
-                
-                try {
-                    isValid = authManager.verifyAuthentication();
-                } catch (Exception e) {
-                    LOG.error("Error verifying authentication", e);
-                }
-                
-                if (isValid) {
-                    authStatusLabel.setText("Authenticated (Verified)");
-                    authStatusLabel.setForeground(new Color(0, 150, 0)); // Green
-                } else {
-                    authStatusLabel.setText("Authenticated (Invalid)");
-                    authStatusLabel.setForeground(new Color(200, 0, 0)); // Red
-                }
-                
-                // Username
-                String username = null;
-                try {
-                    username = authManager.getUsername();
-                } catch (Exception e) {
-                    LOG.error("Error getting username", e);
-                }
-                
-                if (username != null) {
-                    usernameLabel.setText(username);
-                } else {
-                    // Try to get user data
-                    JSONObject userData = null;
-                    try {
-                        userData = authManager.getUserData();
-                    } catch (Exception e) {
-                        LOG.error("Error getting user data", e);
-                    }
-                    
-                    if (userData != null && userData.containsKey("username")) {
-                        Object usernameObj = userData.get("username");
-                        if (usernameObj instanceof String) {
-                            usernameLabel.setText((String) usernameObj);
-                        } else {
-                            usernameLabel.setText("Unknown");
-                        }
-                    } else {
-                        usernameLabel.setText("Unknown");
-                    }
-                }
-            } else {
-                authStatusLabel.setText("Not authenticated");
-                authStatusLabel.setForeground(new Color(200, 0, 0)); // Red
-                
-                usernameLabel.setText("Not logged in");
-            }
-        } catch (Exception e) {
-            LOG.error("Error updating authentication status", e);
-            
-            // Set safe defaults
-            authStatusLabel.setText("Error checking authentication");
-            authStatusLabel.setForeground(new Color(200, 0, 0)); // Red
-            usernameLabel.setText("Unknown");
-        }
-        
-        // Update continuous development status
-        ModForgeSettings settings = ModForgeSettings.getInstance();
-        boolean continuousDevelopment = settings.isContinuousDevelopment();
-        
-        if (continuousDevelopment) {
-            continuousDevelopmentLabel.setText("Enabled");
-            continuousDevelopmentLabel.setForeground(new Color(0, 150, 0)); // Green
-        } else {
-            continuousDevelopmentLabel.setText("Disabled");
-            continuousDevelopmentLabel.setForeground(new Color(200, 0, 0)); // Red
-        }
-        
-        // Update pattern recognition status
-        boolean patternRecognition = settings.isPatternRecognition();
-        
-        if (patternRecognition) {
-            patternRecognitionLabel.setText("Enabled");
-            patternRecognitionLabel.setForeground(new Color(0, 150, 0)); // Green
-        } else {
-            patternRecognitionLabel.setText("Disabled");
-            patternRecognitionLabel.setForeground(new Color(200, 0, 0)); // Red
-        }
-        
-        // Update metrics (if services are available)
-        try {
-            // Update continuous development metrics
-            ContinuousDevelopmentService continuousService = project.getService(ContinuousDevelopmentService.class);
-            if (continuousService != null) {
-                taskCountLabel.setText(String.valueOf(continuousService.getTaskCount()));
-            }
-            
-            // Update pattern recognition metrics
-            AutonomousCodeGenerationService autonomousService = project.getService(AutonomousCodeGenerationService.class);
-            if (autonomousService != null) {
-                int patternMatches = autonomousService.getSuccessfulPatternMatches();
-                int apiFallbacks = autonomousService.getApiFallbacks();
-                
-                patternMatchesLabel.setText(String.valueOf(patternMatches));
-                apiFallbacksLabel.setText(String.valueOf(apiFallbacks));
-                
-                // Calculate estimated cost savings (approximate)
-                double estimatedCostPerRequest = 0.01; // $0.01 per API request saved
-                double costSavings = patternMatches * estimatedCostPerRequest;
-                
-                NumberFormat currencyFormat = NumberFormat.getCurrencyInstance();
-                costSavingsLabel.setText(currencyFormat.format(costSavings));
-            }
-        } catch (Exception e) {
-            LOG.error("Error updating metrics", e);
-        }
-    }
-    
-    /**
-     * Create status panel.
-     * @return Status panel
-     */
-    private JPanel createStatusPanel() {
-        JPanel panel = new JBPanel<>(new GridBagLayout());
-        panel.setBorder(JBUI.Borders.empty(10));
-        
-        GridBagConstraints c = new GridBagConstraints();
-        c.fill = GridBagConstraints.HORIZONTAL;
-        c.insets = JBUI.insets(5);
-        c.gridx = 0;
-        c.gridy = 0;
-        c.weightx = 0.3;
-        
-        // Authentication section
-        JLabel authSectionLabel = new JBLabel("Authentication");
-        authSectionLabel.setFont(authSectionLabel.getFont().deriveFont(Font.BOLD));
-        panel.add(authSectionLabel, c);
-        
-        c.gridx = 1;
-        c.weightx = 0.7;
-        panel.add(authStatusLabel, c);
-        
-        c.gridx = 0;
-        c.gridy++;
-        c.weightx = 0.3;
-        panel.add(new JBLabel("Username:"), c);
-        
-        c.gridx = 1;
-        c.weightx = 0.7;
-        panel.add(usernameLabel, c);
-        
-        // Features section
-        c.gridx = 0;
-        c.gridy++;
-        c.weightx = 1.0;
-        c.gridwidth = 2;
-        c.insets = JBUI.insets(15, 5, 5, 5);
-        
-        JLabel featuresSectionLabel = new JBLabel("Features");
-        featuresSectionLabel.setFont(featuresSectionLabel.getFont().deriveFont(Font.BOLD));
-        panel.add(featuresSectionLabel, c);
-        
-        c.gridx = 0;
-        c.gridy++;
-        c.weightx = 0.3;
-        c.gridwidth = 1;
-        c.insets = JBUI.insets(5);
-        panel.add(new JBLabel("Continuous Development:"), c);
-        
-        c.gridx = 1;
-        c.weightx = 0.7;
-        panel.add(continuousDevelopmentLabel, c);
-        
-        c.gridx = 0;
-        c.gridy++;
-        c.weightx = 0.3;
-        panel.add(new JBLabel("Pattern Recognition:"), c);
-        
-        c.gridx = 1;
-        c.weightx = 0.7;
-        panel.add(patternRecognitionLabel, c);
-        
-        // Add filler to push content to top
-        c.gridx = 0;
-        c.gridy++;
-        c.weighty = 1.0;
-        c.gridwidth = 2;
-        panel.add(new JPanel(), c);
-        
-        return panel;
-    }
-    
-    /**
-     * Create metrics panel.
-     * @return Metrics panel
-     */
-    private JPanel createMetricsPanel() {
-        JPanel panel = new JBPanel<>(new GridBagLayout());
-        panel.setBorder(JBUI.Borders.empty(10));
-        
-        GridBagConstraints c = new GridBagConstraints();
-        c.fill = GridBagConstraints.HORIZONTAL;
-        c.insets = JBUI.insets(5);
-        c.gridx = 0;
-        c.gridy = 0;
-        c.weightx = 0.3;
-        
-        // Usage metrics section
-        JLabel metricsSectionLabel = new JBLabel("Usage Metrics");
-        metricsSectionLabel.setFont(metricsSectionLabel.getFont().deriveFont(Font.BOLD));
-        panel.add(metricsSectionLabel, c);
-        
-        c.gridx = 0;
-        c.gridy++;
-        c.weightx = 0.3;
-        panel.add(new JBLabel("Total Tasks Run:"), c);
-        
-        c.gridx = 1;
-        c.weightx = 0.7;
-        taskCountLabel.setFont(taskCountLabel.getFont().deriveFont(Font.BOLD));
-        panel.add(taskCountLabel, c);
-        
-        // Pattern recognition metrics section
-        c.gridx = 0;
-        c.gridy++;
-        c.weightx = 1.0;
-        c.gridwidth = 2;
-        c.insets = JBUI.insets(15, 5, 5, 5);
-        
-        JLabel patternSectionLabel = new JBLabel("Pattern Recognition Metrics");
-        patternSectionLabel.setFont(patternSectionLabel.getFont().deriveFont(Font.BOLD));
-        panel.add(patternSectionLabel, c);
-        
-        c.gridx = 0;
-        c.gridy++;
-        c.weightx = 0.3;
-        c.gridwidth = 1;
-        c.insets = JBUI.insets(5);
-        panel.add(new JBLabel("Pattern Matches:"), c);
-        
-        c.gridx = 1;
-        c.weightx = 0.7;
-        patternMatchesLabel.setFont(patternMatchesLabel.getFont().deriveFont(Font.BOLD));
-        patternMatchesLabel.setForeground(new Color(0, 150, 0)); // Green
-        panel.add(patternMatchesLabel, c);
-        
-        c.gridx = 0;
-        c.gridy++;
-        c.weightx = 0.3;
-        panel.add(new JBLabel("API Fallbacks:"), c);
-        
-        c.gridx = 1;
-        c.weightx = 0.7;
-        apiFallbacksLabel.setFont(apiFallbacksLabel.getFont().deriveFont(Font.BOLD));
-        panel.add(apiFallbacksLabel, c);
-        
-        // Cost savings section
-        c.gridx = 0;
-        c.gridy++;
-        c.weightx = 1.0;
-        c.gridwidth = 2;
-        c.insets = JBUI.insets(15, 5, 5, 5);
-        
-        JLabel savingsSectionLabel = new JBLabel("Estimated Cost Savings");
-        savingsSectionLabel.setFont(savingsSectionLabel.getFont().deriveFont(Font.BOLD));
-        panel.add(savingsSectionLabel, c);
-        
-        c.gridx = 0;
-        c.gridy++;
-        c.weightx = 0.3;
-        c.gridwidth = 1;
-        c.insets = JBUI.insets(5);
-        panel.add(new JBLabel("API Cost Savings:"), c);
-        
-        c.gridx = 1;
-        c.weightx = 0.7;
-        costSavingsLabel.setFont(costSavingsLabel.getFont().deriveFont(Font.BOLD));
-        costSavingsLabel.setForeground(new Color(0, 100, 0)); // Dark green
-        panel.add(costSavingsLabel, c);
-        
-        // Add filler to push content to top
-        c.gridx = 0;
-        c.gridy++;
-        c.weighty = 1.0;
-        c.gridwidth = 2;
-        panel.add(new JPanel(), c);
-        
-        return panel;
-    }
-    
-    /**
-     * Get component for display in tool window.
-     * @return Component
+     * Get the component for the tool window.
+     *
+     * @return The component
      */
     public JComponent getComponent() {
-        return mainPanel;
+        return contentPanel;
     }
     
     /**
-     * Dispose of resources.
+     * Refresh the content.
      */
-    public void dispose() {
-        if (refreshTimer != null) {
-            refreshTimer.stop();
-            refreshTimer = null;
+    public void refreshContent() {
+        SwingUtilities.invokeLater(() -> {
+            updateStatusPanel();
+        });
+    }
+    
+    /**
+     * Create the status panel.
+     *
+     * @return The status panel
+     */
+    private JPanel createStatusPanel() {
+        JPanel statusPanel = new JBPanel<>(new GridBagLayout());
+        statusPanel.setBorder(JBUI.Borders.empty(10));
+        
+        return statusPanel;
+    }
+    
+    /**
+     * Update the status panel.
+     */
+    private void updateStatusPanel() {
+        try {
+            JPanel statusPanel = (JPanel) contentPanel.getComponent(1);
+            statusPanel.removeAll();
+            
+            GridBagConstraints c = new GridBagConstraints();
+            c.anchor = GridBagConstraints.WEST;
+            c.fill = GridBagConstraints.HORIZONTAL;
+            c.gridx = 0;
+            c.gridy = 0;
+            c.weightx = 1;
+            c.insets = JBUI.insets(5);
+            
+            // Add authentication status
+            ModAuthenticationManager authManager = ModAuthenticationManager.getInstance();
+            JBLabel authLabel = new JBLabel("Authentication Status: ");
+            authLabel.setComponentStyle(UIUtil.ComponentStyle.LARGE);
+            statusPanel.add(authLabel, c);
+            
+            c.gridx = 1;
+            JBLabel authStatusLabel = new JBLabel();
+            if (authManager.isAuthenticated()) {
+                authStatusLabel.setText("Logged in as " + authManager.getUsername());
+                authStatusLabel.setIcon(AllIcons.General.InspectionsOK);
+                authStatusLabel.setForeground(JBColor.GREEN);
+            } else {
+                authStatusLabel.setText("Not logged in");
+                authStatusLabel.setIcon(AllIcons.General.Warning);
+                authStatusLabel.setForeground(JBColor.RED);
+            }
+            authStatusLabel.setComponentStyle(UIUtil.ComponentStyle.LARGE);
+            statusPanel.add(authStatusLabel, c);
+            
+            // Add server status
+            c.gridx = 0;
+            c.gridy = 1;
+            JBLabel serverLabel = new JBLabel("Server Status: ");
+            serverLabel.setComponentStyle(UIUtil.ComponentStyle.LARGE);
+            statusPanel.add(serverLabel, c);
+            
+            c.gridx = 1;
+            JBLabel serverStatusLabel = new JBLabel();
+            
+            ModForgeSettings settings = ModForgeSettings.getInstance();
+            boolean connected = ConnectionTestUtil.testConnection(settings.getServerUrl());
+            
+            if (connected) {
+                serverStatusLabel.setText("Connected to " + settings.getServerUrl());
+                serverStatusLabel.setIcon(AllIcons.General.InspectionsOK);
+                serverStatusLabel.setForeground(JBColor.GREEN);
+            } else {
+                serverStatusLabel.setText("Not connected to " + settings.getServerUrl());
+                serverStatusLabel.setIcon(AllIcons.General.Error);
+                serverStatusLabel.setForeground(JBColor.RED);
+            }
+            serverStatusLabel.setComponentStyle(UIUtil.ComponentStyle.LARGE);
+            statusPanel.add(serverStatusLabel, c);
+            
+            // Add feature status
+            c.gridx = 0;
+            c.gridy = 2;
+            JBLabel featuresLabel = new JBLabel("Features: ");
+            featuresLabel.setComponentStyle(UIUtil.ComponentStyle.LARGE);
+            statusPanel.add(featuresLabel, c);
+            
+            c.gridx = 1;
+            
+            // Add continuous development status
+            JBLabel continuousDevelopmentLabel = new JBLabel();
+            if (settings.isContinuousDevelopment()) {
+                continuousDevelopmentLabel.setText("Continuous Development: Enabled");
+                continuousDevelopmentLabel.setIcon(AllIcons.General.InspectionsOK);
+                continuousDevelopmentLabel.setForeground(JBColor.GREEN);
+            } else {
+                continuousDevelopmentLabel.setText("Continuous Development: Disabled");
+                continuousDevelopmentLabel.setIcon(AllIcons.General.Information);
+                continuousDevelopmentLabel.setForeground(JBColor.GRAY);
+            }
+            continuousDevelopmentLabel.setComponentStyle(UIUtil.ComponentStyle.LARGE);
+            statusPanel.add(continuousDevelopmentLabel, c);
+            
+            // Add pattern recognition status
+            c.gridy = 3;
+            JBLabel patternRecognitionLabel = new JBLabel();
+            if (settings.isPatternRecognition()) {
+                patternRecognitionLabel.setText("Pattern Recognition: Enabled");
+                patternRecognitionLabel.setIcon(AllIcons.General.InspectionsOK);
+                patternRecognitionLabel.setForeground(JBColor.GREEN);
+            } else {
+                patternRecognitionLabel.setText("Pattern Recognition: Disabled");
+                patternRecognitionLabel.setIcon(AllIcons.General.Information);
+                patternRecognitionLabel.setForeground(JBColor.GRAY);
+            }
+            patternRecognitionLabel.setComponentStyle(UIUtil.ComponentStyle.LARGE);
+            statusPanel.add(patternRecognitionLabel, c);
+            
+            statusPanel.revalidate();
+            statusPanel.repaint();
+        } catch (Exception e) {
+            LOG.error("Error updating status panel", e);
         }
     }
 }

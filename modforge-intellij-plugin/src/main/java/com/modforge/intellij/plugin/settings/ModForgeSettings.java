@@ -10,7 +10,7 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * Persistent settings for ModForge plugin.
+ * Persistent settings for ModForge.
  */
 @Service
 @State(
@@ -18,95 +18,33 @@ import org.jetbrains.annotations.Nullable;
         storages = @Storage("ModForgeSettings.xml")
 )
 public final class ModForgeSettings implements PersistentStateComponent<ModForgeSettings> {
-    // Default server URL
+    /**
+     * Default server URL.
+     */
     private static final String DEFAULT_SERVER_URL = "http://localhost:5000";
     
-    // Server URL
+    /**
+     * Server URL.
+     */
     private String serverUrl = DEFAULT_SERVER_URL;
     
-    // Access token
-    private String accessToken = "";
-    
-    // Enable continuous development
+    /**
+     * Whether continuous development is enabled.
+     */
     private boolean continuousDevelopment = false;
     
-    // Enable pattern recognition
+    /**
+     * Whether pattern recognition is enabled.
+     */
     private boolean patternRecognition = true;
     
     /**
-     * Get instance of ModForgeSettings.
-     * @return ModForgeSettings instance
+     * Get the instance of the settings.
+     *
+     * @return The instance
      */
     public static ModForgeSettings getInstance() {
         return ApplicationManager.getApplication().getService(ModForgeSettings.class);
-    }
-    
-    /**
-     * Get server URL.
-     * @return Server URL
-     */
-    public String getServerUrl() {
-        return serverUrl;
-    }
-    
-    /**
-     * Set server URL.
-     * @param serverUrl Server URL
-     */
-    public void setServerUrl(String serverUrl) {
-        if (serverUrl != null) {
-            this.serverUrl = serverUrl;
-        }
-    }
-    
-    /**
-     * Get access token.
-     * @return Access token
-     */
-    public String getAccessToken() {
-        return accessToken;
-    }
-    
-    /**
-     * Set access token.
-     * @param accessToken Access token
-     */
-    public void setAccessToken(String accessToken) {
-        if (accessToken != null) {
-            this.accessToken = accessToken;
-        }
-    }
-    
-    /**
-     * Get whether continuous development is enabled.
-     * @return Whether continuous development is enabled
-     */
-    public boolean isContinuousDevelopment() {
-        return continuousDevelopment;
-    }
-    
-    /**
-     * Set whether continuous development is enabled.
-     * @param continuousDevelopment Whether continuous development is enabled
-     */
-    public void setContinuousDevelopment(boolean continuousDevelopment) {
-        this.continuousDevelopment = continuousDevelopment;
-    }
-    
-    /**
-     * Get whether pattern recognition is enabled.
-     * @return Whether pattern recognition is enabled
-     */
-    public boolean isPatternRecognition() {
-        return patternRecognition;
-    }
-    
-    /**
-     * Set whether pattern recognition is enabled.
-     * @param patternRecognition Whether pattern recognition is enabled
-     */
-    public void setPatternRecognition(boolean patternRecognition) {
-        this.patternRecognition = patternRecognition;
     }
     
     @Override
@@ -117,5 +55,60 @@ public final class ModForgeSettings implements PersistentStateComponent<ModForge
     @Override
     public void loadState(@NotNull ModForgeSettings state) {
         XmlSerializerUtil.copyBean(state, this);
+    }
+    
+    /**
+     * Get the server URL.
+     *
+     * @return The server URL
+     */
+    @NotNull
+    public String getServerUrl() {
+        return serverUrl != null && !serverUrl.isEmpty() ? serverUrl : DEFAULT_SERVER_URL;
+    }
+    
+    /**
+     * Set the server URL.
+     *
+     * @param serverUrl The server URL
+     */
+    public void setServerUrl(@NotNull String serverUrl) {
+        this.serverUrl = serverUrl;
+    }
+    
+    /**
+     * Get whether continuous development is enabled.
+     *
+     * @return Whether continuous development is enabled
+     */
+    public boolean isContinuousDevelopment() {
+        return continuousDevelopment;
+    }
+    
+    /**
+     * Set whether continuous development is enabled.
+     *
+     * @param continuousDevelopment Whether continuous development is enabled
+     */
+    public void setContinuousDevelopment(boolean continuousDevelopment) {
+        this.continuousDevelopment = continuousDevelopment;
+    }
+    
+    /**
+     * Get whether pattern recognition is enabled.
+     *
+     * @return Whether pattern recognition is enabled
+     */
+    public boolean isPatternRecognition() {
+        return patternRecognition;
+    }
+    
+    /**
+     * Set whether pattern recognition is enabled.
+     *
+     * @param patternRecognition Whether pattern recognition is enabled
+     */
+    public void setPatternRecognition(boolean patternRecognition) {
+        this.patternRecognition = patternRecognition;
     }
 }
