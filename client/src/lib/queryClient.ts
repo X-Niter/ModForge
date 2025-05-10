@@ -12,7 +12,7 @@ interface ExtendedRequestInit extends RequestInit {
 }
 
 export async function apiRequest(
-  method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE",
+  method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE" | string,
   path: string,
   data?: any
 ): Promise<Response> {

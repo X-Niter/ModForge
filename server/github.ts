@@ -144,8 +144,9 @@ export async function pushModToGitHub(
     
     addLog(`Authenticated as: ${owner}`);
     
-    // Create repository name - sanitize the mod ID for GitHub (alphanumeric and dashes only)
-    const repoName = `minecraft-${mod.modId.toLowerCase()}-mod`.replace(/[^a-z0-9-]/g, '-');
+    // Create repository name - sanitize the mod name for GitHub (alphanumeric and dashes only)
+    const modName = mod.name || 'minecraft-mod';
+    const repoName = `minecraft-${modName.toLowerCase()}-mod`.replace(/[^a-z0-9-]/g, '-');
     
     // Check if repo exists
     const repoExists = await github.checkRepoExists(owner, repoName);
@@ -157,7 +158,7 @@ export async function pushModToGitHub(
     } else {
       // Create the repository
       addLog(`Creating new repository: ${repoName}...`);
-      const repo = await github.createRepo(repoName, mod.description);
+      const repo = await github.createRepo(repoName, mod.description || `${mod.name} - A Minecraft mod`);
       repoUrl = repo.html_url;
       addLog(`Repository created: ${repoUrl}`);
     }
@@ -178,9 +179,17 @@ export async function pushModToGitHub(
     if (!hasReadme) {
       addLog('Creating README.md...');
       
+      // Get metadata for license and features if available
+      const license = mod.metadata && typeof mod.metadata === 'object' && 'license' in mod.metadata 
+        ? mod.metadata.license
+        : 'MIT License';
+      const features = mod.metadata && typeof mod.metadata === 'object' && 'features' in mod.metadata
+        ? mod.metadata.features
+        : mod.description;
+        
       const readmeContent = `# ${mod.name}
 
-${mod.description}
+${mod.description || ''}
 
 ## Minecraft Version
 ${mod.minecraftVersion}
@@ -189,10 +198,10 @@ ${mod.minecraftVersion}
 ${mod.modLoader}
 
 ## License
-${mod.license}
+${license}
 
 ## Features
-${mod.idea}
+${features}
 `;
       
       await github.createOrUpdateFile(
