@@ -7,6 +7,7 @@ import { pool } from "./db";
 import connectPgSimple from "connect-pg-simple";
 import authRoutes from "./routes/auth-routes";
 import { scheduleMaintenanceTasks } from "./maintenance-tasks";
+import { rootLogger, getLogger } from "./logging";
 
 const app = express();
 // Enable trust proxy to work correctly with express-rate-limit behind a proxy (like in Replit)
@@ -148,6 +149,35 @@ function setupMemoryManagement() {
   };
 }
 
+// Setup global unhandled exception handlers
+const uncaughtLogger = getLogger('uncaught-exception');
+
+// Handle uncaught exceptions
+process.on('uncaughtException', (error) => {
+  uncaughtLogger.critical('Uncaught exception', { 
+    error: error.message,
+    stack: error.stack,
+    name: error.name
+  });
+  
+  // Continue running - we don't want to crash the server for non-critical errors
+  // For truly catastrophic errors, our shutdown timeout will still apply
+});
+
+// Handle unhandled promise rejections
+process.on('unhandledRejection', (reason, promise) => {
+  const reasonStr = reason instanceof Error ? 
+    { message: reason.message, stack: reason.stack } : 
+    String(reason);
+    
+  uncaughtLogger.error('Unhandled promise rejection', { 
+    reason: reasonStr,
+    promise: String(promise)
+  });
+  
+  // Continue running - we don't want to crash the server
+});
+
 (async () => {
   // Setup memory management system for 24/7 operation
   const cleanupMemoryManagement = setupMemoryManagement();
@@ -197,38 +227,48 @@ function setupMemoryManagement() {
   const port = 5000;
   // Setup graceful shutdown handlers
   const gracefulShutdown = async (signal: string) => {
-    log(`${signal} received - starting graceful shutdown`);
+    const shutdownLogger = getLogger('shutdown');
+    shutdownLogger.info(`${signal} received - starting graceful shutdown`);
     
     // Clean up memory management system
-    log('Shutting down memory management system...');
+    shutdownLogger.info('Shutting down memory management system...');
     cleanupMemoryManagement();
     
     // Clean up maintenance tasks
-    log('Shutting down maintenance tasks...');
+    shutdownLogger.info('Shutting down maintenance tasks...');
     cleanupMaintenanceTasks();
     
     // Import the continuousService to clean it up
     const { continuousService } = await import('./continuous-service');
     
     // Clean up continuous development service resources (shutdown all running processes)
-    log('Shutting down continuous development service...');
+    shutdownLogger.info('Shutting down continuous development service...');
     continuousService.cleanup();
-    log('Continuous development service shutdown complete');
+    shutdownLogger.info('Continuous development service shutdown complete');
     
     // Close database pool
-    log('Closing database connection pool...');
+    shutdownLogger.info('Closing database connection pool...');
     await pool.end();
-    log('Database connections closed');
+    shutdownLogger.info('Database connections closed');
     
     // Close the server
     server.close(() => {
-      log('HTTP server closed');
-      process.exit(0);
+      shutdownLogger.info('HTTP server closed, shutdown complete');
+      // Log final message before exit
+      shutdownLogger.info('Exiting process gracefully', { 
+        uptime: process.uptime(),
+        signal
+      });
+      
+      // Short delay to allow log to be written
+      setTimeout(() => {
+        process.exit(0);
+      }, 500);
     });
     
     // If server hasn't closed in 10 seconds, force exit
     setTimeout(() => {
-      console.error('Server shutdown timed out, forcing exit');
+      shutdownLogger.error('Server shutdown timed out after 10 seconds, forcing exit');
       process.exit(1);
     }, 10000);
   };
@@ -244,5 +284,9 @@ function setupMemoryManagement() {
     reusePort: true,
   }, () => {
     log(`serving on port ${port}`);
+    rootLogger.info(`Server started and listening on port ${port}`, {
+      environment: process.env.NODE_ENV || 'development',
+      nodeVersion: process.version
+    });
   });
 })();

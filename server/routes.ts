@@ -1398,6 +1398,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/github", githubRoutes);
   app.use("/api/error-monitoring", requireAuth, errorMonitoringRouter);
   
+  // Test endpoint for logging system
+  app.get("/api/logging/test", requireAuth, (req, res) => {
+    // Import the logging system
+    import('./logging').then(({ getLogger }) => {
+      const logger = getLogger('api-test', req.user?.id?.toString());
+      
+      // Generate test logs at different levels
+      logger.debug('This is a debug message');
+      logger.info('This is an info message');
+      logger.warn('This is a warning message');
+      logger.error('This is an error message', { source: 'test endpoint', userId: req.user?.id });
+      
+      res.json({
+        success: true,
+        message: 'Test logs generated successfully',
+        timestamp: new Date().toISOString()
+      });
+    }).catch(error => {
+      res.status(500).json({
+        success: false,
+        message: 'Failed to load logging system',
+        error: error instanceof Error ? error.message : String(error)
+      });
+    });
+  });
+  
   // Maintenance endpoint for manual system maintenance
   app.post("/api/maintenance/run", requireAuth, async (req, res) => {
     try {
