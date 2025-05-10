@@ -23,6 +23,8 @@ public class TokenAuthConnectionUtil {
     private static final Logger LOG = Logger.getInstance(TokenAuthConnectionUtil.class);
     private static final ExecutorService EXECUTOR = Executors.newCachedThreadPool();
     private static final Gson GSON = new Gson();
+    private static final int MAX_RETRIES = 3;
+    private static final int RETRY_DELAY_MS = 1000; // 1 second delay between retries
     
     /**
      * Execute a GET request asynchronously.
@@ -160,62 +162,110 @@ public class TokenAuthConnectionUtil {
      * @throws IOException If an I/O error occurs
      */
     private static String executeRequest(String urlString, String method, String requestBody, String token) throws IOException {
-        HttpURLConnection connection = null;
-        try {
-            URL url = new URL(urlString);
-            connection = (HttpURLConnection) url.openConnection();
-            connection.setRequestMethod(method);
-            
-            // Set common headers
-            connection.setRequestProperty("Content-Type", "application/json");
-            connection.setRequestProperty("Accept", "application/json");
-            
-            // Set token if provided
-            if (token != null && !token.isEmpty()) {
-                connection.setRequestProperty("Authorization", "Bearer " + token);
-            }
-            
-            // Set connection properties
-            connection.setConnectTimeout(10000); // 10 seconds
-            connection.setReadTimeout(30000); // 30 seconds
-            
-            // Send request body for methods that support it
-            if (requestBody != null && !requestBody.isEmpty() && 
-                    ("POST".equals(method) || "PUT".equals(method) || "PATCH".equals(method))) {
-                connection.setDoOutput(true);
-                try (OutputStream os = connection.getOutputStream()) {
-                    byte[] input = requestBody.getBytes(StandardCharsets.UTF_8);
-                    os.write(input, 0, input.length);
+        IOException lastException = null;
+        
+        // Implement retry logic
+        for (int retry = 0; retry < MAX_RETRIES; retry++) {
+            if (retry > 0) {
+                LOG.info("Retrying request (" + retry + "/" + MAX_RETRIES + ") to: " + urlString);
+                // Wait before retrying
+                try {
+                    Thread.sleep(RETRY_DELAY_MS * retry);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    throw new IOException("Request interrupted", e);
                 }
             }
             
-            // Check response code
-            int responseCode = connection.getResponseCode();
-            LOG.info("Response code: " + responseCode + " for " + method + " " + urlString);
-            
-            // Read response
-            try (BufferedReader br = new BufferedReader(
-                    new InputStreamReader(
-                            responseCode >= 400 ? connection.getErrorStream() : connection.getInputStream(),
-                            StandardCharsets.UTF_8))) {
-                StringBuilder response = new StringBuilder();
-                String responseLine;
-                while ((responseLine = br.readLine()) != null) {
-                    response.append(responseLine.trim());
+            HttpURLConnection connection = null;
+            try {
+                URL url = new URL(urlString);
+                connection = (HttpURLConnection) url.openConnection();
+                connection.setRequestMethod(method);
+                
+                // Set common headers
+                connection.setRequestProperty("Content-Type", "application/json");
+                connection.setRequestProperty("Accept", "application/json");
+                
+                // Set token if provided
+                if (token != null && !token.isEmpty()) {
+                    connection.setRequestProperty("Authorization", "Bearer " + token);
                 }
                 
-                // If the response code indicates an error, throw an exception
-                if (responseCode >= 400) {
-                    throw new IOException("HTTP error code: " + responseCode + ", Response: " + response);
+                // Set connection properties
+                connection.setConnectTimeout(10000); // 10 seconds
+                connection.setReadTimeout(30000); // 30 seconds
+                
+                // Send request body for methods that support it
+                if (requestBody != null && !requestBody.isEmpty() && 
+                        ("POST".equals(method) || "PUT".equals(method) || "PATCH".equals(method))) {
+                    connection.setDoOutput(true);
+                    try (OutputStream os = connection.getOutputStream()) {
+                        byte[] input = requestBody.getBytes(StandardCharsets.UTF_8);
+                        os.write(input, 0, input.length);
+                    }
                 }
                 
-                return response.toString();
-            }
-        } finally {
-            if (connection != null) {
-                connection.disconnect();
+                // Check response code
+                int responseCode = connection.getResponseCode();
+                LOG.info("Response code: " + responseCode + " for " + method + " " + urlString);
+                
+                // Read response
+                try (BufferedReader br = new BufferedReader(
+                        new InputStreamReader(
+                                responseCode >= 400 ? connection.getErrorStream() : connection.getInputStream(),
+                                StandardCharsets.UTF_8))) {
+                    StringBuilder response = new StringBuilder();
+                    String responseLine;
+                    while ((responseLine = br.readLine()) != null) {
+                        response.append(responseLine.trim());
+                    }
+                    
+                    // If the response code indicates an error
+                    if (responseCode >= 400) {
+                        String errorMsg = "HTTP error code: " + responseCode + ", Response: " + response;
+                        
+                        // Only retry if it's a server error (5xx) or specific client errors
+                        if (responseCode >= 500 || responseCode == 429) {
+                            lastException = new IOException(errorMsg);
+                            continue; // Retry
+                        } else {
+                            // Don't retry client errors except for 429 (Too Many Requests)
+                            throw new IOException(errorMsg);
+                        }
+                    }
+                    
+                    // Success
+                    return response.toString();
+                }
+            } catch (IOException e) {
+                lastException = e;
+                
+                // Check if this is a connection-related error that might be worth retrying
+                if (e instanceof java.net.ConnectException || 
+                    e instanceof java.net.SocketTimeoutException ||
+                    e instanceof java.net.UnknownHostException) {
+                    LOG.warn("Retryable network error: " + e.getMessage());
+                    continue; // Retry
+                }
+                
+                // For other types of errors, don't retry
+                throw e;
+            } finally {
+                if (connection != null) {
+                    connection.disconnect();
+                }
             }
         }
+        
+        // If we get here, all retries failed
+        if (lastException != null) {
+            LOG.error("All retries failed for request to: " + urlString, lastException);
+            throw lastException;
+        }
+        
+        // Should never reach here, but just in case
+        throw new IOException("Unknown error executing request to: " + urlString);
     }
     
     /**

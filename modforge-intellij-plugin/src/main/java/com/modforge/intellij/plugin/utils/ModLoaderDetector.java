@@ -78,10 +78,10 @@ public class ModLoaderDetector {
         
         // If no contributors are registered, add some default entries
         if (loaders.isEmpty()) {
-            loaders.add(new ModLoaderInfo("forge", "Minecraft Forge", "1.7.10 - 1.20.1", false));
-            loaders.add(new ModLoaderInfo("fabric", "Fabric Mod Loader", "1.14 - 1.20.1", false));
-            loaders.add(new ModLoaderInfo("quilt", "Quilt Mod Loader", "1.18 - 1.20.1", false));
-            loaders.add(new ModLoaderInfo("architectury", "Architectury (Multi-Loader)", "1.16 - 1.20.1", false));
+            loaders.add(new ModLoaderInfo("forge", "Minecraft Forge", "1.7.10 - 1.20.4", false));
+            loaders.add(new ModLoaderInfo("fabric", "Fabric Mod Loader", "1.14 - 1.20.4", false));
+            loaders.add(new ModLoaderInfo("quilt", "Quilt Mod Loader", "1.18 - 1.20.4", false));
+            loaders.add(new ModLoaderInfo("architectury", "Architectury (Multi-Loader)", "1.16 - 1.20.4", false));
         }
         
         return loaders;

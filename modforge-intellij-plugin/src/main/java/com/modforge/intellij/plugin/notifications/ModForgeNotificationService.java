@@ -98,4 +98,44 @@ public final class ModForgeNotificationService {
                 NotificationType.ERROR
         ).notify(project);
     }
+    
+    /**
+     * Show an error notification with exception details.
+     *
+     * @param title     The notification title
+     * @param content   The notification content
+     * @param exception The exception
+     */
+    public void showErrorNotification(
+            @NotNull @NlsContexts.NotificationTitle String title,
+            @NotNull @NlsContexts.NotificationContent String content,
+            @NotNull Throwable exception
+    ) {
+        String exceptionMessage = exception.getMessage();
+        String detailedContent = content;
+        
+        if (exceptionMessage != null && !exceptionMessage.isEmpty()) {
+            detailedContent += "<br><br>Error details: " + exceptionMessage;
+        }
+        
+        Notification notification = MODFORGE_NOTIFICATION_GROUP.createNotification(
+                title,
+                detailedContent,
+                NotificationType.ERROR
+        );
+        
+        // Add stack trace as additional content that can be expanded
+        StringBuilder stackTraceBuilder = new StringBuilder();
+        for (StackTraceElement element : exception.getStackTrace()) {
+            stackTraceBuilder.append(element.toString()).append("<br>");
+        }
+        
+        if (stackTraceBuilder.length() > 0) {
+            notification.addAction(NotificationAction.createSimple("Show Details", () -> {
+                showErrorNotification("Error Details", stackTraceBuilder.toString());
+            }));
+        }
+        
+        notification.notify(project);
+    }
 }
