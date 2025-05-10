@@ -60,28 +60,19 @@ interface GenerateIdeasResponse {
 }
 
 interface ExpandedIdeaResponse {
-  title: string;
-  description: string;
-  detailedDescription: string;
-  features: Array<{
-    name: string;
+  expandedIdea: {
+    title: string;
     description: string;
-    implementation: string;
-  }>;
-  technicalDetails: {
-    requiredDependencies: string[];
-    suggestedModLoader: string;
-    recommendedMcVersions: string[];
-    difficulty: string;
-    estimatedDevTime: string;
-  };
-  compatibility: {
-    compatibleWith: string[];
-    potentialConflicts: string[];
-    notes: string;
-  };
-  fileStructure: string[];
-  nextSteps: string[];
+    detailedFeatures: Array<{
+      name: string;
+      description: string;
+      implementation: string;
+    }>;
+    technicalConsiderations: string[];
+    developmentRoadmap: string[];
+    potentialChallenges: string[];
+    suggestedImplementationApproach: string;
+  }
 }
 
 export default function IdeaGeneratorPage() {
@@ -628,27 +619,16 @@ export default function IdeaGeneratorPage() {
               <div className="lg:col-span-2 space-y-6">
                 <Card>
                   <CardHeader>
-                    <CardTitle>{expandedIdea.title}</CardTitle>
+                    <CardTitle>{expandedIdea.expandedIdea.title}</CardTitle>
                     <CardDescription>
-                      {expandedIdea.description}
+                      {expandedIdea.expandedIdea.description}
                     </CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-4">
                     <div>
-                      <h3 className="text-sm font-medium mb-2">Detailed Description</h3>
-                      <div className="text-sm text-muted-foreground space-y-2">
-                        {expandedIdea.detailedDescription.split('\n\n').map((paragraph, idx) => (
-                          <p key={idx}>{paragraph}</p>
-                        ))}
-                      </div>
-                    </div>
-
-                    <Separator />
-
-                    <div>
                       <h3 className="text-sm font-medium mb-4">Features</h3>
                       <div className="space-y-4">
-                        {expandedIdea.features.map((feature, index) => (
+                        {expandedIdea.expandedIdea.detailedFeatures.map((feature, index) => (
                           <div key={index} className="space-y-2">
                             <h4 className="font-medium">{feature.name}</h4>
                             <p className="text-sm text-muted-foreground">{feature.description}</p>
@@ -665,28 +645,28 @@ export default function IdeaGeneratorPage() {
 
                 <Card>
                   <CardHeader>
-                    <CardTitle className="text-lg">File Structure</CardTitle>
+                    <CardTitle className="text-lg">Implementation Approach</CardTitle>
                     <CardDescription>
-                      Suggested organization for your mod
+                      Suggested approach for development
                     </CardDescription>
                   </CardHeader>
                   <CardContent>
-                    <pre className="text-xs bg-muted rounded-md p-4 overflow-x-auto">
-                      {expandedIdea.fileStructure.join('\n')}
-                    </pre>
+                    <div className="text-sm text-muted-foreground space-y-2">
+                      <p>{expandedIdea.expandedIdea.suggestedImplementationApproach}</p>
+                    </div>
                   </CardContent>
                 </Card>
 
                 <Card>
                   <CardHeader>
-                    <CardTitle className="text-lg">Next Steps</CardTitle>
+                    <CardTitle className="text-lg">Development Roadmap</CardTitle>
                     <CardDescription>
-                      Recommended actions to start developing this mod
+                      Recommended milestones for implementation
                     </CardDescription>
                   </CardHeader>
                   <CardContent>
                     <ol className="list-decimal pl-5 space-y-2">
-                      {expandedIdea.nextSteps.map((step, index) => (
+                      {expandedIdea.expandedIdea.developmentRoadmap.map((step, index) => (
                         <li key={index} className="text-sm">
                           {step}
                         </li>
@@ -708,87 +688,27 @@ export default function IdeaGeneratorPage() {
               <div className="space-y-6">
                 <Card>
                   <CardHeader>
-                    <CardTitle className="text-lg">Technical Details</CardTitle>
+                    <CardTitle className="text-lg">Technical Considerations</CardTitle>
                   </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div>
-                      <h3 className="text-sm font-medium">Difficulty</h3>
-                      <p className="text-sm text-muted-foreground">
-                        {expandedIdea.technicalDetails.difficulty}
-                      </p>
-                    </div>
-                    <div>
-                      <h3 className="text-sm font-medium">Estimated Development Time</h3>
-                      <p className="text-sm text-muted-foreground">
-                        {expandedIdea.technicalDetails.estimatedDevTime}
-                      </p>
-                    </div>
-                    <div>
-                      <h3 className="text-sm font-medium">Suggested Mod Loader</h3>
-                      <p className="text-sm text-muted-foreground">
-                        {expandedIdea.technicalDetails.suggestedModLoader}
-                      </p>
-                    </div>
-                    <div>
-                      <h3 className="text-sm font-medium">Recommended MC Versions</h3>
-                      <div className="flex flex-wrap gap-1 mt-1">
-                        {expandedIdea.technicalDetails.recommendedMcVersions.map((version, idx) => (
-                          <Badge key={idx} variant="outline" className="text-xs">
-                            {version}
-                          </Badge>
-                        ))}
-                      </div>
-                    </div>
-                    <div>
-                      <h3 className="text-sm font-medium">Required Dependencies</h3>
-                      {expandedIdea.technicalDetails.requiredDependencies.length > 0 ? (
-                        <ul className="list-disc pl-5 mt-1">
-                          {expandedIdea.technicalDetails.requiredDependencies.map((dep, idx) => (
-                            <li key={idx} className="text-sm text-muted-foreground">{dep}</li>
-                          ))}
-                        </ul>
-                      ) : (
-                        <p className="text-sm text-muted-foreground">No additional dependencies required</p>
-                      )}
-                    </div>
+                  <CardContent>
+                    <ul className="list-disc pl-5 space-y-2">
+                      {expandedIdea.expandedIdea.technicalConsiderations.map((item, idx) => (
+                        <li key={idx} className="text-sm text-muted-foreground">{item}</li>
+                      ))}
+                    </ul>
                   </CardContent>
                 </Card>
 
                 <Card>
                   <CardHeader>
-                    <CardTitle className="text-lg">Compatibility</CardTitle>
+                    <CardTitle className="text-lg">Potential Challenges</CardTitle>
                   </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div>
-                      <h3 className="text-sm font-medium">Compatible With</h3>
-                      {expandedIdea.compatibility.compatibleWith.length > 0 ? (
-                        <ul className="list-disc pl-5 mt-1">
-                          {expandedIdea.compatibility.compatibleWith.map((mod, idx) => (
-                            <li key={idx} className="text-sm text-muted-foreground">{mod}</li>
-                          ))}
-                        </ul>
-                      ) : (
-                        <p className="text-sm text-muted-foreground">No specific compatibility notes</p>
-                      )}
-                    </div>
-                    <div>
-                      <h3 className="text-sm font-medium">Potential Conflicts</h3>
-                      {expandedIdea.compatibility.potentialConflicts.length > 0 ? (
-                        <ul className="list-disc pl-5 mt-1">
-                          {expandedIdea.compatibility.potentialConflicts.map((mod, idx) => (
-                            <li key={idx} className="text-sm text-muted-foreground">{mod}</li>
-                          ))}
-                        </ul>
-                      ) : (
-                        <p className="text-sm text-muted-foreground">No known conflicts</p>
-                      )}
-                    </div>
-                    <div>
-                      <h3 className="text-sm font-medium">Notes</h3>
-                      <p className="text-sm text-muted-foreground">
-                        {expandedIdea.compatibility.notes}
-                      </p>
-                    </div>
+                  <CardContent>
+                    <ul className="list-disc pl-5 space-y-2">
+                      {expandedIdea.expandedIdea.potentialChallenges.map((challenge, idx) => (
+                        <li key={idx} className="text-sm text-muted-foreground">{challenge}</li>
+                      ))}
+                    </ul>
                   </CardContent>
                 </Card>
 
