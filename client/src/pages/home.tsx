@@ -21,9 +21,17 @@ export default function HomePage() {
     <div className="container mx-auto py-10">
       <div className="flex flex-col md:flex-row gap-8 items-center mb-10">
         <div className="flex-1">
-          <h1 className="text-4xl font-bold mb-4 bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-violet-600">
-            ModForge
-          </h1>
+          <div className="flex items-center space-x-3 mb-4">
+            <div className="flex items-center justify-center w-10 h-10 rounded-md bg-gradient-to-br from-blue-600 to-violet-600">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M7 8h10M7 12h10M7 16h10" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                <rect x="3" y="3" width="18" height="18" rx="2" stroke="white" strokeWidth="2"/>
+              </svg>
+            </div>
+            <h1 className="text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-violet-600">
+              ModForge
+            </h1>
+          </div>
           <p className="text-xl text-muted-foreground mb-6">
             AI-powered Minecraft mod development platform for automated creation, continuous improvement, and seamless collaboration.
           </p>
@@ -171,15 +179,25 @@ export default function HomePage() {
         </TabsContent>
       </Tabs>
 
-      <section className="my-12 py-8 px-6 bg-muted rounded-lg">
-        <h2 className="text-2xl font-bold mb-4 text-center">Ready to revolutionize your Minecraft modding workflow?</h2>
-        <p className="text-center text-muted-foreground mb-6">Create, improve, and publish your mods faster than ever before with AI-powered assistance.</p>
-        <div className="flex justify-center">
-          <Link href="/idea-generator">
-            <Button size="lg" className="bg-gradient-to-r from-blue-600 to-violet-600 hover:from-blue-700 hover:to-violet-700">
-              Get Started Now
-            </Button>
-          </Link>
+      <section className="my-12 py-10 px-6 bg-muted rounded-lg overflow-hidden relative">
+        {/* Decorative gradient overlay */}
+        <div className="absolute -top-24 -right-24 w-48 h-48 bg-gradient-to-br from-blue-600/20 to-violet-600/20 rounded-full blur-xl"></div>
+        <div className="absolute -bottom-24 -left-24 w-48 h-48 bg-gradient-to-tr from-violet-600/20 to-blue-600/20 rounded-full blur-xl"></div>
+        
+        <div className="relative">
+          <h2 className="text-2xl md:text-3xl font-bold mb-4 text-center bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-violet-600">
+            Ready to revolutionize your Minecraft modding workflow?
+          </h2>
+          <p className="text-center text-muted-foreground mb-8 max-w-2xl mx-auto">
+            Create, improve, and publish your mods faster than ever before with AI-powered assistance.
+          </p>
+          <div className="flex justify-center">
+            <Link href="/idea-generator">
+              <Button size="lg" className="bg-gradient-to-r from-blue-600 to-violet-600 hover:from-blue-700 hover:to-violet-700 shadow-lg">
+                Get Started Now
+              </Button>
+            </Link>
+          </div>
         </div>
       </section>
     </div>
@@ -188,13 +206,24 @@ export default function HomePage() {
 
 function FeatureCard({ icon, title, description }: { icon?: React.ReactNode, title: string, description: string }) {
   return (
-    <Card>
-      <CardHeader>
-        {icon && <div className="mb-2">{icon}</div>}
-        <CardTitle>{title}</CardTitle>
+    <Card className="overflow-hidden border-border/50 transition-all duration-200 hover:shadow-md hover:border-border/80">
+      <CardHeader className="pb-2">
+        {icon ? (
+          <div className="mb-3">{icon}</div>
+        ) : (
+          <div className="mb-3">
+            <div className="h-10 w-10 rounded-md bg-gradient-to-br from-blue-600/20 to-violet-600/20 flex items-center justify-center">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M7 8h10M7 12h10M7 16h10" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                <rect x="3" y="3" width="18" height="18" rx="2" stroke="currentColor" strokeWidth="2"/>
+              </svg>
+            </div>
+          </div>
+        )}
+        <CardTitle className="text-lg">{title}</CardTitle>
       </CardHeader>
       <CardContent>
-        <CardDescription className="text-sm">{description}</CardDescription>
+        <CardDescription className="text-sm leading-relaxed">{description}</CardDescription>
       </CardContent>
     </Card>
   );

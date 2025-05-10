@@ -105,10 +105,18 @@ export default function AuthPage() {
     <div className="container mx-auto grid min-h-screen items-center justify-center md:grid-cols-2 gap-6 py-8 bg-background">
       <div className="mx-auto flex w-full flex-col justify-center space-y-6 sm:w-[350px]">
         <div className="flex flex-col space-y-2 text-center">
-          <h1 className="text-2xl font-bold tracking-tight bg-gradient-to-r from-primary to-blue-400 bg-clip-text text-transparent">
+          <div className="flex items-center justify-center mb-2">
+            <div className="flex items-center justify-center w-10 h-10 rounded-md bg-gradient-to-br from-blue-600 to-violet-600">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M7 8h10M7 12h10M7 16h10" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                <rect x="3" y="3" width="18" height="18" rx="2" stroke="white" strokeWidth="2"/>
+              </svg>
+            </div>
+          </div>
+          <h1 className="text-2xl font-bold tracking-tight bg-gradient-to-r from-blue-600 to-violet-600 bg-clip-text text-transparent">
             Welcome to ModForge
           </h1>
-          <p className="text-base text-foreground">
+          <p className="text-base text-muted-foreground">
             {activeTab === "login" 
               ? "Sign in to access your account" 
               : "Create an account to get started"}
@@ -152,7 +160,7 @@ export default function AuthPage() {
                 />
                 <Button 
                   type="submit" 
-                  className="w-full bg-gradient-to-r from-primary to-blue-500 hover:from-primary/90 hover:to-blue-500/90 text-white" 
+                  className="w-full bg-gradient-to-r from-blue-600 to-violet-600 hover:from-blue-700 hover:to-violet-700 text-white" 
                   disabled={loginMutation.isPending}
                 >
                   {loginMutation.isPending ? (
@@ -238,7 +246,7 @@ export default function AuthPage() {
                 />
                 <Button 
                   type="submit" 
-                  className="w-full bg-gradient-to-r from-primary to-blue-500 hover:from-primary/90 hover:to-blue-500/90 text-white" 
+                  className="w-full bg-gradient-to-r from-blue-600 to-violet-600 hover:from-blue-700 hover:to-violet-700 text-white" 
                   disabled={registerMutation.isPending}
                 >
                   {registerMutation.isPending ? (
@@ -269,17 +277,31 @@ export default function AuthPage() {
       </div>
 
       {/* Hero section */}
-      <div className="hidden bg-background border-l p-10 md:flex md:flex-col md:justify-center">
-        <div className="space-y-6">
-          <h1 className="text-3xl font-bold bg-gradient-to-r from-primary to-blue-400 bg-clip-text text-transparent">AI-Powered Minecraft Mod Development</h1>
-          <p className="text-xl text-foreground">
+      <div className="hidden bg-background border-l p-10 md:flex md:flex-col md:justify-center relative overflow-hidden">
+        {/* Decorative gradient background */}
+        <div className="absolute -top-24 -right-24 w-48 h-48 bg-gradient-to-br from-blue-600/10 to-violet-600/10 rounded-full blur-xl"></div>
+        <div className="absolute -bottom-24 -left-24 w-48 h-48 bg-gradient-to-tr from-violet-600/10 to-blue-600/10 rounded-full blur-xl"></div>
+        
+        <div className="space-y-6 relative z-10">
+          <div className="flex items-center mb-4">
+            <div className="flex items-center justify-center w-12 h-12 rounded-md bg-gradient-to-br from-blue-600 to-violet-600 mr-4">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M7 8h10M7 12h10M7 16h10" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                <rect x="3" y="3" width="18" height="18" rx="2" stroke="white" strokeWidth="2"/>
+              </svg>
+            </div>
+            <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-violet-600 bg-clip-text text-transparent">
+              AI-Powered Minecraft Mod Development
+            </h1>
+          </div>
+          <p className="text-xl text-muted-foreground">
             Create, test, and improve Minecraft mods with AI assistance. 
             ModForge handles the complex details, letting you focus on creativity.
           </p>
           <ul className="grid gap-4">
             <li className="flex items-center gap-3">
-              <div className="bg-primary/10 p-1 rounded-full">
-                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5 text-primary">
+              <div className="bg-gradient-to-br from-blue-600/20 to-violet-600/20 p-1 rounded-full">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5 text-blue-600">
                   <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
                   <polyline points="22 4 12 14.01 9 11.01"></polyline>
                 </svg>
@@ -287,8 +309,8 @@ export default function AuthPage() {
               <span className="text-foreground font-medium">Automatic compilation error fixing</span>
             </li>
             <li className="flex items-center gap-3">
-              <div className="bg-primary/10 p-1 rounded-full">
-                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5 text-primary">
+              <div className="bg-gradient-to-br from-blue-600/20 to-violet-600/20 p-1 rounded-full">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5 text-blue-600">
                   <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
                   <polyline points="22 4 12 14.01 9 11.01"></polyline>
                 </svg>
@@ -296,8 +318,8 @@ export default function AuthPage() {
               <span className="text-foreground font-medium">Support for multiple mod loaders</span>
             </li>
             <li className="flex items-center gap-3">
-              <div className="bg-primary/10 p-1 rounded-full">
-                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5 text-primary">
+              <div className="bg-gradient-to-br from-blue-600/20 to-violet-600/20 p-1 rounded-full">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5 text-blue-600">
                   <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
                   <polyline points="22 4 12 14.01 9 11.01"></polyline>
                 </svg>
@@ -305,8 +327,8 @@ export default function AuthPage() {
               <span className="text-foreground font-medium">Continuous development with GitHub</span>
             </li>
             <li className="flex items-center gap-3">
-              <div className="bg-primary/10 p-1 rounded-full">
-                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5 text-primary">
+              <div className="bg-gradient-to-br from-blue-600/20 to-violet-600/20 p-1 rounded-full">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5 text-blue-600">
                   <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
                   <polyline points="22 4 12 14.01 9 11.01"></polyline>
                 </svg>
