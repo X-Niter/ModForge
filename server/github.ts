@@ -1,6 +1,6 @@
 import axios from 'axios';
 import { storage } from "./storage";
-import { log } from "./vite";
+import { githubLogger } from "./logger";
 
 // GitHub API helper class
 class GitHubClient {
@@ -112,7 +112,7 @@ export async function pushModToGitHub(
   
   const addLog = (message: string) => {
     logs += `${message}\n`;
-    log(`[GitHub] ${message}`, 'github');
+    githubLogger.info(message);
   };
   
   try {

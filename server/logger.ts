@@ -1,99 +1,57 @@
 import winston from 'winston';
-import path from 'path';
+import { format } from 'winston';
 import fs from 'fs';
+import path from 'path';
 
-// Define log levels
-const levels = {
-  error: 0,
-  warn: 1,
-  info: 2,
-  http: 3,
-  debug: 4,
-};
-
-// Define level based on environment
-const level = () => {
-  const env = process.env.NODE_ENV || 'development';
-  return env === 'development' ? 'debug' : 'http';
-};
-
-// Define custom colors
-const colors = {
-  error: 'red',
-  warn: 'yellow',
-  info: 'green',
-  http: 'magenta',
-  debug: 'blue',
-};
-
-// Add colors to winston
-winston.addColors(colors);
-
-// Define the format for console output
-const consoleFormat = winston.format.combine(
-  winston.format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss:ms' }),
-  winston.format.colorize({ all: true }),
-  winston.format.printf(
-    (info) => `${info.timestamp} ${info.level}: ${info.message}`,
-  ),
-);
-
-// Define the format for file output (JSON for better parsing)
-const fileFormat = winston.format.combine(
-  winston.format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss:ms' }),
-  winston.format.json(),
-);
-
-// Make sure logs directory exists in production
-if (process.env.NODE_ENV === 'production') {
-  const logDir = path.join(process.cwd(), 'logs');
-  if (!fs.existsSync(logDir)) {
-    fs.mkdirSync(logDir, { recursive: true });
-  }
+// Create logs directory if it doesn't exist
+const logsDir = path.join(process.cwd(), 'logs');
+if (!fs.existsSync(logsDir)) {
+  fs.mkdirSync(logsDir, { recursive: true });
 }
 
-// Define transports array with explicit type annotation to avoid TypeScript errors
-const transports = [] as winston.transport[];
-
-// Add console transport separately to avoid TypeScript errors
-transports.push(
-  new winston.transports.Console({
-    format: consoleFormat,
-  }) as winston.transport
+// Define log format
+const logFormat = format.combine(
+  format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }),
+  format.errors({ stack: true }),
+  format.splat(),
+  format.json()
 );
 
-// Add file transports in production
-if (process.env.NODE_ENV === 'production') {
-  // Log directory
-  const logDir = path.join(process.cwd(), 'logs');
-
-  // Add error log file
-  transports.push(
-    new winston.transports.File({
-      filename: path.join(logDir, 'error.log'),
-      level: 'error',
-      format: fileFormat,
-      maxsize: 5242880, // 5MB
-      maxFiles: 5,
-    }) as winston.transport
-  );
-  
-  // Add combined log file
-  transports.push(
-    new winston.transports.File({
-      filename: path.join(logDir, 'combined.log'),
-      format: fileFormat,
-      maxsize: 5242880, // 5MB
-      maxFiles: 5,
-    }) as winston.transport
-  );
-}
-
-// Create the logger
+// Create logger instance
 const logger = winston.createLogger({
-  level: level(),
-  levels,
-  transports,
+  level: process.env.NODE_ENV === 'production' ? 'info' : 'debug',
+  format: logFormat,
+  defaultMeta: { service: 'mod-forge' },
+  transports: [
+    // Write logs to console
+    new winston.transports.Console({
+      format: format.combine(
+        format.colorize(),
+        format.printf(({ timestamp, level, message, ...meta }) => {
+          return `${timestamp} ${level}: ${message} ${Object.keys(meta).length ? JSON.stringify(meta, null, 2) : ''}`;
+        })
+      ),
+    }),
+    // Write to error log
+    new winston.transports.File({ 
+      filename: path.join(logsDir, 'error.log'),
+      level: 'error',
+    }),
+    // Write all logs to combined log
+    new winston.transports.File({ 
+      filename: path.join(logsDir, 'combined.log'),
+      maxsize: 10485760, // 10MB
+      maxFiles: 5
+    }),
+  ],
 });
 
+// Create specialized loggers for different services
+export const githubLogger = logger.child({ module: 'github' });
+export const aiLogger = logger.child({ module: 'ai-service' });
+export const compilerLogger = logger.child({ module: 'compiler' });
+export const appLogger = logger.child({ module: 'app' });
+export const patternLearningLogger = logger.child({ module: 'pattern-learning' });
+
+// Export default logger
 export default logger;

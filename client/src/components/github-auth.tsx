@@ -5,7 +5,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { useModContext } from "@/context/mod-context";
-import axios from 'axios';
+import { apiRequest } from "@/lib/queryClient";
+import { useMutation } from "@tanstack/react-query";
 
 interface GitHubAuthProps {
   onSuccess?: (token: string) => void;
@@ -26,33 +27,25 @@ interface GitHubPushResponse {
 
 export function GitHubAuth({ onSuccess }: GitHubAuthProps) {
   const [token, setToken] = useState('');
-  const [isVerifying, setIsVerifying] = useState(false);
   const { toast } = useToast();
   const { currentMod } = useModContext();
   
-  // Verify GitHub token
-  const handleVerifyToken = async () => {
-    if (!token) {
-      toast({
-        title: "Token Required",
-        description: "Please enter a GitHub personal access token.",
-        variant: "destructive"
-      });
-      return;
-    }
-    
-    setIsVerifying(true);
-    
-    try {
-      // Verify token by testing it
-      const response = await axios.post<GitHubVerifyResponse>('/api/github/verify-token', { token });
-      const data = response.data;
+  // Verify GitHub token mutation
+  const verifyTokenMutation = useMutation({
+    mutationFn: async (tokenToVerify: string) => {
+      const response = await apiRequest("POST", "/api/github/verify-token", { token: tokenToVerify });
       
+      if (!response.ok) {
+        throw new Error("Failed to verify GitHub token");
+      }
+      
+      return response.json() as Promise<GitHubVerifyResponse>;
+    },
+    onSuccess: (data) => {
       if (data.valid) {
         toast({
           title: "Authentication Successful",
           description: `Connected to GitHub as ${data.username}`,
-          variant: "default"
         });
         
         // Pass token to parent component if needed
@@ -66,19 +59,86 @@ export function GitHubAuth({ onSuccess }: GitHubAuthProps) {
           variant: "destructive"
         });
       }
-    } catch (error) {
+    },
+    onError: (error) => {
       toast({
         title: "Authentication Error",
         description: error instanceof Error ? error.message : "Failed to verify GitHub token.",
         variant: "destructive"
       });
-    } finally {
-      setIsVerifying(false);
     }
+  });
+  
+  // Push to GitHub mutation
+  const pushToGitHubMutation = useMutation({
+    mutationFn: async () => {
+      if (!currentMod) {
+        throw new Error("No mod selected");
+      }
+      
+      const response = await apiRequest(
+        "POST", 
+        `/api/mods/${currentMod.id}/push-to-github`, 
+        { token }
+      );
+      
+      if (!response.ok) {
+        throw new Error("Failed to push to GitHub");
+      }
+      
+      return response.json() as Promise<GitHubPushResponse>;
+    },
+    onSuccess: (data) => {
+      if (data.success && data.repoUrl) {
+        toast({
+          title: "Mod Pushed to GitHub",
+          description: (
+            <div>
+              <p>Your mod has been successfully pushed to GitHub!</p>
+              <a 
+                href={data.repoUrl} 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="underline"
+              >
+                View Repository
+              </a>
+            </div>
+          )
+        });
+      } else {
+        toast({
+          title: "GitHub Push Failed",
+          description: data.error || "Failed to push mod to GitHub.",
+          variant: "destructive"
+        });
+      }
+    },
+    onError: (error) => {
+      toast({
+        title: "GitHub Push Error",
+        description: error instanceof Error ? error.message : "An unknown error occurred.",
+        variant: "destructive"
+      });
+    }
+  });
+
+  // Verify GitHub token handler
+  const handleVerifyToken = () => {
+    if (!token) {
+      toast({
+        title: "Token Required",
+        description: "Please enter a GitHub personal access token.",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    verifyTokenMutation.mutate(token);
   };
   
   // Handle push to GitHub when a mod is selected
-  const handlePushToGitHub = async () => {
+  const handlePushToGitHub = () => {
     if (!currentMod) {
       toast({
         title: "No Mod Selected",
@@ -97,49 +157,7 @@ export function GitHubAuth({ onSuccess }: GitHubAuthProps) {
       return;
     }
     
-    setIsVerifying(true);
-    
-    try {
-      const response = await axios.post<GitHubPushResponse>(
-        `/api/mods/${currentMod.id}/push-to-github`, 
-        { token }
-      );
-      const data = response.data;
-      
-      if (data.success && data.repoUrl) {
-        toast({
-          title: "Mod Pushed to GitHub",
-          description: (
-            <div>
-              <p>Your mod has been successfully pushed to GitHub!</p>
-              <a 
-                href={data.repoUrl} 
-                target="_blank" 
-                rel="noopener noreferrer"
-                className="text-primary underline"
-              >
-                View Repository
-              </a>
-            </div>
-          ),
-          variant: "default"
-        });
-      } else {
-        toast({
-          title: "GitHub Push Failed",
-          description: data.error || "Failed to push mod to GitHub.",
-          variant: "destructive"
-        });
-      }
-    } catch (error) {
-      toast({
-        title: "GitHub Push Error",
-        description: error instanceof Error ? error.message : "An unknown error occurred.",
-        variant: "destructive"
-      });
-    } finally {
-      setIsVerifying(false);
-    }
+    pushToGitHubMutation.mutate();
   };
   
   return (
@@ -199,11 +217,11 @@ export function GitHubAuth({ onSuccess }: GitHubAuthProps) {
         <Button 
           variant="outline" 
           onClick={handleVerifyToken}
-          disabled={!token || isVerifying}
+          disabled={!token || verifyTokenMutation.isPending}
         >
-          {isVerifying ? (
+          {verifyTokenMutation.isPending ? (
             <>
-              <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-primary" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+              <svg className="animate-spin -ml-1 mr-2 h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
               </svg>
@@ -214,11 +232,11 @@ export function GitHubAuth({ onSuccess }: GitHubAuthProps) {
         
         <Button 
           onClick={handlePushToGitHub}
-          disabled={!token || !currentMod || isVerifying}
+          disabled={!token || !currentMod || pushToGitHubMutation.isPending}
         >
-          {isVerifying ? (
+          {pushToGitHubMutation.isPending ? (
             <>
-              <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+              <svg className="animate-spin -ml-1 mr-2 h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
               </svg>
