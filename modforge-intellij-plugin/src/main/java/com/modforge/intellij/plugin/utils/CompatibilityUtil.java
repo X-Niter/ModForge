@@ -134,4 +134,29 @@ public class CompatibilityUtil {
     public static Document getDocument(@NotNull VirtualFile file) {
         return runReadAction(() -> FileDocumentManager.getInstance().getDocument(file));
     }
+    
+    /**
+     * Runs a task on the UI thread with compatibility across IntelliJ versions.
+     * This wraps ApplicationManager.getApplication().invokeLater() with better compatibility.
+     *
+     * @param runnable the task to run on the UI thread
+     */
+    public static void runOnUIThread(@NotNull Runnable runnable) {
+        ApplicationManager.getApplication().invokeLater(runnable);
+    }
+    
+    /**
+     * Runs a task on the UI thread with compatibility across IntelliJ versions
+     * and ensures it's executed only when the project is not disposed.
+     *
+     * @param project the project
+     * @param runnable the task to run on the UI thread
+     */
+    public static void runOnUIThread(@NotNull Project project, @NotNull Runnable runnable) {
+        ApplicationManager.getApplication().invokeLater(() -> {
+            if (!project.isDisposed()) {
+                runnable.run();
+            }
+        });
+    }
 }
