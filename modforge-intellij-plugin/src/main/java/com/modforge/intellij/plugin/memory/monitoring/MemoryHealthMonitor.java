@@ -267,7 +267,9 @@ public class MemoryHealthMonitor implements Disposable {
     private void triggerPreemptiveRecovery() {
         MemoryRecoveryManager recoveryManager = MemoryRecoveryManager.getInstance();
         if (recoveryManager != null) {
-            recoveryManager.initiateRecovery(MemoryRecoveryManager.RecoveryLevel.LEVEL1);
+            // Use performRecovery instead of initiateRecovery (which doesn't exist)
+            // And use the correct enum type RecoveryPriority.MEDIUM
+            recoveryManager.performRecovery(MemoryRecoveryManager.RecoveryPriority.MEDIUM);
         }
     }
     

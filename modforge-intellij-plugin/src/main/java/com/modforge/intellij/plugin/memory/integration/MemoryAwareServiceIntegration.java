@@ -169,7 +169,8 @@ public class MemoryAwareServiceIntegration implements StartupActivity {
                         if (predictedUsagePercentage > severeThreshold && minutesAway <= severeMinutesThreshold) {
                             LOG.warn("Taking preemptive recovery action due to predicted severe memory pressure: " + 
                                     String.format("%.1f", predictedUsagePercentage) + "% in " + minutesAway + " minutes");
-                            recoveryManager.initiateRecovery(MemoryRecoveryManager.RecoveryLevel.LEVEL2);
+                            // Use performRecovery instead of initiateRecovery, with correct enum type
+                            recoveryManager.performRecovery(MemoryRecoveryManager.RecoveryPriority.HIGH);
                         }
                         // If predicting moderate pressure, take lighter preemptive action
                         else if (predictedUsagePercentage > moderateThreshold && minutesAway <= moderateMinutesThreshold) {
