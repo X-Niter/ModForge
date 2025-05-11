@@ -30,9 +30,9 @@ public class ModForgeWebSocketClient {
     private final CopyOnWriteArrayList<WebSocketMessageListener> listeners = new CopyOnWriteArrayList<>();
     
     /**
-     * Creates a new WebSocketClient.
+     * Creates a new ModForgeWebSocketClient.
      */
-    public WebSocketClient() {
+    public ModForgeWebSocketClient() {
     }
     
     /**
