@@ -188,6 +188,91 @@ public class MemoryRecoveryManager {
     }
     
     /**
+     * Add a recovery listener
+     *
+     * @param listener The listener to add
+     */
+    public void addRecoveryListener(@NotNull RecoveryListener listener) {
+        synchronized (recoveryListeners) {
+            recoveryListeners.add(listener);
+            LOG.debug("Added recovery listener: " + listener.getClass().getSimpleName());
+        }
+    }
+    
+    /**
+     * Remove a recovery listener
+     *
+     * @param listener The listener to remove
+     */
+    public void removeRecoveryListener(@NotNull RecoveryListener listener) {
+        synchronized (recoveryListeners) {
+            recoveryListeners.remove(listener);
+            LOG.debug("Removed recovery listener: " + listener.getClass().getSimpleName());
+        }
+    }
+    
+    /**
+     * Notify all recovery listeners that recovery has started
+     *
+     * @param priority The priority of the recovery
+     */
+    private void notifyRecoveryStarted(@NotNull RecoveryPriority priority) {
+        List<RecoveryListener> listeners;
+        synchronized (recoveryListeners) {
+            listeners = new ArrayList<>(recoveryListeners);
+        }
+        
+        for (RecoveryListener listener : listeners) {
+            try {
+                listener.onRecoveryStarted(priority);
+            } catch (Exception e) {
+                LOG.warn("Error notifying recovery listener: " + e.getMessage(), e);
+            }
+        }
+    }
+    
+    /**
+     * Notify all recovery listeners that recovery has completed
+     *
+     * @param priority The priority of the recovery
+     */
+    private void notifyRecoveryCompleted(@NotNull RecoveryPriority priority) {
+        List<RecoveryListener> listeners;
+        synchronized (recoveryListeners) {
+            listeners = new ArrayList<>(recoveryListeners);
+        }
+        
+        for (RecoveryListener listener : listeners) {
+            try {
+                listener.onRecoveryCompleted(priority);
+            } catch (Exception e) {
+                LOG.warn("Error notifying recovery listener: " + e.getMessage(), e);
+            }
+        }
+    }
+    
+    /**
+     * Notify all recovery listeners that recovery has failed
+     *
+     * @param priority The priority of the recovery
+     * @param error The error that occurred
+     */
+    private void notifyRecoveryFailed(@NotNull RecoveryPriority priority, @NotNull Exception error) {
+        List<RecoveryListener> listeners;
+        synchronized (recoveryListeners) {
+            listeners = new ArrayList<>(recoveryListeners);
+        }
+        
+        for (RecoveryListener listener : listeners) {
+            try {
+                listener.onRecoveryFailed(priority, error);
+            } catch (Exception e) {
+                LOG.warn("Error notifying recovery listener: " + e.getMessage(), e);
+            }
+        }
+    }
+    
+    /**
      * Perform memory recovery up to the specified priority level
      *
      * @param maxPriority The maximum priority level to execute
@@ -206,6 +291,9 @@ public class MemoryRecoveryManager {
             LOG.info("Performing memory recovery (priority: " + maxPriority + 
                     ", count: " + count + ")");
             
+            // Notify listeners that recovery has started
+            notifyRecoveryStarted(maxPriority);
+            
             MemoryUtils.logMemoryStats();
             
             // Sort actions by priority
@@ -214,29 +302,39 @@ public class MemoryRecoveryManager {
             
             boolean anyPerformed = false;
             
-            // Execute actions up to the maximum priority
-            for (MemoryRecoveryAction action : sortedActions) {
-                if (action.getPriority().compareTo(maxPriority) <= 0) {
-                    try {
-                        LOG.info("Executing recovery action: " + action.getName() + 
-                                " (priority: " + action.getPriority() + ")");
-                        
-                        boolean success = action.execute();
-                        if (success) {
-                            LOG.info("Recovery action completed successfully: " + action.getName());
-                            anyPerformed = true;
-                        } else {
-                            LOG.warn("Recovery action did not complete successfully: " + action.getName());
+            try {
+                // Execute actions up to the maximum priority
+                for (MemoryRecoveryAction action : sortedActions) {
+                    if (action.getPriority().compareTo(maxPriority) <= 0) {
+                        try {
+                            LOG.info("Executing recovery action: " + action.getName() + 
+                                    " (priority: " + action.getPriority() + ")");
+                            
+                            boolean success = action.execute();
+                            if (success) {
+                                LOG.info("Recovery action completed successfully: " + action.getName());
+                                anyPerformed = true;
+                            } else {
+                                LOG.warn("Recovery action did not complete successfully: " + action.getName());
+                            }
+                        } catch (Exception e) {
+                            LOG.error("Error executing recovery action: " + action.getName(), e);
                         }
-                    } catch (Exception e) {
-                        LOG.error("Error executing recovery action: " + action.getName(), e);
                     }
                 }
+                
+                MemoryUtils.logMemoryStats();
+                
+                // Notify listeners that recovery has completed
+                notifyRecoveryCompleted(maxPriority);
+                
+                return anyPerformed;
+            } catch (Exception e) {
+                // Notify listeners that recovery has failed
+                notifyRecoveryFailed(maxPriority, e);
+                LOG.error("Error performing memory recovery", e);
+                return false;
             }
-            
-            MemoryUtils.logMemoryStats();
-            
-            return anyPerformed;
         } finally {
             recovering.set(false);
         }
@@ -448,6 +546,24 @@ public class MemoryRecoveryManager {
         // Reset state
         recoveryCount.set(0);
         recovering.set(false);
+        
+        // Store current recovery listeners to re-register
+        List<RecoveryListener> currentListeners;
+        synchronized (recoveryListeners) {
+            currentListeners = new ArrayList<>(recoveryListeners);
+            recoveryListeners.clear();
+        }
+        
+        // Reset recovery actions
+        synchronized (recoveryActions) {
+            recoveryActions.clear();
+            registerStandardRecoveryActions();
+        }
+        
+        // Re-register recovery listeners
+        for (RecoveryListener listener : currentListeners) {
+            addRecoveryListener(listener);
+        }
         
         // Restart monitoring
         startMonitoring();
