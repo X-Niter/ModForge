@@ -1,94 +1,146 @@
-# IntelliJ IDEA 2025.1.1.1 Compatibility Guide
+# ModForge IntelliJ IDEA 2025.1.1.1 Compatibility Guide
 
-This guide provides essential information for maintaining compatibility with IntelliJ IDEA 2025.1.1.1 (Build #IC-251.25410.129).
+## Overview
 
-## Common API Changes
+This guide provides comprehensive instructions for ensuring compatibility with IntelliJ IDEA 2025.1.1.1 (Build #IC-251.25410.129).
 
-### Deprecated APIs and Replacements
+## Key Compatibility Issues
 
-| Deprecated API | Replacement | Notes |
-|----------------|-------------|-------|
-| `Project.getBaseDir()` | `CompatibilityUtil.getProjectBaseDir(project)` | Use our utility method for consistent behavior |
-| `FileEditorManager.getSelectedTextEditor()` | `CompatibilityUtil.getSelectedTextEditor(project)` | Handles null checks and version differences |
-| `CacheUpdater`, `CacheUpdaterFacade` | `CompatibilityUtil.refreshAll(project)` | Removed in newer versions |
-| `ApplicationManager.getApplication().runReadAction()` | `CompatibilityUtil.runReadAction()` | More consistent behavior |
-| `ApplicationManager.getApplication().runWriteAction()` | `CompatibilityUtil.runWriteAction()` | More consistent behavior |
-| `PsiManager.getInstance(project).findFile()` | `CompatibilityUtil.findPsiFile(project, file)` | More robust against nulls |
+### Missing Method Errors
 
-### Java 21 Features
-
-IntelliJ IDEA 2025.1.1.1 runs on Java 21, allowing us to use its features:
-
-1. **Virtual Threads**: Use `ThreadUtils.createVirtualThreadExecutor()` for better performance with network operations.
-2. **String Templates**: Available for more concise string formatting.
-3. **Pattern Matching for Switch**: Use for more concise and safer type checking.
-4. **Record Patterns**: Use for destructuring records.
-
-## Service Registration
-
-Services must be properly registered in the plugin.xml file. Use the appropriate service level:
-
-```xml
-<extensions defaultExtensionNs="com.intellij">
-    <!-- Application-level service -->
-    <applicationService serviceImplementation="com.modforge.intellij.plugin.services.ModAuthenticationManager"/>
-    
-    <!-- Project-level service -->
-    <projectService serviceImplementation="com.modforge.intellij.plugin.services.ModForgeNotificationService"/>
-</extensions>
-```
-
-For modern service implementation, use the `@Service` annotation:
+Many "cannot find symbol" errors occur because methods are missing from service classes or have changed signatures:
 
 ```java
-@Service(Service.Level.PROJECT)
-public final class MyService {
-    // Service implementation
+// Error: cannot find symbol - method isPatternRecognition()
+boolean usePatterns = settings.isPatternRecognition();
+
+// Error: cannot find symbol - method getAccessToken()
+String token = settings.getAccessToken();
+```
+
+**Solution:** Ensure all service classes have the required methods with correct signatures.
+
+### Service Implementation Issues
+
+Service classes are missing proper getInstance() methods or other key methods:
+
+```java
+// Error: cannot find symbol - method getInstance(Project)
+AutonomousCodeGenerationService codeGenService = AutonomousCodeGenerationService.getInstance(project);
+
+// Error: cannot find symbol - method generateDocumentation(String,<null>)
+String documentedCode = codeGenService.generateDocumentation(code, null).get();
+```
+
+**Solution:** 
+1. Implement the missing methods
+2. Ensure getInstance() methods are properly defined
+3. Check method signatures across all service classes
+
+### API Changes
+
+APIs like Messages and notifications have changed:
+
+```java
+// Error: cannot find symbol - method showInfoDialog(Project,String,String)
+Messages.showInfoDialog(project, message, title);
+
+// Error: cannot find symbol - method showInfo(String,String)
+notificationService.showInfo("Title", "Message");
+```
+
+**Solution:** Use `CompatibilityUtil` to provide wrapper methods for these APIs.
+
+### Parameter Type Mismatches
+
+Parameter types in method calls don't match expected types:
+
+```java
+// Error: incompatible types: VirtualFile cannot be converted to String
+String code = codeGenService.generateCode(prompt, file, language);
+```
+
+**Solution:** Update method signatures or use proper type conversion.
+
+### DialogWrapper Issues
+
+DialogWrapper override conflicts:
+
+```java
+// Error: getOwner() in PushToGitHubDialog cannot override getOwner() in DialogWrapper
+// return type String is not compatible with Window
+public String getOwner() {
+    return ownerField.getText();
 }
 ```
 
-## Plugin.xml Compatibility
+**Solution:** Rename the method or change the return type to match the parent class.
 
-The plugin.xml file must include the correct IDs and dependency declarations:
+## Implementation Strategy
 
-1. Always use proper `id` elements - never use shorthand notations
-2. Specify version ranges: `sinceBuild="233"` and `untilBuild="251.25410.129"`
-3. Include only essential plugin dependencies
+1. **Create Service Interfaces**:
+   - Define clear interfaces for all services with required methods
+   - Ensure implementation classes adhere to interfaces
 
-## Build System
+2. **Update Compatibility Utilities**:
+   - Add wrappers for all problematic API calls
+   - Create adapter methods for different IntelliJ versions
 
-Our Gradle build is configured to:
+3. **Fix Method Signatures**:
+   - Ensure all parameters match expected types
+   - Add proper annotations (@NotNull, @Nullable)
+   - Use consistent return types
 
-1. Build with Java 17 compatibility (required for IntelliJ 2023.3.6)
-2. Use a Java 21 toolchain for development
-3. Validate plugin structure and versioning
+4. **Standardize Service Access**:
+   - Use consistent getInstance() patterns
+   - Add proper project context to service methods
 
-Always run the `validatePluginForProduction` task before releasing.
+## Testing Approach
 
-## Troubleshooting
+1. **Incremental Testing**:
+   - Fix one category of issues at a time
+   - Compile after each set of changes
 
-### Common Issues
+2. **Verify with Latest IDE**:
+   - Test with IntelliJ IDEA 2025.1.1.1 specifically
+   - Check for runtime exceptions even after compilation succeeds
 
-1. **NoSuchMethodError**: API method may be renamed or removed. Check the IntelliJ API changelog.
-2. **ClassNotFoundException**: Class moved to a different package or removed. Use `CompatibilityUtil`.
-3. **NullPointerException in IDE core**: Check parameter null-safety with `@NotNull` and `@Nullable`.
+3. **Validate Plugin**:
+   - Use `verifyPlugin` Gradle task
+   - Check for any warnings in verification output
 
-### Debugging Steps
+## Recommended Utility Classes
 
-1. Check API changes in the [IntelliJ Platform API Changes Log](https://plugins.jetbrains.com/docs/intellij/api-changes-list.html)
-2. Use our `CompatibilityUtil` class for API version differences
-3. Test with both 2023.3.6 (build target) and 2025.1.1.1 (runtime target)
+1. **CompatibilityUtil.java**:
+   - Project operations (getProjectBaseDir, etc.)
+   - Read/write actions
+   - Dialog wrappers
 
-## Best Practices
+2. **ServiceManager.java**:
+   - Centralized service access
+   - Standard getInstance() implementations
+   - Service registration
 
-1. Always use `@Service` annotation for services
-2. Prefer constructor injection over field injection
-3. Use `ThreadUtils` for thread management
-4. Follow IntelliJ Platform Coding Guidelines
-5. Test with different IntelliJ versions
+3. **NotificationWrapper.java**:
+   - Cross-version notification methods
+   - Standard info/error/warning methods
+   - Proper notification group handling
 
-## Resources
+## Common Error Patterns to Watch For
 
-- [IntelliJ Platform SDK](https://plugins.jetbrains.com/docs/intellij/welcome.html)
-- [Plugin Repository](https://plugins.jetbrains.com/)
-- [ModForge Support Channels](https://modforge.dev/support)
+1. **Cannot find symbol** - Usually means a method is missing or signature has changed
+2. **Incompatible types** - Method parameter or return type mismatch
+3. **Cannot override** - Method signature in child class doesn't match parent
+4. **Method not found** - API method has been removed or relocated
+
+## IntelliJ IDEA 2025.1.1.1 API Changes
+
+Major API changes in this version include:
+
+1. Notification system overhaul
+2. Dialog system refactoring
+3. Project structure API changes
+4. File system access modifications
+5. Service model enhancements
+
+Always check the official IntelliJ Platform SDK documentation for the most recent guidance.

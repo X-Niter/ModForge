@@ -1,376 +1,662 @@
 @echo off
-setlocal EnableDelayedExpansion
+setlocal enabledelayedexpansion
 
-:: ========================================================
-:: ModForge IntelliJ Plugin - Universal Builder v4.0
-:: ========================================================
-:: This single script handles everything:
-:: - Works in any Windows environment
-:: - Configures Java and Gradle appropriately
-:: - Builds the plugin with proper validation settings
-:: - Provides detailed logs and error handling
-:: ========================================================
+REM ===================================
+REM ModForge Ultimate Builder
+REM ===================================
+REM
+REM This script handles the complete build process for ModForge IntelliJ Plugin
+REM including:
+REM  1. Gradle build with proper configuration
+REM  2. Multiple build attempts with different settings if needed
+REM  3. Comprehensive error analysis on build failures
+REM  4. Compatibility scanning for IntelliJ IDEA 2025.1.1.1
+REM  5. Detailed logs and reports for all operations
 
-:: Configuration
-set "VERSION=4.0.0"
-set "PLUGIN_VERSION=2.1.0"
-set "LOG_FILE=ultimate-builder.log"
-set "PLUGIN_PATH=build\distributions\modforge-intellij-plugin-%PLUGIN_VERSION%.zip"
+REM Default values and directories
+set "LOG_DIR=logs"
+set "BUILD_LOG=%LOG_DIR%\build.log"
+set "ERROR_LOG=%LOG_DIR%\error_analysis.log"
+set "TEMP_DIR=%TEMP%\modforge-build"
+set "COMPATIBILITY_REPORT=%LOG_DIR%\compatibility-issues.md"
+set "MISSING_METHODS_REPORT=%LOG_DIR%\missing-methods.md"
+set "RESOLUTION_ERRORS_REPORT=%LOG_DIR%\resolution-errors.md"
+set "SOURCE_DIR=src\main\java"
+set "MAX_BUILD_ATTEMPTS=2"
 
-:: Initialize log file
-echo ModForge IntelliJ IDEA Plugin - Builder v%VERSION% > "%LOG_FILE%"
-echo Started: %DATE% %TIME% >> "%LOG_FILE%"
-echo ======================================================== >> "%LOG_FILE%"
-
-:: Setup nice display
-if exist "%SystemRoot%\system32\chcp.com" (
-  chcp 65001 > nul 2>&1
-  title ModForge Builder v%VERSION%
-)
-
-:: Display header
+echo ===== ModForge Ultimate Builder =====
 echo.
-echo ========================================================
-echo   ModForge IntelliJ Plugin - Universal Builder
-echo ========================================================
-echo   Version %VERSION% - Building plugin v%PLUGIN_VERSION%
-echo ========================================================
+echo Starting build process on %DATE% %TIME%
 echo.
 
-:: Simple logging function that won't break anything
-call :show_log "Builder started"
+REM Create necessary directories
+if not exist "%LOG_DIR%" mkdir "%LOG_DIR%"
+if not exist "%TEMP_DIR%" mkdir "%TEMP_DIR%"
 
-:: Check Java setup
-call :show_log "Checking Java installation..."
+REM Clear previous logs
+if exist "%BUILD_LOG%" del "%BUILD_LOG%"
+if exist "%ERROR_LOG%" del "%ERROR_LOG%"
 
-:: Get Java from JAVA_HOME first
-if defined JAVA_HOME (
-  call :show_log "JAVA_HOME is defined: %JAVA_HOME%"
-  if exist "%JAVA_HOME%\bin\java.exe" (
-    set "JAVA_PATH=%JAVA_HOME%"
-    set "JAVA_BIN=%JAVA_HOME%\bin"
-    call :show_log "Using Java from JAVA_HOME"
-  ) else (
-    call :show_log "Warning: java.exe not found in JAVA_HOME\bin"
-  )
+REM ===================================
+REM Build Attempt Logic
+REM ===================================
+set BUILD_SUCCESS=0
+set BUILD_ATTEMPT=1
+
+:BUILD_LOOP
+echo Attempt %BUILD_ATTEMPT% of %MAX_BUILD_ATTEMPTS%...
+echo.
+
+echo Building plugin with Gradle...
+call gradlew.bat clean buildPlugin --stacktrace > "%BUILD_LOG%" 2>&1
+
+REM Check if build succeeded
+findstr /i /c:"BUILD SUCCESSFUL" "%BUILD_LOG%" > nul
+if !ERRORLEVEL! equ 0 (
+    set BUILD_SUCCESS=1
+    echo Build successful!
+    goto BUILD_DONE
 ) else (
-  call :show_log "JAVA_HOME not defined"
+    echo Build failed. Analyzing errors...
+    
+    REM If this is the last attempt, perform comprehensive error analysis
+    if %BUILD_ATTEMPT% equ %MAX_BUILD_ATTEMPTS% (
+        call :PERFORM_ERROR_ANALYSIS
+    )
+    
+    REM Increment attempt counter
+    set /a BUILD_ATTEMPT+=1
+    
+    REM If we've reached max attempts, stop trying
+    if %BUILD_ATTEMPT% GTR %MAX_BUILD_ATTEMPTS% (
+        goto BUILD_DONE
+    )
+    
+    REM Try again with different settings
+    echo Retrying build with different configuration...
+    
+    REM Adjust Gradle properties for next attempt
+    echo org.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8 > gradle.properties
+    echo org.gradle.parallel=true >> gradle.properties
+    echo org.gradle.caching=true >> gradle.properties
+)
+goto BUILD_LOOP
+
+:BUILD_DONE
+echo.
+if %BUILD_SUCCESS% equ 1 (
+    echo ===== Build completed successfully! =====
+    echo.
+    echo Plugin has been built successfully.
+    echo Plugin file location: build\libs\modforge-intellij-plugin.jar
+) else (
+    echo ===== Build failed after %MAX_BUILD_ATTEMPTS% attempts =====
+    echo.
+    echo Please check the error analysis reports:
+    echo - Build log: %BUILD_LOG%
+    echo - Error analysis: %ERROR_LOG%
+    echo - Compatibility issues: %COMPATIBILITY_REPORT%
+    echo - Missing methods: %MISSING_METHODS_REPORT%
+    echo - Resolution errors: %RESOLUTION_ERRORS_REPORT%
 )
 
-:: If Java not found via JAVA_HOME, look in PATH or use safe fallback
-if not defined JAVA_PATH (
-  call :show_log "Looking for Java in PATH..."
-  where java.exe >nul 2>&1
-  if not errorlevel 1 (
-    :: Temporarily store the Java path in a file to avoid issues with spaces
-    set "JAVA_OUT_FILE=%TEMP%\modforge_java_path.txt"
-    where java.exe > "%JAVA_OUT_FILE%"
+goto :END
+
+REM ===================================
+REM Error Analysis Subroutine
+REM ===================================
+:PERFORM_ERROR_ANALYSIS
+echo.
+echo ===== Performing Comprehensive Error Analysis =====
+echo.
+
+REM Extract key errors from build log
+echo Extracting error patterns...
+echo # ModForge Build Error Analysis > "%ERROR_LOG%"
+echo. >> "%ERROR_LOG%"
+echo ## Extracted Errors >> "%ERROR_LOG%"
+echo. >> "%ERROR_LOG%"
+
+REM Find and extract "error:" lines
+findstr /i /c:"error:" "%BUILD_LOG%" > "%TEMP_DIR%\error_lines.txt"
+
+REM Process each error pattern and categorize
+REM Count different error types
+set /a SYMBOL_ERRORS=0
+set /a TYPE_ERRORS=0
+set /a OVERRIDE_ERRORS=0
+set /a OTHER_ERRORS=0
+
+REM Process symbol errors
+findstr /i /c:"cannot find symbol" "%BUILD_LOG%" > "%TEMP_DIR%\symbol_errors.txt"
+for /f %%a in ('type "%TEMP_DIR%\symbol_errors.txt" ^| find /c /v ""') do set SYMBOL_ERRORS=%%a
+
+REM Process incompatible type errors
+findstr /i /c:"incompatible types" "%BUILD_LOG%" > "%TEMP_DIR%\type_errors.txt"
+for /f %%a in ('type "%TEMP_DIR%\type_errors.txt" ^| find /c /v ""') do set TYPE_ERRORS=%%a
+
+REM Process override errors
+findstr /i /c:"cannot override" "%BUILD_LOG%" > "%TEMP_DIR%\override_errors.txt"
+for /f %%a in ('type "%TEMP_DIR%\override_errors.txt" ^| find /c /v ""') do set OVERRIDE_ERRORS=%%a
+
+REM Calculate other errors
+for /f %%a in ('type "%TEMP_DIR%\error_lines.txt" ^| find /c /v ""') do (
+    set /a TOTAL_ERRORS=%%a
+    set /a OTHER_ERRORS=!TOTAL_ERRORS!-!SYMBOL_ERRORS!-!TYPE_ERRORS!-!OVERRIDE_ERRORS!
+)
+
+REM Add error summary to log
+echo ### Error Summary >> "%ERROR_LOG%"
+echo. >> "%ERROR_LOG%"
+echo - Cannot find symbol errors: %SYMBOL_ERRORS% >> "%ERROR_LOG%"
+echo - Incompatible types errors: %TYPE_ERRORS% >> "%ERROR_LOG%"
+echo - Override errors: %OVERRIDE_ERRORS% >> "%ERROR_LOG%"
+echo - Other errors: %OTHER_ERRORS% >> "%ERROR_LOG%"
+echo - Total errors: %TOTAL_ERRORS% >> "%ERROR_LOG%"
+echo. >> "%ERROR_LOG%"
+
+REM Extract specific error details
+echo ### Cannot Find Symbol Errors >> "%ERROR_LOG%"
+echo. >> "%ERROR_LOG%"
+echo ```java >> "%ERROR_LOG%"
+type "%TEMP_DIR%\symbol_errors.txt" >> "%ERROR_LOG%"
+echo ``` >> "%ERROR_LOG%"
+echo. >> "%ERROR_LOG%"
+
+echo ### Incompatible Types Errors >> "%ERROR_LOG%"
+echo. >> "%ERROR_LOG%"
+echo ```java >> "%ERROR_LOG%"
+type "%TEMP_DIR%\type_errors.txt" >> "%ERROR_LOG%"
+echo ``` >> "%ERROR_LOG%"
+echo. >> "%ERROR_LOG%"
+
+echo ### Override Errors >> "%ERROR_LOG%"
+echo. >> "%ERROR_LOG%"
+echo ```java >> "%ERROR_LOG%"
+type "%TEMP_DIR%\override_errors.txt" >> "%ERROR_LOG%"
+echo ``` >> "%ERROR_LOG%"
+echo. >> "%ERROR_LOG%"
+
+REM Perform in-depth compatibility analysis
+echo Performing API compatibility analysis...
+call :RUN_COMPATIBILITY_SCAN
+
+REM Analyze missing methods
+echo Analyzing missing methods and "cannot find symbol" errors...
+call :FIND_MISSING_METHODS
+
+REM Analyze resolution errors
+echo Analyzing potential resolution errors...
+call :FIND_RESOLUTION_ERRORS
+
+echo Error analysis complete!
+echo.
+
+goto :EOF
+
+REM ===================================
+REM Compatibility Scan Subroutine
+REM ===================================
+:RUN_COMPATIBILITY_SCAN
+echo.
+echo === Running API Compatibility Scan ===
+
+REM Create output file with header
+> "%COMPATIBILITY_REPORT%" (
+    echo # ModForge IntelliJ IDEA 2025.1.1.1 Compatibility Issues 
+    echo. 
+    echo This report contains potential compatibility issues found in the codebase. 
+    echo Generated on %DATE% %TIME%. 
+    echo. 
+    echo ## Overview 
+    echo. 
+    echo This scan looks for deprecated APIs, problematic patterns, and compatibility issues 
+    echo that might affect the plugin's functionality with IntelliJ IDEA 2025.1.1.1. 
+    echo. 
+    echo ## Known Deprecated APIs and Replacements 
+    echo. 
+    echo * **Project.getBaseDir()** - Replace with CompatibilityUtil.getProjectBaseDir(project) - Removed in 2020.3+ 
+    echo * **CacheUpdater** - Replace with CompatibilityUtil.refreshAll(project) - Removed in 2020.1+ 
+    echo * **CacheUpdaterFacade** - Replace with CompatibilityUtil.refreshAll(project) - Removed in 2020.1+ 
+    echo * **ApplicationManager.getApplication().runReadAction()** - Replace with CompatibilityUtil.runReadAction() 
+    echo * **ApplicationManager.getApplication().runWriteAction()** - Replace with CompatibilityUtil.runWriteAction() 
+    echo. 
+)
+
+REM Check if the source directory exists
+if not exist "%SOURCE_DIR%" (
+    echo Source directory does not exist: %SOURCE_DIR%
+    >> "%COMPATIBILITY_REPORT%" (
+        echo ## Error
+        echo.
+        echo Source directory does not exist: %SOURCE_DIR%
+    )
+    goto :EOF
+)
+
+REM Find all Java files
+dir /s /b "%SOURCE_DIR%\*.java" > "%TEMP_DIR%\java_files.txt" 2>nul
+
+REM Count total files
+set /a TOTAL_FILES=0
+for /f %%f in (%TEMP_DIR%\java_files.txt) do set /a TOTAL_FILES+=1
+
+REM Initialize counters
+set /a TOTAL_ISSUES=0
+set /a AFFECTED_FILES=0
+
+if exist "%TEMP_DIR%\found_file.tmp" del "%TEMP_DIR%\found_file.tmp" 2>nul
+if exist "%TEMP_DIR%\matches.txt" del "%TEMP_DIR%\matches.txt" 2>nul
+
+REM Process each file
+set PROCESSED=0
+
+if %TOTAL_FILES% equ 0 (
+    echo No Java files found in %SOURCE_DIR%
+    >> "%COMPATIBILITY_REPORT%" (
+        echo ## Error
+        echo.
+        echo No Java files found in %SOURCE_DIR%
+    )
+    goto :EOF
+)
+
+for /f "delims=" %%f in (%TEMP_DIR%\java_files.txt) do (
+    set /a PROCESSED+=1
     
-    :: Check the file exists and is not empty
-    if exist "%JAVA_OUT_FILE%" (
-      for %%F in ("%JAVA_OUT_FILE%") do if %%~zF gtr 0 (
-        :: Get the first Java found (most likely the default one)
-        set /p JAVA_EXE=<"%JAVA_OUT_FILE%"
-        if defined JAVA_EXE (
-          call :show_log "Found Java: !JAVA_EXE!"
-          
-          :: Extract the bin directory - need to handle spaces carefully
-          for %%i in ("!JAVA_EXE!") do set "JAVA_BIN=%%~dpi"
-          
-          :: Make sure we have a valid path
-          if defined JAVA_BIN (
-            :: Remove trailing slash if present
-            IF "!JAVA_BIN:~-1!" == "\" SET "JAVA_BIN=!JAVA_BIN:~0,-1!"
-            call :show_log "Java bin: !JAVA_BIN!"
-            
-            :: Special check for Java path that could be in Common Files
-            set "USE_STANDARD_PATH=0"
-            if "!JAVA_BIN!" == "C:\Program Files\Common Files\Oracle\Java\javapath" set "USE_STANDARD_PATH=1"
-            if "!JAVA_BIN!" == "C:\Program Files (x86)\Common Files\Oracle\Java\javapath" set "USE_STANDARD_PATH=1"
-            
-            if "!USE_STANDARD_PATH!" == "1" (
-              call :show_log "Detected Oracle JDK in Common Files path - using a standard JDK path"
-              set "JAVA_PATH=C:\Program Files\Java\jdk-21"
-              set "JAVA_BIN=C:\Program Files\Java\jdk-21\bin"
-            ) else (
-              :: Normal handling for typical Java installs
-              set "JAVA_PATH=!JAVA_BIN:~0,-4!"
-              if "!JAVA_PATH:~-1!" == "\" set "JAVA_PATH=!JAVA_PATH:~0,-1!"
-            )
-          ) else (
-            call :show_log "Error extracting bin directory from !JAVA_EXE!"
-            set "JAVA_PATH=C:\Program Files\Java\jdk-21"
-            set "JAVA_BIN=C:\Program Files\Java\jdk-21\bin"
-          )
-        ) else (
-          call :show_log "Error reading Java path from file"
-          set "JAVA_PATH=C:\Program Files\Java\jdk-21"
-          set "JAVA_BIN=C:\Program Files\Java\jdk-21\bin"
+    REM Progress indicator
+    set /a MOD=!PROCESSED! %% 10
+    if !MOD! equ 0 (
+        echo Processed !PROCESSED! of %TOTAL_FILES% files...
+    )
+    
+    REM Check for key patterns
+    for %%p in (getBaseDir CacheUpdater CacheUpdaterFacade runReadAction runWriteAction getSelectedTextEditor ApplicationComponent ProjectComponent ModuleComponent createXmlTag) do (
+        findstr /c:"%%p" "%%f" >nul 2>&1
+        if !ERRORLEVEL! equ 0 (
+            echo %%f:%%p >> "%TEMP_DIR%\matches.txt"
+            echo 1 > "%TEMP_DIR%\found_file.tmp"
         )
-      ) else (
-        call :show_log "Java path file is empty"
-        set "JAVA_PATH=C:\Program Files\Java\jdk-21"
-        set "JAVA_BIN=C:\Program Files\Java\jdk-21\bin"
-      )
-    ) else (
-      call :show_log "Error creating Java path file"
-      set "JAVA_PATH=C:\Program Files\Java\jdk-21"
-      set "JAVA_BIN=C:\Program Files\Java\jdk-21\bin"
     )
     
-    call :show_log "Using Java path: !JAVA_PATH!"
-  ) else (
-    call :show_log "Java not found in PATH, using fallback path"
-    set "JAVA_PATH=C:\Program Files\Java\jdk-21"
-    set "JAVA_BIN=C:\Program Files\Java\jdk-21\bin"
-  )
-)
-
-:: Make sure we have Java
-if not defined JAVA_PATH (
-  call :show_log "ERROR: Java not found. Please install Java 21 or set JAVA_HOME."
-  goto :build_failed
-)
-
-:: Check if Java bin directory actually exists
-if not exist "%JAVA_BIN%" (
-  call :show_log "Warning: Java bin directory %JAVA_BIN% doesn't exist"
-  call :show_log "Looking for alternative Java installations..."
-  
-  :: Try to find a Java 21 installation in standard locations
-  if exist "C:\Program Files\Java\jdk-21\bin" (
-    set "JAVA_PATH=C:\Program Files\Java\jdk-21"
-    set "JAVA_BIN=C:\Program Files\Java\jdk-21\bin"
-    call :show_log "Found alternative Java at: %JAVA_PATH%"
-  ) else if exist "C:\Program Files\Eclipse Adoptium\jdk-21.0.1.12-hotspot\bin" (
-    set "JAVA_PATH=C:\Program Files\Eclipse Adoptium\jdk-21.0.1.12-hotspot"
-    set "JAVA_BIN=C:\Program Files\Eclipse Adoptium\jdk-21.0.1.12-hotspot\bin"
-    call :show_log "Found alternative Java at: %JAVA_PATH%"
-  )
-)
-
-:: Check Java version
-call :show_log "Checking Java version..."
-if exist "%JAVA_BIN%\java.exe" (
-  "%JAVA_BIN%\java.exe" -version 2>&1 | findstr /i "21\." >nul
-  if not errorlevel 1 (
-    call :show_log "Confirmed Java 21 is available"
-  ) else (
-    call :show_log "Warning: Java version may not be 21. This might cause issues."
-  )
-) else (
-  call :show_log "Warning: java.exe not found in %JAVA_BIN%"
-  call :show_log "Will try to continue anyway..."
-)
-
-:: Fix paths for Gradle - ensure no trailing spaces and handle paths with spaces
-:: First, force exact path
-if "%JAVA_PATH%" == "C:\Program Files\Java\jdk-21" (
-  :: This is a known good path - make sure we clean it up properly
-  set "JAVA_PATH_NORM=C:/Program Files/Java/jdk-21"
-) else (
-  :: For any other paths, clean up very carefully
-  set "TEMP_PROP_FILE=%TEMP%\modforge_path.txt"
-  echo %JAVA_PATH%> "%TEMP_PROP_FILE%"
-  
-  :: Read the file line by line to preserve spaces but trim the end
-  for /f "usebackq tokens=*" %%p in ("%TEMP_PROP_FILE%") do (
-    set "SAFE_PATH=%%p"
-    :: Trim any trailing spaces (this is a common issue)
-    :: First ensure path doesn't end with a space
-    set "CLEAN_PATH="
-    set "JAVA_PATH_FIXED=!SAFE_PATH!"
-    
-    :: Loop through each character to ensure no trailing spaces
-    set "len=0"
-    :loop
-    if not "!JAVA_PATH_FIXED:~%len%,1!" == "" (
-      set /a "len+=1"
-      goto :loop
+    if exist "%TEMP_DIR%\found_file.tmp" (
+        set /a AFFECTED_FILES+=1
+        del "%TEMP_DIR%\found_file.tmp" 2>nul
     )
-    
-    :: Now that we know the length, copy without any trailing spaces
-    set /a "clean_len=%len%"
-    :trim_loop
-    if "%clean_len%" gtr "0" (
-      set /a "idx=%clean_len%-1"
-      if "!JAVA_PATH_FIXED:~%idx%,1!" == " " (
-        set /a "clean_len-=1"
-        goto :trim_loop
-      )
+)
+
+REM Count total issues
+if exist "%TEMP_DIR%\matches.txt" (
+    for /f %%a in ('type "%TEMP_DIR%\matches.txt" ^| find /c /v ""') do set TOTAL_ISSUES=%%a
+)
+
+REM Add summary to output file
+>> "%COMPATIBILITY_REPORT%" (
+    echo ## Summary 
+    echo. 
+    echo * Total Java files scanned: %TOTAL_FILES% 
+    echo * Files with potential compatibility issues: %AFFECTED_FILES% 
+    echo * Total potential issues found: %TOTAL_ISSUES% 
+    echo. 
+    echo ## Detailed Issue List 
+    echo. 
+)
+
+REM Process and add issues to output file
+if exist "%TEMP_DIR%\matches.txt" (
+    for /f "tokens=1,2 delims=:" %%a in (%TEMP_DIR%\matches.txt) do (
+        >> "%COMPATIBILITY_REPORT%" (
+            echo ### Issue in %%a 
+            echo. 
+            echo * Potential problem: `%%b` 
+        )
+        
+        REM Add suggested fix based on pattern
+        if "%%b"=="getBaseDir" (
+            echo * **Suggested fix:** Replace `Project.getBaseDir()` with `CompatibilityUtil.getProjectBaseDir(project)` >> "%COMPATIBILITY_REPORT%"
+        ) else if "%%b"=="CacheUpdater" (
+            echo * **Suggested fix:** Replace with `CompatibilityUtil.refreshAll(project)` >> "%COMPATIBILITY_REPORT%"
+        ) else if "%%b"=="runReadAction" (
+            echo * **Suggested fix:** Replace with `CompatibilityUtil.runReadAction(() -> { ... })` >> "%COMPATIBILITY_REPORT%"
+        ) else if "%%b"=="runWriteAction" (
+            echo * **Suggested fix:** Replace with `CompatibilityUtil.runWriteAction(() -> { ... })` >> "%COMPATIBILITY_REPORT%"
+        ) else if "%%b"=="getSelectedTextEditor" (
+            echo * **Suggested fix:** Replace with `CompatibilityUtil.getSelectedTextEditor(project)` >> "%COMPATIBILITY_REPORT%"
+        ) else if "%%b"=="ProjectComponent" (
+            echo * **Suggested fix:** Replace with `@Service(Service.Level.PROJECT)` annotation >> "%COMPATIBILITY_REPORT%"
+        ) else if "%%b"=="ApplicationComponent" (
+            echo * **Suggested fix:** Replace with `@Service(Service.Level.APPLICATION)` annotation >> "%COMPATIBILITY_REPORT%"
+        ) else (
+            echo * **Suggested fix:** Check compatibility with IntelliJ IDEA 2025.1.1.1 and use `CompatibilityUtil` methods where appropriate >> "%COMPATIBILITY_REPORT%"
+        )
+        
+        echo. >> "%COMPATIBILITY_REPORT%"
     )
-    
-    :: Get the cleaned string by taking just the first clean_len characters
-    set "SAFE_PATH=!JAVA_PATH_FIXED:~0,%clean_len%!"
-  )
-  
-  :: Convert backslashes to forward slashes for Gradle
-  set "JAVA_PATH_NORM=!SAFE_PATH:\=/!"
-)
-
-call :show_log "Using Java path for Gradle: %JAVA_PATH_NORM%"
-
-:: Check for Gradle wrapper
-if exist "gradlew.bat" (
-  call :show_log "Found Gradle wrapper: gradlew.bat"
-  set "GRADLE_CMD=gradlew.bat"
-) else if exist "gradlew" (
-  call :show_log "Found Gradle wrapper: gradlew"
-  set "GRADLE_CMD=gradlew"
 ) else (
-  call :show_log "Gradle wrapper not found, checking for Gradle in PATH..."
-  
-  where gradle >nul 2>&1
-  if not errorlevel 1 (
-    call :show_log "Found Gradle in PATH"
-    set "GRADLE_CMD=gradle"
-  ) else (
-    call :show_log "Gradle not found. Creating minimal Gradle wrapper..."
-    call :create_minimal_wrapper
-  )
+    echo No compatibility issues found! >> "%COMPATIBILITY_REPORT%"
 )
 
-:: Create gradle.properties - special handling for paths with spaces
-call :show_log "Creating Gradle properties file..."
+echo Compatibility analysis complete.
+goto :EOF
 
-:: Create a temporary properties file to ensure paths are correctly formatted
-(
-  echo # Generated by ModForge Builder v%VERSION%
-  echo # %DATE% %TIME%
-  echo.
-  echo # Java home for building
-  echo org.gradle.java.home=%JAVA_PATH_NORM%
-  echo.
-  echo # Disable configuration cache to avoid issues
-  echo org.gradle.configuration-cache=false
-  echo.
-  echo # Memory settings
-  echo org.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8
-  echo.
-  echo # Performance settings
-  echo org.gradle.parallel=true
-  echo org.gradle.daemon=true
-  echo org.gradle.caching=true
-) > "%TEMP%\modforge_gradle.properties"
-
-:: Copy the temp file to the actual gradle.properties to avoid any issues with redirection
-copy /Y "%TEMP%\modforge_gradle.properties" gradle.properties >nul
-
-:: Build the plugin
-call :show_log "Building IntelliJ plugin..."
-set "BUILD_OK=0"
-
-:: First build attempt
-call :show_log "Running first build attempt..."
-call %GRADLE_CMD% clean build > build.log 2>&1
-
-:: Check if build succeeded
-if exist "%PLUGIN_PATH%" (
-  call :show_log "Build successful on first attempt!"
-  set "BUILD_OK=1"
-) else (
-  call :show_log "First build attempt failed. Trying with validation disabled..."
-  
-  :: Backup build.gradle if exists
-  if exist "build.gradle" (
-    copy build.gradle build.gradle.bak >nul
-    
-    :: Create a temporary file without validation
-    findstr /v /c:"validatePluginForProduction" build.gradle > build.gradle.tmp
-    move /y build.gradle.tmp build.gradle >nul
-    
-    :: Try build again
-    call :show_log "Running second build attempt with validation disabled..."
-    call %GRADLE_CMD% clean build > build_simple.log 2>&1
-    
-    :: Restore original build.gradle
-    move /y build.gradle.bak build.gradle >nul
-    
-    :: Check if this build succeeded
-    if exist "%PLUGIN_PATH%" (
-      call :show_log "Build successful with validation disabled!"
-      set "BUILD_OK=1"
-    ) else (
-      call :show_log "Build failed even with validation disabled."
-    )
-  ) else (
-    call :show_log "Error: build.gradle not found."
-  )
-)
-
-:: Check final build result
-if "%BUILD_OK%" == "1" (
-  goto :build_succeeded
-) else (
-  goto :build_failed
-)
-
-:: ===================================
-:: BUILD RESULT HANDLERS
-:: ===================================
-
-:build_succeeded
+REM ===================================
+REM Missing Methods Scan Subroutine
+REM ===================================
+:FIND_MISSING_METHODS
 echo.
-echo ========================================================
-echo   BUILD SUCCESSFUL
-echo ========================================================
-echo.
-call :show_log "Plugin file created: %CD%\%PLUGIN_PATH%"
-echo Plugin file created:
-echo %CD%\%PLUGIN_PATH%
-echo.
-echo You can install it manually via:
-echo Settings → Plugins → ⚙ → Install Plugin from Disk...
-echo.
-goto :end
+echo === Running Missing Methods Analysis ===
 
-:build_failed
-echo.
-echo ========================================================
-echo   BUILD FAILED
-echo ========================================================
-echo.
-call :show_log "Build process failed."
-echo Please check the log files for details:
-echo - %LOG_FILE%
-echo - build.log
-echo - build_simple.log
-echo.
-goto :end
-
-:end
-call :show_log "Build process completed."
-echo Log file: %LOG_FILE%
-pause
-exit /b
-
-:: ===================================
-:: UTILITY FUNCTIONS
-:: ===================================
-
-:show_log
-  echo %* >> "%LOG_FILE%"
-  echo %*
-  goto :EOF
-
-:create_minimal_wrapper
-  call :show_log "Creating minimal Gradle wrapper..."
-  
-  (
-    echo @echo off
-    echo echo Running Gradle build with auto-download...
+REM Create output file with header
+> "%MISSING_METHODS_REPORT%" (
+    echo # Missing Methods and Symbol Resolution Report
     echo.
-    echo :: Try to use system Gradle first
-    echo call gradle %%* 2^>nul
-    echo if %%errorlevel%% == 0 exit /b 0
+    echo This report identifies methods that are called but might not be implemented,
+    echo which leads to "cannot find symbol" errors during compilation.
     echo.
-    echo echo System Gradle not available. Using simplified wrapper...
-    echo if not exist gradle-wrapper mkdir gradle-wrapper
+    echo Generated on %DATE% %TIME%.
     echo.
-    echo :: Use Java to run simple Gradle build
-    echo "%JAVA_BIN%\java" -Dorg.gradle.appname=gradlew -jar gradle-wrapper\gradle-wrapper.jar %%*
-  ) > gradlew.bat
-  
-  call :show_log "Created minimal gradlew.bat"
-  set "GRADLE_CMD=gradlew.bat"
-  goto :EOF
+    echo ## Overview
+    echo.
+    echo This analysis looks for:
+    echo.
+    echo 1. Methods called on service classes that might not exist
+    echo 2. Method signature mismatches between calls and definitions
+    echo 3. Missing getInstance() methods on service classes
+    echo 4. Missing methods in common utility classes
+    echo.
+)
+
+REM Extract method calls from build errors
+findstr /i /c:"symbol:   method" "%BUILD_LOG%" > "%TEMP_DIR%\missing_methods.txt"
+findstr /i /c:"location: variable" "%BUILD_LOG%" > "%TEMP_DIR%\locations.txt"
+
+REM Create a consolidated report of missing methods
+>> "%MISSING_METHODS_REPORT%" (
+    echo ## Missing Methods from Build Errors
+    echo.
+    echo These methods are referenced in the code but could not be found during compilation:
+    echo.
+)
+
+REM Process missing methods from build log
+if exist "%TEMP_DIR%\missing_methods.txt" (
+    for /f "tokens=*" %%m in (%TEMP_DIR%\missing_methods.txt) do (
+        set "METHOD_LINE=%%m"
+        set "METHOD=!METHOD_LINE:*method =!"
+        echo - **!METHOD!** >> "%MISSING_METHODS_REPORT%"
+    )
+    
+    echo. >> "%MISSING_METHODS_REPORT%"
+    echo ## Service Classes with Missing Methods >> "%MISSING_METHODS_REPORT%"
+    echo. >> "%MISSING_METHODS_REPORT%"
+    
+    REM Analyze common service classes
+    echo ### ModForgeSettings Implementation Issues >> "%MISSING_METHODS_REPORT%"
+    echo. >> "%MISSING_METHODS_REPORT%"
+    findstr /i /c:"settings" "%TEMP_DIR%\locations.txt" > "%TEMP_DIR%\settings_locations.txt"
+    if exist "%TEMP_DIR%\settings_locations.txt" (
+        echo The following methods might be missing from ModForgeSettings: >> "%MISSING_METHODS_REPORT%"
+        echo. >> "%MISSING_METHODS_REPORT%"
+        echo ```java >> "%MISSING_METHODS_REPORT%"
+        echo // Required methods: >> "%MISSING_METHODS_REPORT%"
+        echo public class ModForgeSettings { >> "%MISSING_METHODS_REPORT%"
+        echo     public String getAccessToken() { ... } >> "%MISSING_METHODS_REPORT%"
+        echo     public boolean isPatternRecognition() { ... } >> "%MISSING_METHODS_REPORT%"
+        echo     public String getGitHubUsername() { ... } >> "%MISSING_METHODS_REPORT%"
+        echo     public void openSettings(Project project) { ... } >> "%MISSING_METHODS_REPORT%"
+        echo     // other methods... >> "%MISSING_METHODS_REPORT%"
+        echo } >> "%MISSING_METHODS_REPORT%"
+        echo ``` >> "%MISSING_METHODS_REPORT%"
+        echo. >> "%MISSING_METHODS_REPORT%"
+    )
+    
+    echo ### ModAuthenticationManager Implementation Issues >> "%MISSING_METHODS_REPORT%"
+    echo. >> "%MISSING_METHODS_REPORT%"
+    findstr /i /c:"authManager" "%TEMP_DIR%\locations.txt" > "%TEMP_DIR%\auth_locations.txt"
+    if exist "%TEMP_DIR%\auth_locations.txt" (
+        echo The following methods might be missing from ModAuthenticationManager: >> "%MISSING_METHODS_REPORT%"
+        echo. >> "%MISSING_METHODS_REPORT%"
+        echo ```java >> "%MISSING_METHODS_REPORT%"
+        echo // Required methods: >> "%MISSING_METHODS_REPORT%"
+        echo public class ModAuthenticationManager { >> "%MISSING_METHODS_REPORT%"
+        echo     public boolean login(String username, String password) { ... } >> "%MISSING_METHODS_REPORT%"
+        echo     public void logout() { ... } >> "%MISSING_METHODS_REPORT%"
+        echo     public String getUsername() { ... } >> "%MISSING_METHODS_REPORT%"
+        echo     // other methods... >> "%MISSING_METHODS_REPORT%"
+        echo } >> "%MISSING_METHODS_REPORT%"
+        echo ``` >> "%MISSING_METHODS_REPORT%"
+        echo. >> "%MISSING_METHODS_REPORT%"
+    )
+    
+    echo ### AutonomousCodeGenerationService Implementation Issues >> "%MISSING_METHODS_REPORT%"
+    echo. >> "%MISSING_METHODS_REPORT%"
+    findstr /i /c:"codeGenService" /c:"AutonomousCodeGenerationService" "%TEMP_DIR%\locations.txt" > "%TEMP_DIR%\codegen_locations.txt"
+    if exist "%TEMP_DIR%\codegen_locations.txt" (
+        echo The following methods might be missing from AutonomousCodeGenerationService: >> "%MISSING_METHODS_REPORT%"
+        echo. >> "%MISSING_METHODS_REPORT%"
+        echo ```java >> "%MISSING_METHODS_REPORT%"
+        echo // Required static method: >> "%MISSING_METHODS_REPORT%"
+        echo public class AutonomousCodeGenerationService { >> "%MISSING_METHODS_REPORT%"
+        echo     public static AutonomousCodeGenerationService getInstance(Project project) { ... } >> "%MISSING_METHODS_REPORT%"
+        echo      >> "%MISSING_METHODS_REPORT%"
+        echo     // Required instance methods: >> "%MISSING_METHODS_REPORT%"
+        echo     public String generateCode(String prompt, VirtualFile contextFile, String language) { ... } >> "%MISSING_METHODS_REPORT%"
+        echo     public String fixCode(String code, String errorMessage, String language) { ... } >> "%MISSING_METHODS_REPORT%"
+        echo     public CompletableFuture<String> generateDocumentation(String code, Object options) { ... } >> "%MISSING_METHODS_REPORT%"
+        echo     public CompletableFuture<String> explainCode(String code, Object options) { ... } >> "%MISSING_METHODS_REPORT%"
+        echo     public boolean generateImplementation(String interfaceName, String packageName, String className) { ... } >> "%MISSING_METHODS_REPORT%"
+        echo     // other methods... >> "%MISSING_METHODS_REPORT%"
+        echo } >> "%MISSING_METHODS_REPORT%"
+        echo ``` >> "%MISSING_METHODS_REPORT%"
+        echo. >> "%MISSING_METHODS_REPORT%"
+    )
+    
+    echo ## Type Compatibility Issues >> "%MISSING_METHODS_REPORT%"
+    echo. >> "%MISSING_METHODS_REPORT%"
+    findstr /i /c:"incompatible types:" "%BUILD_LOG%" > "%TEMP_DIR%\type_issues.txt"
+    if exist "%TEMP_DIR%\type_issues.txt" (
+        echo The following type compatibility issues were found: >> "%MISSING_METHODS_REPORT%"
+        echo. >> "%MISSING_METHODS_REPORT%"
+        echo ```java >> "%MISSING_METHODS_REPORT%"
+        type "%TEMP_DIR%\type_issues.txt" >> "%MISSING_METHODS_REPORT%"
+        echo ``` >> "%MISSING_METHODS_REPORT%"
+        echo. >> "%MISSING_METHODS_REPORT%"
+        echo Ensure parameter types match exactly between method calls and definitions. >> "%MISSING_METHODS_REPORT%"
+        echo. >> "%MISSING_METHODS_REPORT%"
+    )
+    
+    echo ## Method Override Issues >> "%MISSING_METHODS_REPORT%"
+    echo. >> "%MISSING_METHODS_REPORT%"
+    findstr /i /c:"cannot override" "%BUILD_LOG%" > "%TEMP_DIR%\override_issues.txt"
+    if exist "%TEMP_DIR%\override_issues.txt" (
+        echo The following method override issues were found: >> "%MISSING_METHODS_REPORT%"
+        echo. >> "%MISSING_METHODS_REPORT%"
+        echo ```java >> "%MISSING_METHODS_REPORT%"
+        type "%TEMP_DIR%\override_issues.txt" >> "%MISSING_METHODS_REPORT%"
+        echo ``` >> "%MISSING_METHODS_REPORT%"
+        echo. >> "%MISSING_METHODS_REPORT%"
+        echo Ensure overridden methods have exactly the same return type as the parent class method. >> "%MISSING_METHODS_REPORT%"
+        echo. >> "%MISSING_METHODS_REPORT%"
+    )
+) else (
+    echo No specific missing methods detected from build errors. >> "%MISSING_METHODS_REPORT%"
+)
+
+echo Missing methods analysis complete.
+goto :EOF
+
+REM ===================================
+REM Resolution Errors Scan Subroutine
+REM ===================================
+:FIND_RESOLUTION_ERRORS
+echo.
+echo === Running Resolution Errors Analysis ===
+
+REM Create output file with header
+> "%RESOLUTION_ERRORS_REPORT%" (
+    echo # Potential Resolution Error Report
+    echo.
+    echo This report identifies potential "Cannot resolve" errors for IntelliJ IDEA 2025.1.1.1.
+    echo Generated on %DATE% %TIME%.
+    echo.
+    echo ## Overview
+    echo.
+    echo This scan identifies references to packages and classes that have been:
+    echo.
+    echo 1. Relocated to a different package
+    echo 2. Renamed or significantly changed
+    echo 3. Removed entirely in IntelliJ IDEA 2025.1.1.1
+    echo.
+    echo These references are likely to cause "Cannot resolve symbol" errors during compilation.
+    echo.
+)
+
+REM Create a list of problematic patterns
+> "%TEMP_DIR%\relocation_patterns.txt" (
+    echo ProjectManagerEx
+    echo ContentManagerEx
+    echo ToolWindowManagerEx
+    echo FileEditorManagerEx
+    echo NotificationGroup
+    echo JBPopupFactoryImpl
+    echo IntentionActionDelegate
+    echo GotoActionBase
+    echo RefreshAction
+    echo ProjectFileIndex
+    echo PluginId
+    echo ExtensionsArea
+    echo JavaPsiFacade
+    echo ClassUtil
+    echo VirtualFileManager
+    echo PsiUtils
+    echo PsiUtil
+    echo PsiTreeUtil
+    echo FileChooserDescriptor
+    echo LightVirtualFile
+    echo CoreLocalVirtualFile
+    echo JavaDirectoryService
+    echo PsiElementFactory
+    echo XmlElementFactory
+)
+
+REM Check if the source directory exists
+if not exist "%SOURCE_DIR%" (
+    echo Source directory does not exist: %SOURCE_DIR%
+    >> "%RESOLUTION_ERRORS_REPORT%" (
+        echo ## Error
+        echo.
+        echo Source directory does not exist: %SOURCE_DIR%
+    )
+    goto :EOF
+)
+
+REM Find all Java files
+dir /s /b "%SOURCE_DIR%\*.java" > "%TEMP_DIR%\java_files_resolution.txt" 2>nul
+
+REM Extract imports from files
+>> "%RESOLUTION_ERRORS_REPORT%" (
+    echo ## Potentially Problematic Imports
+    echo.
+    echo The following imports may cause resolution issues:
+    echo.
+)
+
+set "FOUND_ISSUES=0"
+for /f "tokens=*" %%p in (%TEMP_DIR%\relocation_patterns.txt) do (
+    findstr /s /i /c:"import.*%%p" "%SOURCE_DIR%\*.java" > "%TEMP_DIR%\problem_imports_%%p.txt" 2>nul
+    if exist "%TEMP_DIR%\problem_imports_%%p.txt" (
+        set "FOUND_ISSUES=1"
+        echo ### References to %%p >> "%RESOLUTION_ERRORS_REPORT%"
+        echo. >> "%RESOLUTION_ERRORS_REPORT%"
+        echo ```java >> "%RESOLUTION_ERRORS_REPORT%"
+        type "%TEMP_DIR%\problem_imports_%%p.txt" >> "%RESOLUTION_ERRORS_REPORT%"
+        echo ``` >> "%RESOLUTION_ERRORS_REPORT%"
+        echo. >> "%RESOLUTION_ERRORS_REPORT%"
+        echo Consider updating these imports to use the latest API. >> "%RESOLUTION_ERRORS_REPORT%"
+        echo. >> "%RESOLUTION_ERRORS_REPORT%"
+    )
+)
+
+REM Check for deprecated method calls
+>> "%RESOLUTION_ERRORS_REPORT%" (
+    echo ## Potentially Problematic Method Calls
+    echo.
+    echo The following method calls may cause resolution issues:
+    echo.
+)
+
+set "METHODS_FOUND=0"
+for %%m in (getBaseDir findFileByPath getInstanceEx getFileSystem resolveFile) do (
+    findstr /s /i /c:".%%m(" "%SOURCE_DIR%\*.java" > "%TEMP_DIR%\problem_methods_%%m.txt" 2>nul
+    if exist "%TEMP_DIR%\problem_methods_%%m.txt" (
+        set "METHODS_FOUND=1"
+        echo ### Calls to %%m >> "%RESOLUTION_ERRORS_REPORT%"
+        echo. >> "%RESOLUTION_ERRORS_REPORT%"
+        echo ```java >> "%RESOLUTION_ERRORS_REPORT%"
+        type "%TEMP_DIR%\problem_methods_%%m.txt" >> "%RESOLUTION_ERRORS_REPORT%"
+        echo ``` >> "%RESOLUTION_ERRORS_REPORT%"
+        echo. >> "%RESOLUTION_ERRORS_REPORT%"
+        
+        REM Add specific suggestions
+        if "%%m"=="getBaseDir" (
+            echo **Suggested fix:** Replace with `CompatibilityUtil.getProjectBaseDir(project)` >> "%RESOLUTION_ERRORS_REPORT%"
+        ) else if "%%m"=="findFileByPath" (
+            echo **Suggested fix:** Use `VirtualFileUtil.findFileByPath(path)` >> "%RESOLUTION_ERRORS_REPORT%"
+        ) else if "%%m"=="getInstanceEx" (
+            echo **Suggested fix:** Use the standard `.getInstance()` method instead >> "%RESOLUTION_ERRORS_REPORT%"
+        ) else if "%%m"=="getFileSystem" (
+            echo **Suggested fix:** Use `VirtualFileManager.getInstance().getFileSystem(StandardFileSystems.FILE_PROTOCOL)` >> "%RESOLUTION_ERRORS_REPORT%"
+        ) else if "%%m"=="resolveFile" (
+            echo **Suggested fix:** Use `CompatibilityUtil.findPsiFile(project, file)` >> "%RESOLUTION_ERRORS_REPORT%"
+        )
+        
+        echo. >> "%RESOLUTION_ERRORS_REPORT%"
+    )
+)
+
+if "%FOUND_ISSUES%%METHODS_FOUND%"=="00" (
+    echo No specific resolution issues detected from static analysis. >> "%RESOLUTION_ERRORS_REPORT%"
+    echo. >> "%RESOLUTION_ERRORS_REPORT%"
+    echo However, build errors indicate there are resolution issues. Check the build log for details. >> "%RESOLUTION_ERRORS_REPORT%"
+)
+
+REM Extract resolution issues from build log
+findstr /i /c:"cannot find symbol" "%BUILD_LOG%" > "%TEMP_DIR%\build_resolution_errors.txt"
+if exist "%TEMP_DIR%\build_resolution_errors.txt" (
+    >> "%RESOLUTION_ERRORS_REPORT%" (
+        echo ## Resolution Errors from Build Log
+        echo.
+        echo The following resolution errors were found during compilation:
+        echo.
+        echo ```java
+    )
+    type "%TEMP_DIR%\build_resolution_errors.txt" >> "%RESOLUTION_ERRORS_REPORT%"
+    echo ``` >> "%RESOLUTION_ERRORS_REPORT%"
+    echo. >> "%RESOLUTION_ERRORS_REPORT%"
+)
+
+REM Add implementation recommendations
+>> "%RESOLUTION_ERRORS_REPORT%" (
+    echo ## Fix Recommendations
+    echo.
+    echo 1. **Update imports** to use the latest package paths
+    echo 2. **Use CompatibilityUtil** for deprecated method calls
+    echo 3. **Fix method signatures** to match exactly what callers expect
+    echo 4. **Add missing methods** to service classes
+    echo 5. **Implement proper getInstance()** methods for service classes
+    echo.
+)
+
+echo Resolution errors analysis complete.
+goto :EOF
+
+:END
+echo.
+echo Build process completed in %TIME%.
+echo.
+echo All operations are complete. Please review the generated reports.
+echo.
+echo Thank you for using ModForge Ultimate Builder!
+echo.
+
+endlocal
