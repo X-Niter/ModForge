@@ -79,11 +79,11 @@ public class StartCollaborationAction extends AnAction {
         boolean startSession = dialog.isStartSession();
         
         if (startSession) {
-            CompletableFuture<String> future = collaborationService.startSession(username);
-            
-            future.thenAccept(sessionId -> {
-                // Show success message with session ID
-                Messages.showInfoDialog(
+            // Call the startSession method which now returns a CompletableFuture<String>
+            collaborationService.startSession(username)
+                .thenAccept(sessionId -> {
+                    // Show success message with session ID
+                    Messages.showInfoDialog(
                         project,
                         "Session started with ID: " + sessionId + "\n\n" +
                         "Share this ID with your team members so they can join.",

@@ -1,149 +1,87 @@
 package com.modforge.intellij.plugin.collaboration.websocket;
 
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
 import org.jetbrains.annotations.NotNull;
 
-import java.util.HashMap;
-import java.util.Map;
-
 /**
- * Message for WebSocket communication.
+ * Message model for WebSocket communication.
+ * Compatible with IntelliJ IDEA 2025.1.1.1
  */
 public class WebSocketMessage {
-    // Common message types
-    public static final String TYPE_JOIN = "join";
-    public static final String TYPE_LEAVE = "leave";
-    public static final String TYPE_OPERATION = "operation";
-    public static final String TYPE_PARTICIPANT_JOINED = "participant_joined";
-    public static final String TYPE_PARTICIPANT_LEFT = "participant_left";
-    public static final String TYPE_ERROR = "error";
+    private static final Gson GSON = new GsonBuilder().create();
     
-    /** The message type. */
-    @NotNull
-    private final String type;
-    
-    /** The message data. */
-    @NotNull
-    private final Map<String, Object> data;
-    
-    /** The timestamp when the message was created. */
+    private final WebSocketMessageType type;
+    private final String sender;
+    private final String content;
     private final long timestamp;
     
     /**
-     * Creates a new WebSocketMessage.
-     * @param type The message type
-     * @param data The message data
+     * Constructor for creating a new message.
+     *
+     * @param type The message type.
+     * @param sender The sender's username.
+     * @param content The message content.
      */
-    public WebSocketMessage(@NotNull String type, @NotNull Map<String, Object> data) {
+    public WebSocketMessage(@NotNull WebSocketMessageType type, @NotNull String sender, @NotNull String content) {
         this.type = type;
-        this.data = new HashMap<>(data);
+        this.sender = sender;
+        this.content = content;
         this.timestamp = System.currentTimeMillis();
     }
     
     /**
      * Gets the message type.
-     * @return The message type
+     *
+     * @return The message type.
      */
-    @NotNull
-    public String getType() {
+    public WebSocketMessageType getType() {
         return type;
     }
     
     /**
-     * Gets the message data.
-     * @return The message data
+     * Gets the sender's username.
+     *
+     * @return The sender.
      */
-    @NotNull
-    public Map<String, Object> getData() {
-        return data;
+    public String getSender() {
+        return sender;
     }
     
     /**
-     * Gets the timestamp.
-     * @return The timestamp
+     * Gets the message content.
+     *
+     * @return The content.
+     */
+    public String getContent() {
+        return content;
+    }
+    
+    /**
+     * Gets the message timestamp.
+     *
+     * @return The timestamp.
      */
     public long getTimestamp() {
         return timestamp;
     }
     
     /**
-     * Creates a join message.
-     * @param sessionId The session ID
-     * @param userId The user ID
-     * @param username The username
-     * @return The message
+     * Converts the message to JSON.
+     *
+     * @return The JSON string.
      */
-    @NotNull
-    public static WebSocketMessage createJoinMessage(
-            @NotNull String sessionId,
-            @NotNull String userId,
-            @NotNull String username
-    ) {
-        Map<String, Object> data = new HashMap<>();
-        data.put("sessionId", sessionId);
-        data.put("userId", userId);
-        data.put("username", username);
-        
-        return new WebSocketMessage(TYPE_JOIN, data);
+    public String toJson() {
+        return GSON.toJson(this);
     }
     
     /**
-     * Creates a leave message.
-     * @param sessionId The session ID
-     * @param userId The user ID
-     * @return The message
+     * Creates a message from JSON.
+     *
+     * @param json The JSON string.
+     * @return The message.
      */
-    @NotNull
-    public static WebSocketMessage createLeaveMessage(
-            @NotNull String sessionId,
-            @NotNull String userId
-    ) {
-        Map<String, Object> data = new HashMap<>();
-        data.put("sessionId", sessionId);
-        data.put("userId", userId);
-        
-        return new WebSocketMessage(TYPE_LEAVE, data);
-    }
-    
-    /**
-     * Creates an operation message.
-     * @param sessionId The session ID
-     * @param userId The user ID
-     * @param operationData The operation data
-     * @return The message
-     */
-    @NotNull
-    public static WebSocketMessage createOperationMessage(
-            @NotNull String sessionId,
-            @NotNull String userId,
-            @NotNull Map<String, Object> operationData
-    ) {
-        Map<String, Object> data = new HashMap<>();
-        data.put("sessionId", sessionId);
-        data.put("userId", userId);
-        data.put("operation", operationData);
-        
-        return new WebSocketMessage(TYPE_OPERATION, data);
-    }
-    
-    /**
-     * Creates an error message.
-     * @param errorMessage The error message
-     * @return The message
-     */
-    @NotNull
-    public static WebSocketMessage createErrorMessage(@NotNull String errorMessage) {
-        Map<String, Object> data = new HashMap<>();
-        data.put("message", errorMessage);
-        
-        return new WebSocketMessage(TYPE_ERROR, data);
-    }
-    
-    @Override
-    public String toString() {
-        return "WebSocketMessage{" +
-                "type='" + type + '\'' +
-                ", data=" + data +
-                ", timestamp=" + timestamp +
-                '}';
+    public static WebSocketMessage fromJson(String json) {
+        return GSON.fromJson(json, WebSocketMessage.class);
     }
 }

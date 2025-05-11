@@ -1,228 +1,179 @@
 package com.modforge.intellij.plugin.collaboration.websocket;
 
-import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
 import com.intellij.openapi.diagnostic.Logger;
-import org.java_websocket.client.WebSocketClient;
-import org.java_websocket.handshake.ServerHandshake;
+import com.intellij.openapi.project.Project;
+import com.modforge.intellij.plugin.settings.ModForgeSettings;
 import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
 
 import java.net.URI;
-import java.net.URISyntaxException;
-import java.util.Map;
-import java.util.concurrent.CopyOnWriteArrayList;
-import java.util.concurrent.TimeUnit;
+import java.net.http.HttpClient;
+import java.net.http.WebSocket;
+import java.nio.ByteBuffer;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
- * WebSocket client for real-time collaboration.
+ * WebSocket client for ModForge real-time collaboration.
+ * Uses Java 21 HttpClient with WebSocket support for compatibility with IntelliJ IDEA 2025.1.1.1
  */
 public class ModForgeWebSocketClient {
     private static final Logger LOG = Logger.getInstance(ModForgeWebSocketClient.class);
     
-    // WebSocket connection
-    private InternalWebSocketClient client;
-    
-    // Gson for JSON serialization/deserialization
-    private final Gson gson = new GsonBuilder().create();
-    
-    // Listeners
-    private final CopyOnWriteArrayList<WebSocketMessageListener> listeners = new CopyOnWriteArrayList<>();
-    
+    private final Project project;
+    private final String sessionId;
+    private final String username;
+    private final boolean isHost;
+    private WebSocket webSocket;
+    private final AtomicBoolean connected = new AtomicBoolean(false);
+    private final WebSocketMessageHandler messageHandler = new WebSocketMessageHandler();
+
     /**
-     * Creates a new ModForgeWebSocketClient.
+     * Constructor for the client.
+     *
+     * @param project The project.
+     * @param sessionId The session ID.
+     * @param username The username.
+     * @param isHost Whether this client is the host.
      */
-    public ModForgeWebSocketClient() {
+    public ModForgeWebSocketClient(@NotNull Project project, @NotNull String sessionId, @NotNull String username, boolean isHost) {
+        this.project = project;
+        this.sessionId = sessionId;
+        this.username = username;
+        this.isHost = isHost;
     }
-    
+
     /**
-     * Connects to a WebSocket server.
-     * @param serverUrl The server URL
-     * @param sessionId The session ID
-     * @param userId The user ID
-     * @param username The username
-     * @return Whether the connection was successful
+     * Connects to the WebSocket server.
+     *
+     * @return True if connected successfully, false otherwise.
      */
-    public boolean connect(@NotNull String serverUrl, @NotNull String sessionId, @NotNull String userId, @NotNull String username) {
+    public boolean connect() {
         try {
-            // Create WebSocket URI
-            URI uri = new URI(serverUrl + "?sessionId=" + sessionId + "&userId=" + userId + "&username=" + username);
+            String serverUrl = ModForgeSettings.getInstance().getServerUrl();
+            URI uri = new URI(serverUrl.replace("http", "ws") + "/ws/collaboration/" + sessionId);
             
-            // Create and connect WebSocket client
-            client = new InternalWebSocketClient(uri);
-            client.connectBlocking(5, TimeUnit.SECONDS);
+            LOG.info("Connecting to WebSocket server: " + uri);
             
-            LOG.info("Connected to WebSocket server: " + serverUrl);
-            return client.isOpen();
-        } catch (URISyntaxException e) {
-            LOG.error("Invalid WebSocket server URL: " + serverUrl, e);
-            return false;
-        } catch (InterruptedException e) {
-            LOG.error("WebSocket connection interrupted", e);
-            Thread.currentThread().interrupt();
-            return false;
+            // Create the WebSocket client using Java 21 HttpClient 
+            HttpClient client = HttpClient.newHttpClient();
+            
+            CompletableFuture<WebSocket> webSocketFuture = client.newWebSocketBuilder()
+                .header("Username", username)
+                .header("Session-ID", sessionId)
+                .header("Is-Host", String.valueOf(isHost))
+                .buildAsync(uri, new WebSocketListener());
+            
+            // Wait for the connection to complete
+            webSocket = webSocketFuture.join();
+            connected.set(true);
+            
+            // Send initial connection message
+            sendMessage(new WebSocketMessage(
+                WebSocketMessageType.CONNECT, 
+                username, 
+                "Joined session"
+            ));
+            
+            return true;
         } catch (Exception e) {
             LOG.error("Error connecting to WebSocket server", e);
             return false;
         }
     }
-    
+
     /**
-     * Disconnects from the WebSocket server.
+     * Closes the WebSocket connection.
      */
-    public void disconnect() {
-        if (client != null && client.isOpen()) {
+    public void close() {
+        if (webSocket != null) {
             try {
-                client.closeBlocking();
-                LOG.info("Disconnected from WebSocket server");
-            } catch (InterruptedException e) {
-                LOG.error("WebSocket disconnection interrupted", e);
-                Thread.currentThread().interrupt();
+                webSocket.sendClose(WebSocket.NORMAL_CLOSURE, "Client disconnected");
+            } catch (Exception e) {
+                LOG.error("Error closing WebSocket", e);
+            } finally {
+                connected.set(false);
             }
         }
     }
-    
+
+    /**
+     * Checks if the WebSocket is connected.
+     *
+     * @return True if connected, false otherwise.
+     */
+    public boolean isConnected() {
+        return connected.get() && webSocket != null;
+    }
+
     /**
      * Sends a message to the WebSocket server.
-     * @param type The message type
-     * @param data The message data
-     * @return Whether the message was sent
+     *
+     * @param message The message to send.
      */
-    public boolean sendMessage(@NotNull String type, @NotNull Map<String, Object> data) {
-        if (client == null || !client.isOpen()) {
-            LOG.warn("Cannot send message: WebSocket not connected");
-            return false;
+    public void sendMessage(WebSocketMessage message) {
+        if (!isConnected()) {
+            LOG.warn("Cannot send message, not connected");
+            return;
         }
         
         try {
-            // Create message
-            WebSocketMessage message = new WebSocketMessage(type, data);
-            
-            // Serialize message to JSON
-            String json = gson.toJson(message);
-            
-            // Send message
-            client.send(json);
-            return true;
+            String json = message.toJson();
+            webSocket.sendText(json, true);
         } catch (Exception e) {
-            LOG.error("Error sending WebSocket message", e);
-            return false;
+            LOG.error("Error sending message", e);
         }
     }
-    
+
     /**
-     * Adds a WebSocket message listener.
-     * @param listener The listener
+     * WebSocket listener implementation using Java 21 WebSocket.Listener.
      */
-    public void addListener(@NotNull WebSocketMessageListener listener) {
-        listeners.add(listener);
-    }
-    
-    /**
-     * Removes a WebSocket message listener.
-     * @param listener The listener
-     */
-    public void removeListener(@NotNull WebSocketMessageListener listener) {
-        listeners.remove(listener);
-    }
-    
-    /**
-     * Notifies listeners of a received message.
-     * @param message The message
-     */
-    private void notifyMessageReceived(@NotNull WebSocketMessage message) {
-        for (WebSocketMessageListener listener : listeners) {
-            try {
-                listener.onMessageReceived(message);
-            } catch (Exception e) {
-                LOG.error("Error notifying WebSocket message listener", e);
-            }
-        }
-    }
-    
-    /**
-     * Notifies listeners of a WebSocket connection.
-     */
-    private void notifyConnected() {
-        for (WebSocketMessageListener listener : listeners) {
-            try {
-                listener.onConnected();
-            } catch (Exception e) {
-                LOG.error("Error notifying WebSocket connection listener", e);
-            }
-        }
-    }
-    
-    /**
-     * Notifies listeners of a WebSocket disconnection.
-     */
-    private void notifyDisconnected() {
-        for (WebSocketMessageListener listener : listeners) {
-            try {
-                listener.onDisconnected();
-            } catch (Exception e) {
-                LOG.error("Error notifying WebSocket disconnection listener", e);
-            }
-        }
-    }
-    
-    /**
-     * Notifies listeners of a WebSocket error.
-     * @param message The error message
-     * @param exception The exception
-     */
-    private void notifyError(@NotNull String message, @Nullable Exception exception) {
-        for (WebSocketMessageListener listener : listeners) {
-            try {
-                listener.onError(message, exception);
-            } catch (Exception e) {
-                LOG.error("Error notifying WebSocket error listener", e);
-            }
-        }
-    }
-    
-    /**
-     * Internal WebSocket client implementation.
-     */
-    private class InternalWebSocketClient extends org.java_websocket.client.WebSocketClient {
-        /**
-         * Creates a new InternalWebSocketClient.
-         * @param serverUri The server URI
-         */
-        InternalWebSocketClient(URI serverUri) {
-            super(serverUri);
-        }
+    private class WebSocketListener implements WebSocket.Listener {
+        private final StringBuilder messageBuffer = new StringBuilder();
         
         @Override
-        public void onOpen(ServerHandshake handshakedata) {
+        public void onOpen(WebSocket webSocket) {
             LOG.info("WebSocket connection opened");
-            notifyConnected();
+            WebSocket.Listener.super.onOpen(webSocket);
         }
         
         @Override
-        public void onMessage(String message) {
-            try {
-                // Parse message from JSON
-                WebSocketMessage webSocketMessage = gson.fromJson(message, WebSocketMessage.class);
+        public CompletionStage<?> onText(WebSocket webSocket, CharSequence data, boolean last) {
+            messageBuffer.append(data);
+            
+            if (last) {
+                String message = messageBuffer.toString();
+                messageBuffer.setLength(0);
                 
-                // Notify listeners
-                notifyMessageReceived(webSocketMessage);
-            } catch (Exception e) {
-                LOG.error("Error parsing WebSocket message: " + message, e);
-                notifyError("Error parsing WebSocket message", e);
+                try {
+                    WebSocketMessage parsedMessage = WebSocketMessage.fromJson(message);
+                    messageHandler.handleMessage(parsedMessage, project);
+                } catch (Exception e) {
+                    LOG.error("Error handling message", e);
+                }
             }
+            
+            return WebSocket.Listener.super.onText(webSocket, data, last);
         }
         
         @Override
-        public void onClose(int code, String reason, boolean remote) {
-            LOG.info("WebSocket connection closed: " + reason);
-            notifyDisconnected();
+        public CompletionStage<?> onBinary(WebSocket webSocket, ByteBuffer data, boolean last) {
+            // Not implemented for this client
+            return WebSocket.Listener.super.onBinary(webSocket, data, last);
         }
         
         @Override
-        public void onError(Exception ex) {
-            LOG.error("WebSocket error", ex);
-            notifyError("WebSocket error", ex);
+        public CompletionStage<?> onClose(WebSocket webSocket, int statusCode, String reason) {
+            LOG.info("WebSocket connection closed: " + statusCode + " - " + reason);
+            connected.set(false);
+            return WebSocket.Listener.super.onClose(webSocket, statusCode, reason);
+        }
+        
+        @Override
+        public void onError(WebSocket webSocket, Throwable error) {
+            LOG.error("WebSocket error", error);
+            connected.set(false);
+            WebSocket.Listener.super.onError(webSocket, error);
         }
     }
 }
