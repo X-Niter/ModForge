@@ -539,13 +539,38 @@ export function setupAuth(app: Express) {
 
   // Logout endpoint
   app.post("/api/logout", (req: Request, res: Response) => {
+    console.log('Logout request received:', {
+      hasSession: !!req.session,
+      sessionID: req.sessionID,
+      isAuthenticated: req.isAuthenticated()
+    });
+    
     req.logout((err) => {
       if (err) {
-        return res.status(500).json({ message: "Logout failed" });
+        console.error('Logout error:', err);
+        return res.status(500).json({ message: "Logout failed", error: err.message });
       }
-      req.session.destroy((err) => {
+      
+      console.log('Passport logout successful, destroying session');
+      
+      if (req.session) {
+        req.session.destroy((sessionErr) => {
+          if (sessionErr) {
+            console.error('Session destruction error:', sessionErr);
+            return res.status(500).json({ message: "Logout partially successful, session destruction failed" });
+          }
+          
+          // Clear all possible session cookies
+          res.clearCookie('connect.sid');
+          res.clearCookie('modforge.sid');
+          
+          console.log('Session destroyed successfully, user fully logged out');
+          return res.status(200).json({ message: "Logged out successfully" });
+        });
+      } else {
+        console.log('No session to destroy, user logged out');
         return res.status(200).json({ message: "Logged out successfully" });
-      });
+      }
     });
   });
 
@@ -591,6 +616,70 @@ export function setupAuth(app: Express) {
       userExists: !!req.user,
       cookies: req.headers.cookie
     });
+  });
+  
+  // Debug login endpoint - DO NOT USE IN PRODUCTION
+  app.post("/api/debug/login", async (req: Request, res: Response) => {
+    if (process.env.NODE_ENV === 'production') {
+      return res.status(403).json({ message: "Debug endpoints disabled in production" });
+    }
+    
+    try {
+      // Get username from request or use default
+      const username = (req.body && req.body.username) ? req.body.username : 'X_Niter';
+      
+      // Find the user
+      const [user] = await db.select().from(users).where(eq(users.username, username));
+      
+      if (!user) {
+        return res.status(404).json({ message: `Debug user '${username}' not found` });
+      }
+      
+      // Properly handle metadata for type safety
+      let metadata: Record<string, unknown> = {};
+      try {
+        if (typeof user.metadata === 'object' && user.metadata !== null) {
+          metadata = user.metadata as Record<string, unknown>;
+        }
+      } catch (e) {
+        console.warn('Failed to parse metadata, using empty object');
+      }
+      
+      // Create a user with the right metadata type
+      const userWithValidMetadata = {
+        ...user,
+        metadata
+      };
+      
+      // Log the user in
+      req.login(userWithValidMetadata, (err) => {
+        if (err) {
+          console.error('Debug login error:', err);
+          return res.status(500).json({ message: "Login error", error: err.message });
+        }
+        
+        console.log('Debug login successful:', {
+          userId: user.id,
+          username: user.username,
+          sessionID: req.sessionID,
+          isAuthenticated: req.isAuthenticated()
+        });
+        
+        const { password, ...userWithoutPassword } = user;
+        return res.status(200).json({ 
+          message: "Debug login successful", 
+          user: userWithoutPassword,
+          sessionID: req.sessionID, 
+          isAuthenticated: req.isAuthenticated()
+        });
+      });
+    } catch (error) {
+      console.error('Debug login error:', error);
+      return res.status(500).json({ 
+        message: "Debug login failed", 
+        error: error instanceof Error ? error.message : String(error) 
+      });
+    }
   });
   
   // Token verification endpoint
