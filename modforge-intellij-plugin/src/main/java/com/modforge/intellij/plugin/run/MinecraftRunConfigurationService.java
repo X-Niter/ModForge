@@ -13,7 +13,7 @@ import com.intellij.openapi.vfs.VirtualFileListener;
 import com.intellij.openapi.vfs.VirtualFileManager;
 import com.modforge.intellij.plugin.notifications.ModForgeNotificationService;
 import com.modforge.intellij.plugin.run.MinecraftRunConfiguration.RunType;
-import com.modforge.intellij.plugin.run.ModLoaderDetector.ModLoader;
+import com.modforge.intellij.plugin.run.ModLoaderDetector;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.Arrays;
@@ -122,7 +122,7 @@ public class MinecraftRunConfigurationService implements StartupActivity.DumbAwa
         
         // Update configurations with latest project information
         String mcVersion = MinecraftIntegrationUtil.getMinecraftVersion(project);
-        ModLoader modLoader = ModLoaderDetector.detectModLoader(project, null);
+        ModLoaderDetector.ModLoader modLoader = ModLoaderDetector.detectModLoader(project, null);
         
         // Find main module
         Module mainModule = findMainModule(project);
@@ -159,12 +159,12 @@ public class MinecraftRunConfigurationService implements StartupActivity.DumbAwa
      * 
      * @param config The configuration to update
      * @param mcVersion The detected Minecraft version
-     * @param modLoader The detected mod loader
+     * @param modLoader The detected mod loader from ModLoaderDetector
      * @param project The project
      * @return True if the configuration was changed, false otherwise
      */
     private boolean updateRunConfiguration(MinecraftRunConfiguration config, String mcVersion, 
-                                          ModLoader modLoader, Project project) {
+                                          ModLoaderDetector.ModLoader modLoader, Project project) {
         boolean changed = false;
         
         // Update the asset index based on Minecraft version if available
