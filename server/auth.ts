@@ -167,13 +167,24 @@ export type LoginData = z.infer<typeof loginSchema>;
 export function setupAuth(app: Express) {
   // Configure sessions
   const sessionSecret = process.env.SESSION_SECRET || randomBytes(32).toString("hex");
+  console.log('Session configuration:', {
+    environment: process.env.NODE_ENV,
+    usingProduction: process.env.NODE_ENV === 'production',
+    sessionSecretLength: sessionSecret.length
+  });
   
   // Set up PostgreSQL session store
   const PgSession = connectPgSimple(session);
   const sessionStore = new PgSession({
     pool,
     tableName: 'session', // default table name
-    createTableIfMissing: true // automatically create the sessions table if it doesn't exist
+    createTableIfMissing: true, // automatically create the sessions table if it doesn't exist
+    errorLog: console.error, // log session store errors
+  });
+  
+  // Log session store errors
+  sessionStore.on('error', function(error) {
+    console.error('Session store error:', error);
   });
   
   const sessionSettings: session.SessionOptions = {
@@ -181,9 +192,12 @@ export function setupAuth(app: Express) {
     secret: sessionSecret,
     resave: false,
     saveUninitialized: false,
+    name: 'modforge.sid', // custom session cookie name
     cookie: {
       secure: process.env.NODE_ENV === "production",
       maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
+      httpOnly: true, // prevents JavaScript from making changes
+      sameSite: 'lax' // helps prevent CSRF
     }
   };
   
@@ -424,8 +438,16 @@ export function setupAuth(app: Express) {
       
       req.login(user, (loginErr) => {
         if (loginErr) {
+          console.error('Login error:', loginErr);
           return next(loginErr);
         }
+        
+        console.log('User logged in successfully:', {
+          userId: user.id,
+          username: user.username,
+          sessionID: req.sessionID,
+          isAuthenticated: req.isAuthenticated()
+        });
         
         // Generate a JSON Web Token for API access
         const token = signJwt(
@@ -529,6 +551,13 @@ export function setupAuth(app: Express) {
 
   // User info endpoint - supports both session and token auth
   app.get("/api/user", (req: Request, res: Response, next: NextFunction) => {
+    console.log('Session info:', {
+      hasSession: !!req.session,
+      isAuthenticated: req.isAuthenticated(),
+      sessionID: req.sessionID,
+      hasUser: !!req.user
+    });
+    
     // Try session auth first
     if (req.isAuthenticated()) {
       const { password, ...userWithoutPassword } = req.user as Express.User;
@@ -539,9 +568,11 @@ export function setupAuth(app: Express) {
     passport.authenticate('bearer', { session: false }, 
       (err: Error | null, user: Express.User | false | null, info: string | undefined) => {
         if (err) {
+          console.error('Bearer auth error:', err);
           return next(err);
         }
         if (!user) {
+          console.log('Authentication failed:', info);
           return res.status(401).json({ message: "Not authenticated" });
         }
         
@@ -549,6 +580,17 @@ export function setupAuth(app: Express) {
         return res.status(200).json(userWithoutPassword);
       }
     )(req, res, next);
+  });
+  
+  // Add a debug endpoint to check session status
+  app.get("/api/debug/session", (req: Request, res: Response) => {
+    return res.json({
+      hasSession: !!req.session,
+      sessionID: req.sessionID,
+      isAuthenticated: req.isAuthenticated(),
+      userExists: !!req.user,
+      cookies: req.headers.cookie
+    });
   });
   
   // Token verification endpoint
