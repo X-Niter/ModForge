@@ -202,35 +202,31 @@ echo.
 echo === Running API Compatibility Scan ===
 
 REM Create output file with header
-> "%COMPATIBILITY_REPORT%" (
-    echo # ModForge IntelliJ IDEA 2025.1.1.1 Compatibility Issues 
-    echo. 
-    echo This report contains potential compatibility issues found in the codebase. 
-    echo Generated on %DATE% %TIME%. 
-    echo. 
-    echo ## Overview 
-    echo. 
-    echo This scan looks for deprecated APIs, problematic patterns, and compatibility issues 
-    echo that might affect the plugin's functionality with IntelliJ IDEA 2025.1.1.1. 
-    echo. 
-    echo ## Known Deprecated APIs and Replacements 
-    echo. 
-    echo * **Project.getBaseDir()** - Replace with CompatibilityUtil.getProjectBaseDir(project) - Removed in 2020.3+ 
-    echo * **CacheUpdater** - Replace with CompatibilityUtil.refreshAll(project) - Removed in 2020.1+ 
-    echo * **CacheUpdaterFacade** - Replace with CompatibilityUtil.refreshAll(project) - Removed in 2020.1+ 
-    echo * **ApplicationManager.getApplication().runReadAction()** - Replace with CompatibilityUtil.runReadAction() 
-    echo * **ApplicationManager.getApplication().runWriteAction()** - Replace with CompatibilityUtil.runWriteAction() 
-    echo. 
-)
+echo # ModForge IntelliJ IDEA 2025.1.1.1 Compatibility Issues > "%COMPATIBILITY_REPORT%"
+echo. >> "%COMPATIBILITY_REPORT%"
+echo This report contains potential compatibility issues found in the codebase. >> "%COMPATIBILITY_REPORT%"
+echo Generated on %DATE% %TIME%. >> "%COMPATIBILITY_REPORT%"
+echo. >> "%COMPATIBILITY_REPORT%"
+echo ## Overview >> "%COMPATIBILITY_REPORT%"
+echo. >> "%COMPATIBILITY_REPORT%"
+echo This scan looks for deprecated APIs, problematic patterns, and compatibility issues >> "%COMPATIBILITY_REPORT%"
+echo that might affect the plugin's functionality with IntelliJ IDEA 2025.1.1.1. >> "%COMPATIBILITY_REPORT%"
+echo. >> "%COMPATIBILITY_REPORT%"
+echo ## Known Deprecated APIs and Replacements >> "%COMPATIBILITY_REPORT%"
+echo. >> "%COMPATIBILITY_REPORT%"
+echo * **Project.getBaseDir()** - Replace with CompatibilityUtil.getProjectBaseDir(project) - Removed in 2020.3+ >> "%COMPATIBILITY_REPORT%"
+echo * **CacheUpdater** - Replace with CompatibilityUtil.refreshAll(project) - Removed in 2020.1+ >> "%COMPATIBILITY_REPORT%"
+echo * **CacheUpdaterFacade** - Replace with CompatibilityUtil.refreshAll(project) - Removed in 2020.1+ >> "%COMPATIBILITY_REPORT%"
+echo * **ApplicationManager.getApplication().runReadAction()** - Replace with CompatibilityUtil.runReadAction() >> "%COMPATIBILITY_REPORT%"
+echo * **ApplicationManager.getApplication().runWriteAction()** - Replace with CompatibilityUtil.runWriteAction() >> "%COMPATIBILITY_REPORT%"
+echo. >> "%COMPATIBILITY_REPORT%"
 
 REM Check if the source directory exists
 if not exist "%SOURCE_DIR%" (
     echo Source directory does not exist: %SOURCE_DIR%
-    >> "%COMPATIBILITY_REPORT%" (
-        echo ## Error
-        echo.
-        echo Source directory does not exist: %SOURCE_DIR%
-    )
+    echo ## Error >> "%COMPATIBILITY_REPORT%"
+    echo. >> "%COMPATIBILITY_REPORT%"
+    echo Source directory does not exist: %SOURCE_DIR% >> "%COMPATIBILITY_REPORT%"
     goto :EOF
 )
 
@@ -253,11 +249,9 @@ set PROCESSED=0
 
 if %TOTAL_FILES% equ 0 (
     echo No Java files found in %SOURCE_DIR%
-    >> "%COMPATIBILITY_REPORT%" (
-        echo ## Error
-        echo.
-        echo No Java files found in %SOURCE_DIR%
-    )
+    echo ## Error >> "%COMPATIBILITY_REPORT%"
+    echo. >> "%COMPATIBILITY_REPORT%"
+    echo No Java files found in %SOURCE_DIR% >> "%COMPATIBILITY_REPORT%"
     goto :EOF
 )
 
@@ -291,25 +285,21 @@ if exist "%TEMP_DIR%\matches.txt" (
 )
 
 REM Add summary to output file
->> "%COMPATIBILITY_REPORT%" (
-    echo ## Summary 
-    echo. 
-    echo * Total Java files scanned: %TOTAL_FILES% 
-    echo * Files with potential compatibility issues: %AFFECTED_FILES% 
-    echo * Total potential issues found: %TOTAL_ISSUES% 
-    echo. 
-    echo ## Detailed Issue List 
-    echo. 
-)
+echo ## Summary >> "%COMPATIBILITY_REPORT%"
+echo. >> "%COMPATIBILITY_REPORT%"
+echo * Total Java files scanned: %TOTAL_FILES% >> "%COMPATIBILITY_REPORT%"
+echo * Files with potential compatibility issues: %AFFECTED_FILES% >> "%COMPATIBILITY_REPORT%"
+echo * Total potential issues found: %TOTAL_ISSUES% >> "%COMPATIBILITY_REPORT%"
+echo. >> "%COMPATIBILITY_REPORT%"
+echo ## Detailed Issue List >> "%COMPATIBILITY_REPORT%"
+echo. >> "%COMPATIBILITY_REPORT%"
 
 REM Process and add issues to output file
 if exist "%TEMP_DIR%\matches.txt" (
     for /f "tokens=1,2 delims=:" %%a in (%TEMP_DIR%\matches.txt) do (
-        >> "%COMPATIBILITY_REPORT%" (
-            echo ### Issue in %%a 
-            echo. 
-            echo * Potential problem: `%%b` 
-        )
+        echo ### Issue in %%a >> "%COMPATIBILITY_REPORT%"
+        echo. >> "%COMPATIBILITY_REPORT%"
+        echo * Potential problem: `%%b` >> "%COMPATIBILITY_REPORT%"
         
         REM Add suggested fix based on pattern
         if "%%b"=="getBaseDir" (
@@ -347,36 +337,32 @@ echo.
 echo === Running Missing Methods Analysis ===
 
 REM Create output file with header
-> "%MISSING_METHODS_REPORT%" (
-    echo # Missing Methods and Symbol Resolution Report
-    echo.
-    echo This report identifies methods that are called but might not be implemented,
-    echo which leads to "cannot find symbol" errors during compilation.
-    echo.
-    echo Generated on %DATE% %TIME%.
-    echo.
-    echo ## Overview
-    echo.
-    echo This analysis looks for:
-    echo.
-    echo 1. Methods called on service classes that might not exist
-    echo 2. Method signature mismatches between calls and definitions
-    echo 3. Missing getInstance() methods on service classes
-    echo 4. Missing methods in common utility classes
-    echo.
-)
+echo # Missing Methods and Symbol Resolution Report > "%MISSING_METHODS_REPORT%"
+echo. >> "%MISSING_METHODS_REPORT%"
+echo This report identifies methods that are called but might not be implemented, >> "%MISSING_METHODS_REPORT%"
+echo which leads to "cannot find symbol" errors during compilation. >> "%MISSING_METHODS_REPORT%"
+echo. >> "%MISSING_METHODS_REPORT%"
+echo Generated on %DATE% %TIME%. >> "%MISSING_METHODS_REPORT%"
+echo. >> "%MISSING_METHODS_REPORT%"
+echo ## Overview >> "%MISSING_METHODS_REPORT%"
+echo. >> "%MISSING_METHODS_REPORT%"
+echo This analysis looks for: >> "%MISSING_METHODS_REPORT%"
+echo. >> "%MISSING_METHODS_REPORT%"
+echo 1. Methods called on service classes that might not exist >> "%MISSING_METHODS_REPORT%"
+echo 2. Method signature mismatches between calls and definitions >> "%MISSING_METHODS_REPORT%"
+echo 3. Missing getInstance() methods on service classes >> "%MISSING_METHODS_REPORT%"
+echo 4. Missing methods in common utility classes >> "%MISSING_METHODS_REPORT%"
+echo. >> "%MISSING_METHODS_REPORT%"
 
 REM Extract method calls from build errors
 findstr /i /c:"symbol:   method" "%BUILD_LOG%" > "%TEMP_DIR%\missing_methods.txt"
 findstr /i /c:"location: variable" "%BUILD_LOG%" > "%TEMP_DIR%\locations.txt"
 
 REM Create a consolidated report of missing methods
->> "%MISSING_METHODS_REPORT%" (
-    echo ## Missing Methods from Build Errors
-    echo.
-    echo These methods are referenced in the code but could not be found during compilation:
-    echo.
-)
+echo ## Missing Methods from Build Errors >> "%MISSING_METHODS_REPORT%"
+echo. >> "%MISSING_METHODS_REPORT%"
+echo These methods are referenced in the code but could not be found during compilation: >> "%MISSING_METHODS_REPORT%"
+echo. >> "%MISSING_METHODS_REPORT%"
 
 REM Process missing methods from build log
 if exist "%TEMP_DIR%\missing_methods.txt" (
@@ -493,60 +479,54 @@ echo.
 echo === Running Resolution Errors Analysis ===
 
 REM Create output file with header
-> "%RESOLUTION_ERRORS_REPORT%" (
-    echo # Potential Resolution Error Report
-    echo.
-    echo This report identifies potential "Cannot resolve" errors for IntelliJ IDEA 2025.1.1.1.
-    echo Generated on %DATE% %TIME%.
-    echo.
-    echo ## Overview
-    echo.
-    echo This scan identifies references to packages and classes that have been:
-    echo.
-    echo 1. Relocated to a different package
-    echo 2. Renamed or significantly changed
-    echo 3. Removed entirely in IntelliJ IDEA 2025.1.1.1
-    echo.
-    echo These references are likely to cause "Cannot resolve symbol" errors during compilation.
-    echo.
-)
+echo # Potential Resolution Error Report > "%RESOLUTION_ERRORS_REPORT%"
+echo. >> "%RESOLUTION_ERRORS_REPORT%"
+echo This report identifies potential "Cannot resolve" errors for IntelliJ IDEA 2025.1.1.1. >> "%RESOLUTION_ERRORS_REPORT%"
+echo Generated on %DATE% %TIME%. >> "%RESOLUTION_ERRORS_REPORT%"
+echo. >> "%RESOLUTION_ERRORS_REPORT%"
+echo ## Overview >> "%RESOLUTION_ERRORS_REPORT%"
+echo. >> "%RESOLUTION_ERRORS_REPORT%"
+echo This scan identifies references to packages and classes that have been: >> "%RESOLUTION_ERRORS_REPORT%"
+echo. >> "%RESOLUTION_ERRORS_REPORT%"
+echo 1. Relocated to a different package >> "%RESOLUTION_ERRORS_REPORT%"
+echo 2. Renamed or significantly changed >> "%RESOLUTION_ERRORS_REPORT%"
+echo 3. Removed entirely in IntelliJ IDEA 2025.1.1.1 >> "%RESOLUTION_ERRORS_REPORT%"
+echo. >> "%RESOLUTION_ERRORS_REPORT%"
+echo These references are likely to cause "Cannot resolve symbol" errors during compilation. >> "%RESOLUTION_ERRORS_REPORT%"
+echo. >> "%RESOLUTION_ERRORS_REPORT%"
 
 REM Create a list of problematic patterns
-> "%TEMP_DIR%\relocation_patterns.txt" (
-    echo ProjectManagerEx
-    echo ContentManagerEx
-    echo ToolWindowManagerEx
-    echo FileEditorManagerEx
-    echo NotificationGroup
-    echo JBPopupFactoryImpl
-    echo IntentionActionDelegate
-    echo GotoActionBase
-    echo RefreshAction
-    echo ProjectFileIndex
-    echo PluginId
-    echo ExtensionsArea
-    echo JavaPsiFacade
-    echo ClassUtil
-    echo VirtualFileManager
-    echo PsiUtils
-    echo PsiUtil
-    echo PsiTreeUtil
-    echo FileChooserDescriptor
-    echo LightVirtualFile
-    echo CoreLocalVirtualFile
-    echo JavaDirectoryService
-    echo PsiElementFactory
-    echo XmlElementFactory
-)
+echo ProjectManagerEx > "%TEMP_DIR%\relocation_patterns.txt"
+echo ContentManagerEx >> "%TEMP_DIR%\relocation_patterns.txt"
+echo ToolWindowManagerEx >> "%TEMP_DIR%\relocation_patterns.txt"
+echo FileEditorManagerEx >> "%TEMP_DIR%\relocation_patterns.txt"
+echo NotificationGroup >> "%TEMP_DIR%\relocation_patterns.txt"
+echo JBPopupFactoryImpl >> "%TEMP_DIR%\relocation_patterns.txt"
+echo IntentionActionDelegate >> "%TEMP_DIR%\relocation_patterns.txt"
+echo GotoActionBase >> "%TEMP_DIR%\relocation_patterns.txt"
+echo RefreshAction >> "%TEMP_DIR%\relocation_patterns.txt"
+echo ProjectFileIndex >> "%TEMP_DIR%\relocation_patterns.txt"
+echo PluginId >> "%TEMP_DIR%\relocation_patterns.txt"
+echo ExtensionsArea >> "%TEMP_DIR%\relocation_patterns.txt"
+echo JavaPsiFacade >> "%TEMP_DIR%\relocation_patterns.txt"
+echo ClassUtil >> "%TEMP_DIR%\relocation_patterns.txt"
+echo VirtualFileManager >> "%TEMP_DIR%\relocation_patterns.txt"
+echo PsiUtils >> "%TEMP_DIR%\relocation_patterns.txt"
+echo PsiUtil >> "%TEMP_DIR%\relocation_patterns.txt"
+echo PsiTreeUtil >> "%TEMP_DIR%\relocation_patterns.txt"
+echo FileChooserDescriptor >> "%TEMP_DIR%\relocation_patterns.txt"
+echo LightVirtualFile >> "%TEMP_DIR%\relocation_patterns.txt"
+echo CoreLocalVirtualFile >> "%TEMP_DIR%\relocation_patterns.txt"
+echo JavaDirectoryService >> "%TEMP_DIR%\relocation_patterns.txt"
+echo PsiElementFactory >> "%TEMP_DIR%\relocation_patterns.txt"
+echo XmlElementFactory >> "%TEMP_DIR%\relocation_patterns.txt"
 
 REM Check if the source directory exists
 if not exist "%SOURCE_DIR%" (
     echo Source directory does not exist: %SOURCE_DIR%
-    >> "%RESOLUTION_ERRORS_REPORT%" (
-        echo ## Error
-        echo.
-        echo Source directory does not exist: %SOURCE_DIR%
-    )
+    echo ## Error >> "%RESOLUTION_ERRORS_REPORT%"
+    echo. >> "%RESOLUTION_ERRORS_REPORT%"
+    echo Source directory does not exist: %SOURCE_DIR% >> "%RESOLUTION_ERRORS_REPORT%"
     goto :EOF
 )
 
@@ -554,12 +534,10 @@ REM Find all Java files
 dir /s /b "%SOURCE_DIR%\*.java" > "%TEMP_DIR%\java_files_resolution.txt" 2>nul
 
 REM Extract imports from files
->> "%RESOLUTION_ERRORS_REPORT%" (
-    echo ## Potentially Problematic Imports
-    echo.
-    echo The following imports may cause resolution issues:
-    echo.
-)
+echo ## Potentially Problematic Imports >> "%RESOLUTION_ERRORS_REPORT%"
+echo. >> "%RESOLUTION_ERRORS_REPORT%"
+echo The following imports may cause resolution issues: >> "%RESOLUTION_ERRORS_REPORT%"
+echo. >> "%RESOLUTION_ERRORS_REPORT%"
 
 set "FOUND_ISSUES=0"
 for /f "tokens=*" %%p in (%TEMP_DIR%\relocation_patterns.txt) do (
@@ -578,12 +556,10 @@ for /f "tokens=*" %%p in (%TEMP_DIR%\relocation_patterns.txt) do (
 )
 
 REM Check for deprecated method calls
->> "%RESOLUTION_ERRORS_REPORT%" (
-    echo ## Potentially Problematic Method Calls
-    echo.
-    echo The following method calls may cause resolution issues:
-    echo.
-)
+echo ## Potentially Problematic Method Calls >> "%RESOLUTION_ERRORS_REPORT%"
+echo. >> "%RESOLUTION_ERRORS_REPORT%"
+echo The following method calls may cause resolution issues: >> "%RESOLUTION_ERRORS_REPORT%"
+echo. >> "%RESOLUTION_ERRORS_REPORT%"
 
 set "METHODS_FOUND=0"
 for %%m in (getBaseDir findFileByPath getInstanceEx getFileSystem resolveFile) do (
@@ -623,29 +599,25 @@ if "%FOUND_ISSUES%%METHODS_FOUND%"=="00" (
 REM Extract resolution issues from build log
 findstr /i /c:"cannot find symbol" "%BUILD_LOG%" > "%TEMP_DIR%\build_resolution_errors.txt"
 if exist "%TEMP_DIR%\build_resolution_errors.txt" (
-    >> "%RESOLUTION_ERRORS_REPORT%" (
-        echo ## Resolution Errors from Build Log
-        echo.
-        echo The following resolution errors were found during compilation:
-        echo.
-        echo ```java
-    )
+    echo ## Resolution Errors from Build Log >> "%RESOLUTION_ERRORS_REPORT%"
+    echo. >> "%RESOLUTION_ERRORS_REPORT%"
+    echo The following resolution errors were found during compilation: >> "%RESOLUTION_ERRORS_REPORT%"
+    echo. >> "%RESOLUTION_ERRORS_REPORT%"
+    echo ```java >> "%RESOLUTION_ERRORS_REPORT%"
     type "%TEMP_DIR%\build_resolution_errors.txt" >> "%RESOLUTION_ERRORS_REPORT%"
     echo ``` >> "%RESOLUTION_ERRORS_REPORT%"
     echo. >> "%RESOLUTION_ERRORS_REPORT%"
 )
 
 REM Add implementation recommendations
->> "%RESOLUTION_ERRORS_REPORT%" (
-    echo ## Fix Recommendations
-    echo.
-    echo 1. **Update imports** to use the latest package paths
-    echo 2. **Use CompatibilityUtil** for deprecated method calls
-    echo 3. **Fix method signatures** to match exactly what callers expect
-    echo 4. **Add missing methods** to service classes
-    echo 5. **Implement proper getInstance()** methods for service classes
-    echo.
-)
+echo ## Fix Recommendations >> "%RESOLUTION_ERRORS_REPORT%"
+echo. >> "%RESOLUTION_ERRORS_REPORT%"
+echo 1. **Update imports** to use the latest package paths >> "%RESOLUTION_ERRORS_REPORT%"
+echo 2. **Use CompatibilityUtil** for deprecated method calls >> "%RESOLUTION_ERRORS_REPORT%"
+echo 3. **Fix method signatures** to match exactly what callers expect >> "%RESOLUTION_ERRORS_REPORT%"
+echo 4. **Add missing methods** to service classes >> "%RESOLUTION_ERRORS_REPORT%"
+echo 5. **Implement proper getInstance()** methods for service classes >> "%RESOLUTION_ERRORS_REPORT%"
+echo. >> "%RESOLUTION_ERRORS_REPORT%"
 
 echo Resolution errors analysis complete.
 goto :EOF
