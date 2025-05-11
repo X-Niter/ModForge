@@ -85,6 +85,9 @@
         <com.modforge.intellij.plugin.modLoaderContributor implementation="com.modforge.intellij.plugin.loaders.FabricLoaderContributor"/>
         <com.modforge.intellij.plugin.modLoaderContributor implementation="com.modforge.intellij.plugin.loaders.QuiltLoaderContributor"/>
         <com.modforge.intellij.plugin.modLoaderContributor implementation="com.modforge.intellij.plugin.loaders.ArchitecturyLoaderContributor"/>
+        
+        <!-- Run Configurations -->
+        <configurationType implementation="com.modforge.intellij.plugin.run.MinecraftRunConfigurationType"/>
     </extensions>
     
     <actions>
