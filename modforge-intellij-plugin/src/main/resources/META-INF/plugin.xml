@@ -97,7 +97,6 @@
         <projectService serviceImplementation="com.modforge.intellij.plugin.designers.recipe.RecipeManager"/>
         <projectService serviceImplementation="com.modforge.intellij.plugin.designers.structure.StructureManager"/>
         <projectService serviceImplementation="com.modforge.intellij.plugin.memory.MemoryOptimizer"/>
-        <projectService serviceImplementation="com.modforge.intellij.plugin.services.MemoryAwareContinuousService"/>
         <projectService serviceImplementation="com.modforge.intellij.plugin.services.MemoryRecoveryService"/>
         <projectService serviceImplementation="com.modforge.intellij.plugin.github.GitHubIntegrationService"/>
         <projectService serviceImplementation="com.modforge.intellij.plugin.notifications.ModForgeNotificationService"/>
@@ -111,6 +110,7 @@
         <applicationService serviceImplementation="com.modforge.intellij.plugin.memory.settings.MemoryManagementSettings"/>
         <applicationService serviceImplementation="com.modforge.intellij.plugin.memory.recovery.MemoryRecoveryManager"/>
         <applicationService serviceImplementation="com.modforge.intellij.plugin.memory.monitoring.MemoryHealthMonitor"/>
+        <applicationService serviceImplementation="com.modforge.intellij.plugin.memory.monitoring.MemorySnapshotManager"/>
         <applicationService serviceImplementation="com.modforge.intellij.plugin.memory.config.MemoryThresholdConfig"/>
         
         <!-- Settings -->
@@ -261,33 +261,31 @@
             </action>
         </group>
         
-        <!-- New Group -->
-        <group id="ModForge.NewGroup" 
-               class="com.modforge.intellij.plugin.actions.ModForgeNewGroup" 
-               text="ModForge" 
-               popup="true" 
-               icon="/icons/modforge.svg">
-            <add-to-group group-id="NewGroup" anchor="after" relative-to-action="NewFromTemplate"/>
+        <!-- Editor Popup Menu -->
+        <group id="ModForge.EditorPopupMenu" text="ModForge AI">
+            <add-to-group group-id="EditorPopupMenu" anchor="last"/>
             
-            <action id="ModForge.NewModFromTemplate"
-                    class="com.modforge.intellij.plugin.actions.CreateFromTemplateAction"
-                    text="Minecraft Mod"
-                    description="Create a new Minecraft mod from a template">
+            <action id="ModForge.GenerateCodePopupAction"
+                    class="com.modforge.intellij.plugin.actions.GenerateCodeAction"
+                    text="Generate Code with AI"
+                    description="Generate code using AI">
+            </action>
+            <action id="ModForge.FixErrorsPopupAction"
+                    class="com.modforge.intellij.plugin.actions.FixErrorsAction"
+                    text="Fix Errors with AI"
+                    description="Fix compilation errors using AI">
             </action>
         </group>
         
-        <!-- Editor Actions -->
-        <action id="ModForge.EditorGenerateCodeAction"
-                class="com.modforge.intellij.plugin.actions.GenerateCodeAction"
-                text="Generate Code with ModForge AI"
-                description="Generate code using ModForge AI">
-            <add-to-group group-id="EditorPopupMenu" anchor="last"/>
-        </action>
-        <action id="ModForge.EditorFixErrorsAction"
-                class="com.modforge.intellij.plugin.actions.FixErrorsAction"
-                text="Fix Errors with ModForge AI"
-                description="Fix compilation errors using ModForge AI">
-            <add-to-group group-id="EditorPopupMenu" anchor="last"/>
-        </action>
+        <!-- Project Popup Menu -->
+        <group id="ModForge.ProjectPopupMenu" text="ModForge AI">
+            <add-to-group group-id="ProjectViewPopupMenu" anchor="last"/>
+            
+            <action id="ModForge.GenerateModElementAction"
+                    class="com.modforge.intellij.plugin.actions.GenerateModElementAction"
+                    text="Generate Minecraft Element"
+                    description="Generate a Minecraft element (block, item, etc.)">
+            </action>
+        </group>
     </actions>
 </idea-plugin>

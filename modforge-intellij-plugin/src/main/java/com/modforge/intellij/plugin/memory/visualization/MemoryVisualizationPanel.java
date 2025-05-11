@@ -11,6 +11,7 @@ import com.intellij.util.ui.UIUtil;
 import com.modforge.intellij.plugin.memory.MemoryManager;
 import com.modforge.intellij.plugin.memory.monitoring.MemoryHealthMonitor;
 import com.modforge.intellij.plugin.memory.monitoring.MemorySnapshot;
+import com.modforge.intellij.plugin.memory.monitoring.MemorySnapshotManager;
 import org.jetbrains.annotations.NotNull;
 
 import javax.swing.*;
@@ -159,6 +160,73 @@ public class MemoryVisualizationPanel extends JBPanel<MemoryVisualizationPanel> 
      */
     private void updateVisualization() {
         try {
+            // Get snapshot manager for persistent storage
+            MemorySnapshotManager snapshotManager = MemorySnapshotManager.getInstance();
+            if (snapshotManager == null) {
+                LOG.warn("Memory snapshot manager is not available, falling back to direct memory access");
+                updateVisualizationLegacy();
+                return;
+            }
+            
+            // Get latest snapshot from manager (it will create one if needed)
+            MemorySnapshot currentSnapshot = snapshotManager.getLatestSnapshot();
+            if (currentSnapshot == null) {
+                LOG.warn("Failed to get current memory snapshot, skipping visualization update");
+                return;
+            }
+            
+            // Get all snapshots from the manager
+            List<MemorySnapshot> allSnapshots = snapshotManager.getSnapshots();
+            
+            // Thread-safe update of local memory history
+            synchronized (memoryHistory) {
+                // Replace our local history with the manager's history
+                memoryHistory.clear();
+                memoryHistory.addAll(allSnapshots);
+                
+                // Make a thread-safe copy for filtering and display
+                final List<MemorySnapshot> memoryCopy = new ArrayList<>(memoryHistory);
+                final int currentTimeRange = timeRangeMinutes;
+                final boolean currentShowPrediction = showPrediction;
+                final String currentMetric = selectedMetric;
+                
+                // Filter data based on time range
+                List<MemorySnapshot> filteredData = filterDataByTimeRange(memoryCopy, currentTimeRange);
+                
+                // Update chart in a thread-safe manner
+                chartPanel.updateData(filteredData, currentShowPrediction, currentMetric);
+                
+                // Update status label in the EDT
+                final MemorySnapshot finalSnapshot = currentSnapshot;
+                SwingUtilities.invokeLater(() -> {
+                    try {
+                        updateStatusLabel(finalSnapshot);
+                    } catch (Exception ex) {
+                        LOG.error("Error updating status label", ex);
+                    }
+                });
+            }
+        } catch (Exception ex) {
+            LOG.error("Error updating memory visualization", ex);
+            SwingUtilities.invokeLater(() -> {
+                statusLabel.setText("Error updating visualization: " + ex.getMessage());
+            });
+            
+            // Try legacy fallback method
+            try {
+                updateVisualizationLegacy();
+            } catch (Exception fallbackEx) {
+                LOG.error("Fallback visualization update also failed", fallbackEx);
+            }
+        }
+    }
+    
+    /**
+     * Legacy update method that doesn't rely on the snapshot manager
+     * Used as a fallback if the snapshot manager is not available
+     */
+    private void updateVisualizationLegacy() {
+        try {
             // Check if we have a valid memory manager
             MemoryManager memoryManager = MemoryManager.getInstance();
             if (memoryManager == null) {
@@ -213,7 +281,7 @@ public class MemoryVisualizationPanel extends JBPanel<MemoryVisualizationPanel> 
                 });
             }
         } catch (Exception ex) {
-            LOG.error("Error updating memory visualization", ex);
+            LOG.error("Error in legacy memory visualization update", ex);
             SwingUtilities.invokeLater(() -> {
                 statusLabel.setText("Error updating visualization: " + ex.getMessage());
             });
@@ -293,6 +361,130 @@ public class MemoryVisualizationPanel extends JBPanel<MemoryVisualizationPanel> 
      * Export memory data to a CSV file
      */
     private void exportMemoryData() {
+        try {
+            // First try to use the snapshot manager for export
+            MemorySnapshotManager snapshotManager = MemorySnapshotManager.getInstance();
+            if (snapshotManager != null) {
+                exportMemoryDataWithManager(snapshotManager);
+                return;
+            }
+            
+            // Fall back to local memory history if manager not available
+            exportMemoryDataLegacy();
+            
+        } catch (Exception ex) {
+            LOG.error("Error during memory data export initialization", ex);
+            SwingUtilities.invokeLater(() -> {
+                statusLabel.setText("Error preparing memory data export: " + ex.getMessage());
+                
+                // Show error notification
+                JOptionPane.showMessageDialog(this,
+                        "Failed to prepare memory data export:\n" + ex.getMessage(),
+                        "Export Error",
+                        JOptionPane.ERROR_MESSAGE);
+            });
+        }
+    }
+    
+    /**
+     * Export memory data using the snapshot manager
+     * 
+     * @param snapshotManager The snapshot manager to use
+     */
+    private void exportMemoryDataWithManager(MemorySnapshotManager snapshotManager) {
+        // Check if the manager has data
+        List<MemorySnapshot> managerData = snapshotManager.getSnapshots();
+        
+        if (managerData.isEmpty()) {
+            LOG.info("No memory data available in snapshot manager, falling back to local history");
+            exportMemoryDataLegacy();
+            return;
+        }
+        
+        try {
+            // Create file chooser and get save location
+            JFileChooser fileChooser = new JFileChooser();
+            fileChooser.setDialogTitle("Save Memory Data");
+            fileChooser.setFileSelectionMode(JFileChooser.FILES_ONLY);
+            
+            // Set default filename with timestamp
+            String defaultFilename = "memory_data_" + 
+                    LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss")) + ".csv";
+            fileChooser.setSelectedFile(new java.io.File(defaultFilename));
+            
+            // Show save dialog
+            int result = fileChooser.showSaveDialog(this);
+            if (result != JFileChooser.APPROVE_OPTION) {
+                LOG.info("User canceled memory data export");
+                return;
+            }
+            
+            // Get selected file
+            java.io.File file = fileChooser.getSelectedFile();
+            
+            // Add .csv extension if missing
+            if (!file.getName().toLowerCase().endsWith(".csv")) {
+                file = new java.io.File(file.getAbsolutePath() + ".csv");
+            }
+            
+            // Check if file already exists
+            if (file.exists()) {
+                int overwrite = JOptionPane.showConfirmDialog(this,
+                        "File already exists. Overwrite?",
+                        "Confirm Overwrite",
+                        JOptionPane.YES_NO_OPTION,
+                        JOptionPane.WARNING_MESSAGE);
+                        
+                if (overwrite != JOptionPane.YES_OPTION) {
+                    LOG.info("User canceled overwriting existing file: " + file.getAbsolutePath());
+                    return;
+                }
+            }
+            
+            // Use the manager to export data
+            boolean success = snapshotManager.exportSnapshotsToCSV(file);
+            
+            if (success) {
+                final String finalPath = file.getAbsolutePath();
+                SwingUtilities.invokeLater(() -> {
+                    statusLabel.setText("Memory data exported to " + finalPath);
+                    
+                    // Show success notification
+                    JOptionPane.showMessageDialog(this,
+                            "Memory data successfully exported to:\n" + finalPath,
+                            "Export Complete",
+                            JOptionPane.INFORMATION_MESSAGE);
+                });
+                
+                LOG.info("Memory data exported to " + file.getAbsolutePath() + 
+                        " using snapshot manager");
+            } else {
+                LOG.warn("Export failed with manager, falling back to legacy export");
+                exportMemoryDataLegacy();
+            }
+            
+        } catch (Exception ex) {
+            LOG.error("Error exporting memory data with manager", ex);
+            SwingUtilities.invokeLater(() -> {
+                statusLabel.setText("Error exporting memory data: " + ex.getMessage());
+                
+                // Show error notification
+                JOptionPane.showMessageDialog(this,
+                        "Failed to export memory data with manager:\n" + ex.getMessage(),
+                        "Export Error",
+                        JOptionPane.ERROR_MESSAGE);
+            });
+            
+            // Try legacy fallback
+            exportMemoryDataLegacy();
+        }
+    }
+    
+    /**
+     * Legacy export method that uses the local memory history
+     * Used as a fallback if the snapshot manager export fails
+     */
+    private void exportMemoryDataLegacy() {
         // Check if we have data to export
         if (memoryHistory == null || memoryHistory.isEmpty()) {
             SwingUtilities.invokeLater(() -> {
@@ -310,18 +502,18 @@ public class MemoryVisualizationPanel extends JBPanel<MemoryVisualizationPanel> 
             
             // Create file chooser and get save location
             JFileChooser fileChooser = new JFileChooser();
-            fileChooser.setDialogTitle("Save Memory Data");
+            fileChooser.setDialogTitle("Save Memory Data (Legacy Export)");
             fileChooser.setFileSelectionMode(JFileChooser.FILES_ONLY);
             
             // Set default filename with timestamp
-            String defaultFilename = "memory_data_" + 
+            String defaultFilename = "memory_data_legacy_" + 
                     LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss")) + ".csv";
             fileChooser.setSelectedFile(new java.io.File(defaultFilename));
             
             // Show save dialog
             int result = fileChooser.showSaveDialog(this);
             if (result != JFileChooser.APPROVE_OPTION) {
-                LOG.info("User canceled memory data export");
+                LOG.info("User canceled legacy memory data export");
                 return;
             }
             
@@ -386,16 +578,16 @@ public class MemoryVisualizationPanel extends JBPanel<MemoryVisualizationPanel> 
             });
             
             LOG.info("Memory data exported to " + file.getAbsolutePath() + 
-                    " (" + dataToExport.size() + " records)");
+                    " using legacy method (" + dataToExport.size() + " records)");
             
         } catch (Exception ex) {
-            LOG.error("Error exporting memory data", ex);
+            LOG.error("Error exporting memory data using legacy method", ex);
             SwingUtilities.invokeLater(() -> {
                 statusLabel.setText("Error exporting memory data: " + ex.getMessage());
                 
                 // Show error notification
                 JOptionPane.showMessageDialog(this,
-                        "Failed to export memory data:\n" + ex.getMessage(),
+                        "Failed to export memory data using legacy method:\n" + ex.getMessage(),
                         "Export Error",
                         JOptionPane.ERROR_MESSAGE);
             });
