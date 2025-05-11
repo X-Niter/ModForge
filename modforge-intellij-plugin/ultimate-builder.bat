@@ -607,6 +607,8 @@ if "%FOUND_ISSUES%%METHODS_FOUND%"=="00" (
     echo No specific resolution issues detected from static analysis. >> "%RESOLUTION_ERRORS_REPORT%"
     echo. >> "%RESOLUTION_ERRORS_REPORT%"
     echo However, build errors indicate there are resolution issues. Check the build log for details. >> "%RESOLUTION_ERRORS_REPORT%"
+) else (
+    echo Static analysis found potential resolution issues. >> "%RESOLUTION_ERRORS_REPORT%"
 )
 
 REM Extract resolution issues from build log
@@ -620,6 +622,8 @@ if exist "%TEMP_DIR%\build_resolution_errors.txt" (
     type "%TEMP_DIR%\build_resolution_errors.txt" >> "%RESOLUTION_ERRORS_REPORT%"
     echo --- End Code --- >> "%RESOLUTION_ERRORS_REPORT%"
     echo. >> "%RESOLUTION_ERRORS_REPORT%"
+) else (
+    REM No resolution errors found in build log
 )
 
 REM Add implementation recommendations
