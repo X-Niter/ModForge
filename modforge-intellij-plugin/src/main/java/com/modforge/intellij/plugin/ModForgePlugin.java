@@ -63,8 +63,9 @@ public class ModForgePlugin implements StartupActivity, ProjectManagerListener {
             );
             
             notification.addAction(NotificationAction.createSimple("Open Settings", () -> {
-                // Open settings dialog
-                project.getComponent("com.modforge.intellij.plugin.settings.ModForgeSettings");
+                // Open settings dialog using the modern API
+                com.intellij.openapi.options.ShowSettingsUtil.getInstance().showSettingsDialog(
+                    project, "com.modforge.intellij.plugin.settings.ModForgeSettingsConfigurable");
             }));
             
             notification.notify(project);
