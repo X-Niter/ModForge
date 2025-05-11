@@ -34,38 +34,18 @@ echo This scan looks for deprecated APIs, problematic patterns, and compatibilit
 echo that might affect the plugin's functionality with IntelliJ IDEA 2025.1.1.1. >> "%OUTPUT_FILE%"
 echo. >> "%OUTPUT_FILE%"
 
-REM Add known deprecations table
+REM Add known deprecations as a list instead of a table
 echo ## Known Deprecated APIs and Replacements >> "%OUTPUT_FILE%"
 echo. >> "%OUTPUT_FILE%"
-echo ^| Deprecated API ^| Replacement ^| Compatibility Note ^| >> "%OUTPUT_FILE%"
-echo ^|----------------|-------------|-------------------^| >> "%OUTPUT_FILE%"
-echo ^| Project.getBaseDir() ^| CompatibilityUtil.getProjectBaseDir(project) ^| Removed in 2020.3+ ^| >> "%OUTPUT_FILE%"
-echo ^| CacheUpdater ^| CompatibilityUtil.refreshAll(project) ^| Removed in 2020.1+ ^| >> "%OUTPUT_FILE%"
-echo ^| CacheUpdaterFacade ^| CompatibilityUtil.refreshAll(project) ^| Removed in 2020.1+ ^| >> "%OUTPUT_FILE%"
-echo ^| ApplicationManager.getApplication().runReadAction() ^| CompatibilityUtil.runReadAction() ^| Better API in 2020.3+ ^| >> "%OUTPUT_FILE%"
-echo ^| ApplicationManager.getApplication().runWriteAction() ^| CompatibilityUtil.runWriteAction() ^| Better API in 2020.3+ ^| >> "%OUTPUT_FILE%"
+echo * **Project.getBaseDir()** - Replace with CompatibilityUtil.getProjectBaseDir(project) - Removed in 2020.3+ >> "%OUTPUT_FILE%"
+echo * **CacheUpdater** - Replace with CompatibilityUtil.refreshAll(project) - Removed in 2020.1+ >> "%OUTPUT_FILE%"
+echo * **CacheUpdaterFacade** - Replace with CompatibilityUtil.refreshAll(project) - Removed in 2020.1+ >> "%OUTPUT_FILE%"
+echo * **ApplicationManager.getApplication().runReadAction()** - Replace with CompatibilityUtil.runReadAction() >> "%OUTPUT_FILE%"
+echo * **ApplicationManager.getApplication().runWriteAction()** - Replace with CompatibilityUtil.runWriteAction() >> "%OUTPUT_FILE%"
 echo. >> "%OUTPUT_FILE%"
 
-REM Create batch file to search for patterns
-echo @echo off > search_temp.bat
-echo setlocal enabledelayedexpansion >> search_temp.bat
-echo set "FOUND=false" >> search_temp.bat
-echo set "FILE=%%1" >> search_temp.bat
-echo set "PATTERNS=getBaseDir CacheUpdater CacheUpdaterFacade ApplicationManager.getApplication runReadAction runWriteAction createXmlTag getSelectedTextEditor VirtualFileManager.getInstance FileEditorManager ActionPlaces PlatformDataKeys DataConstants TransactionGuard ProjectLevelVcsManager VcsException VcsRoot ShowSettingsUtil CreateElementActionBase" >> search_temp.bat
-echo for %%%%p in (!PATTERNS!) do ( >> search_temp.bat
-echo   findstr /c:"%%%%p" "!FILE!" ^>nul 2^>^&1 >> search_temp.bat
-echo   if !ERRORLEVEL! equ 0 ( >> search_temp.bat
-echo     echo !FILE!:%%%%p >> "%TEMP_MATCHES%" >> search_temp.bat
-echo     set "FOUND=true" >> search_temp.bat
-echo   ) >> search_temp.bat
-echo ) >> search_temp.bat
-echo if "!FOUND!"=="true" ( >> search_temp.bat
-echo   echo 1 >> found_file.tmp >> search_temp.bat
-echo ) >> search_temp.bat
-echo endlocal >> search_temp.bat
-
 REM Find all Java files
-dir /s /b "%SOURCE_DIR%\*.java" > "%TEMP_FILES%"
+dir /s /b "%SOURCE_DIR%\*.java" > "%TEMP_FILES%" 2>nul
 
 echo Searching for potentially problematic API usage...
 
@@ -77,13 +57,18 @@ REM Initialize counters
 set /a TOTAL_ISSUES=0
 set /a AFFECTED_FILES=0
 
-if exist found_file.tmp del found_file.tmp
-if exist "%TEMP_MATCHES%" del "%TEMP_MATCHES%"
+if exist found_file.tmp del found_file.tmp 2>nul
+if exist "%TEMP_MATCHES%" del "%TEMP_MATCHES%" 2>nul
 
 REM Process each file
 set PROCESSED=0
 
 echo Scanning %TOTAL_FILES% Java files...
+
+if %TOTAL_FILES% equ 0 (
+    echo No Java files found in %SOURCE_DIR%
+    goto CLEANUP
+)
 
 for /f "delims=" %%f in (%TEMP_FILES%) do (
     set /a PROCESSED+=1
@@ -95,57 +80,17 @@ for /f "delims=" %%f in (%TEMP_FILES%) do (
     )
     
     REM Check for key patterns
-    findstr /c:"getBaseDir" "%%f" >nul 2>&1
-    if !ERRORLEVEL! equ 0 (
-        echo %%f:getBaseDir >> "%TEMP_MATCHES%"
-        echo 1 > found_file.tmp
-    )
-    
-    findstr /c:"CacheUpdater" "%%f" >nul 2>&1
-    if !ERRORLEVEL! equ 0 (
-        echo %%f:CacheUpdater >> "%TEMP_MATCHES%"
-        echo 1 > found_file.tmp
-    )
-    
-    findstr /c:"runReadAction" "%%f" >nul 2>&1
-    if !ERRORLEVEL! equ 0 (
-        echo %%f:runReadAction >> "%TEMP_MATCHES%"
-        echo 1 > found_file.tmp
-    )
-    
-    findstr /c:"runWriteAction" "%%f" >nul 2>&1
-    if !ERRORLEVEL! equ 0 (
-        echo %%f:runWriteAction >> "%TEMP_MATCHES%"
-        echo 1 > found_file.tmp
-    )
-    
-    findstr /c:"getSelectedTextEditor" "%%f" >nul 2>&1
-    if !ERRORLEVEL! equ 0 (
-        echo %%f:getSelectedTextEditor >> "%TEMP_MATCHES%"
-        echo 1 > found_file.tmp
-    )
-    
-    findstr /c:"ProjectComponent" "%%f" >nul 2>&1
-    if !ERRORLEVEL! equ 0 (
-        echo %%f:ProjectComponent >> "%TEMP_MATCHES%"
-        echo 1 > found_file.tmp
-    )
-    
-    findstr /c:"ApplicationComponent" "%%f" >nul 2>&1
-    if !ERRORLEVEL! equ 0 (
-        echo %%f:ApplicationComponent >> "%TEMP_MATCHES%"
-        echo 1 > found_file.tmp
-    )
-    
-    findstr /c:"ModuleComponent" "%%f" >nul 2>&1
-    if !ERRORLEVEL! equ 0 (
-        echo %%f:ModuleComponent >> "%TEMP_MATCHES%"
-        echo 1 > found_file.tmp
+    for %%p in (getBaseDir CacheUpdater CacheUpdaterFacade runReadAction runWriteAction getSelectedTextEditor ApplicationComponent ProjectComponent ModuleComponent createXmlTag) do (
+        findstr /c:"%%p" "%%f" >nul 2>&1
+        if !ERRORLEVEL! equ 0 (
+            echo %%f:%%p >> "%TEMP_MATCHES%"
+            echo 1 > found_file.tmp
+        )
     )
     
     if exist found_file.tmp (
         set /a AFFECTED_FILES+=1
-        del found_file.tmp
+        del found_file.tmp 2>nul
     )
 )
 
@@ -191,11 +136,13 @@ if exist "%TEMP_MATCHES%" (
         ) else if "%%b"=="ApplicationComponent" (
             echo * **Suggested fix:** Replace with `@Service(Service.Level.APPLICATION)` annotation >> "%OUTPUT_FILE%"
         ) else (
-            echo * Check compatibility with IntelliJ IDEA 2025.1.1.1 and use `CompatibilityUtil` methods where appropriate >> "%OUTPUT_FILE%"
+            echo * **Suggested fix:** Check compatibility with IntelliJ IDEA 2025.1.1.1 and use `CompatibilityUtil` methods where appropriate >> "%OUTPUT_FILE%"
         )
         
         echo. >> "%OUTPUT_FILE%"
     )
+) else (
+    echo No compatibility issues found! >> "%OUTPUT_FILE%"
 )
 
 REM Add compatibility guide
@@ -207,37 +154,25 @@ echo 1. **Replace deprecated Project methods** >> "%OUTPUT_FILE%"
 echo    - Use `CompatibilityUtil.getProjectBaseDir(project)` instead of `project.getBaseDir()` >> "%OUTPUT_FILE%"
 echo    - Use `ProjectRootManager.getInstance(project).getContentRoots()` for content roots >> "%OUTPUT_FILE%"
 echo. >> "%OUTPUT_FILE%"
-echo 2. **Update Actions** >> "%OUTPUT_FILE%"
-echo    - Override `getActionUpdateThread()` in AnAction implementations >> "%OUTPUT_FILE%"
-echo    - Make sure action updates happen on correct threads >> "%OUTPUT_FILE%"
-echo. >> "%OUTPUT_FILE%"
-echo 3. **Update Threading** >> "%OUTPUT_FILE%"
+echo 2. **Update Threading** >> "%OUTPUT_FILE%"
 echo    - Use `CompatibilityUtil.runReadAction()` instead of direct ApplicationManager calls >> "%OUTPUT_FILE%"
 echo    - Use `CompatibilityUtil.runWriteAction()` for write operations >> "%OUTPUT_FILE%"
 echo    - Use virtual threads with `ThreadUtils.createVirtualThreadExecutor()` for better performance >> "%OUTPUT_FILE%"
 echo. >> "%OUTPUT_FILE%"
-echo 4. **Update Service Management** >> "%OUTPUT_FILE%"
+echo 3. **Update Service Management** >> "%OUTPUT_FILE%"
 echo    - Use `@Service` annotation instead of component registration >> "%OUTPUT_FILE%"
 echo    - Register services in plugin.xml with appropriate level (application/project) >> "%OUTPUT_FILE%"
 echo    - Remove usage of ProjectComponent, ApplicationComponent, etc. >> "%OUTPUT_FILE%"
 echo. >> "%OUTPUT_FILE%"
-echo 5. **Plugin Configuration** >> "%OUTPUT_FILE%"
+echo 4. **Plugin Configuration** >> "%OUTPUT_FILE%"
 echo    - Use full element tags in plugin.xml (no shorthand) >> "%OUTPUT_FILE%"
 echo    - Specify proper since/until build numbers >> "%OUTPUT_FILE%"
 echo    - Use only necessary plugin dependencies >> "%OUTPUT_FILE%"
-echo. >> "%OUTPUT_FILE%"
-echo 6. **File System Access** >> "%OUTPUT_FILE%"
-echo    - Use VfsUtil methods consistently >> "%OUTPUT_FILE%"
-echo    - Handle invalid files properly >> "%OUTPUT_FILE%"
-echo. >> "%OUTPUT_FILE%"
-echo 7. **PSI Operations** >> "%OUTPUT_FILE%"
-echo    - Always run in read actions >> "%OUTPUT_FILE%"
-echo    - Handle null results properly >> "%OUTPUT_FILE%"
 
+:CLEANUP
 REM Clean up
-if exist search_temp.bat del search_temp.bat
-if exist "%TEMP_MATCHES%" del "%TEMP_MATCHES%"
-if exist "%TEMP_FILES%" del "%TEMP_FILES%"
+if exist "%TEMP_MATCHES%" del "%TEMP_MATCHES%" 2>nul
+if exist "%TEMP_FILES%" del "%TEMP_FILES%" 2>nul
 
 echo Compatibility analysis complete! Report written to: %OUTPUT_FILE%
 echo.
