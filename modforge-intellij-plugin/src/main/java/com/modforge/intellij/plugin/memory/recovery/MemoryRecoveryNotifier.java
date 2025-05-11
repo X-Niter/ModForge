@@ -132,12 +132,12 @@ public class MemoryRecoveryNotifier implements MemoryRecoveryManager.RecoveryLis
     }
     
     @Override
-    public void onRecoveryStarted(MemoryRecoveryManager.RecoveryLevel level) {
+    public void onRecoveryStarted(MemoryRecoveryManager.RecoveryPriority priority) {
         String title = "Memory Recovery Started";
-        String content = "Memory recovery at level " + level + " has started.";
+        String content = "Memory recovery at priority " + priority + " has started.";
         NotificationType type = NotificationType.INFORMATION;
         
-        if (level.ordinal() >= MemoryRecoveryManager.RecoveryLevel.LEVEL3.ordinal()) {
+        if (priority == MemoryRecoveryManager.RecoveryPriority.CRITICAL) {
             title = "Aggressive Memory Recovery";
             content = "Aggressive memory recovery actions are being performed. This may temporarily affect performance.";
             type = NotificationType.WARNING;
@@ -154,9 +154,9 @@ public class MemoryRecoveryNotifier implements MemoryRecoveryManager.RecoveryLis
     }
     
     @Override
-    public void onRecoveryCompleted(MemoryRecoveryManager.RecoveryLevel level) {
+    public void onRecoveryCompleted(MemoryRecoveryManager.RecoveryPriority priority) {
         String title = "Memory Recovery Completed";
-        String content = "Memory recovery at level " + level + " has completed successfully.";
+        String content = "Memory recovery at priority " + priority + " has completed successfully.";
         
         Notification notification = new Notification(
                 NOTIFICATION_GROUP_ID,
@@ -172,9 +172,9 @@ public class MemoryRecoveryNotifier implements MemoryRecoveryManager.RecoveryLis
     }
     
     @Override
-    public void onRecoveryFailed(MemoryRecoveryManager.RecoveryLevel level, Exception error) {
+    public void onRecoveryFailed(MemoryRecoveryManager.RecoveryPriority priority, Exception error) {
         String title = "Memory Recovery Failed";
-        String content = "Memory recovery at level " + level + " has failed: " + error.getMessage();
+        String content = "Memory recovery at priority " + priority + " has failed: " + error.getMessage();
         
         Notification notification = new Notification(
                 NOTIFICATION_GROUP_ID,

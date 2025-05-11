@@ -392,22 +392,22 @@ public class MemoryMonitorPanel extends JBPanel<MemoryMonitorPanel> implements D
             ApplicationManager.getApplication().executeOnPooledThread(() -> {
                 try {
                     // Get appropriate level based on current pressure
-                    MemoryRecoveryManager.RecoveryLevel level;
+                    MemoryRecoveryManager.RecoveryPriority priority;
                     MemoryUtils.MemoryPressureLevel pressureLevel = MemoryUtils.getMemoryPressureLevel();
                     
                     switch (pressureLevel) {
                         case EMERGENCY:
-                            level = MemoryRecoveryManager.RecoveryLevel.LEVEL3;
+                            priority = MemoryRecoveryManager.RecoveryPriority.CRITICAL;
                             break;
                         case CRITICAL:
-                            level = MemoryRecoveryManager.RecoveryLevel.LEVEL2;
+                            priority = MemoryRecoveryManager.RecoveryPriority.HIGH;
                             break;
                         default:
-                            level = MemoryRecoveryManager.RecoveryLevel.LEVEL1;
+                            priority = MemoryRecoveryManager.RecoveryPriority.MEDIUM;
                             break;
                     }
                     
-                    recoveryManager.initiateRecovery(level);
+                    recoveryManager.performRecovery(priority);
                     
                     // Allow some time for recovery to complete
                     Thread.sleep(1000);
