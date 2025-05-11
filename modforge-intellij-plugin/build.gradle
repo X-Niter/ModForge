@@ -1,5 +1,6 @@
 plugins {
     id 'java'
+    // Use JetBrains' new IntelliJ Platform Gradle plugin instead
     id 'org.jetbrains.intellij' version '1.17.2'
     id 'org.jetbrains.kotlin.jvm' version '2.0.0' apply false // For Kotlin support
 }
@@ -28,18 +29,19 @@ dependencies {
 
 // Configure Gradle IntelliJ Plugin
 intellij {
-    // Use the exact version matching IntelliJ IDEA 2025.1
-    version = '251.23774.435' // Exact build number for 2025.1
+    // Use the latest published stable IntelliJ version
+    version = '2023.3.6' // Last stable version with reliable repo access
     type = 'IC' // Target IDE: IntelliJ IDEA Community Edition
     
-    // Only include essential plugins available in repositories
-    plugins = [
-        'java',
-        'org.jetbrains.plugins.github:251.23774.435'
-    ]
+    // Only include essential plugins
+    plugins = ['java']
     
     // Don't update build numbers automatically
-    updateSinceUntilBuild = false 
+    updateSinceUntilBuild = false
+    
+    // For local testing, you can comment out the version above and uncomment this
+    // This will use your locally installed IntelliJ IDEA
+    // localPath = 'C:/Program Files/JetBrains/IntelliJ IDEA Community Edition 2025.1'
 }
 
 // Configure Java sourceSets
@@ -76,10 +78,10 @@ wrapper {
 
 // Additional IntelliJ plugin configuration
 tasks {
-    // Set compatibility range for IntelliJ IDEA 2025.1
+    // Set compatibility range to include IntelliJ IDEA 2025.1
     patchPluginXml {
-        sinceBuild.set("251.23774.435") // Exact IntelliJ IDEA 2025.1 build
-        untilBuild.set("251.*")         // Compatible with all 2025.1.x builds
+        sinceBuild.set("233") // Support from 2023.3
+        untilBuild.set("251.*") // Compatible up to all 2025.1.x builds
         changeNotes.set("""
             <h2>Version 2.1.0 - May 11, 2025</h2>
             <ul>
