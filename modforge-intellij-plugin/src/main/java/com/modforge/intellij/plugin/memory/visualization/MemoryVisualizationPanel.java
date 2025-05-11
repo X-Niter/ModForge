@@ -645,6 +645,60 @@ public class MemoryVisualizationPanel extends JBPanel<MemoryVisualizationPanel> 
     }
     
     /**
+     * Reset the visualization panel
+     * Clears current data and fetches fresh data
+     */
+    public void resetVisualization() {
+        LOG.info("Resetting memory visualization panel");
+        
+        try {
+            SwingUtilities.invokeLater(() -> {
+                try {
+                    // Clear current data
+                    synchronized (memoryHistory) {
+                        memoryHistory.clear();
+                    }
+                    
+                    // Reset chart
+                    chartPanel.clearData();
+                    
+                    // Reset UI state
+                    statusLabel.setText("Resetting memory visualization...");
+                    
+                    // Reset to default settings
+                    timeRangeMinutes = DEFAULT_TIME_RANGE_MINUTES;
+                    timeRangeComboBox.setSelectedIndex(2); // 30 min
+                    metricTypeComboBox.setSelectedIndex(0); // Used Memory (%)
+                    showPredictionCheckBox.setSelected(true);
+                    showPrediction = true;
+                    selectedMetric = "Used Memory (%)";
+                    
+                    // Try to reset snapshot manager if available
+                    MemorySnapshotManager snapshotManager = MemorySnapshotManager.getInstance();
+                    if (snapshotManager != null) {
+                        // Do this in a background thread to avoid UI freezes
+                        ApplicationManager.getApplication().executeOnPooledThread(() -> {
+                            snapshotManager.reset();
+                            // Update visualization after reset
+                            SwingUtilities.invokeLater(this::updateVisualization);
+                        });
+                    } else {
+                        // If snapshot manager is not available, just update normally
+                        updateVisualization();
+                    }
+                    
+                    LOG.info("Memory visualization panel reset completed");
+                } catch (Exception e) {
+                    LOG.error("Error during memory visualization panel reset", e);
+                    statusLabel.setText("Error resetting visualization: " + e.getMessage());
+                }
+            });
+        } catch (Exception e) {
+            LOG.error("Error scheduling memory visualization panel reset", e);
+        }
+    }
+    
+    /**
      * Memory chart panel that draws the chart
      */
     private class MemoryChartPanel extends JPanel {
@@ -704,6 +758,20 @@ public class MemoryVisualizationPanel extends JBPanel<MemoryVisualizationPanel> 
             } else {
                 LOG.warn("Attempted to update chart with null data");
             }
+        }
+        
+        /**
+         * Clear all data from the chart
+         * Used for reset operations
+         */
+        public void clearData() {
+            LOG.info("Clearing memory chart data");
+            
+            // Update on the EDT to ensure thread safety
+            SwingUtilities.invokeLater(() -> {
+                this.data = Collections.emptyList();
+                repaint();
+            });
         }
         
         @Override
