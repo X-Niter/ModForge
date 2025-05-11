@@ -57,7 +57,7 @@ if defined JAVA_HOME (
   call :show_log "JAVA_HOME not defined"
 )
 
-:: If Java not found via JAVA_HOME, look in PATH
+:: If Java not found via JAVA_HOME, look in PATH or use safe fallback
 if not defined JAVA_PATH (
   call :show_log "Looking for Java in PATH..."
   where java.exe >nul 2>&1
@@ -66,31 +66,63 @@ if not defined JAVA_PATH (
     set "JAVA_OUT_FILE=%TEMP%\modforge_java_path.txt"
     where java.exe > "%JAVA_OUT_FILE%"
     
-    :: Get the first Java found (most likely the default one)
-    set /p JAVA_EXE=<"%JAVA_OUT_FILE%"
-    call :show_log "Found Java: !JAVA_EXE!"
-    
-    :: Extract the bin directory - need to handle spaces carefully
-    for %%i in ("!JAVA_EXE!") do set "JAVA_BIN=%%~dpi"
-    set "JAVA_BIN=!JAVA_BIN:~0,-1!"
-    call :show_log "Java bin: !JAVA_BIN!"
-    
-    :: Special check for Java path that could be in Common Files
-    if "!JAVA_BIN!" == "C:\Program Files\Common Files\Oracle\Java\javapath" (
-      call :show_log "Detected Oracle JDK in Common Files path - using a standard JDK path"
-      set "JAVA_PATH=C:\Program Files\Java\jdk-21"
-    ) else if "!JAVA_BIN!" == "C:\Program Files (x86)\Common Files\Oracle\Java\javapath" (
-      call :show_log "Detected Oracle JDK in Common Files (x86) path - using a standard JDK path"
-      set "JAVA_PATH=C:\Program Files\Java\jdk-21"
+    :: Check the file exists and is not empty
+    if exist "%JAVA_OUT_FILE%" (
+      for %%F in ("%JAVA_OUT_FILE%") do if %%~zF gtr 0 (
+        :: Get the first Java found (most likely the default one)
+        set /p JAVA_EXE=<"%JAVA_OUT_FILE%"
+        if defined JAVA_EXE (
+          call :show_log "Found Java: !JAVA_EXE!"
+          
+          :: Extract the bin directory - need to handle spaces carefully
+          for %%i in ("!JAVA_EXE!") do set "JAVA_BIN=%%~dpi"
+          
+          :: Make sure we have a valid path
+          if defined JAVA_BIN (
+            :: Remove trailing slash if present
+            IF "!JAVA_BIN:~-1!" == "\" SET "JAVA_BIN=!JAVA_BIN:~0,-1!"
+            call :show_log "Java bin: !JAVA_BIN!"
+            
+            :: Special check for Java path that could be in Common Files
+            set "USE_STANDARD_PATH=0"
+            if "!JAVA_BIN!" == "C:\Program Files\Common Files\Oracle\Java\javapath" set "USE_STANDARD_PATH=1"
+            if "!JAVA_BIN!" == "C:\Program Files (x86)\Common Files\Oracle\Java\javapath" set "USE_STANDARD_PATH=1"
+            
+            if "!USE_STANDARD_PATH!" == "1" (
+              call :show_log "Detected Oracle JDK in Common Files path - using a standard JDK path"
+              set "JAVA_PATH=C:\Program Files\Java\jdk-21"
+              set "JAVA_BIN=C:\Program Files\Java\jdk-21\bin"
+            ) else (
+              :: Normal handling for typical Java installs
+              set "JAVA_PATH=!JAVA_BIN:~0,-4!"
+              if "!JAVA_PATH:~-1!" == "\" set "JAVA_PATH=!JAVA_PATH:~0,-1!"
+            )
+          ) else (
+            call :show_log "Error extracting bin directory from !JAVA_EXE!"
+            set "JAVA_PATH=C:\Program Files\Java\jdk-21"
+            set "JAVA_BIN=C:\Program Files\Java\jdk-21\bin"
+          )
+        ) else (
+          call :show_log "Error reading Java path from file"
+          set "JAVA_PATH=C:\Program Files\Java\jdk-21"
+          set "JAVA_BIN=C:\Program Files\Java\jdk-21\bin"
+        )
+      ) else (
+        call :show_log "Java path file is empty"
+        set "JAVA_PATH=C:\Program Files\Java\jdk-21"
+        set "JAVA_BIN=C:\Program Files\Java\jdk-21\bin"
+      )
     ) else (
-      :: Normal handling for typical Java installs
-      for %%i in ("!JAVA_BIN!") do set "JAVA_PATH=%%~dpi"
-      set "JAVA_PATH=!JAVA_PATH:~0,-1!"
+      call :show_log "Error creating Java path file"
+      set "JAVA_PATH=C:\Program Files\Java\jdk-21"
+      set "JAVA_BIN=C:\Program Files\Java\jdk-21\bin"
     )
     
     call :show_log "Using Java path: !JAVA_PATH!"
   ) else (
-    call :show_log "Java not found in PATH"
+    call :show_log "Java not found in PATH, using fallback path"
+    set "JAVA_PATH=C:\Program Files\Java\jdk-21"
+    set "JAVA_BIN=C:\Program Files\Java\jdk-21\bin"
   )
 )
 
@@ -131,13 +163,51 @@ if exist "%JAVA_BIN%\java.exe" (
   call :show_log "Will try to continue anyway..."
 )
 
-:: Fix paths for Gradle - handle paths with spaces by using a temporary file
-set "TEMP_PROP_FILE=%TEMP%\modforge_path.txt"
-echo %JAVA_PATH% > "%TEMP_PROP_FILE%"
-for /f "usebackq delims=" %%p in ("%TEMP_PROP_FILE%") do (
-  set "SAFE_PATH=%%p"
+:: Fix paths for Gradle - ensure no trailing spaces and handle paths with spaces
+:: First, force exact path
+if "%JAVA_PATH%" == "C:\Program Files\Java\jdk-21" (
+  :: This is a known good path - make sure we clean it up properly
+  set "JAVA_PATH_NORM=C:/Program Files/Java/jdk-21"
+) else (
+  :: For any other paths, clean up very carefully
+  set "TEMP_PROP_FILE=%TEMP%\modforge_path.txt"
+  echo %JAVA_PATH%> "%TEMP_PROP_FILE%"
+  
+  :: Read the file line by line to preserve spaces but trim the end
+  for /f "usebackq tokens=*" %%p in ("%TEMP_PROP_FILE%") do (
+    set "SAFE_PATH=%%p"
+    :: Trim any trailing spaces (this is a common issue)
+    :: First ensure path doesn't end with a space
+    set "CLEAN_PATH="
+    set "JAVA_PATH_FIXED=!SAFE_PATH!"
+    
+    :: Loop through each character to ensure no trailing spaces
+    set "len=0"
+    :loop
+    if not "!JAVA_PATH_FIXED:~%len%,1!" == "" (
+      set /a "len+=1"
+      goto :loop
+    )
+    
+    :: Now that we know the length, copy without any trailing spaces
+    set /a "clean_len=%len%"
+    :trim_loop
+    if "%clean_len%" gtr "0" (
+      set /a "idx=%clean_len%-1"
+      if "!JAVA_PATH_FIXED:~%idx%,1!" == " " (
+        set /a "clean_len-=1"
+        goto :trim_loop
+      )
+    )
+    
+    :: Get the cleaned string by taking just the first clean_len characters
+    set "SAFE_PATH=!JAVA_PATH_FIXED:~0,%clean_len%!"
+  )
+  
+  :: Convert backslashes to forward slashes for Gradle
+  set "JAVA_PATH_NORM=!SAFE_PATH:\=/!"
 )
-set "JAVA_PATH_NORM=%SAFE_PATH:\=/%"
+
 call :show_log "Using Java path for Gradle: %JAVA_PATH_NORM%"
 
 :: Check for Gradle wrapper
