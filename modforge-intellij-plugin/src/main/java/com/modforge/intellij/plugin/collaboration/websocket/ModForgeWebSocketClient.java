@@ -17,8 +17,8 @@ import java.util.concurrent.TimeUnit;
 /**
  * WebSocket client for real-time collaboration.
  */
-public class WebSocketClient {
-    private static final Logger LOG = Logger.getInstance(WebSocketClient.class);
+public class ModForgeWebSocketClient {
+    private static final Logger LOG = Logger.getInstance(ModForgeWebSocketClient.class);
     
     // WebSocket connection
     private InternalWebSocketClient client;
