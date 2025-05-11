@@ -328,8 +328,17 @@ async function sendEmailNotification(
   } catch (error) {
     // Create a safe version of the subject line even if we don't have all data
     let emailSubject = "ModForge Alert";
+
+    // Reference the locally defined severityEmoji object from above in this function
+    const safeEmoji = {
+      [NotificationSeverity.INFO]: 'ℹ️',
+      [NotificationSeverity.WARNING]: '⚠️',
+      [NotificationSeverity.ERROR]: '❌',
+      [NotificationSeverity.CRITICAL]: '🔥'
+    };
+
     try {
-      emailSubject = `${severityEmoji[message.severity]} ModForge Alert: ${message.title}`;
+      emailSubject = `${safeEmoji[message.severity]} ModForge Alert: ${message.title}`;
     } catch (subjectError) {
       // If we can't create the subject, use a default
     }
@@ -429,7 +438,13 @@ async function sendSlackNotification(
     
     return true;
   } catch (error) {
-    logger.error('Failed to send Slack notification', { error });
+    logger.error('Failed to send Slack notification', {
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+      webhookUrl: typeof config === 'object' && 'webhookUrl' in config ? 
+        `${config.webhookUrl.substring(0, 15)}...` : 'unknown', // Only log partial URL for security
+      channel: isSlackConfig(config) && config.channel ? config.channel : 'default'
+    });
     return false;
   }
 }
@@ -485,7 +500,14 @@ async function sendWebhookNotification(
     
     return true;
   } catch (error) {
-    logger.error('Failed to send webhook notification', { error });
+    logger.error('Failed to send webhook notification', {
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+      url: isWebhookConfig(config) ? `${config.url.substring(0, 15)}...` : 'unknown', // Only log partial URL for security
+      method: isWebhookConfig(config) && config.method ? config.method : 'POST',
+      status: error instanceof Error && 'response' in error && typeof error.response === 'object' && 
+              error.response !== null && 'status' in error.response ? error.response.status : 'unknown'
+    });
     return false;
   }
 }
@@ -573,7 +595,14 @@ async function sendSmsNotification(
     logger.info('SMS notifications sent', { recipients: to.length, provider: serviceProvider });
     return true;
   } catch (error) {
-    logger.error('Failed to send SMS notification', { error });
+    logger.error('Failed to send SMS notification', {
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+      serviceProvider: isSmsConfig(config) ? config.serviceProvider : 'unknown',
+      recipientCount: isSmsConfig(config) && Array.isArray(config.to) ? config.to.length : 0,
+      status: error instanceof Error && 'response' in error && typeof error.response === 'object' && 
+              error.response !== null && 'status' in error.response ? error.response.status : 'unknown'
+    });
     return false;
   }
 }
