@@ -1,7 +1,10 @@
 @echo off
 setlocal enabledelayedexpansion
 
-echo ===== ModForge IntelliJ Plugin Builder for 2025.1 =====
+echo ===== ModForge IntelliJ Plugin Builder for 2025.1.1.1 =====
+echo.
+
+echo Target: IntelliJ IDEA 2025.1.1.1 (Build: 251.25410.129)
 echo.
 
 echo Checking Java installation...
@@ -13,7 +16,7 @@ if %ERRORLEVEL% NEQ 0 (
 
 echo.
 echo Building options:
-echo 1. Use locally installed IntelliJ IDEA 2025.1 (recommended)
+echo 1. Use locally installed IntelliJ IDEA 2025.1.1.1 (recommended)
 echo 2. Use JetBrains repository version (2023.3.6)
 echo.
 
@@ -21,15 +24,15 @@ set /p BUILD_OPTION="Select build option (1 or 2): "
 
 if "%BUILD_OPTION%"=="1" (
     echo.
-    echo Selected: Build using local IntelliJ IDEA 2025.1 installation
+    echo Selected: Build using local IntelliJ IDEA 2025.1.1.1 installation
     echo.
 
     set USE_LOCAL=true
-    set INTELLIJ_PATH=C:\Program Files\JetBrains\IntelliJ IDEA Community Edition 2025.1
+    set INTELLIJ_PATH=C:\Program Files\JetBrains\IntelliJ IDEA Community Edition 2025.1.1.1
     
     if not exist "!INTELLIJ_PATH!" (
-        echo IntelliJ IDEA 2025.1 not found at default location.
-        set /p INTELLIJ_PATH="Please enter the path to IntelliJ IDEA 2025.1 installation: "
+        echo IntelliJ IDEA 2025.1.1.1 not found at default location.
+        set /p INTELLIJ_PATH="Please enter the path to IntelliJ IDEA 2025.1.1.1 installation: "
         
         if not exist "!INTELLIJ_PATH!" (
             echo ERROR: The specified path does not exist.

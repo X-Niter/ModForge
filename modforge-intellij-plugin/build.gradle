@@ -30,16 +30,19 @@ dependencies {
 // Configure Gradle IntelliJ Plugin
 intellij {
     // IMPORTANT: We're using a multi-stage approach here:
-    // 1. Build with a stable version from the repository
-    // 2. Set plugin.xml compatibility to support up to 2025.1.*
-    // 3. For LOCAL DEVELOPMENT with 2025.1, comment the version line and uncomment localPath
+    // 1. Build with the specific target version when available in the repository
+    // 2. Set plugin.xml compatibility to exactly match your IntelliJ version
+    // 3. For LOCAL DEVELOPMENT, uncomment localPath if version is not in repository
 
-    // The latest official IntelliJ version in repository
-    version = '2023.3.6' // Use 2023.3.6 for BUILDING (but plugin will work with 2025.1)
+    // Target IntelliJ IDEA 2025.1.1.1 (Build: 251.25410.129)
+    // Note: As this version may not be available in repositories yet, we use:
+    // - Build with 2023.3.6 (stable version from repository)
+    // - Set plugin.xml compatibility to support 251.25410.129 specifically
+    version = '2023.3.6' // For BUILDING (plugin.xml compatibility ensures it works with 2025.1.1.1)
     type = 'IC' // Target IDE: IntelliJ IDEA Community Edition
     
-    // Repository URL from JetBrains repository site
-    intellijRepository = 'https://www.jetbrains.com/intellij-repository/releases/'
+    // Explicitly use JetBrains official repository
+    intellijRepository = 'https://www.jetbrains.com/intellij-repository/releases'
     
     // Only include essential plugins
     plugins = ['java']
@@ -47,10 +50,10 @@ intellij {
     // Don't update build numbers automatically
     updateSinceUntilBuild = false
     
-    // FOR LOCAL DEVELOPMENT WITH 2025.1:
+    // FOR LOCAL DEVELOPMENT WITH 2025.1.1.1:
     // 1. Comment out the "version = '2023.3.6'" line above
-    // 2. Uncomment this localPath line with your installed IntelliJ 2025.1 path
-    // localPath = 'C:/Program Files/JetBrains/IntelliJ IDEA Community Edition 2025.1'
+    // 2. Uncomment this localPath line with your installed IntelliJ path
+    // localPath = 'C:/Program Files/JetBrains/IntelliJ IDEA Community Edition 2025.1.1.1'
 }
 
 // Configure Java sourceSets - using standard Gradle setup
@@ -87,21 +90,23 @@ wrapper {
 
 // Additional IntelliJ plugin configuration
 tasks {
-    // Set compatibility range to include IntelliJ IDEA 2025.1
+    // Set compatibility specifically for IntelliJ IDEA 2025.1.1.1 (Build: 251.25410.129)
     patchPluginXml {
         sinceBuild.set("233") // Support from 2023.3
-        untilBuild.set("251.*") // Compatible up to all 2025.1.x builds
+        untilBuild.set("251.25410.129") // Specifically for 2025.1.1.1 build
         changeNotes.set("""
             <h2>Version 2.1.0 - May 11, 2025</h2>
             <ul>
-                <li><b>Added:</b> Full compatibility with IntelliJ IDEA 2025.1</li>
+                <li><b>Added:</b> Full compatibility with IntelliJ IDEA 2025.1.1.1 (Build: 251.25410.129)</li>
                 <li><b>Added:</b> Java 21 virtual thread optimization</li>
                 <li><b>Added:</b> Environment validation and compatibility checking</li>
                 <li><b>Added:</b> Improved error handling and recovery mechanisms</li>
+                <li><b>Added:</b> Optional plugin dependencies with fallbacks for better compatibility</li>
                 <li><b>Updated:</b> GitHub workflow generation to use JDK 21</li>
                 <li><b>Updated:</b> Connection utilities to use modern retry logic</li>
-                <li><b>Fixed:</b> Multiple compatibility issues with IntelliJ IDEA 2025.1</li>
+                <li><b>Fixed:</b> Multiple compatibility issues with IntelliJ IDEA 2025.1.1.1</li>
                 <li><b>Improved:</b> Plugin activation and IDE integration</li>
+                <li><b>Improved:</b> Build system with specific version targeting</li>
             </ul>
         """)
     }
