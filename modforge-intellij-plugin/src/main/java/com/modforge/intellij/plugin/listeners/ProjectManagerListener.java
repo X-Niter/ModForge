@@ -10,8 +10,8 @@ import org.jetbrains.annotations.NotNull;
  * Listener for project open and close events.
  * Initializes ModForge AI services when a project is opened.
  */
-public class ProjectManagerListener implements ProjectManagerListener {
-    private static final Logger LOG = Logger.getInstance(ProjectManagerListener.class);
+public class ModForgeProjectManagerListener implements ProjectManagerListener {
+    private static final Logger LOG = Logger.getInstance(ModForgeProjectManagerListener.class);
 
     @Override
     public void projectOpened(@NotNull Project project) {

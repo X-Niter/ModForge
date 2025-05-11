@@ -408,8 +408,8 @@ public class ModForgeToolWindowFactory implements ToolWindowFactory {
      * @param project The project
      * @return The action event
      */
-    private AnActionEvent createEmptyActionEvent(@NotNull Project project) {
-        return new AnActionEvent(
+    private com.intellij.openapi.actionSystem.AnActionEvent createEmptyActionEvent(@NotNull Project project) {
+        return new com.intellij.openapi.actionSystem.AnActionEvent(
                 null,
                 com.intellij.openapi.actionSystem.DataManager.getInstance().getDataContext(),
                 "",
@@ -449,7 +449,7 @@ public class ModForgeToolWindowFactory implements ToolWindowFactory {
         private JPasswordField passwordField;
         private JTextField serverUrlField;
         
-        public LoginDialog(@Nullable Project project) {
+        public LoginDialog(Project project) {
             super(project);
             
             setTitle("Login to ModForge");
@@ -460,7 +460,7 @@ public class ModForgeToolWindowFactory implements ToolWindowFactory {
         }
         
         @Override
-        protected @Nullable JComponent createCenterPanel() {
+        protected JComponent createCenterPanel() {
             // Create components
             usernameField = new JTextField(20);
             passwordField = new JPasswordField(20);
@@ -483,7 +483,7 @@ public class ModForgeToolWindowFactory implements ToolWindowFactory {
         }
         
         @Override
-        protected @Nullable JComponent getPreferredFocusedComponent() {
+        protected JComponent getPreferredFocusedComponent() {
             return usernameField;
         }
         

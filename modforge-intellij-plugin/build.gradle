@@ -65,7 +65,7 @@ intellij {
     updateSinceUntilBuild = false
     
     // Use only essential plugins - make GitHub/etc optional with fallbacks
-    plugins = ['java']
+    plugins = ['java', 'com.intellij.modules.platform', 'com.intellij.modules.lang']
     
     // Access multiple repositories for better dependency resolution
     intellijRepository = 'https://www.jetbrains.com/intellij-repository/releases'

@@ -107,7 +107,7 @@ public class MemoryStatusBarWidget implements StatusBarWidget.TextPresentation, 
     }
     
     @Override
-    public @Nullable WidgetPresentation getPresentation() {
+    public Object getPresentation() {
         return this;
     }
     

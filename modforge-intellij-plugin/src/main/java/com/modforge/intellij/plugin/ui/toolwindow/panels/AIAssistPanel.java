@@ -371,7 +371,7 @@ public class AIAssistPanel {
      * @return The programming language
      */
     @NotNull
-    private String getLanguageFromFile(@Nullable VirtualFile file) {
+    private String getLanguageFromFile(VirtualFile file) {
         if (file == null) {
             return "java";
         }
