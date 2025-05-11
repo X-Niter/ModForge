@@ -359,6 +359,49 @@ public final class MemorySnapshotManager {
     }
     
     /**
+     * Reset the memory snapshot manager
+     * Clears all snapshots, saves current state, and reinitializes
+     * 
+     * @return True if reset was successful
+     */
+    public boolean reset() {
+        LOG.info("Resetting memory snapshot manager");
+        
+        try {
+            // Save current snapshots first in case they're valuable
+            boolean savedOk = false;
+            try {
+                savedOk = saveSnapshotsAsync();
+                if (savedOk) {
+                    LOG.info("Successfully saved snapshots before reset");
+                }
+            } catch (Exception e) {
+                LOG.warn("Failed to save snapshots before reset", e);
+                // Continue with reset even if save fails
+            }
+            
+            // Clear all snapshots
+            clearSnapshots();
+            
+            // Create a single current snapshot to start fresh
+            MemoryManager memoryManager = MemoryManager.getInstance();
+            if (memoryManager != null) {
+                MemorySnapshot currentSnapshot = memoryManager.getCurrentMemorySnapshot();
+                if (currentSnapshot != null) {
+                    addSnapshot(currentSnapshot);
+                    LOG.info("Added current memory snapshot after reset");
+                }
+            }
+            
+            LOG.info("Memory snapshot manager reset completed successfully");
+            return true;
+        } catch (Exception e) {
+            LOG.error("Failed to reset memory snapshot manager", e);
+            return false;
+        }
+    }
+    
+    /**
      * Export snapshots to CSV
      * 
      * @param file The file to export to

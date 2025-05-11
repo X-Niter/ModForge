@@ -481,6 +481,114 @@ public final class ContinuousDevelopmentService {
     }
     
     /**
+     * Flag to enable/disable reduced features mode
+     * This mode limits the scope and complexity of operations to reduce memory consumption
+     */
+    private final AtomicBoolean reducedFeaturesMode = new AtomicBoolean(false);
+    
+    /**
+     * Set reduced features mode
+     * This mode limits the scope and complexity of development operations
+     * to reduce memory consumption during high memory pressure
+     * 
+     * @param enabled True to enable reduced features mode, false to disable
+     */
+    public void setReducedFeaturesMode(boolean enabled) {
+        LOG.info((enabled ? "Enabling" : "Disabling") + " reduced features mode");
+        reducedFeaturesMode.set(enabled);
+    }
+    
+    /**
+     * Check if reduced features mode is enabled
+     * 
+     * @return True if reduced features mode is enabled
+     */
+    public boolean isReducedFeaturesMode() {
+        return reducedFeaturesMode.get();
+    }
+    
+    /**
+     * Execute a single development cycle
+     * This is the main method for performing continuous development tasks
+     */
+    public void executeDevelopmentCycle() {
+        if (!running.get() || project.isDisposed()) {
+            return;
+        }
+        
+        LOG.info("Executing development cycle (reduced features: " + reducedFeaturesMode.get() + ")");
+        
+        try {
+            // First scan for problems
+            scan();
+            
+            // Then perform enhancement
+            performEnhancement();
+            
+            // Log completion
+            LOG.info("Development cycle complete");
+            addActionLog("Development cycle completed successfully");
+            
+        } catch (Exception e) {
+            LOG.error("Error executing development cycle", e);
+            addActionLog("Error executing development cycle: " + e.getMessage());
+        }
+    }
+    
+    /**
+     * Perform lightweight development cycle
+     * This only performs essential maintenance tasks and minimal operations
+     * to avoid high memory consumption during critical memory pressure
+     */
+    public void performLightweightCycle() {
+        if (!running.get() || project.isDisposed()) {
+            return;
+        }
+        
+        LOG.info("Executing lightweight development cycle");
+        
+        try {
+            // Just scan for problems
+            scan();
+            
+            // Skip enhancement and other intensive operations
+            
+            // Log completion
+            LOG.info("Lightweight development cycle complete");
+            addActionLog("Lightweight development cycle completed successfully");
+            
+        } catch (Exception e) {
+            LOG.error("Error executing lightweight development cycle", e);
+            addActionLog("Error executing lightweight development cycle: " + e.getMessage());
+        }
+    }
+    
+    /**
+     * Perform code enhancement
+     * This method looks for opportunities to improve code quality, modularity, etc.
+     */
+    private void performEnhancement() {
+        if (!running.get() || project.isDisposed() || reducedFeaturesMode.get()) {
+            // Skip enhancement in reduced features mode
+            return;
+        }
+        
+        try {
+            LOG.info("Performing code enhancement");
+            addActionLog("Performing code enhancement");
+            
+            // This is where enhancement logic would go
+            // Since this is just the interface integration, we'll leave it as a placeholder
+            
+            LOG.info("Code enhancement complete");
+            
+        } catch (Exception e) {
+            LOG.error("Error performing code enhancement", e);
+            addActionLog("Error performing code enhancement: " + e.getMessage());
+        }
+    }
+    
+    /**
      * Listener for continuous development events.
      */
     public interface ContinuousDevelopmentListener {

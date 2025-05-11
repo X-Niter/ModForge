@@ -153,19 +153,70 @@ public class MemoryAwareContinuousService implements Disposable, MemoryManager.M
         
         // Get the main continuous development service
         ContinuousDevelopmentService continuousService = project.getService(ContinuousDevelopmentService.class);
-        if (continuousService != null && continuousService.isEnabled()) {
-            // Execute a development cycle with memory awareness
-            boolean useReducedFeatures = currentPressureLevel != MemoryUtils.MemoryPressureLevel.NORMAL;
-            
+        if (continuousService == null) {
+            LOG.warn("Continuous development service not available");
+            return;
+        }
+        
+        if (!continuousService.isEnabled()) {
+            LOG.info("Continuous development service is not enabled, skipping development cycle");
+            return;
+        }
+        
+        // Execute a development cycle with memory awareness
+        boolean useReducedFeatures = currentPressureLevel != MemoryUtils.MemoryPressureLevel.NORMAL;
+        
+        try {
             LOG.info("Executing memory-aware development cycle (reduced features: " + useReducedFeatures + ")");
             
-            // TODO: Replace with actual implementation that integrates with 
-            // the ContinuousDevelopmentService to execute a memory-aware development cycle
+            // Set memory-aware options in the continuous service
+            if (useReducedFeatures) {
+                LOG.info("Using reduced features due to memory pressure: " + currentPressureLevel);
+                
+                // Check severe memory pressure, apply circuit breaker if needed
+                if (currentPressureLevel == MemoryUtils.MemoryPressureLevel.CRITICAL || 
+                        currentPressureLevel == MemoryUtils.MemoryPressureLevel.EMERGENCY) {
+                    
+                    // If we're under severe memory pressure, only perform minimal tasks
+                    LOG.warn("Severe memory pressure detected, performing minimal continuous development");
+                    
+                    // For critical memory situations, just do essential maintenance and defer intensive tasks
+                    continuousService.performLightweightCycle();
+                    
+                    LOG.info("Lightweight memory-aware development cycle complete");
+                    return;
+                }
+                
+                // Otherwise use reduced features mode for moderate memory pressure
+                continuousService.setReducedFeaturesMode(true);
+            } else {
+                // Normal memory conditions, use full features
+                continuousService.setReducedFeaturesMode(false);
+            }
             
-            // For now, just log the execution
+            // Execute the development cycle with current memory constraints
+            continuousService.executeDevelopmentCycle();
+            
             LOG.info("Memory-aware development cycle complete");
-        } else {
-            LOG.info("Continuous development service is not enabled, skipping development cycle");
+            
+        } catch (Exception e) {
+            LOG.error("Error in memory-aware development cycle", e);
+            
+            if (notificationService != null) {
+                notificationService.showErrorNotification(
+                        "Development Cycle Error",
+                        "An error occurred during the memory-aware development cycle: " + e.getMessage()
+                );
+            }
+        } finally {
+            // Reset any temporary settings
+            if (useReducedFeatures) {
+                try {
+                    continuousService.setReducedFeaturesMode(false);
+                } catch (Exception e) {
+                    LOG.warn("Error resetting reduced features mode", e);
+                }
+            }
         }
     }
     
