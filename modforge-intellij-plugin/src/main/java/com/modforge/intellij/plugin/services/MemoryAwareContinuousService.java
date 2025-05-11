@@ -131,6 +131,42 @@ public class MemoryAwareContinuousService implements Disposable, MemoryManager.M
     }
     
     /**
+     * Pause all background tasks to conserve memory during high pressure situations
+     * This is called by the memory recovery system when critical memory conditions are detected
+     * 
+     * @return True if background tasks were paused successfully
+     */
+    public boolean pauseBackgroundTasks() {
+        LOG.info("Pausing background tasks due to memory pressure");
+        
+        try {
+            // Stop the service temporarily if it's running
+            boolean wasRunning = running.get();
+            if (wasRunning) {
+                stop();
+            }
+            
+            // Cancel any pending tasks
+            if (currentTask != null && !currentTask.isDone()) {
+                currentTask.cancel(false);
+                currentTask = null;
+            }
+            
+            // Clear any scheduled tasks in the executor
+            executor.purge();
+            
+            // Mark that background tasks are paused
+            consecutiveHighPressureCount.incrementAndGet();
+            
+            LOG.info("Background tasks paused successfully");
+            return true;
+        } catch (Exception e) {
+            LOG.error("Error pausing background tasks", e);
+            return false;
+        }
+    }
+    
+    /**
      * Schedule the next execution of the service
      */
     private void schedule() {
