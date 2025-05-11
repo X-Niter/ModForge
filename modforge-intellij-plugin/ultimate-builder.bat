@@ -314,7 +314,7 @@ if exist "%TEMP_DIR%\matches.txt" (
         
         REM Add suggested fix based on pattern
         if "%%b"=="getBaseDir" (
-            echo * **Suggested fix:** Use CompatibilityUtil.getProjectBaseDir(project) instead of Project.getBaseDir() >> "%COMPATIBILITY_REPORT%"
+            echo * **Suggested fix:** Use CompatibilityUtil.getProjectBaseDir(project) >> "%COMPATIBILITY_REPORT%"
         ) else if "%%b"=="CacheUpdater" (
             echo * **Suggested fix:** Use CompatibilityUtil.refreshAll(project) >> "%COMPATIBILITY_REPORT%"
         ) else if "%%b"=="runReadAction" (
@@ -590,7 +590,7 @@ for %%m in (getBaseDir findFileByPath getInstanceEx getFileSystem resolveFile) d
         ) else if "%%m"=="findFileByPath" (
             echo **Suggested fix:** Use VirtualFileUtil.findFileByPath(path) >> "%RESOLUTION_ERRORS_REPORT%"
         ) else if "%%m"=="getInstanceEx" (
-            echo **Suggested fix:** Use the standard .getInstance() method instead >> "%RESOLUTION_ERRORS_REPORT%"
+            echo **Suggested fix:** Use the standard .getInstance() method >> "%RESOLUTION_ERRORS_REPORT%"
         ) else if "%%m"=="getFileSystem" (
             echo **Suggested fix:** Use VirtualFileManager.getInstance().getFileSystem(StandardFileSystems.FILE_PROTOCOL) >> "%RESOLUTION_ERRORS_REPORT%"
         ) else if "%%m"=="resolveFile" (
