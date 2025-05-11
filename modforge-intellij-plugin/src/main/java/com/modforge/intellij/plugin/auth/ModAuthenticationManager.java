@@ -159,7 +159,53 @@ public final class ModAuthenticationManager implements PersistentStateComponent<
      * @return true if API key is valid, false otherwise
      */
     public boolean isOpenAIApiKeyValid() {
+        if (!openAIKeyValid) {
+            validateOpenAIApiKey();
+        }
         return openAIKeyValid;
+    }
+    
+    /**
+     * Validate the OpenAI API key
+     */
+    public void validateOpenAIApiKey() {
+        String apiKey = getOpenAIApiKey();
+        if (apiKey == null || apiKey.isEmpty()) {
+            openAIKeyValid = false;
+            return;
+        }
+        
+        // For now, we just check if it's in the right format
+        // In production, we would validate against the OpenAI API
+        openAIKeyValid = apiKey.startsWith("sk-") && apiKey.length() > 20;
+        
+        LOG.info("OpenAI API key validation: " + (openAIKeyValid ? "valid" : "invalid"));
+    }
+    
+    /**
+     * Validate the OpenAI API key asynchronously
+     * 
+     * @param callback Callback for validation result
+     */
+    public void validateOpenAIApiKeyAsync(Consumer<Boolean> callback) {
+        String apiKey = getOpenAIApiKey();
+        if (apiKey == null || apiKey.isEmpty()) {
+            openAIKeyValid = false;
+            callback.accept(false);
+            return;
+        }
+        
+        CompletableFuture.supplyAsync(() -> {
+            // For now, we just check if it's in the right format
+            // In production, we would validate against the OpenAI API
+            boolean valid = apiKey.startsWith("sk-") && apiKey.length() > 20;
+            if (valid) {
+                openAIKeyValid = true;
+            }
+            return valid;
+        }, Executors.newVirtualThreadPerTaskExecutor()).thenAccept(valid -> {
+            ApplicationManager.getApplication().invokeLater(() -> callback.accept(valid));
+        });
     }
     
     /**
