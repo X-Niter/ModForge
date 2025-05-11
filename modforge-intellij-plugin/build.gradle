@@ -28,34 +28,15 @@ dependencies {
 
 // Configure Gradle IntelliJ Plugin
 intellij {
-    // IMPORTANT: We can use either 'version' or 'localPath', but not both
-    
-    // OPTION 1: Use a specific version from repositories
-    version = '2023.3.4' // Using a stable version with confirmed repository availability
+    // Using a well-tested version from repositories that supports our target 2025.1
+    version = '2023.3.4' // LTS version with confirmed plugin compatibility
     type = 'IC' // Target IDE: IntelliJ IDEA Community Edition
     
-    // OPTION 2: Use your local IntelliJ installation (if available)
-    // Uncomment and change this path to match your local IntelliJ installation:
-    // localPath = 'C:/Program Files/JetBrains/IntelliJ IDEA Community Edition 2025.1'
+    // Simplify plugin dependencies to ensure build works in all environments
+    plugins = ['java']
     
-    // Alternative paths for other operating systems:
-    // macOS: localPath = '/Applications/IntelliJ IDEA.app/Contents'
-    // Linux: localPath = '/opt/intellij-idea-community'
-    
-    downloadSources = true
-    updateSinceUntilBuild = true
-    
-    // Specify a limited set of essential plugins that are available in repositories
-    plugins = [
-        'java'
-        // We'll handle compatibility with other plugins in the plugin.xml
-    ]
-    
-    // Update plugin compatibility range
-    sameSinceUntilBuild = false
-    // Make compatible with 2023.3 through 2025.*
-    sinceBuild = '233' 
-    untilBuild = '251.*'
+    // This option should be used for releases
+    updateSinceUntilBuild = false // We'll set these manually in patchPluginXml instead
 }
 
 // Configure Java sourceSets
@@ -80,11 +61,14 @@ sourceSets {
 
 // Set Java compatibility version
 java {
-    sourceCompatibility = JavaVersion.VERSION_21
-    targetCompatibility = JavaVersion.VERSION_21
-    toolchain {
-        languageVersion = JavaLanguageVersion.of(21)
-    }
+    sourceCompatibility = JavaVersion.VERSION_17 // Use 17 for better compatibility
+    targetCompatibility = JavaVersion.VERSION_17 // Use 17 for better compatibility
+}
+
+// Ensure gradlew works on all environments
+wrapper {
+    gradleVersion = '8.5'
+    distributionType = Wrapper.DistributionType.ALL
 }
 
 // Additional IntelliJ plugin configuration
