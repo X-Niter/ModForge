@@ -326,11 +326,18 @@ async function sendEmailNotification(
     
     return true;
   } catch (error) {
+    // Create a safe version of the subject line even if we don't have all data
+    let emailSubject = "ModForge Alert";
+    try {
+      emailSubject = `${severityEmoji[message.severity]} ModForge Alert: ${message.title}`;
+    } catch (subjectError) {
+      // If we can't create the subject, use a default
+    }
+
     logger.error('Failed to send email notification', {
       error: error instanceof Error ? error.message : String(error),
       stack: error instanceof Error ? error.stack : undefined,
-      recipients: recipients?.length || 0,
-      subject
+      emailSubject
     });
     return false;
   }
