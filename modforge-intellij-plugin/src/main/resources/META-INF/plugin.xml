@@ -268,39 +268,43 @@
                     text="Open Structure Designer"
                     description="Open the Minecraft structure designer">
             </action>
-        </group>
-        
-        <!-- Editor Popup Menu -->
-        <group id="ModForge.EditorPopupMenu" text="ModForge AI">
-            <add-to-group group-id="EditorPopupMenu" anchor="last"/>
+            <separator/>
             
-            <action id="ModForge.GenerateCodePopupAction"
-                    class="com.modforge.intellij.plugin.actions.GenerateCodeAction"
-                    text="Generate Code with AI"
-                    description="Generate code using AI">
+            <!-- Optimization Actions -->
+            <action id="ModForge.AnalyzeModPerformanceAction"
+                    class="com.modforge.intellij.plugin.actions.AnalyzeModPerformanceAction"
+                    text="Analyze Mod Performance"
+                    description="Analyze your mod for performance issues">
             </action>
-            <action id="ModForge.FixErrorsPopupAction"
-                    class="com.modforge.intellij.plugin.actions.FixErrorsAction"
-                    text="Fix Errors with AI"
-                    description="Fix compilation errors using AI">
-            </action>
-        </group>
-        
-        <!-- Project Popup Menu -->
-        <group id="ModForge.ProjectPopupMenu" text="ModForge AI">
-            <add-to-group group-id="ProjectViewPopupMenu" anchor="last"/>
-            
-            <action id="ModForge.GenerateModElementAction"
-                    class="com.modforge.intellij.plugin.actions.GenerateModElementAction"
-                    text="Generate Minecraft Element"
-                    description="Generate a Minecraft element (block, item, etc.)">
+            <action id="ModForge.OptimizeModCodeAction"
+                    class="com.modforge.intellij.plugin.actions.OptimizeModCodeAction"
+                    text="Optimize Mod Code"
+                    description="Optimize your mod code for better performance">
             </action>
             <separator/>
-            <action id="ModForge.ResetMemorySystemProjectAction"
-                    class="com.modforge.intellij.plugin.actions.ResetMemorySystemAction"
-                    text="Reset Memory Management System"
-                    description="Reset all memory management components and services">
+            
+            <!-- Settings Actions -->
+            <action id="ModForge.OpenSettingsAction"
+                    class="com.modforge.intellij.plugin.actions.OpenSettingsAction"
+                    text="Open ModForge Settings"
+                    description="Open ModForge plugin settings">
             </action>
         </group>
+        
+        <!-- Editor Popup Menu Actions -->
+        <action id="ModForge.EditorPopupAction" 
+                class="com.modforge.intellij.plugin.actions.EditorPopupAction"
+                text="ModForge AI Options"
+                description="ModForge AI options">
+            <add-to-group group-id="EditorPopupMenu" anchor="last"/>
+        </action>
+        
+        <!-- Project View Popup Menu Actions -->
+        <action id="ModForge.ProjectViewPopupAction" 
+                class="com.modforge.intellij.plugin.actions.ProjectViewPopupAction"
+                text="ModForge AI Options"
+                description="ModForge AI options">
+            <add-to-group group-id="ProjectViewPopupMenu" anchor="last"/>
+        </action>
     </actions>
 </idea-plugin>

@@ -14,6 +14,7 @@ import com.modforge.intellij.plugin.services.PatternRecognitionService;
 import org.jetbrains.annotations.NotNull;
 
 import javax.swing.*;
+import javax.swing.Timer; // Explicitly import the Swing Timer to avoid ambiguity with java.util.Timer
 import javax.swing.border.TitledBorder;
 import java.awt.*;
 import java.awt.event.ActionEvent;
