@@ -192,12 +192,15 @@ export function setupAuth(app: Express) {
     secret: sessionSecret,
     resave: false,
     saveUninitialized: false,
-    name: 'modforge.sid', // custom session cookie name
+    name: 'connect.sid', // use default name for compatibility with client
+    proxy: true, // trust the reverse proxy
+    rolling: true, // refresh cookie expiration on each request
     cookie: {
       secure: process.env.NODE_ENV === "production",
       maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
       httpOnly: true, // prevents JavaScript from making changes
-      sameSite: 'lax' // helps prevent CSRF
+      sameSite: 'lax', // helps prevent CSRF
+      path: '/' // explicitly set path to root
     }
   };
   
@@ -582,31 +585,43 @@ export function setupAuth(app: Express) {
 
   // User info endpoint - supports both session and token auth
   app.get("/api/user", (req: Request, res: Response, next: NextFunction) => {
-    console.log('Session info:', {
-      hasSession: !!req.session,
-      isAuthenticated: req.isAuthenticated(),
-      sessionID: req.sessionID,
-      hasUser: !!req.user
-    });
+    // For debugging only
+    if (process.env.NODE_ENV !== 'production') {
+      console.log('Session info:', {
+        hasSession: !!req.session,
+        isAuthenticated: req.isAuthenticated(),
+        sessionID: req.sessionID,
+        hasUser: !!req.user
+      });
+    }
     
-    // Try session auth first
-    if (req.isAuthenticated()) {
-      const { password, ...userWithoutPassword } = req.user as Express.User;
+    // Try session auth first (most common web app case)
+    if (req.isAuthenticated() && req.user) {
+      // Create a safe copy without password
+      const user = req.user as Express.User;
+      const { password, ...userWithoutPassword } = user;
       return res.status(200).json(userWithoutPassword);
     }
     
-    // Fall back to token auth
+    // Fall back to token auth (for IDE plugin and API clients)
     passport.authenticate('bearer', { session: false }, 
-      (err: Error | null, user: Express.User | false | null, info: string | undefined) => {
+      (err: Error | null, user: Express.User | false | null, info: any) => {
+        // Error handling
         if (err) {
           console.error('Bearer auth error:', err);
           return next(err);
         }
+        
+        // Authentication failed
         if (!user) {
-          console.log('Authentication failed:', info);
+          // Only log in non-production for security
+          if (process.env.NODE_ENV !== 'production') {
+            console.log('Authentication failed:', info);
+          }
           return res.status(401).json({ message: "Not authenticated" });
         }
         
+        // Success - create safe copy without password
         const { password, ...userWithoutPassword } = user;
         return res.status(200).json(userWithoutPassword);
       }
