@@ -447,7 +447,7 @@ public class MemoryRecoveryManager {
                                 com.modforge.intellij.plugin.services.MemoryAwareContinuousService.class);
                 
                 if (maService != null) {
-                    maService.enableReducedFeaturesMode(true);
+                    maService.setReducedFeaturesMode(true);
                 }
             }
             
