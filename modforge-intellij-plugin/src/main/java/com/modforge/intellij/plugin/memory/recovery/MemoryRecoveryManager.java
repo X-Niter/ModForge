@@ -40,6 +40,9 @@ public class MemoryRecoveryManager {
     // Recovery actions to perform
     private final List<MemoryRecoveryAction> recoveryActions = new ArrayList<>();
     
+    // Recovery listeners
+    private final List<RecoveryListener> recoveryListeners = new ArrayList<>();
+    
     // Scheduled executor for recovery monitoring
     private final ScheduledExecutorService executor;
     private ScheduledFuture<?> monitoringTask;
@@ -496,6 +499,33 @@ public class MemoryRecoveryManager {
      */
     public interface RecoveryActionExecutor {
         boolean execute();
+    }
+    
+    /**
+     * Interface for listening to recovery events
+     */
+    public interface RecoveryListener {
+        /**
+         * Called when a recovery process is started
+         *
+         * @param priority The priority of the recovery
+         */
+        default void onRecoveryStarted(RecoveryPriority priority) {}
+        
+        /**
+         * Called when a recovery process is completed
+         *
+         * @param priority The priority of the recovery
+         */
+        default void onRecoveryCompleted(RecoveryPriority priority) {}
+        
+        /**
+         * Called when a recovery process fails
+         *
+         * @param priority The priority of the recovery
+         * @param error The error that occurred
+         */
+        default void onRecoveryFailed(RecoveryPriority priority, Exception error) {}
     }
     
     /**
