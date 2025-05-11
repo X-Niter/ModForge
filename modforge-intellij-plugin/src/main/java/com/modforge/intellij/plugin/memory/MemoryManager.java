@@ -261,6 +261,88 @@ public class MemoryManager {
     }
     
     /**
+     * Performs a complete reset of the memory management system
+     * This resets and reinitializes all memory-related components
+     */
+    public void resetMemorySystem() {
+        LOG.info("Performing complete reset of memory management system");
+        
+        try {
+            // Cancel current scheduled tasks
+            if (monitoringTask != null) {
+                monitoringTask.cancel(false);
+                monitoringTask = null;
+            }
+            
+            if (optimizationTask != null) {
+                optimizationTask.cancel(false);
+                optimizationTask = null;
+            }
+            
+            // Reset state
+            optimizing.set(false);
+            
+            // Request forceful garbage collection
+            MemoryUtils.requestGarbageCollection();
+            
+            // Reset snapshot manager
+            try {
+                com.modforge.intellij.plugin.memory.monitoring.MemorySnapshotManager snapshotManager = 
+                        com.modforge.intellij.plugin.memory.monitoring.MemorySnapshotManager.getInstance();
+                if (snapshotManager != null) {
+                    snapshotManager.reset();
+                    LOG.info("Memory snapshot manager reset successful");
+                }
+            } catch (Exception e) {
+                LOG.warn("Error resetting memory snapshot manager", e);
+            }
+            
+            // Reset and optimize all projects
+            Project[] projects = ProjectManager.getInstance().getOpenProjects();
+            for (Project project : projects) {
+                if (project.isDisposed()) continue;
+                
+                try {
+                    // Reset memory optimizer
+                    MemoryOptimizer optimizer = project.getService(MemoryOptimizer.class);
+                    if (optimizer != null) {
+                        optimizer.reset();
+                        LOG.info("Memory optimizer reset for project: " + project.getName());
+                    }
+                    
+                    // Reset visualization panel if available
+                    com.modforge.intellij.plugin.memory.visualization.MemoryVisualizationPanel visualPanel = 
+                            com.modforge.intellij.plugin.utils.ServiceUtil.getServiceFromProject(
+                                    project, 
+                                    com.modforge.intellij.plugin.memory.visualization.MemoryVisualizationPanel.class);
+                    if (visualPanel != null) {
+                        visualPanel.resetVisualization();
+                        LOG.info("Memory visualization panel reset for project: " + project.getName());
+                    }
+                } catch (Exception e) {
+                    LOG.warn("Error resetting memory components for project: " + project.getName(), e);
+                }
+            }
+            
+            // Reinitialize the memory manager
+            initialized.set(false);
+            reinitialize();
+            
+            LOG.info("Memory management system reset completed successfully");
+        } catch (Exception e) {
+            LOG.error("Error during memory management system reset", e);
+            
+            // Force reinitialization even if there was an error
+            try {
+                initialized.set(false);
+                reinitialize();
+            } catch (Exception reinitEx) {
+                LOG.error("Failed to reinitialize memory manager after reset error", reinitEx);
+            }
+        }
+    }
+    
+    /**
      * Perform optimization on all open projects
      * 
      * @param level The optimization level
