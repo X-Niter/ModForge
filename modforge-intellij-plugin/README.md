@@ -1,109 +1,88 @@
 # ModForge IntelliJ Plugin
 
-> **IMPORTANT UPDATE**: This plugin has been completely updated for compatibility with IntelliJ IDEA 2025.1 (Build #IC-251.23774.435) and Java 21. If you're using an older version of IntelliJ IDEA, please use an older version of this plugin. See [INTELLIJ_2025_COMPATIBILITY.md](INTELLIJ_2025_COMPATIBILITY.md) for details.
+IntelliJ IDEA plugin for integrating with ModForge - an AI-powered Minecraft mod development platform.
 
 ## Overview
 
-ModForge IntelliJ Plugin is an AI-powered assistant for Minecraft mod development. The plugin integrates with the IntelliJ IDEA development environment to provide intelligent code generation, error detection and fixing, and continuous development capabilities.
+This plugin provides integration between IntelliJ IDEA and the ModForge platform, enabling seamless mod development with AI assistance directly from your IDE.
 
 ## Features
 
-- **Multi-mod loader support** - Works with Forge, Fabric, Quilt, and Architectury
-- **AI-driven code generation** - Generate code by describing what you want
-- **Automatic error detection and fixing** - Fix compilation errors with AI
-- **Pattern recognition** - Reduces API costs by learning from patterns
-- **Continuous development** - Keep working on your mods even when you're not
-- **GitHub integration** - Automatic workflows for continuous improvement
-- **Full IntelliJ IDEA 2025.1 compatibility** - Optimized for the latest IDE version
-- **Java 21 optimization** - Uses virtual threads for improved performance
+- AI-assisted code generation and improvement
+- Minecraft mod structure templates and validation
+- Real-time compilation error fixing
+- Background memory optimization
+- GitHub workflow integration
+- Cross-loader development support (Forge, Fabric, Quilt, and Architectury)
 
-## System Requirements
+## Requirements
 
-- IntelliJ IDEA 2025.1 (Build #IC-251.23774.435) or compatible version (Community or Ultimate edition)
-- Java Development Kit (JDK) 21.0.6 or later (compatible with JBR runtime 21.0.6+9-b895.109)
-- Internet connection for API access
-- Compatible with Minecraft Development plugin (v2025.1-1.8.4)
+- IntelliJ IDEA 2025.1 or newer
+- Java 21 or newer
+- Git
+- ModForge account (for cloud features)
 
 ## Installation
 
-### Installation from Disk
+### Option 1: Install from JetBrains Marketplace
 
-1. Build the plugin or download the latest release
+1. Open IntelliJ IDEA
+2. Go to Settings/Preferences → Plugins → Marketplace
+3. Search for "ModForge"
+4. Click "Install"
+
+### Option 2: Manual Installation
+
+1. Download the latest plugin ZIP from the [releases page](https://github.com/modforge/intellij-plugin/releases)
 2. Open IntelliJ IDEA
 3. Go to Settings/Preferences → Plugins
-4. Click the gear icon → Install Plugin from Disk...
-5. Select the .zip file from the `build/distributions` directory
+4. Click the gear icon and select "Install Plugin from Disk..."
+5. Select the downloaded ZIP file
 6. Restart IntelliJ IDEA when prompted
 
-### Building from Source
+## Building from Source
 
-1. Clone this repository
-2. Navigate to the plugin directory
-3. Run the production build script:
+### Requirements
+
+- JDK 21+
+- IntelliJ IDEA 2025.1+ (for testing)
+
+### Build Steps
+
+1. Clone the repository:
    ```
-   ./build-production-plugin.sh
+   git clone https://github.com/modforge/intellij-plugin.git
+   cd intellij-plugin
    ```
-4. The script will output the location of the generated plugin file
-5. Follow the installation steps above to install the plugin
 
-## Configuration
+2. Configure your IntelliJ IDEA path in `build.gradle`:
+   - Windows: `localPath = 'C:/Program Files/JetBrains/IntelliJ IDEA Community Edition 2025.1'`
+   - macOS: `localPath = '/Applications/IntelliJ IDEA.app/Contents'`
+   - Linux: `localPath = '/opt/intellij-idea-community'`
 
-1. After installation, open the ModForge settings in IntelliJ IDEA:
-   - Settings/Preferences → Tools → ModForge AI Settings
-2. Configure the following settings:
-   - Server URL: The URL of your ModForge server
-   - API Key: Your OpenAI API key
-   - GitHub Token: Your GitHub personal access token (if using GitHub integration)
-3. Click "Test Connection" to verify your settings
-4. Click "Apply" to save your settings
+3. Run the build script:
+   ```
+   ./build-plugin.sh
+   ```
 
-## Usage
-
-### Generate Code with AI
-
-1. Right-click in the editor
-2. Select "Generate Code with ModForge AI"
-3. Describe what you want to generate
-4. Review and accept the generated code
-
-### Fix Errors with AI
-
-1. If there are compilation errors, right-click on the error
-2. Select "Fix Errors with ModForge AI"
-3. The plugin will analyze and fix the errors
-
-### Create a New Mod
-
-1. Go to File → New → ModForge → Minecraft Mod
-2. Select the mod loader (Forge, Fabric, Quilt, or Architectury)
-3. Enter the mod details
-4. Click "Create" to generate the mod template
-
-### Push to GitHub
-
-1. From the Tools menu, select ModForge AI → Push to GitHub
-2. Enter the repository details
-3. Click "Push" to create or update the GitHub repository
-
-### Toggle Continuous Development
-
-1. From the Tools menu, select ModForge AI → Toggle Continuous Development
-2. The plugin will start monitoring and improving your code automatically
+   This will produce a ZIP file in `build/distributions/`.
 
 ## Troubleshooting
 
-- If the plugin is not working, check the following:
-  - Make sure you have a valid API key
-  - Check your network connection
-  - Verify the server URL is correct
-  - Check the IntelliJ IDEA log for errors (Help → Show Log)
+### Cannot Find Plugin Dependencies
 
-## Support
+If you encounter a "Cannot find builtin plugin" error, modify the `build.gradle` file to point to your local IntelliJ installation path as shown in the Build Steps section above.
 
-For support, please contact:
-- Email: support@modforge.dev
-- Website: https://www.modforge.dev
+### Java Version Issues
+
+The plugin requires Java 21. Check your Java version:
+
+```
+java -version
+```
+
+If you're using an older version, download and install Java 21 from [Adoptium](https://adoptium.net/temurin/releases/?version=21).
 
 ## License
 
-This plugin is distributed under the terms of the Apache License 2.0.
+Copyright © 2025 ModForge Team. All rights reserved.
