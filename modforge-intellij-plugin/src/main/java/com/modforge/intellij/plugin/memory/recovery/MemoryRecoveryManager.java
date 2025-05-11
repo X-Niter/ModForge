@@ -89,6 +89,34 @@ public class MemoryRecoveryManager implements MemoryManager.MemoryPressureListen
     }
     
     /**
+     * Completely reset the memory recovery manager
+     * This cancels all monitoring tasks, resets all counters, and reinitializes
+     */
+    public void reset() {
+        LOG.info("Resetting memory recovery manager");
+        
+        // Cancel monitoring task
+        if (monitoringTask != null) {
+            monitoringTask.cancel(false);
+            monitoringTask = null;
+        }
+        
+        // Reset state
+        recovering.set(false);
+        consecutiveCriticalCount = 0;
+        consecutiveEmergencyCount = 0;
+        lastRecoveryTime = 0;
+        
+        // Reset initialized flag to force reinitialization
+        initialized.set(false);
+        
+        // Reinitialize
+        initialize();
+        
+        LOG.info("Memory recovery manager reset completed");
+    }
+    
+    /**
      * Check memory health and trigger recovery if needed
      */
     private void checkMemoryHealth() {

@@ -74,6 +74,54 @@ public class MemoryAwareContinuousService implements Disposable, MemoryManager.M
     }
     
     /**
+     * Reset the continuous service to its initial state
+     * This stops the service, resets all counters and state variables, and optionally restarts
+     * 
+     * @param autoRestart Whether to automatically restart the service after reset
+     */
+    public void reset(boolean autoRestart) {
+        LOG.info("Resetting memory-aware continuous service");
+        
+        // Stop the service if it's running
+        stop();
+        
+        // Reset internal state
+        consecutiveHighPressureCount.set(0);
+        currentPressureLevel = MemoryUtils.MemoryPressureLevel.NORMAL;
+        
+        // Cancel any pending tasks
+        if (currentTask != null) {
+            currentTask.cancel(false);
+            currentTask = null;
+        }
+        
+        // Refresh our memory manager listener registration
+        MemoryManager memoryManager = MemoryManager.getInstance();
+        if (memoryManager != null) {
+            memoryManager.removeMemoryPressureListener(this);
+            memoryManager.addMemoryPressureListener(this);
+        }
+        
+        // Get continuous service and reset its state
+        try {
+            ContinuousDevelopmentService continuousService = project.getService(ContinuousDevelopmentService.class);
+            if (continuousService != null) {
+                continuousService.setReducedFeaturesMode(false);
+            }
+        } catch (Exception e) {
+            LOG.warn("Error resetting continuous development service state", e);
+        }
+        
+        LOG.info("Memory-aware continuous service reset completed");
+        
+        // Restart if requested and not disposed
+        if (autoRestart && !project.isDisposed()) {
+            LOG.info("Auto-restarting memory-aware continuous service after reset");
+            start();
+        }
+    }
+    
+    /**
      * Check if the service is running
      * 
      * @return True if the service is running

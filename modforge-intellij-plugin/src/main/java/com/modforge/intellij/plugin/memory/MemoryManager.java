@@ -285,6 +285,18 @@ public class MemoryManager {
             // Request forceful garbage collection
             MemoryUtils.requestGarbageCollection();
             
+            // Reset recovery manager
+            try {
+                com.modforge.intellij.plugin.memory.recovery.MemoryRecoveryManager recoveryManager = 
+                        com.modforge.intellij.plugin.memory.recovery.MemoryRecoveryManager.getInstance();
+                if (recoveryManager != null) {
+                    recoveryManager.reset();
+                    LOG.info("Memory recovery manager reset successful");
+                }
+            } catch (Exception e) {
+                LOG.warn("Error resetting memory recovery manager", e);
+            }
+            
             // Reset snapshot manager
             try {
                 com.modforge.intellij.plugin.memory.monitoring.MemorySnapshotManager snapshotManager = 
@@ -310,6 +322,16 @@ public class MemoryManager {
                         LOG.info("Memory optimizer reset for project: " + project.getName());
                     }
                     
+                    // Reset memory-aware continuous service
+                    com.modforge.intellij.plugin.services.MemoryAwareContinuousService maService = 
+                            com.modforge.intellij.plugin.utils.ServiceUtil.getServiceFromProject(
+                                    project, 
+                                    com.modforge.intellij.plugin.services.MemoryAwareContinuousService.class);
+                    if (maService != null) {
+                        maService.reset(true); // Auto-restart the service
+                        LOG.info("Memory-aware continuous service reset for project: " + project.getName());
+                    }
+                    
                     // Reset visualization panel if available
                     com.modforge.intellij.plugin.memory.visualization.MemoryVisualizationPanel visualPanel = 
                             com.modforge.intellij.plugin.utils.ServiceUtil.getServiceFromProject(
@@ -324,9 +346,23 @@ public class MemoryManager {
                 }
             }
             
+            // Clear listeners and re-register them
+            try {
+                listeners.forEach(this::removeMemoryPressureListener);
+                List<MemoryPressureListener> listenersBackup = new ArrayList<>(listeners);
+                listeners.clear();
+                listenersBackup.forEach(this::addMemoryPressureListener);
+                LOG.info("Memory pressure listeners reset successful");
+            } catch (Exception e) {
+                LOG.warn("Error resetting memory pressure listeners", e);
+            }
+            
             // Reinitialize the memory manager
             initialized.set(false);
             reinitialize();
+            
+            // Request another garbage collection after reset
+            MemoryUtils.requestGarbageCollection();
             
             LOG.info("Memory management system reset completed successfully");
         } catch (Exception e) {
