@@ -414,6 +414,16 @@ public class MemoryManager {
     }
     
     /**
+     * Get the current memory pressure level
+     * 
+     * @return The current memory pressure level
+     */
+    @NotNull
+    public MemoryUtils.MemoryPressureLevel getPressureLevel() {
+        return MemoryUtils.getMemoryPressureLevel();
+    }
+    
+    /**
      * Get the recommended optimization level based on current memory pressure
      * 
      * @return The recommended optimization level
