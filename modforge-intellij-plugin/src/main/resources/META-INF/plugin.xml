@@ -101,6 +101,7 @@
         <applicationService serviceImplementation="com.modforge.intellij.plugin.settings.ModForgeSettings"/>
         <applicationService serviceImplementation="com.modforge.intellij.plugin.ai.pattern.PatternLearningSystem"/>
         <applicationService serviceImplementation="com.modforge.intellij.plugin.memory.MemoryManager"/>
+        <applicationService serviceImplementation="com.modforge.intellij.plugin.memory.settings.MemoryManagementSettings"/>
         
         <!-- Settings -->
         <applicationConfigurable parentId="tools" 
@@ -188,10 +189,20 @@
                     text="Toggle Continuous Development"
                     description="Enable or disable continuous development">
             </action>
+            <action id="ModForge.ToggleMemoryAwareContinuousServiceAction"
+                    class="com.modforge.intellij.plugin.memory.actions.ToggleMemoryAwareContinuousServiceAction"
+                    text="Toggle Memory-Aware Continuous Service"
+                    description="Enable or disable memory-aware continuous service">
+            </action>
             <action id="ModForge.TogglePatternRecognitionAction"
                     class="com.modforge.intellij.plugin.actions.TogglePatternRecognitionAction"
                     text="Toggle Pattern Recognition"
                     description="Enable or disable pattern recognition">
+            </action>
+            <action id="ModForge.OptimizeMemoryAction"
+                    class="com.modforge.intellij.plugin.memory.actions.OptimizeMemoryAction"
+                    text="Optimize Memory"
+                    description="Perform memory optimization">
             </action>
             <separator/>
             
