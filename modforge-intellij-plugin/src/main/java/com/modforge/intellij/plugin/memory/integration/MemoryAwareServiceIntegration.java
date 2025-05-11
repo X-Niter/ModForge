@@ -23,6 +23,11 @@ public class MemoryAwareServiceIntegration implements StartupActivity {
     
     @Override
     public void runActivity(@NotNull Project project) {
+        if (project.isDisposed()) {
+            LOG.info("Project is already disposed, skipping memory-aware services integration");
+            return;
+        }
+        
         LOG.info("Initializing memory-aware services integration for project " + project.getName());
         
         try {
@@ -31,6 +36,8 @@ public class MemoryAwareServiceIntegration implements StartupActivity {
             if (memoryManager != null) {
                 memoryManager.initialize();
                 LOG.info("Memory manager initialized");
+            } else {
+                LOG.warn("Memory manager is not available");
             }
             
             // Initialize memory health monitor
@@ -38,6 +45,8 @@ public class MemoryAwareServiceIntegration implements StartupActivity {
             if (healthMonitor != null) {
                 healthMonitor.start();
                 LOG.info("Memory health monitor started");
+            } else {
+                LOG.warn("Memory health monitor is not available");
             }
             
             // Initialize memory recovery manager
@@ -45,36 +54,74 @@ public class MemoryAwareServiceIntegration implements StartupActivity {
             if (recoveryManager != null) {
                 recoveryManager.initialize();
                 LOG.info("Memory recovery manager initialized");
+            } else {
+                LOG.warn("Memory recovery manager is not available");
             }
             
             // Initialize memory recovery service
-            MemoryRecoveryService recoveryService = project.getService(MemoryRecoveryService.class);
+            MemoryRecoveryService recoveryService = null;
+            try {
+                recoveryService = project.getService(MemoryRecoveryService.class);
+            } catch (Exception ex) {
+                LOG.warn("Failed to get memory recovery service", ex);
+            }
+            
             if (recoveryService != null) {
                 recoveryService.start();
                 LOG.info("Memory recovery service started");
+            } else {
+                LOG.warn("Memory recovery service is not available");
             }
             
             // Initialize memory-aware continuous service based on settings
-            MemoryManagementSettings settings = MemoryManagementSettings.getInstance();
-            if (settings.isMemoryAwareContinuousServiceEnabled()) {
+            MemoryManagementSettings settings = null;
+            try {
+                settings = MemoryManagementSettings.getInstance();
+            } catch (Exception ex) {
+                LOG.warn("Failed to get memory management settings", ex);
+            }
+            
+            if (settings != null && settings.isMemoryAwareContinuousServiceEnabled()) {
+                final MemoryManagementSettings finalSettings = settings;
                 ApplicationManager.getApplication().invokeLater(() -> {
-                    MemoryAwareContinuousService continuousService = 
-                            project.getService(MemoryAwareContinuousService.class);
+                    if (project.isDisposed()) {
+                        LOG.info("Project is disposed, skipping memory-aware continuous service initialization");
+                        return;
+                    }
+                    
+                    MemoryAwareContinuousService continuousService = null;
+                    try {
+                        continuousService = project.getService(MemoryAwareContinuousService.class);
+                    } catch (Exception ex) {
+                        LOG.warn("Failed to get memory-aware continuous service", ex);
+                    }
                     
                     if (continuousService != null) {
                         continuousService.start();
-                        LOG.info("Memory-aware continuous service started");
+                        LOG.info("Memory-aware continuous service started with settings: threshold=" + 
+                                finalSettings.getMemoryThresholdPercent() + "%, interval=" + 
+                                finalSettings.getCheckIntervalMs() + "ms");
+                    } else {
+                        LOG.warn("Memory-aware continuous service is not available");
                     }
                 });
+            } else {
+                LOG.info("Memory-aware continuous service is disabled in settings or settings are not available");
             }
             
             // Setup integration between health monitor and recovery manager
             if (healthMonitor != null && recoveryManager != null) {
                 setupHealthMonitorRecoveryIntegration(healthMonitor, recoveryManager);
+            } else {
+                LOG.warn("Cannot set up health monitor and recovery manager integration - one or both components are not available");
             }
             
             // Log initial memory stats
-            MemoryUtils.logMemoryStats();
+            try {
+                MemoryUtils.logMemoryStats();
+            } catch (Exception ex) {
+                LOG.warn("Failed to log initial memory stats", ex);
+            }
             
         } catch (Exception e) {
             LOG.error("Error initializing memory-aware services integration", e);
@@ -88,49 +135,94 @@ public class MemoryAwareServiceIntegration implements StartupActivity {
      * @param recoveryManager The recovery manager
      */
     private void setupHealthMonitorRecoveryIntegration(
-            MemoryHealthMonitor healthMonitor, 
-            MemoryRecoveryManager recoveryManager) {
+            @NotNull MemoryHealthMonitor healthMonitor, 
+            @NotNull MemoryRecoveryManager recoveryManager) {
         
-        // Add listener for predicted memory pressure
-        healthMonitor.addMemoryHealthListener(new MemoryHealthMonitor.MemoryHealthListener() {
-            @Override
-            public void onPredictedMemoryPressure(double predictedUsagePercentage, int minutesAway) {
-                LOG.info("Memory health monitor predicts " + String.format("%.1f", predictedUsagePercentage) + 
-                        "% usage in " + minutesAway + " minutes");
+        try {
+            // Add listener for predicted memory pressure
+            healthMonitor.addMemoryHealthListener(new MemoryHealthMonitor.MemoryHealthListener() {
+                @Override
+                public void onPredictedMemoryPressure(double predictedUsagePercentage, int minutesAway) {
+                    try {
+                        LOG.info("Memory health monitor predicts " + String.format("%.1f", predictedUsagePercentage) + 
+                                "% usage in " + minutesAway + " minutes");
+                        
+                        // Get threshold config if available
+                        int severeThreshold = 90;
+                        int moderateThreshold = 80;
+                        int severeMinutesThreshold = 5;
+                        int moderateMinutesThreshold = 3;
+                        
+                        MemoryThresholdConfig thresholdConfig = null;
+                        try {
+                            thresholdConfig = MemoryThresholdConfig.getInstance();
+                        } catch (Exception ex) {
+                            LOG.debug("Could not get memory threshold config", ex);
+                        }
+                        
+                        if (thresholdConfig != null) {
+                            severeThreshold = thresholdConfig.getEmergencyThresholdPercent();
+                            moderateThreshold = thresholdConfig.getCriticalThresholdPercent();
+                        }
+                        
+                        // If predicting severe pressure, take preemptive action
+                        if (predictedUsagePercentage > severeThreshold && minutesAway <= severeMinutesThreshold) {
+                            LOG.warn("Taking preemptive recovery action due to predicted severe memory pressure: " + 
+                                    String.format("%.1f", predictedUsagePercentage) + "% in " + minutesAway + " minutes");
+                            recoveryManager.initiateRecovery(MemoryRecoveryManager.RecoveryLevel.LEVEL2);
+                        }
+                        // If predicting moderate pressure, take lighter preemptive action
+                        else if (predictedUsagePercentage > moderateThreshold && minutesAway <= moderateMinutesThreshold) {
+                            LOG.info("Taking light preemptive recovery action due to predicted memory pressure: " +
+                                    String.format("%.1f", predictedUsagePercentage) + "% in " + minutesAway + " minutes");
+                            recoveryManager.initiateRecovery(MemoryRecoveryManager.RecoveryLevel.LEVEL1);
+                        }
+                    } catch (Exception ex) {
+                        LOG.error("Error handling predicted memory pressure", ex);
+                    }
+                }
                 
-                // If predicting severe pressure, take preemptive action
-                if (predictedUsagePercentage > 90 && minutesAway <= 5) {
-                    LOG.warn("Taking preemptive recovery action due to predicted severe memory pressure");
-                    recoveryManager.initiateRecovery(MemoryRecoveryManager.RecoveryLevel.LEVEL2);
+                @Override
+                public void onMemoryHealthStatusChanged(MemoryHealthMonitor.MemoryHealthStatus status, 
+                        com.modforge.intellij.plugin.memory.monitoring.MemorySnapshot snapshot) {
+                    try {
+                        if (status == null) {
+                            LOG.warn("Received null memory health status");
+                            return;
+                        }
+                        
+                        LOG.info("Memory health status changed to " + status + 
+                                (snapshot != null ? 
+                                " (Used: " + String.format("%.1f", snapshot.getUsedMemoryPercent()) + "%, " + 
+                                "Available: " + String.format("%.1f", snapshot.getAvailableMemoryMB()) + " MB)" : 
+                                ""));
+                        
+                        // Take action based on health status
+                        switch (status) {
+                            case CRITICAL:
+                                LOG.warn("Critical memory health status detected, initiating recovery");
+                                recoveryManager.initiateRecovery(MemoryRecoveryManager.RecoveryLevel.LEVEL2);
+                                break;
+                            case PROBLEMATIC:
+                                LOG.info("Problematic memory health status detected, initiating light recovery");
+                                recoveryManager.initiateRecovery(MemoryRecoveryManager.RecoveryLevel.LEVEL1);
+                                break;
+                            case HEALTHY:
+                                LOG.debug("Memory health status is healthy, no action needed");
+                                break;
+                            default:
+                                LOG.info("Memory health status: " + status + ", no specific action defined");
+                                break;
+                        }
+                    } catch (Exception ex) {
+                        LOG.error("Error handling memory health status change", ex);
+                    }
                 }
-                // If predicting moderate pressure, take lighter preemptive action
-                else if (predictedUsagePercentage > 80 && minutesAway <= 3) {
-                    LOG.info("Taking light preemptive recovery action due to predicted memory pressure");
-                    recoveryManager.initiateRecovery(MemoryRecoveryManager.RecoveryLevel.LEVEL1);
-                }
-            }
+            });
             
-            @Override
-            public void onMemoryHealthStatusChanged(MemoryHealthMonitor.MemoryHealthStatus status, 
-                    com.modforge.intellij.plugin.memory.monitoring.MemorySnapshot snapshot) {
-                
-                LOG.info("Memory health status changed to " + status);
-                
-                // Take action based on health status
-                switch (status) {
-                    case CRITICAL:
-                        LOG.warn("Critical memory health status detected, initiating recovery");
-                        recoveryManager.initiateRecovery(MemoryRecoveryManager.RecoveryLevel.LEVEL2);
-                        break;
-                    case PROBLEMATIC:
-                        LOG.info("Problematic memory health status detected, initiating light recovery");
-                        recoveryManager.initiateRecovery(MemoryRecoveryManager.RecoveryLevel.LEVEL1);
-                        break;
-                    default:
-                        // No action needed
-                        break;
-                }
-            }
-        });
+            LOG.info("Successfully set up integration between memory health monitor and recovery manager");
+        } catch (Exception ex) {
+            LOG.error("Failed to set up integration between memory health monitor and recovery manager", ex);
+        }
     }
 }

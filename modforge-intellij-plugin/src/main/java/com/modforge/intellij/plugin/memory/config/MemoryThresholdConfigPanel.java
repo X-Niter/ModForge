@@ -70,28 +70,43 @@ public class MemoryThresholdConfigPanel extends ConfigurableBase<MemoryThreshold
     }
     
     @Override
-    protected @Nullable JComponent createPanel() {
-        createComponents();
+    protected @Nullable Form createPanel() {
+        return new Form();
+    }
+    
+    /**
+     * The Form class for the configurable
+     */
+    public class Form {
+        private final JPanel panel;
         
-        JPanel environmentPanel = createEnvironmentPanel();
-        JPanel thresholdsPanel = createThresholdsPanel();
+        Form() {
+            createComponents();
+            
+            JPanel environmentPanel = createEnvironmentPanel();
+            JPanel thresholdsPanel = createThresholdsPanel();
+            
+            mainPanel = new JPanel(new BorderLayout());
+            
+            JPanel contentPanel = FormBuilder.createFormBuilder()
+                .addComponent(environmentPanel)
+                .addVerticalGap(10)
+                .addComponent(thresholdsPanel)
+                .getPanel();
+            
+            contentPanel.setBorder(JBUI.Borders.empty(10));
+            
+            mainPanel.add(new JBScrollPane(contentPanel), BorderLayout.CENTER);
+            
+            loadSettings();
+            setupListeners();
+            
+            panel = mainPanel;
+        }
         
-        mainPanel = new JPanel(new BorderLayout());
-        
-        JPanel contentPanel = FormBuilder.createFormBuilder()
-            .addComponent(environmentPanel)
-            .addVerticalGap(10)
-            .addComponent(thresholdsPanel)
-            .getPanel();
-        
-        contentPanel.setBorder(JBUI.Borders.empty(10));
-        
-        mainPanel.add(new JBScrollPane(contentPanel), BorderLayout.CENTER);
-        
-        loadSettings();
-        setupListeners();
-        
-        return mainPanel;
+        JComponent getComponent() {
+            return panel;
+        }
     }
     
     /**

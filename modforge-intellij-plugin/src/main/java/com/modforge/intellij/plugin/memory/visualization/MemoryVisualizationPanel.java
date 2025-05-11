@@ -285,11 +285,50 @@ public class MemoryVisualizationPanel extends JBPanel<MemoryVisualizationPanel> 
      * Dispose the panel and release resources
      */
     public void dispose() {
-        if (updateTimer != null) {
-            updateTimer.stop();
-            updateTimer = null;
+        try {
+            if (updateTimer != null) {
+                updateTimer.stop();
+                updateTimer = null;
+            }
+            
+            // Clear data structures
+            if (memoryHistory != null) {
+                memoryHistory.clear();
+            }
+            
+            // Remove listeners from components
+            if (timeRangeComboBox != null) {
+                for (ActionListener listener : timeRangeComboBox.getActionListeners()) {
+                    timeRangeComboBox.removeActionListener(listener);
+                }
+            }
+            
+            if (metricTypeComboBox != null) {
+                for (ActionListener listener : metricTypeComboBox.getActionListeners()) {
+                    metricTypeComboBox.removeActionListener(listener);
+                }
+            }
+            
+            if (showPredictionCheckBox != null) {
+                for (ActionListener listener : showPredictionCheckBox.getActionListeners()) {
+                    showPredictionCheckBox.removeActionListener(listener);
+                }
+            }
+            
+            if (refreshButton != null) {
+                for (ActionListener listener : refreshButton.getActionListeners()) {
+                    refreshButton.removeActionListener(listener);
+                }
+            }
+            
+            if (exportButton != null) {
+                for (ActionListener listener : exportButton.getActionListeners()) {
+                    exportButton.removeActionListener(listener);
+                }
+            }
+        } catch (Exception ex) {
+            LOG.error("Error disposing memory visualization panel", ex);
         }
-        memoryHistory.clear();
     }
     
     /**

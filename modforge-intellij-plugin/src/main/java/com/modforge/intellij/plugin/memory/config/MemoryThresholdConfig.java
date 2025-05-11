@@ -16,7 +16,7 @@ import java.util.Map;
  * Configuration for memory thresholds
  * Allows for environment-specific memory threshold settings
  */
-@Service
+@Service(Service.Level.APP)
 @State(
     name = "com.modforge.intellij.plugin.memory.config.MemoryThresholdConfig",
     storages = @Storage("ModForgeMemoryThresholds.xml")
