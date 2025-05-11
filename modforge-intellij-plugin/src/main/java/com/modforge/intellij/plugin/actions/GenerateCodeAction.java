@@ -234,11 +234,170 @@ public class GenerateCodeAction extends AnAction {
             @NotNull String code,
             @NotNull String language
     ) {
-        // TODO: Implement file creation
+        try {
+            // Check if file name is empty
+            if (fileName == null || fileName.trim().isEmpty()) {
+                // Generate a reasonable file name based on language
+                fileName = generateFileNameForLanguage(language);
+            } else if (!fileName.contains(".")) {
+                // Add extension if missing
+                fileName = addExtensionForLanguage(fileName, language);
+            }
+            
+            // Get source roots
+            com.intellij.openapi.roots.ProjectRootManager rootManager = com.intellij.openapi.roots.ProjectRootManager.getInstance(project);
+            VirtualFile[] sourceRoots = rootManager.getContentSourceRoots();
+            
+            if (sourceRoots.length == 0) {
+                LOG.warn("No source roots found in project");
+                // Show dialog to display code if we can't create the file
+                CodeDisplayDialog dialog = new CodeDisplayDialog(project, code, language);
+                dialog.show();
+                return;
+            }
+            
+            // Select root directory - prefer src/main/java for Java or src for other languages
+            VirtualFile targetDir = null;
+            
+            // First try to find appropriate directory based on language
+            for (VirtualFile root : sourceRoots) {
+                if ("Java".equals(language) && root.getPath().contains("/src/main/java")) {
+                    targetDir = root;
+                    break;
+                } else if (root.getPath().contains("/src")) {
+                    targetDir = root;
+                    break;
+                }
+            }
+            
+            // If no suitable directory found, use the first source root
+            if (targetDir == null) {
+                targetDir = sourceRoots[0];
+            }
+            
+            // Create the file in the target directory
+            final VirtualFile finalTargetDir = targetDir;
+            final String finalFileName = fileName;
+            
+            // Execute write action to create the file
+            WriteCommandAction.runWriteCommandAction(project, () -> {
+                try {
+                    // Create file
+                    VirtualFile newFile = finalTargetDir.createChildData(this, finalFileName);
+                    
+                    // Write code to file
+                    com.intellij.openapi.vfs.VfsUtil.saveText(newFile, code);
+                    
+                    // Open the file in editor
+                    com.intellij.openapi.fileEditor.OpenFileDescriptor descriptor = 
+                            new com.intellij.openapi.fileEditor.OpenFileDescriptor(project, newFile);
+                    com.intellij.openapi.fileEditor.FileEditorManager.getInstance(project).openEditor(descriptor, true);
+                    
+                    // Show notification
+                    com.intellij.notification.Notification notification = new com.intellij.notification.Notification(
+                            "ModForge",
+                            "File Created",
+                            "Created new file: " + finalFileName,
+                            com.intellij.notification.NotificationType.INFORMATION
+                    );
+                    notification.notify(project);
+                } catch (Exception e) {
+                    LOG.error("Error creating file: " + finalFileName, e);
+                    
+                    // Show error message
+                    ApplicationManager.getApplication().invokeLater(() -> {
+                        Messages.showErrorDialog(
+                                project,
+                                "Error creating file: " + e.getMessage(),
+                                "File Creation Error"
+                        );
+                        
+                        // Show code in dialog as fallback
+                        CodeDisplayDialog dialog = new CodeDisplayDialog(project, code, language);
+                        dialog.show();
+                    });
+                }
+            });
+            
+        } catch (Exception e) {
+            LOG.error("Error in file creation", e);
+            
+            // Show error and fall back to dialog
+            ApplicationManager.getApplication().invokeLater(() -> {
+                Messages.showErrorDialog(
+                        project,
+                        "Error creating file: " + e.getMessage(),
+                        "File Creation Error"
+                );
+                
+                // Show code in dialog as fallback
+                CodeDisplayDialog dialog = new CodeDisplayDialog(project, code, language);
+                dialog.show();
+            });
+        }
+    }
+    
+    /**
+     * Generate a file name based on language.
+     *
+     * @param language The programming language
+     * @return A suitable file name with extension
+     */
+    private String generateFileNameForLanguage(String language) {
+        String baseName = "GeneratedCode";
+        return addExtensionForLanguage(baseName, language);
+    }
+    
+    /**
+     * Add appropriate file extension for the given language.
+     *
+     * @param fileName The file name without extension
+     * @param language The programming language
+     * @return The file name with extension
+     */
+    private String addExtensionForLanguage(String fileName, String language) {
+        if (language == null) {
+            return fileName + ".txt";
+        }
         
-        // For now, just show the code
-        CodeDisplayDialog dialog = new CodeDisplayDialog(project, code, language);
-        dialog.show();
+        switch (language) {
+            case "Java":
+                return fileName + ".java";
+            case "Kotlin":
+                return fileName + ".kt";
+            case "JavaScript":
+                return fileName + ".js";
+            case "TypeScript":
+                return fileName + ".ts";
+            case "Python":
+                return fileName + ".py";
+            case "C":
+                return fileName + ".c";
+            case "C++":
+                return fileName + ".cpp";
+            case "C#":
+                return fileName + ".cs";
+            case "Go":
+                return fileName + ".go";
+            case "Rust":
+                return fileName + ".rs";
+            case "Ruby":
+                return fileName + ".rb";
+            case "PHP":
+                return fileName + ".php";
+            case "Swift":
+                return fileName + ".swift";
+            case "HTML":
+                return fileName + ".html";
+            case "CSS":
+                return fileName + ".css";
+            case "JSON":
+                return fileName + ".json";
+            case "XML":
+                return fileName + ".xml";
+            default:
+                return fileName + ".txt";
+        }
     }
     
     /**

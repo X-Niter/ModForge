@@ -116,9 +116,54 @@ public class EnhanceCodeAction extends AnAction {
                         // Call API to enhance code
                         indicator.setText("Enhancing code with " + enhancementType.toLowerCase() + "...");
                         
-                        // TODO: Make actual API call to enhance code
-                        // Display finished message in UI thread
-                        // This would be replaced with actual API call when implemented
+                        // Create API client
+                        com.modforge.intellij.plugin.api.ApiClient apiClient = new com.modforge.intellij.plugin.api.ApiClient(serverUrl);
+                        apiClient.setAuthToken(token);
+                        
+                        // Send request to enhance code
+                        indicator.setText("Sending enhancement request...");
+                        String responseJson = apiClient.post("/api/code/enhance", inputData.toJSONString());
+                        
+                        // Parse response
+                        org.json.simple.parser.JSONParser parser = new org.json.simple.parser.JSONParser();
+                        JSONObject response = (JSONObject) parser.parse(responseJson);
+                        
+                        // Extract enhanced code and explanation
+                        final String enhancedCode = (String) response.get("code");
+                        final String explanation = (String) response.get("explanation");
+                        
+                        // Apply changes in UI thread
+                        com.intellij.openapi.application.ApplicationManager.getApplication().invokeLater(() -> {
+                            try {
+                                // Create dialog to show enhancements
+                                com.modforge.intellij.plugin.dialogs.CodeEnhancementDialog dialog = 
+                                        new com.modforge.intellij.plugin.dialogs.CodeEnhancementDialog(
+                                                project, 
+                                                selectedText, 
+                                                enhancedCode, 
+                                                explanation,
+                                                enhancementType);
+                                
+                                // Show dialog
+                                if (dialog.showAndGet()) {
+                                    // User accepted changes - apply to editor
+                                    com.intellij.openapi.command.WriteCommandAction.runWriteCommandAction(project, () -> {
+                                        editor.getDocument().replaceString(
+                                                selectionModel.getSelectionStart(),
+                                                selectionModel.getSelectionEnd(),
+                                                enhancedCode
+                                        );
+                                    });
+                                }
+                            } catch (Exception ex) {
+                                LOG.error("Error applying code enhancements", ex);
+                                Messages.showErrorDialog(
+                                        project,
+                                        "Error applying code enhancements: " + ex.getMessage(),
+                                        "Error"
+                                );
+                            }
+                        });
                     } catch (Exception ex) {
                         LOG.error("Error enhancing code", ex);
                         

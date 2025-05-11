@@ -91,14 +91,76 @@ public class AddFeaturesAction extends AnAction {
             boolean usePatterns = settings.isPatternRecognition();
             inputData.put("usePatterns", usePatterns);
             
-            // TODO: Implement feature addition using API
-            // This would be replaced with actual API call when implemented
-            
-            // Show success message
-            Messages.showInfoMessage(
-                    project,
-                    "Feature addition requested. This may take some time.",
-                    "Feature Addition"
+            // Run feature addition in background
+            com.intellij.openapi.progress.ProgressManager.getInstance().run(
+                    new com.intellij.openapi.progress.Task.Backgroundable(project, "Adding Feature") {
+                        @Override
+                        public void run(@NotNull com.intellij.openapi.progress.ProgressIndicator indicator) {
+                            try {
+                                // Update progress indicator
+                                indicator.setText("Analyzing feature request...");
+                                indicator.setIndeterminate(true);
+                                
+                                // Get server URL and token
+                                String serverUrl = settings.getServerUrl();
+                                String token = settings.getAccessToken();
+                                
+                                // Create API client
+                                com.modforge.intellij.plugin.api.ApiClient apiClient = 
+                                        new com.modforge.intellij.plugin.api.ApiClient(serverUrl);
+                                apiClient.setAuthToken(token);
+                                
+                                // Send feature addition request
+                                indicator.setText("Sending feature request to API...");
+                                String responseJson = apiClient.post("/api/mod/add-feature", inputData.toJSONString());
+                                
+                                // Parse response
+                                org.json.simple.parser.JSONParser parser = new org.json.simple.parser.JSONParser();
+                                org.json.simple.JSONObject response = (org.json.simple.JSONObject) parser.parse(responseJson);
+                                
+                                // Get request ID for tracking
+                                final String requestId = (String) response.get("requestId");
+                                final boolean success = (Boolean) response.getOrDefault("success", false);
+                                final String message = (String) response.getOrDefault("message", "Feature addition initiated");
+                                
+                                // Show result in UI thread
+                                com.intellij.openapi.application.ApplicationManager.getApplication().invokeLater(() -> {
+                                    if (success) {
+                                        // Show success message with request ID for tracking
+                                        com.intellij.openapi.ui.Messages.showInfoMessage(
+                                                project,
+                                                message + "\n\nRequest ID: " + requestId + 
+                                                "\n\nYou can track the progress in the ModForge panel.",
+                                                "Feature Addition Requested"
+                                        );
+                                        
+                                        // Open ModForge tool window to show progress
+                                        com.intellij.openapi.wm.ToolWindowManager.getInstance(project)
+                                                .getToolWindow("ModForge")
+                                                .show(null);
+                                    } else {
+                                        // Show error message
+                                        com.intellij.openapi.ui.Messages.showErrorDialog(
+                                                project,
+                                                "Failed to add feature: " + message,
+                                                "Feature Addition Failed"
+                                        );
+                                    }
+                                });
+                            } catch (Exception ex) {
+                                LOG.error("Error adding feature", ex);
+                                
+                                // Show error in UI thread
+                                com.intellij.openapi.application.ApplicationManager.getApplication().invokeLater(() -> {
+                                    com.intellij.openapi.ui.Messages.showErrorDialog(
+                                            project,
+                                            "An error occurred while adding the feature: " + ex.getMessage(),
+                                            "Error Adding Feature"
+                                    );
+                                });
+                            }
+                        }
+                    }
             );
         } catch (Exception ex) {
             LOG.error("Error in add features action", ex);

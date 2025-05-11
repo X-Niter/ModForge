@@ -6,78 +6,76 @@ import com.intellij.util.ui.JBUI;
 import com.modforge.intellij.plugin.memory.MemoryUtils;
 import com.modforge.intellij.plugin.memory.monitoring.MemorySnapshot;
 import com.modforge.intellij.plugin.memory.monitoring.MemorySnapshotManager;
+import org.jetbrains.annotations.NotNull;
 
 import javax.swing.*;
 import java.awt.*;
+import java.awt.event.ComponentAdapter;
+import java.awt.event.ComponentEvent;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
-import java.awt.event.MouseMotionAdapter;
+import java.awt.geom.Line2D;
 import java.awt.geom.Path2D;
 import java.awt.geom.Point2D;
-import java.time.Duration;
+import java.awt.geom.Rectangle2D;
+import java.text.SimpleDateFormat;
 import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
+import java.time.ZoneId;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
-import java.util.stream.Collectors;
+import java.util.concurrent.TimeUnit;
 
 /**
- * Component for displaying memory usage trends in a chart
+ * Component that displays a chart of memory usage over time.
  */
 public class MemoryTrendChart extends JPanel {
     private static final Logger LOG = Logger.getInstance(MemoryTrendChart.class);
     
-    // Constants for chart dimensions and styles
-    private static final int PADDING = 20;
-    private static final int AXIS_LABEL_PADDING = 5;
-    private static final int POINT_SIZE = 4;
-    private static final int HOVER_POINT_SIZE = 8;
-    private static final Stroke GRID_STROKE = new BasicStroke(0.5f, BasicStroke.CAP_BUTT,
-            BasicStroke.JOIN_ROUND, 0, new float[]{1, 2}, 0);
-    private static final Stroke DATA_STROKE = new BasicStroke(2.0f);
-    private static final Stroke HOVER_STROKE = new BasicStroke(2.0f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND);
+    private static final Color[] CHART_COLORS = {
+            new Color(45, 183, 93),      // Green for Used Memory
+            new Color(0, 120, 215),      // Blue for Free Memory
+            new Color(122, 117, 199),    // Purple for Total Memory
+            new Color(255, 141, 0)       // Orange for Max Memory
+    };
     
-    // Chart colors
-    private static final Color AXIS_COLOR = JBColor.border();
-    private static final Color GRID_COLOR = new JBColor(new Color(230, 230, 230), new Color(70, 70, 70));
-    private static final Color USED_MEMORY_COLOR = new JBColor(new Color(0, 122, 255), new Color(0, 122, 255));
-    private static final Color FREE_MEMORY_COLOR = new JBColor(new Color(50, 205, 50), new Color(50, 205, 50));
-    private static final Color TOTAL_MEMORY_COLOR = new JBColor(new Color(128, 128, 128), new Color(160, 160, 160));
-    private static final Color THRESHOLD_COLOR = new JBColor(new Color(255, 69, 58), new Color(255, 69, 58));
-    private static final Color HOVER_INFO_BG = new JBColor(new Color(255, 255, 255, 220), new Color(50, 50, 50, 220));
-    private static final Color HOVER_INFO_TEXT = JBColor.foreground();
+    private static final Color BACKGROUND_COLOR = new JBColor(new Color(245, 245, 245), new Color(60, 63, 65));
+    private static final Color GRID_COLOR = new JBColor(new Color(220, 220, 220), new Color(80, 83, 85));
+    private static final Color TEXT_COLOR = new JBColor(new Color(60, 60, 60), new Color(187, 187, 187));
+    private static final Color HOVER_LINE_COLOR = new JBColor(new Color(180, 180, 180), new Color(120, 123, 125));
     
-    // Chart data
-    private List<MemorySnapshot> snapshots = new ArrayList<>();
-    private int minutesBack = 15; // Default to last 15 minutes
-    private int chartType = 0; // 0=Used Memory, 1=Memory Usage %, 2=Free Memory, 3=All
+    private static final int PADDING = 50;
+    private static final int X_AXIS_LABEL_HEIGHT = 25;
+    private static final int Y_AXIS_LABEL_WIDTH = 60;
+    private static final int HOVER_TOLERANCE = 5;
     
-    // Hover data
+    private final List<MemorySnapshot> displaySnapshots = new ArrayList<>();
+    private int chartType = 0; // 0=Used Memory, 1=Memory Usage %, 2=Free Memory, 3=All Types
+    private int timeRangeMinutes = 15; // How far back to show (in minutes)
+    private boolean showGrid = true;
+    private boolean showLabels = true;
     private Point hoverPoint = null;
-    private int hoverIndex = -1;
-    
-    // Cached chart data for performance
-    private transient List<Point2D.Double> usedMemoryPoints = new ArrayList<>();
-    private transient List<Point2D.Double> freeMemoryPoints = new ArrayList<>();
-    private transient List<Point2D.Double> totalMemoryPoints = new ArrayList<>();
-    private transient List<Point2D.Double> usagePercentPoints = new ArrayList<>();
-    
-    private transient double minValue = 0;
-    private transient double maxValue = 100;
-    
-    // Formatter for timestamps
-    private static final DateTimeFormatter TIME_FORMATTER = DateTimeFormatter.ofPattern("HH:mm:ss");
-    private static final DateTimeFormatter DATE_TIME_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+    private MemorySnapshot hoverSnapshot = null;
     
     /**
      * Constructor
      */
     public MemoryTrendChart() {
-        setPreferredSize(new Dimension(600, 300));
-        setBorder(JBUI.Borders.empty(10));
+        setBackground(BACKGROUND_COLOR);
+        setBorder(JBUI.Borders.empty(5));
+        setPreferredSize(new Dimension(800, 400));
         
-        // Add mouse listeners for hover effects
-        addMouseMotionListener(new MouseMotionAdapter() {
+        // Add resize listener
+        addComponentListener(new ComponentAdapter() {
+            @Override
+            public void componentResized(ComponentEvent e) {
+                repaint();
+            }
+        });
+        
+        // Add mouse listeners for hover information
+        addMouseMotionListener(new MouseAdapter() {
             @Override
             public void mouseMoved(MouseEvent e) {
                 updateHoverPoint(e.getPoint());
@@ -88,476 +86,648 @@ public class MemoryTrendChart extends JPanel {
             @Override
             public void mouseExited(MouseEvent e) {
                 hoverPoint = null;
-                hoverIndex = -1;
+                hoverSnapshot = null;
                 repaint();
             }
         });
         
         // Initial data load
         refreshData();
-    }
-    
-    /**
-     * Set the time range for the chart
-     *
-     * @param minutesBack Minutes back to show, or -1 for all data
-     */
-    public void setTimeRange(int minutesBack) {
-        this.minutesBack = minutesBack;
-        refreshData();
+        
+        // Start a timer to update the chart data
+        Timer updateTimer = new Timer(10000, e -> refreshData()); // Update every 10 seconds
+        updateTimer.setInitialDelay(10000);
+        updateTimer.start();
     }
     
     /**
      * Set the chart type
      *
-     * @param chartType Chart type index (0=Used Memory, 1=Memory Usage %, 2=Free Memory, 3=All)
+     * @param type The chart type (0=Used Memory, 1=Memory Usage %, 2=Free Memory, 3=All Types)
      */
-    public void setChartType(int chartType) {
-        this.chartType = chartType;
+    public void setChartType(int type) {
+        if (type >= 0 && type <= 3) {
+            this.chartType = type;
+            repaint();
+        }
+    }
+    
+    /**
+     * Set the time range to display
+     *
+     * @param minutes Minutes of history to show (-1 for all data)
+     */
+    public void setTimeRange(int minutes) {
+        this.timeRangeMinutes = minutes;
         refreshData();
     }
     
     /**
-     * Refresh the chart data
+     * Set whether to show the grid
+     *
+     * @param show True to show the grid, false to hide it
+     */
+    public void setShowGrid(boolean show) {
+        this.showGrid = show;
+        repaint();
+    }
+    
+    /**
+     * Set whether to show labels
+     *
+     * @param show True to show labels, false to hide them
+     */
+    public void setShowLabels(boolean show) {
+        this.showLabels = show;
+        repaint();
+    }
+    
+    /**
+     * Refresh data from the memory snapshot manager
      */
     public void refreshData() {
-        MemorySnapshotManager snapshotManager = MemorySnapshotManager.getInstance();
-        
-        // Get all snapshots or snapshots in range
-        if (minutesBack <= 0) {
-            // Get all snapshots
-            snapshots = snapshotManager.getSnapshots();
-        } else {
-            // Get snapshots in range
-            LocalDateTime endTime = LocalDateTime.now();
-            LocalDateTime startTime = endTime.minusMinutes(minutesBack);
-            snapshots = snapshotManager.getSnapshotsInRange(startTime, endTime);
-        }
-        
-        // Filter out null snapshots
-        snapshots = snapshots.stream()
-                .filter(s -> s != null && s.getTimestamp() != null)
-                .sorted((s1, s2) -> s1.getTimestamp().compareTo(s2.getTimestamp()))
-                .collect(Collectors.toList());
-        
-        // Recalculate chart data
-        calculateChartData();
-        
-        // Update display
-        repaint();
-    }
-    
-    /**
-     * Calculate chart data points
-     */
-    private void calculateChartData() {
-        // Clear existing data
-        usedMemoryPoints.clear();
-        freeMemoryPoints.clear();
-        totalMemoryPoints.clear();
-        usagePercentPoints.clear();
-        
-        // If no data, return
-        if (snapshots.isEmpty()) {
-            return;
-        }
-        
-        // Calculate chart dimensions
-        int chartWidth = getWidth() - (2 * PADDING);
-        int chartHeight = getHeight() - (2 * PADDING);
-        
-        if (chartWidth <= 0 || chartHeight <= 0) {
-            // Not yet sized, use defaults
-            chartWidth = 600 - (2 * PADDING);
-            chartHeight = 300 - (2 * PADDING);
-        }
-        
-        // Determine min and max values
-        long maxMemory = 0;
-        long minMemory = Long.MAX_VALUE;
-        double maxPercent = 0;
-        
-        for (MemorySnapshot snapshot : snapshots) {
-            long totalMemory = snapshot.getTotalMemory();
-            long usedMemory = snapshot.getUsedMemory();
-            long freeMemory = snapshot.getFreeMemory();
-            double usagePercent = (double) usedMemory / totalMemory * 100.0;
-            
-            maxMemory = Math.max(maxMemory, Math.max(totalMemory, Math.max(usedMemory, freeMemory)));
-            minMemory = Math.min(minMemory, Math.min(totalMemory, Math.min(usedMemory, freeMemory)));
-            maxPercent = Math.max(maxPercent, usagePercent);
-        }
-        
-        // Set minValue and maxValue based on chart type
-        if (chartType == 1) {
-            // Memory usage %
-            minValue = 0;
-            maxValue = Math.max(100, maxPercent + 5); // Add some padding
-        } else {
-            // Memory values (bytes)
-            minValue = 0; // Always start at 0 for memory values
-            maxValue = maxMemory * 1.05; // Add 5% padding
-        }
-        
-        // Get the time range
-        LocalDateTime startTime = snapshots.get(0).getTimestamp();
-        LocalDateTime endTime = snapshots.get(snapshots.size() - 1).getTimestamp();
-        
-        // Calculate points
-        for (int i = 0; i < snapshots.size(); i++) {
-            MemorySnapshot snapshot = snapshots.get(i);
-            
-            // Calculate x coordinate based on time
-            double x = PADDING + ((double) Duration.between(startTime, snapshot.getTimestamp()).toMillis() / 
-                                  Duration.between(startTime, endTime).toMillis()) * chartWidth;
-            
-            // Calculate y coordinates for different metrics
-            long totalMemory = snapshot.getTotalMemory();
-            long usedMemory = snapshot.getUsedMemory();
-            long freeMemory = snapshot.getFreeMemory();
-            double usagePercent = (double) usedMemory / totalMemory * 100.0;
-            
-            double usedMemoryY = PADDING + chartHeight - ((usedMemory - minValue) / (maxValue - minValue) * chartHeight);
-            double freeMemoryY = PADDING + chartHeight - ((freeMemory - minValue) / (maxValue - minValue) * chartHeight);
-            double totalMemoryY = PADDING + chartHeight - ((totalMemory - minValue) / (maxValue - minValue) * chartHeight);
-            double usagePercentY = PADDING + chartHeight - ((usagePercent - (chartType == 1 ? minValue : 0)) / 
-                                                           (chartType == 1 ? maxValue : 100) * chartHeight);
-            
-            // Add points
-            usedMemoryPoints.add(new Point2D.Double(x, usedMemoryY));
-            freeMemoryPoints.add(new Point2D.Double(x, freeMemoryY));
-            totalMemoryPoints.add(new Point2D.Double(x, totalMemoryY));
-            usagePercentPoints.add(new Point2D.Double(x, usagePercentY));
-        }
-    }
-    
-    /**
-     * Update hover point
-     *
-     * @param mousePoint Mouse position
-     */
-    private void updateHoverPoint(Point mousePoint) {
-        if (snapshots.isEmpty() || usedMemoryPoints.isEmpty()) {
-            hoverPoint = null;
-            hoverIndex = -1;
-            repaint();
-            return;
-        }
-        
-        // Find the closest point
-        double minDistance = Double.MAX_VALUE;
-        int closestIndex = -1;
-        Point2D.Double closestPoint = null;
-        
-        // Use points based on chart type
-        List<Point2D.Double> points;
-        switch (chartType) {
-            case 0: points = usedMemoryPoints; break;
-            case 1: points = usagePercentPoints; break;
-            case 2: points = freeMemoryPoints; break;
-            case 3: points = usedMemoryPoints; // Default to used memory
-            default: points = usedMemoryPoints;
-        }
-        
-        for (int i = 0; i < points.size(); i++) {
-            Point2D.Double point = points.get(i);
-            double distance = point.distance(mousePoint);
-            
-            if (distance < minDistance && distance < 20) {
-                minDistance = distance;
-                closestIndex = i;
-                closestPoint = point;
+        try {
+            // Get memory snapshot manager
+            MemorySnapshotManager snapshotManager = MemorySnapshotManager.getInstance();
+            if (snapshotManager == null) {
+                LOG.warn("Memory snapshot manager not available");
+                return;
             }
+            
+            // Get filtered snapshots
+            synchronized (displaySnapshots) {
+                displaySnapshots.clear();
+                
+                List<MemorySnapshot> snapshots = snapshotManager.getSnapshots();
+                if (snapshots == null || snapshots.isEmpty()) {
+                    LOG.info("No memory snapshots available");
+                    return;
+                }
+                
+                if (timeRangeMinutes > 0) {
+                    // Filter by time range
+                    LocalDateTime cutoffTime = LocalDateTime.now().minus(timeRangeMinutes, ChronoUnit.MINUTES);
+                    for (MemorySnapshot snapshot : snapshots) {
+                        if (snapshot.getTimestamp().isAfter(cutoffTime)) {
+                            displaySnapshots.add(snapshot);
+                        }
+                    }
+                } else {
+                    // Show all snapshots
+                    displaySnapshots.addAll(snapshots);
+                }
+                
+                // If we have no data in the time range, show at least the latest snapshot
+                if (displaySnapshots.isEmpty() && !snapshots.isEmpty()) {
+                    displaySnapshots.add(snapshots.get(snapshots.size() - 1));
+                }
+            }
+            
+            repaint();
+        } catch (Exception e) {
+            LOG.error("Error refreshing memory trend data", e);
         }
-        
-        if (closestIndex != -1 && closestPoint != null) {
-            hoverPoint = new Point((int) closestPoint.x, (int) closestPoint.y);
-            hoverIndex = closestIndex;
-        } else {
-            hoverPoint = null;
-            hoverIndex = -1;
-        }
-        
-        repaint();
     }
     
     @Override
     protected void paintComponent(Graphics g) {
         super.paintComponent(g);
         
-        Graphics2D g2 = (Graphics2D) g.create();
-        g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+        Graphics2D g2d = (Graphics2D) g.create();
+        g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
         
-        // Get dimensions
         int width = getWidth();
         int height = getHeight();
-        int chartWidth = width - (2 * PADDING);
-        int chartHeight = height - (2 * PADDING);
         
-        // Draw chart background
-        g2.setColor(getBackground());
-        g2.fillRect(0, 0, width, height);
+        // Get chart area
+        Rectangle2D chartArea = new Rectangle2D.Double(
+                PADDING + Y_AXIS_LABEL_WIDTH,
+                PADDING,
+                width - (2 * PADDING) - Y_AXIS_LABEL_WIDTH,
+                height - (2 * PADDING) - X_AXIS_LABEL_HEIGHT
+        );
         
-        // Draw grid
-        drawGrid(g2, chartWidth, chartHeight);
-        
-        // Draw axes
-        drawAxes(g2, chartWidth, chartHeight);
-        
-        // Draw data
-        if (!snapshots.isEmpty()) {
-            if (chartWidth > 0 && chartHeight > 0) {
-                // If chart data is empty, recalculate
-                if (usedMemoryPoints.isEmpty()) {
-                    calculateChartData();
-                }
-                
-                // Draw data lines based on chart type
-                switch (chartType) {
-                    case 0:
-                        // Used memory only
-                        drawDataLine(g2, usedMemoryPoints, USED_MEMORY_COLOR);
-                        break;
-                    case 1:
-                        // Memory usage percentage
-                        drawDataLine(g2, usagePercentPoints, USED_MEMORY_COLOR);
-                        
-                        // Draw warning threshold at 75%
-                        int warningY = PADDING + chartHeight - (int) ((75.0 - minValue) / (maxValue - minValue) * chartHeight);
-                        drawThresholdLine(g2, warningY, chartWidth, "75% (Warning)");
-                        
-                        // Draw critical threshold at 90%
-                        int criticalY = PADDING + chartHeight - (int) ((90.0 - minValue) / (maxValue - minValue) * chartHeight);
-                        drawThresholdLine(g2, criticalY, chartWidth, "90% (Critical)");
-                        break;
-                    case 2:
-                        // Free memory only
-                        drawDataLine(g2, freeMemoryPoints, FREE_MEMORY_COLOR);
-                        break;
-                    case 3:
-                        // All memory types
-                        drawDataLine(g2, totalMemoryPoints, TOTAL_MEMORY_COLOR);
-                        drawDataLine(g2, usedMemoryPoints, USED_MEMORY_COLOR);
-                        drawDataLine(g2, freeMemoryPoints, FREE_MEMORY_COLOR);
-                        break;
-                }
-                
-                // Draw hover info
-                if (hoverPoint != null && hoverIndex >= 0 && hoverIndex < snapshots.size()) {
-                    drawHoverInfo(g2, snapshots.get(hoverIndex), hoverPoint);
-                }
+        // Draw chart
+        synchronized (displaySnapshots) {
+            if (displaySnapshots.isEmpty()) {
+                drawNoDataMessage(g2d, chartArea);
+                return;
             }
-        } else {
-            // Draw "No data" message
-            g2.setColor(JBColor.foreground());
-            g2.setFont(getFont().deriveFont(Font.BOLD, 14f));
-            String noDataMessage = "No memory data available";
-            FontMetrics fm = g2.getFontMetrics();
-            int textWidth = fm.stringWidth(noDataMessage);
-            int textHeight = fm.getHeight();
-            g2.drawString(noDataMessage, (width - textWidth) / 2, (height - textHeight) / 2 + fm.getAscent());
-        }
-        
-        g2.dispose();
-    }
-    
-    /**
-     * Draw a data line
-     *
-     * @param g2 Graphics context
-     * @param points Data points
-     * @param color Line color
-     */
-    private void drawDataLine(Graphics2D g2, List<Point2D.Double> points, Color color) {
-        if (points.size() < 2) {
-            return;
-        }
-        
-        // Draw line
-        g2.setColor(color);
-        g2.setStroke(DATA_STROKE);
-        
-        Path2D.Double path = new Path2D.Double();
-        path.moveTo(points.get(0).x, points.get(0).y);
-        
-        for (int i = 1; i < points.size(); i++) {
-            path.lineTo(points.get(i).x, points.get(i).y);
-        }
-        
-        g2.draw(path);
-        
-        // Draw points
-        for (Point2D.Double point : points) {
-            g2.fillOval((int) point.x - POINT_SIZE / 2, (int) point.y - POINT_SIZE / 2, POINT_SIZE, POINT_SIZE);
-        }
-    }
-    
-    /**
-     * Draw threshold line
-     *
-     * @param g2 Graphics context
-     * @param y Y coordinate
-     * @param width Chart width
-     * @param label Threshold label
-     */
-    private void drawThresholdLine(Graphics2D g2, int y, int width, String label) {
-        g2.setColor(THRESHOLD_COLOR);
-        g2.setStroke(new BasicStroke(1.0f, BasicStroke.CAP_BUTT,
-                BasicStroke.JOIN_ROUND, 0, new float[]{3, 3}, 0));
-        g2.drawLine(PADDING, y, PADDING + width, y);
-        
-        // Draw label
-        FontMetrics fm = g2.getFontMetrics();
-        g2.drawString(label, PADDING, y - fm.getDescent());
-    }
-    
-    /**
-     * Draw grid
-     *
-     * @param g2 Graphics context
-     * @param chartWidth Chart width
-     * @param chartHeight Chart height
-     */
-    private void drawGrid(Graphics2D g2, int chartWidth, int chartHeight) {
-        g2.setColor(GRID_COLOR);
-        g2.setStroke(GRID_STROKE);
-        
-        // Draw vertical grid lines
-        for (int i = 0; i <= 10; i++) {
-            int x = PADDING + (i * chartWidth / 10);
-            g2.drawLine(x, PADDING, x, PADDING + chartHeight);
-        }
-        
-        // Draw horizontal grid lines
-        for (int i = 0; i <= 10; i++) {
-            int y = PADDING + (i * chartHeight / 10);
-            g2.drawLine(PADDING, y, PADDING + chartWidth, y);
-        }
-    }
-    
-    /**
-     * Draw axes
-     *
-     * @param g2 Graphics context
-     * @param chartWidth Chart width
-     * @param chartHeight Chart height
-     */
-    private void drawAxes(Graphics2D g2, int chartWidth, int chartHeight) {
-        g2.setColor(AXIS_COLOR);
-        g2.setStroke(new BasicStroke(1.0f));
-        
-        // Draw axes
-        g2.drawLine(PADDING, PADDING, PADDING, PADDING + chartHeight);
-        g2.drawLine(PADDING, PADDING + chartHeight, PADDING + chartWidth, PADDING + chartHeight);
-        
-        // Draw x-axis labels (time)
-        if (!snapshots.isEmpty()) {
-            // Divide into 5 labels
-            for (int i = 0; i <= 5; i++) {
-                int index = i * (snapshots.size() - 1) / 5;
-                if (index < snapshots.size()) {
-                    MemorySnapshot snapshot = snapshots.get(index);
-                    String timeLabel = snapshot.getTimestamp().format(TIME_FORMATTER);
-                    
-                    int x = PADDING + (i * chartWidth / 5);
-                    
-                    FontMetrics fm = g2.getFontMetrics();
-                    int labelWidth = fm.stringWidth(timeLabel);
-                    
-                    g2.drawString(timeLabel, x - labelWidth / 2, PADDING + chartHeight + AXIS_LABEL_PADDING + fm.getAscent());
-                }
-            }
-        }
-        
-        // Draw y-axis labels (memory or percentage)
-        for (int i = 0; i <= 5; i++) {
-            double value = minValue + (i * (maxValue - minValue) / 5);
-            String label;
             
-            if (chartType == 1) {
-                // Memory percentage
-                label = String.format("%.1f%%", value);
+            drawChart(g2d, chartArea);
+        }
+        
+        g2d.dispose();
+    }
+    
+    /**
+     * Draw a message when no data is available
+     *
+     * @param g2d       The graphics context
+     * @param chartArea The chart area
+     */
+    private void drawNoDataMessage(Graphics2D g2d, Rectangle2D chartArea) {
+        g2d.setColor(TEXT_COLOR);
+        g2d.setFont(g2d.getFont().deriveFont(Font.BOLD, 14f));
+        
+        String message = "No memory trend data available";
+        FontMetrics fm = g2d.getFontMetrics();
+        int textWidth = fm.stringWidth(message);
+        int textHeight = fm.getHeight();
+        
+        g2d.drawString(
+                message,
+                (int) (chartArea.getCenterX() - (textWidth / 2)),
+                (int) (chartArea.getCenterY() - (textHeight / 2) + fm.getAscent())
+        );
+    }
+    
+    /**
+     * Draw the chart with available data
+     *
+     * @param g2d       The graphics context
+     * @param chartArea The chart area
+     */
+    private void drawChart(Graphics2D g2d, Rectangle2D chartArea) {
+        // Determine value ranges
+        long maxValue = determineMaxValue();
+        long minValue = 0; // Always start from zero for memory
+        
+        // Draw grid and labels
+        if (showGrid) {
+            drawGrid(g2d, chartArea, minValue, maxValue);
+        }
+        
+        if (showLabels) {
+            drawLabels(g2d, chartArea, minValue, maxValue);
+        }
+        
+        // Draw data lines based on chart type
+        if (chartType == 3) {
+            // Draw all memory types
+            drawDataLine(g2d, chartArea, 0, minValue, maxValue, CHART_COLORS[0]);  // Used
+            drawDataLine(g2d, chartArea, 2, minValue, maxValue, CHART_COLORS[1]);  // Free
+            drawDataLine(g2d, chartArea, 1, minValue, maxValue, CHART_COLORS[2]);  // Total
+        } else {
+            // Draw selected memory type
+            drawDataLine(g2d, chartArea, chartType, minValue, maxValue, CHART_COLORS[chartType]);
+        }
+        
+        // Draw hover information
+        if (hoverPoint != null && hoverSnapshot != null) {
+            drawHoverInfo(g2d, chartArea, hoverPoint, hoverSnapshot, minValue, maxValue);
+        }
+    }
+    
+    /**
+     * Determine the maximum value for the y-axis based on the chart type
+     *
+     * @return The maximum value
+     */
+    private long determineMaxValue() {
+        long maxValue = 0;
+        
+        for (MemorySnapshot snapshot : displaySnapshots) {
+            switch (chartType) {
+                case 0: // Used Memory
+                    maxValue = Math.max(maxValue, snapshot.getUsedMemory());
+                    break;
+                case 1: // Memory Usage %
+                    maxValue = 100; // Fixed scale for percentage
+                    break;
+                case 2: // Free Memory
+                    maxValue = Math.max(maxValue, snapshot.getFreeMemory());
+                    break;
+                case 3: // All Types
+                    maxValue = Math.max(maxValue, snapshot.getTotalMemory());
+                    break;
+            }
+        }
+        
+        // For memory values, round up to a nice number
+        if (chartType != 1) { // Not percentage
+            maxValue = ((maxValue / 1_000_000_000) + 1) * 1_000_000_000; // Round up to next GB
+        }
+        
+        return maxValue;
+    }
+    
+    /**
+     * Draw the grid lines
+     *
+     * @param g2d       The graphics context
+     * @param chartArea The chart area
+     * @param minValue  The minimum value
+     * @param maxValue  The maximum value
+     */
+    private void drawGrid(Graphics2D g2d, Rectangle2D chartArea, long minValue, long maxValue) {
+        g2d.setColor(GRID_COLOR);
+        g2d.setStroke(new BasicStroke(1.0f, BasicStroke.CAP_BUTT, BasicStroke.JOIN_MITER, 
+                10.0f, new float[]{5.0f}, 0.0f));
+        
+        // Horizontal grid lines (y-axis)
+        int numYLines = 5;
+        for (int i = 0; i <= numYLines; i++) {
+            double y = chartArea.getMaxY() - (i * (chartArea.getHeight() / numYLines));
+            g2d.draw(new Line2D.Double(chartArea.getMinX(), y, chartArea.getMaxX(), y));
+        }
+        
+        // Vertical grid lines (x-axis)
+        if (displaySnapshots.size() > 1) {
+            LocalDateTime firstTime = displaySnapshots.get(0).getTimestamp();
+            LocalDateTime lastTime = displaySnapshots.get(displaySnapshots.size() - 1).getTimestamp();
+            
+            // Calculate grid intervals based on time range
+            long minutes = ChronoUnit.MINUTES.between(firstTime, lastTime);
+            int numXLines = Math.min(10, (int) Math.max(2, minutes));
+            
+            for (int i = 0; i <= numXLines; i++) {
+                double ratio = (double) i / numXLines;
+                double x = chartArea.getMinX() + (ratio * chartArea.getWidth());
+                g2d.draw(new Line2D.Double(x, chartArea.getMinY(), x, chartArea.getMaxY()));
+            }
+        }
+        
+        // Reset stroke
+        g2d.setStroke(new BasicStroke(1.0f));
+    }
+    
+    /**
+     * Draw the axis labels
+     *
+     * @param g2d       The graphics context
+     * @param chartArea The chart area
+     * @param minValue  The minimum value
+     * @param maxValue  The maximum value
+     */
+    private void drawLabels(Graphics2D g2d, Rectangle2D chartArea, long minValue, long maxValue) {
+        g2d.setColor(TEXT_COLOR);
+        g2d.setFont(g2d.getFont().deriveFont(10f));
+        FontMetrics fm = g2d.getFontMetrics();
+        
+        // Y-axis labels
+        int numYLabels = 5;
+        for (int i = 0; i <= numYLabels; i++) {
+            double y = chartArea.getMaxY() - (i * (chartArea.getHeight() / numYLabels));
+            double value = minValue + (i * ((maxValue - minValue) / numYLabels));
+            
+            String label;
+            if (chartType == 1) { // Percentage
+                label = String.format("%.0f%%", value);
             } else {
-                // Memory size
                 label = MemoryUtils.formatMemorySize((long) value);
             }
             
-            int y = PADDING + chartHeight - (i * chartHeight / 5);
-            
-            FontMetrics fm = g2.getFontMetrics();
-            int labelWidth = fm.stringWidth(label);
-            
-            g2.drawString(label, PADDING - labelWidth - AXIS_LABEL_PADDING, y + fm.getAscent() / 2);
+            g2d.drawString(label, (int) (chartArea.getMinX() - fm.stringWidth(label) - 5), (int) (y + fm.getAscent() / 2));
         }
+        
+        // X-axis labels (time)
+        if (displaySnapshots.size() > 1) {
+            LocalDateTime firstTime = displaySnapshots.get(0).getTimestamp();
+            LocalDateTime lastTime = displaySnapshots.get(displaySnapshots.size() - 1).getTimestamp();
+            
+            SimpleDateFormat timeFormat;
+            if (ChronoUnit.HOURS.between(firstTime, lastTime) > 12) {
+                timeFormat = new SimpleDateFormat("MM/dd HH:mm");
+            } else {
+                timeFormat = new SimpleDateFormat("HH:mm:ss");
+            }
+            
+            int numXLabels = Math.min(5, displaySnapshots.size());
+            for (int i = 0; i <= numXLabels; i++) {
+                double ratio = (double) i / numXLabels;
+                double x = chartArea.getMinX() + (ratio * chartArea.getWidth());
+                
+                // Interpolate the time
+                LocalDateTime labelTime = firstTime.plus(
+                        (long) (ChronoUnit.SECONDS.between(firstTime, lastTime) * ratio),
+                        ChronoUnit.SECONDS
+                );
+                
+                Date date = Date.from(labelTime.atZone(ZoneId.systemDefault()).toInstant());
+                String label = timeFormat.format(date);
+                
+                g2d.drawString(
+                        label,
+                        (int) (x - (fm.stringWidth(label) / 2)),
+                        (int) (chartArea.getMaxY() + fm.getHeight() + 5)
+                );
+            }
+        }
+        
+        // Chart title based on type
+        String chartTitle = getChartTitle();
+        g2d.setFont(g2d.getFont().deriveFont(Font.BOLD, 12f));
+        fm = g2d.getFontMetrics();
+        g2d.drawString(
+                chartTitle,
+                (int) (chartArea.getCenterX() - (fm.stringWidth(chartTitle) / 2)),
+                (int) (chartArea.getMinY() - 10)
+        );
+    }
+    
+    /**
+     * Get the chart title based on the chart type
+     *
+     * @return The chart title
+     */
+    private String getChartTitle() {
+        switch (chartType) {
+            case 0:
+                return "Used Memory Over Time";
+            case 1:
+                return "Memory Usage Percentage Over Time";
+            case 2:
+                return "Free Memory Over Time";
+            case 3:
+                return "Memory Metrics Over Time";
+            default:
+                return "Memory Trend";
+        }
+    }
+    
+    /**
+     * Draw a data line for the specified memory metric
+     *
+     * @param g2d       The graphics context
+     * @param chartArea The chart area
+     * @param dataType  The data type (0=Used, 1=Total, 2=Free)
+     * @param minValue  The minimum value
+     * @param maxValue  The maximum value
+     * @param color     The line color
+     */
+    private void drawDataLine(Graphics2D g2d, Rectangle2D chartArea, int dataType, long minValue, long maxValue, Color color) {
+        if (displaySnapshots.size() < 2) {
+            return; // Need at least two points for a line
+        }
+        
+        // Calculate the path
+        Path2D path = new Path2D.Double();
+        boolean started = false;
+        
+        LocalDateTime firstTime = displaySnapshots.get(0).getTimestamp();
+        LocalDateTime lastTime = displaySnapshots.get(displaySnapshots.size() - 1).getTimestamp();
+        long totalTimeSpan = ChronoUnit.SECONDS.between(firstTime, lastTime);
+        
+        for (MemorySnapshot snapshot : displaySnapshots) {
+            double x = calculateXPosition(snapshot.getTimestamp(), firstTime, lastTime, chartArea);
+            double y = calculateYPosition(dataType, snapshot, minValue, maxValue, chartArea);
+            
+            if (!started) {
+                path.moveTo(x, y);
+                started = true;
+            } else {
+                path.lineTo(x, y);
+            }
+        }
+        
+        // Draw the line
+        g2d.setColor(color);
+        g2d.setStroke(new BasicStroke(2.0f));
+        g2d.draw(path);
+        
+        // Draw data points
+        for (MemorySnapshot snapshot : displaySnapshots) {
+            double x = calculateXPosition(snapshot.getTimestamp(), firstTime, lastTime, chartArea);
+            double y = calculateYPosition(dataType, snapshot, minValue, maxValue, chartArea);
+            
+            g2d.setColor(color);
+            g2d.fillOval((int) (x - 3), (int) (y - 3), 6, 6);
+            g2d.setColor(color.darker());
+            g2d.drawOval((int) (x - 3), (int) (y - 3), 6, 6);
+        }
+        
+        // Reset stroke
+        g2d.setStroke(new BasicStroke(1.0f));
+        
+        // Add legend if showing all types
+        if (chartType == 3) {
+            String label;
+            switch (dataType) {
+                case 0:
+                    label = "Used Memory";
+                    break;
+                case 1:
+                    label = "Total Memory";
+                    break;
+                case 2:
+                    label = "Free Memory";
+                    break;
+                default:
+                    label = "Unknown";
+            }
+            
+            g2d.setFont(g2d.getFont().deriveFont(10f));
+            FontMetrics fm = g2d.getFontMetrics();
+            
+            // Position legend in top-right corner with some offset
+            int legendX = (int) chartArea.getMaxX() - fm.stringWidth(label) - 30;
+            int legendY = (int) chartArea.getMinY() + 15 + (dataType * 15);
+            
+            // Draw legend color box
+            g2d.setColor(color);
+            g2d.fillRect(legendX - 15, legendY - 10, 10, 10);
+            g2d.setColor(color.darker());
+            g2d.drawRect(legendX - 15, legendY - 10, 10, 10);
+            
+            // Draw legend text
+            g2d.setColor(TEXT_COLOR);
+            g2d.drawString(label, legendX, legendY);
+        }
+    }
+    
+    /**
+     * Calculate the x position for a timestamp
+     *
+     * @param timestamp The timestamp
+     * @param firstTime The first timestamp in the data
+     * @param lastTime  The last timestamp in the data
+     * @param chartArea The chart area
+     * @return The x position
+     */
+    private double calculateXPosition(LocalDateTime timestamp, LocalDateTime firstTime, LocalDateTime lastTime, Rectangle2D chartArea) {
+        long totalTimeSpan = ChronoUnit.SECONDS.between(firstTime, lastTime);
+        
+        if (totalTimeSpan == 0) {
+            return chartArea.getCenterX(); // Special case for single point or all same time
+        }
+        
+        long secondsFromStart = ChronoUnit.SECONDS.between(firstTime, timestamp);
+        double ratio = (double) secondsFromStart / totalTimeSpan;
+        
+        return chartArea.getMinX() + (ratio * chartArea.getWidth());
+    }
+    
+    /**
+     * Calculate the y position for a memory value
+     *
+     * @param dataType  The data type (0=Used, 1=Total, 2=Free)
+     * @param snapshot  The memory snapshot
+     * @param minValue  The minimum value
+     * @param maxValue  The maximum value
+     * @param chartArea The chart area
+     * @return The y position
+     */
+    private double calculateYPosition(int dataType, MemorySnapshot snapshot, long minValue, long maxValue, Rectangle2D chartArea) {
+        double value;
+        
+        switch (dataType) {
+            case 0: // Used Memory
+                if (chartType == 1) { // Percentage
+                    value = (double) snapshot.getUsedMemory() * 100 / snapshot.getTotalMemory();
+                } else {
+                    value = snapshot.getUsedMemory();
+                }
+                break;
+            case 1: // Total Memory
+                value = snapshot.getTotalMemory();
+                break;
+            case 2: // Free Memory
+                value = snapshot.getFreeMemory();
+                break;
+            default:
+                value = 0;
+        }
+        
+        // Convert value to y position (inverted since y-axis goes down)
+        double valueRange = maxValue - minValue;
+        double ratio = (value - minValue) / valueRange;
+        
+        return chartArea.getMaxY() - (ratio * chartArea.getHeight());
     }
     
     /**
      * Draw hover information
      *
-     * @param g2 Graphics context
-     * @param snapshot Memory snapshot
-     * @param point Hover point
+     * @param g2d       The graphics context
+     * @param chartArea The chart area
+     * @param point     The hover point
+     * @param snapshot  The snapshot at the hover point
+     * @param minValue  The minimum value
+     * @param maxValue  The maximum value
      */
-    private void drawHoverInfo(Graphics2D g2, MemorySnapshot snapshot, Point point) {
-        // Draw hover point
-        g2.setColor(JBColor.RED);
-        g2.fillOval(point.x - HOVER_POINT_SIZE / 2, point.y - HOVER_POINT_SIZE / 2, 
-                HOVER_POINT_SIZE, HOVER_POINT_SIZE);
+    private void drawHoverInfo(Graphics2D g2d, Rectangle2D chartArea, Point point, MemorySnapshot snapshot, long minValue, long maxValue) {
+        // Draw vertical line at hover point
+        g2d.setColor(HOVER_LINE_COLOR);
+        g2d.setStroke(new BasicStroke(1.0f, BasicStroke.CAP_BUTT, BasicStroke.JOIN_MITER, 10.0f, new float[]{3.0f}, 0.0f));
+        g2d.draw(new Line2D.Double(point.x, chartArea.getMinY(), point.x, chartArea.getMaxY()));
         
-        // Prepare hover info content
-        String timestamp = snapshot.getTimestamp().format(DATE_TIME_FORMATTER);
-        String totalMemory = "Total: " + MemoryUtils.formatMemorySize(snapshot.getTotalMemory());
-        String usedMemory = "Used: " + MemoryUtils.formatMemorySize(snapshot.getUsedMemory());
-        String freeMemory = "Free: " + MemoryUtils.formatMemorySize(snapshot.getFreeMemory());
-        String usagePercent = String.format("Usage: %.1f%%", 
-                (double) snapshot.getUsedMemory() / snapshot.getTotalMemory() * 100.0);
+        // Create info box
+        SimpleDateFormat timeFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+        Date date = Date.from(snapshot.getTimestamp().atZone(ZoneId.systemDefault()).toInstant());
+        String timeStr = timeFormat.format(date);
         
-        // Calculate info box dimensions
-        FontMetrics fm = g2.getFontMetrics();
+        List<String> infoLines = new ArrayList<>();
+        infoLines.add("Time: " + timeStr);
+        infoLines.add("Used: " + MemoryUtils.formatMemorySize(snapshot.getUsedMemory()) + 
+                String.format(" (%.1f%%)", (double) snapshot.getUsedMemory() * 100 / snapshot.getTotalMemory()));
+        infoLines.add("Free: " + MemoryUtils.formatMemorySize(snapshot.getFreeMemory()));
+        infoLines.add("Total: " + MemoryUtils.formatMemorySize(snapshot.getTotalMemory()));
+        infoLines.add("Max: " + MemoryUtils.formatMemorySize(snapshot.getMaxMemory()));
+        
+        // Calculate box size
+        g2d.setFont(g2d.getFont().deriveFont(11f));
+        FontMetrics fm = g2d.getFontMetrics();
         int lineHeight = fm.getHeight();
-        int padding = 8;
-        int infoWidth = Math.max(
-                Math.max(fm.stringWidth(timestamp), fm.stringWidth(totalMemory)),
-                Math.max(
-                        Math.max(fm.stringWidth(usedMemory), fm.stringWidth(freeMemory)),
-                        fm.stringWidth(usagePercent)
-                )
-        ) + (2 * padding);
-        int infoHeight = (5 * lineHeight) + (2 * padding);
-        
-        // Calculate info box position
-        int infoX = point.x + 15;
-        int infoY = point.y - infoHeight / 2;
-        
-        // Adjust if off screen
-        if (infoX + infoWidth > getWidth()) {
-            infoX = point.x - infoWidth - 15;
+        int boxWidth = 0;
+        for (String line : infoLines) {
+            boxWidth = Math.max(boxWidth, fm.stringWidth(line));
         }
-        if (infoY < 0) {
-            infoY = 0;
-        } else if (infoY + infoHeight > getHeight()) {
-            infoY = getHeight() - infoHeight;
+        int boxHeight = lineHeight * infoLines.size() + 10;
+        
+        // Position box near the cursor but keep it in bounds
+        int boxX = point.x + 10;
+        if (boxX + boxWidth + 10 > chartArea.getMaxX()) {
+            boxX = point.x - boxWidth - 10;
         }
         
-        // Draw info background
-        g2.setColor(HOVER_INFO_BG);
-        g2.fillRoundRect(infoX, infoY, infoWidth, infoHeight, 10, 10);
+        int boxY = point.y - boxHeight / 2;
+        if (boxY < chartArea.getMinY()) {
+            boxY = (int) chartArea.getMinY();
+        } else if (boxY + boxHeight > chartArea.getMaxY()) {
+            boxY = (int) chartArea.getMaxY() - boxHeight;
+        }
         
-        // Draw info border
-        g2.setColor(JBColor.border());
-        g2.drawRoundRect(infoX, infoY, infoWidth, infoHeight, 10, 10);
+        // Draw box background with semi-transparency
+        g2d.setColor(new Color(245, 245, 245, 220));
+        g2d.fillRoundRect(boxX, boxY, boxWidth + 20, boxHeight, 6, 6);
+        g2d.setColor(new Color(200, 200, 200));
+        g2d.drawRoundRect(boxX, boxY, boxWidth + 20, boxHeight, 6, 6);
         
         // Draw info text
-        g2.setColor(HOVER_INFO_TEXT);
-        int textY = infoY + padding + fm.getAscent();
-        g2.drawString(timestamp, infoX + padding, textY);
-        textY += lineHeight;
-        g2.drawString(totalMemory, infoX + padding, textY);
-        textY += lineHeight;
-        g2.drawString(usedMemory, infoX + padding, textY);
-        textY += lineHeight;
-        g2.drawString(freeMemory, infoX + padding, textY);
-        textY += lineHeight;
-        g2.drawString(usagePercent, infoX + padding, textY);
+        g2d.setColor(new Color(50, 50, 50));
+        for (int i = 0; i < infoLines.size(); i++) {
+            g2d.drawString(infoLines.get(i), boxX + 10, boxY + (i + 1) * lineHeight);
+        }
+    }
+    
+    /**
+     * Update the hover point and find the nearest snapshot
+     *
+     * @param point The mouse point
+     */
+    private void updateHoverPoint(Point point) {
+        synchronized (displaySnapshots) {
+            if (displaySnapshots.isEmpty()) {
+                hoverPoint = null;
+                hoverSnapshot = null;
+                return;
+            }
+            
+            // Get chart area
+            Rectangle2D chartArea = new Rectangle2D.Double(
+                    PADDING + Y_AXIS_LABEL_WIDTH,
+                    PADDING,
+                    getWidth() - (2 * PADDING) - Y_AXIS_LABEL_WIDTH,
+                    getHeight() - (2 * PADDING) - X_AXIS_LABEL_HEIGHT
+            );
+            
+            // Check if point is in chart area
+            if (!chartArea.contains(point)) {
+                hoverPoint = null;
+                hoverSnapshot = null;
+                return;
+            }
+            
+            // Find the nearest snapshot
+            LocalDateTime firstTime = displaySnapshots.get(0).getTimestamp();
+            LocalDateTime lastTime = displaySnapshots.get(displaySnapshots.size() - 1).getTimestamp();
+            
+            double nearestDistance = Double.MAX_VALUE;
+            MemorySnapshot nearestSnapshot = null;
+            Point nearestPoint = null;
+            
+            for (MemorySnapshot snapshot : displaySnapshots) {
+                double x = calculateXPosition(snapshot.getTimestamp(), firstTime, lastTime, chartArea);
+                double distance = Math.abs(x - point.x);
+                
+                if (distance < nearestDistance) {
+                    nearestDistance = distance;
+                    nearestSnapshot = snapshot;
+                    
+                    // Calculate y position based on chart type
+                    double y;
+                    if (chartType == 3) { // All types - use used memory for hover
+                        y = calculateYPosition(0, snapshot, 0, determineMaxValue(), chartArea);
+                    } else {
+                        y = calculateYPosition(chartType == 2 ? 2 : chartType, snapshot, 0, determineMaxValue(), chartArea);
+                    }
+                    
+                    nearestPoint = new Point((int) x, (int) y);
+                }
+            }
+            
+            // Only update if we found a snapshot within tolerance
+            if (nearestDistance <= HOVER_TOLERANCE) {
+                hoverPoint = nearestPoint;
+                hoverSnapshot = nearestSnapshot;
+                repaint();
+            } else if (hoverPoint != null) {
+                // Clear hover if we moved away
+                hoverPoint = null;
+                hoverSnapshot = null;
+                repaint();
+            }
+        }
     }
 }
