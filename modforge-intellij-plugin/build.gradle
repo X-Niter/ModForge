@@ -60,7 +60,6 @@ intellij {
     // Essential configuration
     downloadSources = true
     updateSinceUntilBuild = false
-    pluginDependencyCaching = false
     
     // Use only essential plugins - make GitHub/etc optional with fallbacks
     plugins = ['java']
