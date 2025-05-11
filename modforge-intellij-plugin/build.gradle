@@ -64,13 +64,16 @@ intellij {
     downloadSources = true
     updateSinceUntilBuild = false
     
-    // Use only essential plugins - make GitHub/etc optional with fallbacks
-    plugins = ['java', 'com.intellij.modules.platform', 'com.intellij.modules.lang']
+    // Important: Use only the Java plugin dependency, platform dependencies are implicit
+    // Making platform modules as dependencies causes problems - platform is always included
+    plugins = ['com.intellij.java']
+    
+    // Ensure these are properly resolved for your plugin
+    instrumentCode = true
+    sandboxDir = project.rootDir.canonicalPath + "/.sandbox"
     
     // Access multiple repositories for better dependency resolution
     intellijRepository = 'https://www.jetbrains.com/intellij-repository/releases'
-    
-    // This is duplicated in the comment above - can be removed
 }
 
 // Configure Java sourceSets - using standard Gradle setup
@@ -143,11 +146,20 @@ tasks {
     }
 
     runIde {
+        // Enhanced IDE run configuration for testing
         jvmArgs = [
             '-Xmx2g',
             '--add-opens=java.base/java.util=ALL-UNNAMED',
-            '--add-opens=java.base/java.lang=ALL-UNNAMED'
+            '--add-opens=java.base/java.lang=ALL-UNNAMED',
+            '--add-opens=java.base/java.io=ALL-UNNAMED',
+            '--add-opens=java.base/java.net=ALL-UNNAMED',
+            '--add-opens=java.base/java.nio=ALL-UNNAMED',
+            '-Djava.system.class.loader=com.intellij.util.lang.PathClassLoader',
+            '-Didea.auto.reload.plugins=true',
+            '-Didea.initially.ask.config=false'
         ]
+        // Autoload changes without restarts
+        autoReloadPlugins.set(true)
     }
 
     // JUnit 5 integration
