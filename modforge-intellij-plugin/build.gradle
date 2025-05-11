@@ -35,6 +35,9 @@ dependencies {
     implementation 'com.squareup.okhttp3:okhttp:4.12.0'
     implementation 'commons-io:commons-io:2.15.1'
     implementation 'org.zeroturnaround:zt-zip:1.16'
+    implementation 'com.googlecode.json-simple:json-simple:1.1.1'
+    implementation 'org.java-websocket:Java-WebSocket:1.5.4'
+    implementation 'org.jetbrains:annotations:24.0.1'
     testImplementation 'org.junit.jupiter:junit-jupiter-api:5.10.2'
     testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine:5.10.2'
     testImplementation 'org.mockito:mockito-core:5.10.0'
@@ -90,10 +93,11 @@ sourceSets {
     }
 }
 
-// Set Java compatibility version to match IntelliJ IDEA 2025.1 runtime
+// Set Java compatibility version to match IntelliJ IDEA 2023.3.6 runtime
+// This is required for build compatibility, even though we'll run on 2025.1
 java {
-    sourceCompatibility = JavaVersion.VERSION_21 // IntelliJ 2025.1 uses Java 21
-    targetCompatibility = JavaVersion.VERSION_21 // IntelliJ 2025.1 uses Java 21
+    sourceCompatibility = JavaVersion.VERSION_17 // IntelliJ 2023.3 requires Java 17
+    targetCompatibility = JavaVersion.VERSION_17 // IntelliJ 2023.3 requires Java 17
 }
 
 // Ensure gradlew works on all environments
@@ -103,14 +107,12 @@ wrapper {
 }
 
 // Additional IntelliJ plugin configuration
-// Add improved Java 21 support (ensures explicit Java 21 configuration)
-// Uncomment if java {} is already defined elsewhere to avoid duplication
+// Use toolchain for Java 21 during development, while maintaining Java 17 compatibility for builds
 java {
     toolchain {
         languageVersion.set(JavaLanguageVersion.of(21))
     }
-    sourceCompatibility = JavaVersion.VERSION_21
-    targetCompatibility = JavaVersion.VERSION_21
+    // The sourceCompatibility and targetCompatibility are already set to VERSION_17 above
 }
 
 tasks {
@@ -183,11 +185,11 @@ tasks.register('validatePluginForProduction') {
     doLast {
         println "Validating plugin for production deployment..."
         
-        // Check Java version
+        // Check Java version - we need at least Java 17 to build
         def javaVersion = System.getProperty('java.version')
         def javaVersionMajor = javaVersion.split('\\.')[0].toInteger()
-        if (javaVersionMajor < 21) {
-            throw new GradleException("Invalid Java version: $javaVersion. Java 21 or higher is required.")
+        if (javaVersionMajor < 17) {
+            throw new GradleException("Invalid Java version: $javaVersion. Java 17 or higher is required.")
         }
         println "✓ Java version check passed: $javaVersion"
         
