@@ -318,9 +318,9 @@ if exist "%TEMP_DIR%\matches.txt" (
         ) else if "%%b"=="CacheUpdater" (
             echo * **Suggested fix:** Replace with CompatibilityUtil.refreshAll(project) >> "%COMPATIBILITY_REPORT%"
         ) else if "%%b"=="runReadAction" (
-            echo * **Suggested fix:** Replace with CompatibilityUtil.runReadAction(() -^> { ... }) >> "%COMPATIBILITY_REPORT%"
+            echo * **Suggested fix:** Replace with CompatibilityUtil.runReadAction(lambda) >> "%COMPATIBILITY_REPORT%"
         ) else if "%%b"=="runWriteAction" (
-            echo * **Suggested fix:** Replace with CompatibilityUtil.runWriteAction(() -^> { ... }) >> "%COMPATIBILITY_REPORT%"
+            echo * **Suggested fix:** Replace with CompatibilityUtil.runWriteAction(lambda) >> "%COMPATIBILITY_REPORT%"
         ) else if "%%b"=="getSelectedTextEditor" (
             echo * **Suggested fix:** Replace with CompatibilityUtil.getSelectedTextEditor(project) >> "%COMPATIBILITY_REPORT%"
         ) else if "%%b"=="ProjectComponent" (
