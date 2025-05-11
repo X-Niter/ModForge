@@ -144,6 +144,12 @@ public class MemoryVisualizationPanel extends JBPanel<MemoryVisualizationPanel> 
         exportButton.addActionListener(e -> exportMemoryData());
         panel.add(exportButton);
         
+        // Reset button with icon
+        resetButton = new JButton("Reset Memory System");
+        resetButton.setIcon(com.intellij.openapi.util.IconLoader.getIcon("/icons/reset_memory.svg", getClass()));
+        resetButton.addActionListener(e -> resetMemorySystem());
+        panel.add(resetButton);
+        
         return panel;
     }
     
@@ -355,6 +361,99 @@ public class MemoryVisualizationPanel extends JBPanel<MemoryVisualizationPanel> 
         } catch (Exception ex) {
             LOG.error("Error filtering data by time range", ex);
             return Collections.emptyList();
+        }
+    }
+    
+    /**
+     * Reset the entire memory management system
+     * This is triggered by the reset button in the UI
+     */
+    private void resetMemorySystem() {
+        LOG.info("Resetting memory management system from visualization panel");
+        
+        try {
+            // Show confirmation dialog
+            int result = JOptionPane.showConfirmDialog(
+                    this,
+                    "This will reset the entire memory management system.\nAll components will be reinitialized.\nContinue?",
+                    "Reset Memory System",
+                    JOptionPane.YES_NO_OPTION,
+                    JOptionPane.WARNING_MESSAGE
+            );
+            
+            if (result != JOptionPane.YES_OPTION) {
+                LOG.info("Memory system reset cancelled by user");
+                return;
+            }
+            
+            // First reset our visualization
+            resetVisualization();
+            
+            // Then trigger the memory manager reset
+            com.intellij.openapi.application.ApplicationManager.getApplication().executeOnPooledThread(() -> {
+                try {
+                    // Update status
+                    SwingUtilities.invokeLater(() -> statusLabel.setText("Resetting memory management system..."));
+                    
+                    // Get the memory manager and reset
+                    com.modforge.intellij.plugin.memory.MemoryManager memoryManager = 
+                            com.modforge.intellij.plugin.memory.MemoryManager.getInstance();
+                    
+                    if (memoryManager != null) {
+                        memoryManager.resetMemorySystem();
+                        
+                        // Show success notification
+                        com.intellij.notification.Notification notification = new com.intellij.notification.Notification(
+                                "ModForge",
+                                "Memory System Reset",
+                                "Memory management system has been successfully reset",
+                                com.intellij.notification.NotificationType.INFORMATION
+                        );
+                        com.intellij.notification.Notifications.Bus.notify(notification, project);
+                        
+                        // Update UI
+                        SwingUtilities.invokeLater(() -> {
+                            statusLabel.setText("Memory management system reset completed successfully");
+                            updateVisualization(); // Refresh data after reset
+                        });
+                        
+                        LOG.info("Memory management system reset completed from visualization panel");
+                    } else {
+                        // Show error notification
+                        com.intellij.notification.Notification notification = new com.intellij.notification.Notification(
+                                "ModForge",
+                                "Memory System Reset",
+                                "Failed to reset memory management system: Memory manager is not available",
+                                com.intellij.notification.NotificationType.ERROR
+                        );
+                        com.intellij.notification.Notifications.Bus.notify(notification, project);
+                        
+                        // Update UI
+                        SwingUtilities.invokeLater(() -> 
+                                statusLabel.setText("Error: Memory manager not available"));
+                        
+                        LOG.error("Memory system reset failed: Memory manager is not available");
+                    }
+                } catch (Exception e) {
+                    LOG.error("Error during memory system reset", e);
+                    
+                    // Show error notification
+                    com.intellij.notification.Notification notification = new com.intellij.notification.Notification(
+                            "ModForge",
+                            "Memory System Reset",
+                            "Error during memory system reset: " + e.getMessage(),
+                            com.intellij.notification.NotificationType.ERROR
+                    );
+                    com.intellij.notification.Notifications.Bus.notify(notification, project);
+                    
+                    // Update UI
+                    SwingUtilities.invokeLater(() -> 
+                            statusLabel.setText("Error during memory system reset: " + e.getMessage()));
+                }
+            });
+        } catch (Exception e) {
+            LOG.error("Error initializing memory system reset", e);
+            statusLabel.setText("Error initializing memory system reset: " + e.getMessage());
         }
     }
     
@@ -638,6 +737,12 @@ public class MemoryVisualizationPanel extends JBPanel<MemoryVisualizationPanel> 
             if (exportButton != null) {
                 for (ActionListener listener : exportButton.getActionListeners()) {
                     exportButton.removeActionListener(listener);
+                }
+            }
+            
+            if (resetButton != null) {
+                for (ActionListener listener : resetButton.getActionListeners()) {
+                    resetButton.removeActionListener(listener);
                 }
             }
         } catch (Exception ex) {

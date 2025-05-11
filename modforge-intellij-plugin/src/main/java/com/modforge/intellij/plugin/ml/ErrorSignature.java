@@ -25,6 +25,8 @@ public class ErrorSignature {
     private String errorContext;
     private Set<String> keywords = new HashSet<>();
     
+    // TODO: Implement machine learning-based error similarity detection for more accurate pattern matching
+    
     private static final Gson GSON = new GsonBuilder().create();
     
     // Regular expressions for normalizing error messages
@@ -334,10 +336,18 @@ public class ErrorSignature {
     /**
      * Deserializes an error signature from JSON.
      * @param json The JSON string
-     * @return The deserialized error signature
+     * @return The deserialized error signature or null if there was an error
      */
-    public static ErrorSignature deserialize(String json) {
-        return GSON.fromJson(json, ErrorSignature.class);
+    @Nullable
+    public static ErrorSignature deserialize(@NotNull String json) {
+        try {
+            return GSON.fromJson(json, ErrorSignature.class);
+        } catch (Exception e) {
+            // Log error and return null
+            com.intellij.openapi.diagnostic.Logger.getInstance(ErrorSignature.class)
+                .warn("Failed to deserialize error signature: " + e.getMessage());
+            return null;
+        }
     }
     
     // Getters and setters

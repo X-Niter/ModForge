@@ -383,10 +383,22 @@ public final class CollaborationService {
             return;
         }
         
-        @SuppressWarnings("unchecked")
-        Map<String, Object> operationMap = (Map<String, Object>) message.getData().get("operation");
-        if (operationMap == null) {
-            LOG.warn("Received operation message without operation");
+        // Get the operation map and safely cast it
+        Object operationObj = message.getData().get("operation");
+        if (!(operationObj instanceof Map)) {
+            LOG.warn("Received operation is not a valid Map");
+            return;
+        }
+        
+        try {
+            @SuppressWarnings("unchecked")
+            Map<String, Object> operationMap = (Map<String, Object>) operationObj;
+            if (operationMap.isEmpty()) {
+                LOG.warn("Received operation map is empty");
+                return;
+            }
+        } catch (ClassCastException e) {
+            LOG.error("Error casting operation map", e);
             return;
         }
         
