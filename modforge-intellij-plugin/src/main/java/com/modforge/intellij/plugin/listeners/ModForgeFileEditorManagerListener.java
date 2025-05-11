@@ -6,9 +6,11 @@ import com.intellij.openapi.fileEditor.FileEditorManagerEvent;
 import com.intellij.openapi.fileEditor.FileEditorManagerListener;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vfs.VirtualFile;
+import com.intellij.psi.PsiFile;
 import com.intellij.psi.PsiJavaFile;
 import com.intellij.psi.PsiManager;
 import com.modforge.intellij.plugin.collaboration.CollaborationService;
+import com.modforge.intellij.plugin.utils.CompatibilityUtil;
 import org.jetbrains.annotations.NotNull;
 
 /**
@@ -103,7 +105,7 @@ public class ModForgeFileEditorManagerListener implements FileEditorManagerListe
     private void analyzeFileForSuggestions(@NotNull Project project, @NotNull VirtualFile file) {
         try {
             // Get PsiFile for the virtual file
-            PsiJavaFile psiFile = (PsiJavaFile) PsiManager.getInstance(project).findFile(file);
+            PsiFile psiFile = CompatibilityUtil.getPsiFile(project, file);
             if (psiFile == null) {
                 return;
             }
@@ -112,14 +114,18 @@ public class ModForgeFileEditorManagerListener implements FileEditorManagerListe
             // For now, we'll just log a message
             LOG.info("Analyzing file for suggestions: " + file.getPath());
             
-            // Check if the file is a Minecraft mod
-            boolean isMinecraftMod = isMinecraftModFile(psiFile);
-            if (isMinecraftMod) {
-                LOG.info("File appears to be a Minecraft mod: " + file.getPath());
+            if (psiFile instanceof PsiJavaFile) {
+                PsiJavaFile javaFile = (PsiJavaFile) psiFile;
                 
-                // Register the file for enhanced suggestions
-                // This would be a more elaborate process in a real implementation
-                LOG.info("Registering file for enhanced suggestions: " + file.getPath());
+                // Check if the file is a Minecraft mod
+                boolean isMinecraftMod = isMinecraftModFile(psiFile);
+                if (isMinecraftMod) {
+                    LOG.info("File appears to be a Minecraft mod: " + file.getPath());
+                    
+                    // Register the file for enhanced suggestions
+                    // This would be a more elaborate process in a real implementation
+                    LOG.info("Registering file for enhanced suggestions: " + file.getPath());
+                }
             }
         } catch (Exception e) {
             LOG.error("Error analyzing file for suggestions", e);

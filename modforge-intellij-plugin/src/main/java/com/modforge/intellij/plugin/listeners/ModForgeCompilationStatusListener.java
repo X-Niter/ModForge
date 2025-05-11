@@ -11,6 +11,7 @@ import com.intellij.openapi.compiler.CompileTask;
 import com.intellij.openapi.compiler.CompilerMessage;
 import com.intellij.openapi.compiler.CompilerMessageCategory;
 import com.intellij.openapi.diagnostic.Logger;
+import com.intellij.openapi.fileEditor.FileEditor;
 import com.intellij.openapi.fileEditor.FileEditorManager;
 import com.intellij.openapi.progress.ProgressIndicator;
 import com.intellij.openapi.progress.ProgressManager;
@@ -21,6 +22,7 @@ import com.intellij.openapi.vfs.VirtualFileManager;
 import com.intellij.util.concurrency.AppExecutorUtil;
 import com.modforge.intellij.plugin.services.AutonomousCodeGenerationService;
 import com.modforge.intellij.plugin.settings.ModForgeSettings;
+import com.modforge.intellij.plugin.utils.CompatibilityUtil;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.ArrayList;
@@ -128,7 +130,7 @@ public class ModForgeCompilationStatusListener implements CompilationStatusListe
         notification.addAction(new AnAction("Open File") {
             @Override
             public void actionPerformed(@NotNull AnActionEvent e) {
-                FileEditorManager.getInstance(project).openFile(file, true);
+                CompatibilityUtil.openFileInEditor(project, file, true);
                 notification.expire();
             }
         });
