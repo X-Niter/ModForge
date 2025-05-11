@@ -5,6 +5,7 @@ import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiFile;
 import com.intellij.psi.PsiManager;
+import com.modforge.intellij.plugin.utils.CompatibilityUtil;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -35,7 +36,7 @@ public class MinecraftModUtil {
         ModLoaderDetector.ModLoader modLoader = ModLoaderDetector.detectModLoader(project);
         
         // Get the project base directory
-        VirtualFile baseDir = project.getBaseDir();
+        VirtualFile baseDir = CompatibilityUtil.getProjectBaseDir(project);
         
         // Try to find the mod ID based on the mod loader
         switch (modLoader) {
@@ -71,7 +72,7 @@ public class MinecraftModUtil {
         ModLoaderDetector.ModLoader modLoader = ModLoaderDetector.detectModLoader(project);
         
         // Get the project base directory
-        VirtualFile baseDir = project.getBaseDir();
+        VirtualFile baseDir = CompatibilityUtil.getProjectBaseDir(project);
         
         // Try to find the mod name based on the mod loader
         switch (modLoader) {
@@ -107,7 +108,7 @@ public class MinecraftModUtil {
         ModLoaderDetector.ModLoader modLoader = ModLoaderDetector.detectModLoader(project);
         
         // Get the project base directory
-        VirtualFile baseDir = project.getBaseDir();
+        VirtualFile baseDir = CompatibilityUtil.getProjectBaseDir(project);
         
         // Try to find the mod version based on the mod loader
         switch (modLoader) {
