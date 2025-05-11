@@ -54,11 +54,17 @@
                     anchor="right" 
                     factoryClass="com.modforge.intellij.plugin.ui.ModForgeToolWindowFactory" 
                     icon="/icons/modforge.svg"/>
+                    
+        <toolWindow id="Minecraft Performance" 
+                    anchor="bottom" 
+                    factoryClass="com.modforge.intellij.plugin.debug.ui.MinecraftPerformanceToolWindow" 
+                    icon="/icons/modforge.svg"/>
         
         <!-- Project Services -->
         <projectService serviceImplementation="com.modforge.intellij.plugin.services.AutonomousCodeGenerationService"/>
         <projectService serviceImplementation="com.modforge.intellij.plugin.services.ContinuousDevelopmentService"/>
         <projectService serviceImplementation="com.modforge.intellij.plugin.ai.PatternRecognitionService"/>
+        <projectService serviceImplementation="com.modforge.intellij.plugin.ai.generation.MinecraftCodeGenerator"/>
         <projectService serviceImplementation="com.modforge.intellij.plugin.debug.MinecraftDebugService"/>
         <projectService serviceImplementation="com.modforge.intellij.plugin.debug.MinecraftPerformanceMonitor"/>
         <projectService serviceImplementation="com.modforge.intellij.plugin.github.GitHubIntegrationService"/>
@@ -123,6 +129,12 @@
                     text="Generate Code with AI"
                     description="Generate code using AI">
                 <keyboard-shortcut keymap="$default" first-keystroke="alt shift G"/>
+            </action>
+            <action id="ModForge.GenerateMinecraftCodeAction"
+                    class="com.modforge.intellij.plugin.actions.GenerateMinecraftCodeAction"
+                    text="Generate Minecraft Code"
+                    description="Generate Minecraft-specific code with templates">
+                <keyboard-shortcut keymap="$default" first-keystroke="alt shift M"/>
             </action>
             <action id="ModForge.FixErrorsAction"
                     class="com.modforge.intellij.plugin.actions.FixErrorsAction"
