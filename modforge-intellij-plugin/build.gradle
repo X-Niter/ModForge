@@ -28,15 +28,18 @@ dependencies {
 
 // Configure Gradle IntelliJ Plugin
 intellij {
-    // Using a well-tested version from repositories that supports our target 2025.1
-    version = '2023.3.4' // LTS version with confirmed plugin compatibility
+    // Use the exact version matching IntelliJ IDEA 2025.1
+    version = '251.23774.435' // Exact build number for 2025.1
     type = 'IC' // Target IDE: IntelliJ IDEA Community Edition
     
-    // Simplify plugin dependencies to ensure build works in all environments
-    plugins = ['java']
+    // Only include essential plugins available in repositories
+    plugins = [
+        'java',
+        'org.jetbrains.plugins.github:251.23774.435'
+    ]
     
-    // This option should be used for releases
-    updateSinceUntilBuild = false // We'll set these manually in patchPluginXml instead
+    // Don't update build numbers automatically
+    updateSinceUntilBuild = false 
 }
 
 // Configure Java sourceSets
@@ -59,10 +62,10 @@ sourceSets {
     }
 }
 
-// Set Java compatibility version
+// Set Java compatibility version to match IntelliJ IDEA 2025.1 runtime
 java {
-    sourceCompatibility = JavaVersion.VERSION_17 // Use 17 for better compatibility
-    targetCompatibility = JavaVersion.VERSION_17 // Use 17 for better compatibility
+    sourceCompatibility = JavaVersion.VERSION_21 // IntelliJ 2025.1 uses Java 21
+    targetCompatibility = JavaVersion.VERSION_21 // IntelliJ 2025.1 uses Java 21
 }
 
 // Ensure gradlew works on all environments
@@ -75,8 +78,8 @@ wrapper {
 tasks {
     // Set compatibility range for IntelliJ IDEA 2025.1
     patchPluginXml {
-        sinceBuild.set("251.23774") // Matches IntelliJ IDEA 2025.1 exact build
-        untilBuild.set("252.*")     // Compatible with all 2025.2.x builds
+        sinceBuild.set("251.23774.435") // Exact IntelliJ IDEA 2025.1 build
+        untilBuild.set("251.*")         // Compatible with all 2025.1.x builds
         changeNotes.set("""
             <h2>Version 2.1.0 - May 11, 2025</h2>
             <ul>

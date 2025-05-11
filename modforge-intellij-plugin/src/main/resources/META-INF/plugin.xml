@@ -3,7 +3,7 @@
     <id>com.modforge.intellij.plugin</id>
     <name>ModForge AI</name>
     <vendor email="support@modforge.dev" url="https://www.modforge.dev">ModForge</vendor>
-    <idea-version since-build="251.23774" until-build="252.*"/>
+    <idea-version since-build="251.23774.435" until-build="251.*"/>
     
     <description><![CDATA[
     <p>ModForge AI - Smart Minecraft Mod Development</p>
