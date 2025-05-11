@@ -314,19 +314,19 @@ if exist "%TEMP_DIR%\matches.txt" (
         
         REM Add suggested fix based on pattern
         if "%%b"=="getBaseDir" (
-            echo * **Suggested fix:** Replace Project.getBaseDir() with CompatibilityUtil.getProjectBaseDir(project) >> "%COMPATIBILITY_REPORT%"
+            echo * **Suggested fix:** Use CompatibilityUtil.getProjectBaseDir(project) instead of Project.getBaseDir() >> "%COMPATIBILITY_REPORT%"
         ) else if "%%b"=="CacheUpdater" (
-            echo * **Suggested fix:** Replace with CompatibilityUtil.refreshAll(project) >> "%COMPATIBILITY_REPORT%"
+            echo * **Suggested fix:** Use CompatibilityUtil.refreshAll(project) >> "%COMPATIBILITY_REPORT%"
         ) else if "%%b"=="runReadAction" (
-            echo * **Suggested fix:** Replace with CompatibilityUtil.runReadAction(lambda) >> "%COMPATIBILITY_REPORT%"
+            echo * **Suggested fix:** Use CompatibilityUtil.runReadAction(lambda) >> "%COMPATIBILITY_REPORT%"
         ) else if "%%b"=="runWriteAction" (
-            echo * **Suggested fix:** Replace with CompatibilityUtil.runWriteAction(lambda) >> "%COMPATIBILITY_REPORT%"
+            echo * **Suggested fix:** Use CompatibilityUtil.runWriteAction(lambda) >> "%COMPATIBILITY_REPORT%"
         ) else if "%%b"=="getSelectedTextEditor" (
-            echo * **Suggested fix:** Replace with CompatibilityUtil.getSelectedTextEditor(project) >> "%COMPATIBILITY_REPORT%"
+            echo * **Suggested fix:** Use CompatibilityUtil.getSelectedTextEditor(project) >> "%COMPATIBILITY_REPORT%"
         ) else if "%%b"=="ProjectComponent" (
-            echo * **Suggested fix:** Replace with @Service(Service.Level.PROJECT) annotation >> "%COMPATIBILITY_REPORT%"
+            echo * **Suggested fix:** Use @Service(Service.Level.PROJECT) annotation >> "%COMPATIBILITY_REPORT%"
         ) else if "%%b"=="ApplicationComponent" (
-            echo * **Suggested fix:** Replace with @Service(Service.Level.APPLICATION) annotation >> "%COMPATIBILITY_REPORT%"
+            echo * **Suggested fix:** Use @Service(Service.Level.APPLICATION) annotation >> "%COMPATIBILITY_REPORT%"
         ) else (
             echo * **Suggested fix:** Check compatibility with IntelliJ IDEA 2025.1.1.1 and use CompatibilityUtil methods where appropriate >> "%COMPATIBILITY_REPORT%"
         )
@@ -586,7 +586,7 @@ for %%m in (getBaseDir findFileByPath getInstanceEx getFileSystem resolveFile) d
         
         REM Add specific suggestions
         if "%%m"=="getBaseDir" (
-            echo **Suggested fix:** Replace with CompatibilityUtil.getProjectBaseDir(project) >> "%RESOLUTION_ERRORS_REPORT%"
+            echo **Suggested fix:** Use CompatibilityUtil.getProjectBaseDir(project) >> "%RESOLUTION_ERRORS_REPORT%"
         ) else if "%%m"=="findFileByPath" (
             echo **Suggested fix:** Use VirtualFileUtil.findFileByPath(path) >> "%RESOLUTION_ERRORS_REPORT%"
         ) else if "%%m"=="getInstanceEx" (
