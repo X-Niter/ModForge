@@ -19,7 +19,7 @@ import com.intellij.util.ui.UIUtil;
 import com.modforge.intellij.plugin.ai.generation.MinecraftCodeGenerator;
 import com.modforge.intellij.plugin.ai.generation.MinecraftCodeGenerator.GeneratedCode;
 import com.modforge.intellij.plugin.notifications.ModForgeNotificationService;
-import com.modforge.intellij.plugin.run.ModLoaderDetector.ModLoader;
+import com.modforge.intellij.plugin.util.ModLoaderDetector.ModLoader;
 import com.modforge.intellij.plugin.utils.CompatibilityUtil;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;

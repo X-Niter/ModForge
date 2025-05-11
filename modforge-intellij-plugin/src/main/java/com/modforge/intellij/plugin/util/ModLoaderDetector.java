@@ -23,11 +23,21 @@ public class ModLoaderDetector {
     private static final Logger LOG = Logger.getInstance(ModLoaderDetector.class);
     
     public enum ModLoader {
-        FORGE,
-        FABRIC,
-        QUILT,
-        ARCHITECTURY,
-        UNKNOWN
+        FORGE("Forge"),
+        FABRIC("Fabric"),
+        QUILT("Quilt"),
+        ARCHITECTURY("Architectury"),
+        UNKNOWN("Unknown");
+        
+        private final String displayName;
+        
+        ModLoader(String displayName) {
+            this.displayName = displayName;
+        }
+        
+        public String getDisplayName() {
+            return displayName;
+        }
     }
     
     private static final Set<String> FORGE_INDICATORS = new HashSet<>(Arrays.asList(

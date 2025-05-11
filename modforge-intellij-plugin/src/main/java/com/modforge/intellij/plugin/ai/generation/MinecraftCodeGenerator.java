@@ -17,8 +17,9 @@ import com.intellij.psi.PsiFile;
 import com.intellij.psi.PsiManager;
 import com.intellij.util.concurrency.AppExecutorUtil;
 import com.modforge.intellij.plugin.ai.PatternRecognitionService;
-import com.modforge.intellij.plugin.run.ModLoaderDetector;
-import com.modforge.intellij.plugin.run.ModLoaderDetector.ModLoader;
+import com.modforge.intellij.plugin.util.ModLoaderDetector;
+import com.modforge.intellij.plugin.util.ModLoaderDetector.ModLoader;
+import com.modforge.intellij.plugin.utils.CompatibilityUtil;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -458,8 +459,8 @@ public final class MinecraftCodeGenerator {
                 
                 if (virtualFile != null) {
                     // Open the file in the editor
-                    ApplicationManager.getApplication().invokeLater(() -> {
-                        FileEditorManager.getInstance(project).openFile(virtualFile, true);
+                    CompatibilityUtil.runOnUIThread(() -> {
+                        CompatibilityUtil.openFileInEditor(project, virtualFile, true);
                     });
                 }
                 
