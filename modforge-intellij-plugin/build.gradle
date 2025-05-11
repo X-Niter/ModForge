@@ -31,7 +31,7 @@ intellij {
     // IMPORTANT: We can use either 'version' or 'localPath', but not both
     
     // OPTION 1: Use a specific version from repositories
-    version = '2025.1'
+    version = '2023.3.4' // Using a stable version with confirmed repository availability
     type = 'IC' // Target IDE: IntelliJ IDEA Community Edition
     
     // OPTION 2: Use your local IntelliJ installation (if available)
@@ -45,14 +45,17 @@ intellij {
     downloadSources = true
     updateSinceUntilBuild = true
     
-    // Only specify built-in plugins that are part of the IDE
+    // Specify a limited set of essential plugins that are available in repositories
     plugins = [
-        'java',
-        'git4idea',
-        'GitHub',
-        'terminal'
-        // Removed Minecraft plugin as it should be installed in the IDE
+        'java'
+        // We'll handle compatibility with other plugins in the plugin.xml
     ]
+    
+    // Update plugin compatibility range
+    sameSinceUntilBuild = false
+    // Make compatible with 2023.3 through 2025.*
+    sinceBuild = '233' 
+    untilBuild = '251.*'
 }
 
 // Configure Java sourceSets
