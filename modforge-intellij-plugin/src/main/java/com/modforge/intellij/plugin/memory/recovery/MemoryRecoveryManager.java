@@ -81,8 +81,29 @@ public class MemoryRecoveryManager {
     }
     
     /**
-     * Register standard recovery actions in order of escalation
+     * Initialize the memory recovery manager
+     * Sets up the recovery systems and prepares for operation
      */
+    public void initialize() {
+        LOG.info("Initializing memory recovery manager");
+        
+        try {
+            // Check if monitoring is active and start if needed
+            if (monitoringTask == null || monitoringTask.isDone() || monitoringTask.isCancelled()) {
+                startMonitoring();
+            }
+            
+            // Ensure standard recovery actions are registered
+            if (recoveryActions.isEmpty()) {
+                registerStandardRecoveryActions();
+            }
+            
+            LOG.info("Memory recovery manager initialized successfully");
+        } catch (Exception e) {
+            LOG.error("Error initializing memory recovery manager", e);
+        }
+    }
+    
     private void registerStandardRecoveryActions() {
         // Clear caches (Low priority)
         recoveryActions.add(new MemoryRecoveryAction(

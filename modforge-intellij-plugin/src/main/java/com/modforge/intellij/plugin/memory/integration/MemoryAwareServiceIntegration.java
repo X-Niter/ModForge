@@ -6,6 +6,7 @@ import com.intellij.openapi.project.Project;
 import com.intellij.openapi.startup.StartupActivity;
 import com.modforge.intellij.plugin.memory.MemoryManager;
 import com.modforge.intellij.plugin.memory.MemoryUtils;
+import com.modforge.intellij.plugin.memory.config.MemoryThresholdConfig;
 import com.modforge.intellij.plugin.memory.monitoring.MemoryHealthMonitor;
 import com.modforge.intellij.plugin.memory.recovery.MemoryRecoveryManager;
 import com.modforge.intellij.plugin.memory.settings.MemoryManagementSettings;
