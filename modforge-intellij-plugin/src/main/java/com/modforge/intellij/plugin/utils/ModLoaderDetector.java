@@ -144,7 +144,7 @@ public class ModLoaderDetector {
      */
     @Nullable
     public String detectModLoader() {
-        VirtualFile baseDir = project.getBaseDir();
+        VirtualFile baseDir = CompatibilityUtil.getProjectBaseDir(project);
         if (baseDir == null) {
             return null;
         }

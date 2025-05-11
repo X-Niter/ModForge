@@ -8,6 +8,7 @@ import com.intellij.psi.PsiManager;
 import com.intellij.psi.util.PsiTreeUtil;
 import com.intellij.psi.xml.XmlFile;
 import com.intellij.psi.xml.XmlTag;
+import com.modforge.intellij.plugin.utils.CompatibilityUtil;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -66,7 +67,7 @@ public class ModLoaderDetector {
         LOG.info("Detecting mod loader for project: " + project.getName());
         
         // Check for mod loader config files
-        VirtualFile projectDir = project.getBaseDir();
+        VirtualFile projectDir = CompatibilityUtil.getProjectBaseDir(project);
         
         // Check for Forge mods.toml
         if (hasFile(projectDir, "src/main/resources/META-INF/mods.toml")) {
@@ -241,7 +242,7 @@ public class ModLoaderDetector {
         ModLoader modLoader = detectModLoader(project);
         
         // Get project directory
-        VirtualFile projectDir = project.getBaseDir();
+        VirtualFile projectDir = CompatibilityUtil.getProjectBaseDir(project);
         
         // Check for version in Gradle build files
         String gradleVersion = getMinecraftVersionFromGradle(projectDir);
