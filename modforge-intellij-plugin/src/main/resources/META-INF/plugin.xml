@@ -59,6 +59,8 @@
         <projectService serviceImplementation="com.modforge.intellij.plugin.services.AutonomousCodeGenerationService"/>
         <projectService serviceImplementation="com.modforge.intellij.plugin.services.ContinuousDevelopmentService"/>
         <projectService serviceImplementation="com.modforge.intellij.plugin.ai.PatternRecognitionService"/>
+        <projectService serviceImplementation="com.modforge.intellij.plugin.debug.MinecraftDebugService"/>
+        <projectService serviceImplementation="com.modforge.intellij.plugin.debug.MinecraftPerformanceMonitor"/>
         <projectService serviceImplementation="com.modforge.intellij.plugin.github.GitHubIntegrationService"/>
         <projectService serviceImplementation="com.modforge.intellij.plugin.notifications.ModForgeNotificationService"/>
         <projectService serviceImplementation="com.modforge.intellij.plugin.templates.ModTemplateService"/>
@@ -66,12 +68,18 @@
         <!-- Application Services -->
         <applicationService serviceImplementation="com.modforge.intellij.plugin.auth.ModAuthenticationManager"/>
         <applicationService serviceImplementation="com.modforge.intellij.plugin.settings.ModForgeSettings"/>
+        <applicationService serviceImplementation="com.modforge.intellij.plugin.ai.pattern.PatternLearningSystem"/>
         
         <!-- Settings -->
         <applicationConfigurable parentId="tools" 
                                 instance="com.modforge.intellij.plugin.settings.ModForgeSettingsConfigurable"
                                 id="com.modforge.intellij.plugin.settings.ModForgeSettingsConfigurable" 
                                 displayName="ModForge AI Settings"/>
+                                
+        <applicationConfigurable parentId="com.modforge.intellij.plugin.settings.ModForgeSettingsConfigurable"
+                                instance="com.modforge.intellij.plugin.ai.ui.PatternRecognitionSettingsPanel"
+                                id="com.modforge.intellij.plugin.ai.ui.PatternRecognitionSettingsPanel"
+                                displayName="Pattern Recognition"/>
                                 
         <!-- Notifications -->
         <notificationGroup id="ModForge Notifications" 

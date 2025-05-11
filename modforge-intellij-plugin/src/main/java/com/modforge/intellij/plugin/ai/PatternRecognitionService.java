@@ -1,63 +1,259 @@
 package com.modforge.intellij.plugin.ai;
 
-import com.google.gson.Gson;
-import com.google.gson.reflect.TypeToken;
 import com.intellij.openapi.components.Service;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.project.Project;
-import com.modforge.intellij.plugin.auth.ModAuthenticationManager;
-import com.modforge.intellij.plugin.settings.ModForgeSettings;
-import com.modforge.intellij.plugin.utils.TokenAuthConnectionUtil;
-import org.apache.commons.lang3.StringUtils;
+import com.intellij.openapi.util.Pair;
+import com.intellij.util.concurrency.AppExecutorUtil;
+import com.modforge.intellij.plugin.ai.pattern.PatternData;
+import com.modforge.intellij.plugin.ai.pattern.PatternLearningSystem;
+import com.modforge.intellij.plugin.notifications.ModForgeNotificationService;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-import java.lang.reflect.Type;
-import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.locks.ReadWriteLock;
-import java.util.concurrent.locks.ReentrantReadWriteLock;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.Supplier;
 
 /**
- * Service for pattern recognition to reduce API usage.
- * This service caches and learns from previous requests to minimize OpenAI API calls.
+ * Pattern recognition service for optimizing API calls.
+ * Uses learned patterns to avoid redundant API calls and reduce costs.
  */
-@Service(Service.Level.PROJECT)
+@Service
 public final class PatternRecognitionService {
     private static final Logger LOG = Logger.getInstance(PatternRecognitionService.class);
-    private static final Gson GSON = new Gson();
-    private static final Type PATTERN_LIST_TYPE = new TypeToken<List<Map<String, Object>>>() {}.getType();
-    private static final double SIMILARITY_THRESHOLD = 0.85; // 85% similarity is considered a match
+    
+    // Estimated average tokens per API call
+    private static final int AVG_TOKENS_PER_REQUEST = 1000;
+    
+    // Estimated cost per 1000 tokens in cents (GPT-4 pricing)
+    private static final float COST_PER_1000_TOKENS_CENTS = 3.0f;
     
     private final Project project;
+    private final PatternLearningSystem patternLearningSystem;
     private final AtomicBoolean enabled = new AtomicBoolean(true);
-    private final Map<String, List<Pattern>> patternsByType = new ConcurrentHashMap<>();
-    private final ReadWriteLock patternLock = new ReentrantReadWriteLock();
-    private final AtomicInteger totalRequests = new AtomicInteger(0);
-    private final AtomicInteger patternMatches = new AtomicInteger(0);
-    private final AtomicInteger apiCalls = new AtomicInteger(0);
+    private final AtomicLong lastNotificationTime = new AtomicLong(0);
     
-    /**
-     * Create a pattern recognition service.
-     *
-     * @param project The project
-     */
-    public PatternRecognitionService(@NotNull Project project) {
+    // Prevent notification spam by limiting frequency
+    private static final long MIN_NOTIFICATION_INTERVAL_MS = TimeUnit.HOURS.toMillis(2);
+    
+    public PatternRecognitionService(Project project) {
         this.project = project;
+        this.patternLearningSystem = PatternLearningSystem.getInstance(project);
         
-        // Initialize from settings
-        ModForgeSettings settings = ModForgeSettings.getInstance();
-        enabled.set(settings.isEnablePatternRecognition());
+        // Schedule periodic reports about pattern learning effectiveness
+        schedulePeriodicReports();
         
-        // Load patterns
-        loadPatterns();
+        LOG.info("Pattern recognition service initialized for project: " + project.getName());
     }
     
     /**
-     * Check if pattern recognition is enabled.
-     *
+     * Try to match the prompt against learned patterns to avoid API calls
+     * 
+     * @param prompt The AI prompt
+     * @param context Optional context for the prompt
+     * @return The matched response if found, null otherwise
+     */
+    @Nullable
+    public String tryMatchPattern(String prompt, @Nullable String context) {
+        if (!enabled.get() || !patternLearningSystem.isEnabled()) {
+            return null;
+        }
+        
+        try {
+            Pair<PatternData, Float> match = patternLearningSystem.findMatch(prompt, context);
+            if (match != null) {
+                PatternData pattern = match.getFirst();
+                float confidence = match.getSecond();
+                
+                LOG.info("Pattern match found for prompt with confidence: " + confidence);
+                return pattern.getResponse();
+            }
+        } catch (Exception e) {
+            LOG.warn("Error in pattern matching", e);
+        }
+        
+        return null;
+    }
+    
+    /**
+     * Use the pattern recognition system to optimize API calls
+     * 
+     * @param prompt The AI prompt
+     * @param context Optional context for the prompt
+     * @param apiCallSupplier Supplier that makes the actual API call if no pattern match is found
+     * @return CompletableFuture with the response, either from a pattern match or the API call
+     */
+    @NotNull
+    public CompletableFuture<String> withPatternRecognition(
+            String prompt, 
+            @Nullable String context,
+            Supplier<CompletableFuture<String>> apiCallSupplier) {
+        
+        // Try to match against existing patterns first
+        String patternMatch = tryMatchPattern(prompt, context);
+        if (patternMatch != null) {
+            // If we found a match, return it immediately
+            return CompletableFuture.completedFuture(patternMatch);
+        }
+        
+        // If no match was found, make the API call
+        return apiCallSupplier.get()
+            .thenApply(response -> {
+                // Record the successful API call for future pattern matching
+                recordSuccessfulCall(prompt, response, context);
+                return response;
+            })
+            .exceptionally(e -> {
+                // Record the failed API call
+                recordFailedCall(prompt, context);
+                throw new RuntimeException("API call failed", e);
+            });
+    }
+    
+    /**
+     * Record a successful API call for pattern learning
+     * 
+     * @param prompt The prompt used
+     * @param response The response received
+     * @param context Optional context for the prompt
+     */
+    public void recordSuccessfulCall(String prompt, String response, @Nullable String context) {
+        if (!enabled.get() || !patternLearningSystem.isEnabled()) {
+            return;
+        }
+        
+        try {
+            // Estimate tokens used based on prompt and response length
+            int estimatedTokens = estimateTokens(prompt, response);
+            
+            // Estimate cost in cents
+            int estimatedCostCents = Math.round(estimatedTokens * (COST_PER_1000_TOKENS_CENTS / 1000));
+            
+            // Record the successful pattern
+            patternLearningSystem.recordSuccess(prompt, response, context, estimatedTokens, estimatedCostCents);
+            
+            LOG.debug("Recorded successful API call for pattern learning");
+        } catch (Exception e) {
+            LOG.warn("Error recording successful API call", e);
+        }
+    }
+    
+    /**
+     * Record a failed API call for pattern learning
+     * 
+     * @param prompt The prompt used
+     * @param context Optional context for the prompt
+     */
+    public void recordFailedCall(String prompt, @Nullable String context) {
+        if (!enabled.get() || !patternLearningSystem.isEnabled()) {
+            return;
+        }
+        
+        try {
+            patternLearningSystem.recordFailure(prompt, context);
+            LOG.debug("Recorded failed API call for pattern learning");
+        } catch (Exception e) {
+            LOG.warn("Error recording failed API call", e);
+        }
+    }
+    
+    /**
+     * Estimate the number of tokens used for a prompt and response
+     * 
+     * @param prompt The prompt
+     * @param response The response
+     * @return Estimated token count
+     */
+    private int estimateTokens(String prompt, String response) {
+        // Simple estimation based on number of words (1 token ≈ 0.75 words)
+        int promptWords = countWords(prompt);
+        int responseWords = countWords(response);
+        
+        return (int) ((promptWords + responseWords) / 0.75);
+    }
+    
+    /**
+     * Count the number of words in a string
+     * 
+     * @param text The text to count words in
+     * @return The number of words
+     */
+    private int countWords(String text) {
+        if (text == null || text.isEmpty()) {
+            return 0;
+        }
+        
+        return text.split("\\s+").length;
+    }
+    
+    /**
+     * Schedule periodic reports about pattern learning effectiveness
+     */
+    private void schedulePeriodicReports() {
+        AppExecutorUtil.getAppScheduledExecutorService().scheduleWithFixedDelay(
+            this::reportPatternLearningEffectiveness,
+            24, 24, TimeUnit.HOURS
+        );
+    }
+    
+    /**
+     * Report statistics about pattern learning effectiveness
+     */
+    private void reportPatternLearningEffectiveness() {
+        if (!enabled.get() || !patternLearningSystem.isEnabled()) {
+            return;
+        }
+        
+        Map<String, Object> stats = patternLearningSystem.getStatistics();
+        
+        int totalRequests = (int) stats.get("totalRequests");
+        int patternMatches = (int) stats.get("patternMatches");
+        float hitRate = (float) stats.get("hitRate");
+        int tokensSaved = (int) stats.get("estimatedTokensSaved");
+        int costSavedCents = (int) stats.get("estimatedCostSavedCents");
+        
+        if (totalRequests > 100 && hitRate > 0.1) {
+            // Only notify if it's been a while since the last notification
+            long now = System.currentTimeMillis();
+            long lastTime = lastNotificationTime.get();
+            
+            if (now - lastTime > MIN_NOTIFICATION_INTERVAL_MS) {
+                lastNotificationTime.set(now);
+                
+                // Format the message
+                String message = String.format(
+                    "Pattern learning has saved approximately $%.2f by avoiding %d API calls (%.1f%% hit rate).",
+                    costSavedCents / 100.0, patternMatches, hitRate * 100
+                );
+                
+                // Show a notification
+                ModForgeNotificationService notificationService = project.getService(ModForgeNotificationService.class);
+                if (notificationService != null) {
+                    notificationService.showInfo("Pattern Learning Savings", message);
+                }
+                
+                LOG.info("Pattern learning effectiveness: " + message);
+            }
+        }
+    }
+    
+    /**
+     * Enable or disable pattern recognition
+     * 
+     * @param enabled True to enable, false to disable
+     */
+    public void setEnabled(boolean enabled) {
+        this.enabled.set(enabled);
+        LOG.info("Pattern recognition " + (enabled ? "enabled" : "disabled"));
+    }
+    
+    /**
+     * Check if pattern recognition is enabled
+     * 
      * @return True if enabled, false otherwise
      */
     public boolean isEnabled() {
@@ -65,344 +261,18 @@ public final class PatternRecognitionService {
     }
     
     /**
-     * Enable or disable pattern recognition.
-     *
-     * @param enabled True to enable, false to disable
+     * Get statistics about pattern recognition usage
+     * 
+     * @return Statistics about pattern recognition
      */
-    public void setEnabled(boolean enabled) {
-        this.enabled.set(enabled);
-        
-        // Update settings
-        ModForgeSettings settings = ModForgeSettings.getInstance();
-        settings.setEnablePatternRecognition(enabled);
+    public Map<String, Object> getStatistics() {
+        return patternLearningSystem.getStatistics();
     }
     
     /**
-     * Get metrics on pattern recognition.
-     *
-     * @return Metrics as a map
+     * Reset pattern recognition statistics
      */
-    @NotNull
-    public Map<String, Object> getMetrics() {
-        Map<String, Object> metrics = new HashMap<>();
-        
-        metrics.put("enabled", enabled.get());
-        metrics.put("totalRequests", totalRequests.get());
-        metrics.put("patternMatches", patternMatches.get());
-        metrics.put("apiCalls", apiCalls.get());
-        
-        // Calculate cost savings (approximation)
-        double estimatedTokensSaved = patternMatches.get() * 1500; // Assuming average of 1500 tokens per request
-        double estimatedCostSaved = estimatedTokensSaved * 0.00002; // $0.02 per 1000 tokens
-        
-        metrics.put("estimatedTokensSaved", estimatedTokensSaved);
-        metrics.put("estimatedCostSaved", estimatedCostSaved);
-        
-        // Add pattern counts by type
-        Map<String, Integer> patternCountsByType = new HashMap<>();
-        patternLock.readLock().lock();
-        try {
-            patternsByType.forEach((type, patterns) -> patternCountsByType.put(type, patterns.size()));
-        } finally {
-            patternLock.readLock().unlock();
-        }
-        metrics.put("patternCountsByType", patternCountsByType);
-        
-        return metrics;
-    }
-    
-    /**
-     * Try to match a request with existing patterns.
-     *
-     * @param type        The type of pattern (e.g., "code", "docs", "fix")
-     * @param context     The context for the request (e.g., file contents, error message)
-     * @param instruction The instruction or prompt for the request
-     * @return The response from a matching pattern, or null if no match is found
-     */
-    @Nullable
-    public String tryMatchPattern(@NotNull String type, @NotNull String context, @NotNull String instruction) {
-        if (!enabled.get()) {
-            return null;
-        }
-        
-        totalRequests.incrementAndGet();
-        
-        List<Pattern> patterns = getPatternsByType(type);
-        if (patterns.isEmpty()) {
-            // No patterns of this type yet
-            apiCalls.incrementAndGet();
-            return null;
-        }
-        
-        // Find the most similar pattern
-        Pattern bestMatch = null;
-        double bestSimilarity = 0;
-        
-        for (Pattern pattern : patterns) {
-            double contextSimilarity = calculateSimilarity(context, pattern.context);
-            double instructionSimilarity = calculateSimilarity(instruction, pattern.instruction);
-            
-            // Weight the similarities (context is more important)
-            double overallSimilarity = (contextSimilarity * 0.7) + (instructionSimilarity * 0.3);
-            
-            if (overallSimilarity > bestSimilarity) {
-                bestSimilarity = overallSimilarity;
-                bestMatch = pattern;
-            }
-        }
-        
-        if (bestMatch != null && bestSimilarity >= SIMILARITY_THRESHOLD) {
-            LOG.info("Found pattern match with similarity " + bestSimilarity);
-            patternMatches.incrementAndGet();
-            return bestMatch.response;
-        }
-        
-        // No match found, will fall back to API
-        apiCalls.incrementAndGet();
-        return null;
-    }
-    
-    /**
-     * Store a pattern from a successful API request.
-     *
-     * @param type        The type of pattern (e.g., "code", "docs", "fix")
-     * @param context     The context for the request (e.g., file contents, error message)
-     * @param instruction The instruction or prompt for the request
-     * @param response    The response from the API
-     */
-    public void storePattern(@NotNull String type, @NotNull String context, @NotNull String instruction, @NotNull String response) {
-        if (!enabled.get()) {
-            return;
-        }
-        
-        patternLock.writeLock().lock();
-        try {
-            List<Pattern> patterns = patternsByType.computeIfAbsent(type, k -> new ArrayList<>());
-            
-            // Check if very similar pattern already exists
-            for (Pattern pattern : patterns) {
-                double contextSimilarity = calculateSimilarity(context, pattern.context);
-                double instructionSimilarity = calculateSimilarity(instruction, pattern.instruction);
-                
-                // If almost identical, update response and return
-                if (contextSimilarity > 0.95 && instructionSimilarity > 0.95) {
-                    pattern.response = response;
-                    LOG.info("Updated existing pattern");
-                    return;
-                }
-            }
-            
-            // Add new pattern
-            Pattern pattern = new Pattern(type, context, instruction, response);
-            patterns.add(pattern);
-            LOG.info("Added new pattern of type " + type);
-            
-            // Upload patterns to server
-            uploadPatterns();
-        } finally {
-            patternLock.writeLock().unlock();
-        }
-    }
-    
-    /**
-     * Load patterns from the server.
-     */
-    private void loadPatterns() {
-        ModAuthenticationManager authManager = ModAuthenticationManager.getInstance();
-        if (!authManager.isAuthenticated()) {
-            LOG.warn("Cannot load patterns: not authenticated");
-            return;
-        }
-        
-        ModForgeSettings settings = ModForgeSettings.getInstance();
-        String serverUrl = settings.getServerUrl();
-        String token = authManager.getToken();
-        
-        String patternsUrl = serverUrl.endsWith("/") ? serverUrl + "patterns" : serverUrl + "/patterns";
-        
-        TokenAuthConnectionUtil.executeGet(patternsUrl, token)
-                .thenAccept(response -> {
-                    if (response == null || response.isEmpty()) {
-                        LOG.info("No patterns found on server");
-                        return;
-                    }
-                    
-                    try {
-                        List<Map<String, Object>> patternsList = GSON.fromJson(response, PATTERN_LIST_TYPE);
-                        int count = 0;
-                        
-                        patternLock.writeLock().lock();
-                        try {
-                            patternsByType.clear();
-                            
-                            for (Map<String, Object> patternMap : patternsList) {
-                                String type = (String) patternMap.get("type");
-                                String context = (String) patternMap.get("context");
-                                String instruction = (String) patternMap.get("instruction");
-                                String response = (String) patternMap.get("response");
-                                
-                                if (type != null && context != null && instruction != null && response != null) {
-                                    List<Pattern> patterns = patternsByType.computeIfAbsent(type, k -> new ArrayList<>());
-                                    patterns.add(new Pattern(type, context, instruction, response));
-                                    count++;
-                                }
-                            }
-                        } finally {
-                            patternLock.writeLock().unlock();
-                        }
-                        
-                        LOG.info("Loaded " + count + " patterns from server");
-                    } catch (Exception e) {
-                        LOG.error("Error parsing patterns from server", e);
-                    }
-                })
-                .exceptionally(e -> {
-                    LOG.error("Error loading patterns from server", e);
-                    return null;
-                });
-    }
-    
-    /**
-     * Upload patterns to the server.
-     */
-    private void uploadPatterns() {
-        ModAuthenticationManager authManager = ModAuthenticationManager.getInstance();
-        if (!authManager.isAuthenticated()) {
-            LOG.warn("Cannot upload patterns: not authenticated");
-            return;
-        }
-        
-        ModForgeSettings settings = ModForgeSettings.getInstance();
-        String serverUrl = settings.getServerUrl();
-        String token = authManager.getToken();
-        
-        String patternsUrl = serverUrl.endsWith("/") ? serverUrl + "patterns" : serverUrl + "/patterns";
-        
-        List<Map<String, Object>> patternsList = new ArrayList<>();
-        
-        patternLock.readLock().lock();
-        try {
-            patternsByType.forEach((type, patterns) -> {
-                for (Pattern pattern : patterns) {
-                    Map<String, Object> patternMap = new HashMap<>();
-                    patternMap.put("type", pattern.type);
-                    patternMap.put("context", pattern.context);
-                    patternMap.put("instruction", pattern.instruction);
-                    patternMap.put("response", pattern.response);
-                    patternsList.add(patternMap);
-                }
-            });
-        } finally {
-            patternLock.readLock().unlock();
-        }
-        
-        LOG.info("Uploading " + patternsList.size() + " patterns to server");
-        
-        TokenAuthConnectionUtil.executePost(patternsUrl, patternsList, token)
-                .thenAccept(response -> LOG.info("Patterns uploaded successfully"))
-                .exceptionally(e -> {
-                    LOG.error("Error uploading patterns to server", e);
-                    return null;
-                });
-    }
-    
-    /**
-     * Get patterns by type.
-     *
-     * @param type The type of pattern
-     * @return The list of patterns for the given type
-     */
-    @NotNull
-    private List<Pattern> getPatternsByType(@NotNull String type) {
-        patternLock.readLock().lock();
-        try {
-            return patternsByType.getOrDefault(type, Collections.emptyList());
-        } finally {
-            patternLock.readLock().unlock();
-        }
-    }
-    
-    /**
-     * Calculate the similarity between two strings.
-     * This is a basic implementation using Jaccard similarity on tokens.
-     *
-     * @param str1 The first string
-     * @param str2 The second string
-     * @return A similarity score between 0 and 1
-     */
-    private static double calculateSimilarity(@NotNull String str1, @NotNull String str2) {
-        if (str1.isEmpty() || str2.isEmpty()) {
-            return 0;
-        }
-        
-        // Exact match
-        if (str1.equals(str2)) {
-            return 1.0;
-        }
-        
-        // Tokenize
-        Set<String> tokens1 = new HashSet<>(Arrays.asList(tokenize(str1)));
-        Set<String> tokens2 = new HashSet<>(Arrays.asList(tokenize(str2)));
-        
-        // Calculate Jaccard similarity
-        Set<String> union = new HashSet<>(tokens1);
-        union.addAll(tokens2);
-        
-        Set<String> intersection = new HashSet<>(tokens1);
-        intersection.retainAll(tokens2);
-        
-        return (double) intersection.size() / union.size();
-    }
-    
-    /**
-     * Tokenize a string.
-     *
-     * @param str The string to tokenize
-     * @return An array of tokens
-     */
-    private static String[] tokenize(@NotNull String str) {
-        // Remove excess whitespace and punctuation
-        String cleaned = str.replaceAll("[\\p{Punct}]", " ").replaceAll("\\s+", " ").trim().toLowerCase();
-        
-        // Split by whitespace
-        String[] words = cleaned.split("\\s+");
-        
-        // Filter out stop words and short words
-        List<String> tokens = new ArrayList<>();
-        for (String word : words) {
-            if (word.length() > 2 && !isStopWord(word)) {
-                tokens.add(word);
-            }
-        }
-        
-        return tokens.toArray(new String[0]);
-    }
-    
-    /**
-     * Check if a word is a stop word.
-     *
-     * @param word The word to check
-     * @return True if it's a stop word, false otherwise
-     */
-    private static boolean isStopWord(@NotNull String word) {
-        // Common English stop words
-        return Arrays.asList("the", "and", "or", "of", "to", "in", "is", "that", "it", "with", "for", "as", "be", "this", "was", "are").contains(word);
-    }
-    
-    /**
-     * A pattern for matching contexts and instructions.
-     */
-    private static class Pattern {
-        final String type;
-        final String context;
-        final String instruction;
-        String response;
-        
-        Pattern(String type, String context, String instruction, String response) {
-            this.type = type;
-            this.context = context;
-            this.instruction = instruction;
-            this.response = response;
-        }
+    public void resetStatistics() {
+        patternLearningSystem.resetStatistics();
     }
 }
