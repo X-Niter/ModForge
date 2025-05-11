@@ -72,9 +72,15 @@ public class AIAssistPanel {
         promptArea.setWrapStyleWord(true);
         promptArea.setBorder(JBUI.Borders.empty(5));
         
-        // Create models combo box
-        modelComboBox = new ComboBox<>(new String[]{"gpt-4", "gpt-4-turbo", "gpt-3.5-turbo"});
-        modelComboBox.setSelectedItem(ModForgeSettings.getInstance().getOpenAiModel());
+        // Create models combo box with the latest models
+        modelComboBox = new ComboBox<>(new String[]{"gpt-4o", "gpt-4-turbo", "gpt-3.5-turbo"});
+        // Select the configured model, falling back to gpt-4o if the configured model is gpt-4 (which is outdated)
+        String configuredModel = ModForgeSettings.getInstance().getOpenAiModel();
+        if ("gpt-4".equals(configuredModel)) {
+            configuredModel = "gpt-4o"; // automatically upgrade from gpt-4 to gpt-4o
+            ModForgeSettings.getInstance().setOpenAiModel(configuredModel);
+        }
+        modelComboBox.setSelectedItem(configuredModel);
         modelComboBox.addItemListener(e -> {
             if (e.getStateChange() == ItemEvent.SELECTED) {
                 String model = (String) e.getItem();
@@ -254,7 +260,7 @@ public class AIAssistPanel {
         // Get model
         String model = (String) modelComboBox.getSelectedItem();
         if (model == null) {
-            model = "gpt-4";
+            model = "gpt-4o"; // Use the newest OpenAI model
         }
         
         // Show progress
