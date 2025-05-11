@@ -30,13 +30,13 @@ dependencies {
 intellij {
     // IMPORTANT: We can use either 'version' or 'localPath', but not both
     
-    // OPTION 1: Use a specific version from repositories (uncomment these two lines)
-    // version = '2025.1'
-    // type = 'IC' // Target IDE: IntelliJ IDEA Community Edition
+    // OPTION 1: Use a specific version from repositories
+    version = '2025.1'
+    type = 'IC' // Target IDE: IntelliJ IDEA Community Edition
     
-    // OPTION 2: Use your local IntelliJ installation (RECOMMENDED)
-    // Change this path to match your local IntelliJ installation
-    localPath = 'C:/Program Files/JetBrains/IntelliJ IDEA Community Edition 2025.1'
+    // OPTION 2: Use your local IntelliJ installation (if available)
+    // Uncomment and change this path to match your local IntelliJ installation:
+    // localPath = 'C:/Program Files/JetBrains/IntelliJ IDEA Community Edition 2025.1'
     
     // Alternative paths for other operating systems:
     // macOS: localPath = '/Applications/IntelliJ IDEA.app/Contents'
