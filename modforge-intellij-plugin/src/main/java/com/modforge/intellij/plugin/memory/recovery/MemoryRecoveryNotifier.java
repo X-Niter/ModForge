@@ -19,7 +19,7 @@ import org.jetbrains.annotations.NotNull;
  * Notifier for memory recovery events
  * Displays notifications for memory pressure and recovery actions
  */
-public class MemoryRecoveryNotifier implements MemoryRecoveryManager.RecoveryListener {
+public class MemoryRecoveryNotifier implements MemoryRecoveryManager.RecoveryListener, Disposable {
     private static final Logger LOG = Logger.getInstance(MemoryRecoveryNotifier.class);
     
     private static final String NOTIFICATION_GROUP_ID = "ModForge Memory Management";
@@ -195,5 +195,20 @@ public class MemoryRecoveryNotifier implements MemoryRecoveryManager.RecoveryLis
         }));
         
         Notifications.Bus.notify(notification, project);
+    }
+    
+    /**
+     * Dispose the notifier
+     * Unregister itself as a recovery listener
+     */
+    @Override
+    public void dispose() {
+        LOG.debug("Disposing memory recovery notifier");
+        
+        // Unregister from recovery manager
+        MemoryRecoveryManager recoveryManager = MemoryRecoveryManager.getInstance();
+        if (recoveryManager != null) {
+            recoveryManager.removeRecoveryListener(this);
+        }
     }
 }

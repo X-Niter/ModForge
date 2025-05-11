@@ -346,13 +346,27 @@ public class MemoryOptimizer implements Disposable {
                 try {
                     // Basic cleanup
                     cancelRunningTasks();
-                    clearCaches();
+                    UIUtil.dispatchAllInvocationEvents();
                     MemoryUtils.requestGarbageCollection();
                     LOG.info("Memory optimizer reset completed");
                 } catch (Exception e) {
                     LOG.error("Error during memory optimizer reset", e);
                 }
             });
+        }
+    }
+    
+    /**
+     * Cancel any running background tasks that might be consuming memory
+     */
+    private void cancelRunningTasks() {
+        LOG.info("Canceling running tasks to free memory");
+        
+        try {
+            // Cancel any running background tasks
+            ProgressManager.getInstance().cancelAllTasksExceptWriteAccessPreventingOnes();
+        } catch (Exception e) {
+            LOG.warn("Error canceling running tasks", e);
         }
     }
     
