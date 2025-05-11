@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<idea-plugin require-restart="true">
+    <id>com.modforge.intellij.plugin</id>
+    <name>ModForge AI</name>
+    <vendor email="support@modforge.dev" url="https://www.modforge.dev">ModForge</vendor>
+    <!-- Explicit compatibility with IntelliJ IDEA 2025.1.1.1 (Build: 251.25410.129) -->
+    <idea-version since-build="233" until-build="251.*"/>
+    
+    <!-- Rest of the plugin.xml content... -->
+</idea-plugin>

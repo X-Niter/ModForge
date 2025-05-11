@@ -270,41 +270,55 @@
             </action>
             <separator/>
             
-            <!-- Optimization Actions -->
-            <action id="ModForge.AnalyzeModPerformanceAction"
-                    class="com.modforge.intellij.plugin.actions.AnalyzeModPerformanceAction"
-                    text="Analyze Mod Performance"
-                    description="Analyze your mod for performance issues">
-            </action>
-            <action id="ModForge.OptimizeModCodeAction"
-                    class="com.modforge.intellij.plugin.actions.OptimizeModCodeAction"
-                    text="Optimize Mod Code"
-                    description="Optimize your mod code for better performance">
+            <!-- Performance Monitoring Actions -->
+            <action id="ModForge.OpenPerformanceMonitorAction"
+                    class="com.modforge.intellij.plugin.debug.ui.OpenPerformanceMonitorAction"
+                    text="Open Performance Monitor"
+                    description="Open the Minecraft performance monitor">
             </action>
             <separator/>
             
-            <!-- Settings Actions -->
-            <action id="ModForge.OpenSettingsAction"
-                    class="com.modforge.intellij.plugin.actions.OpenSettingsAction"
-                    text="Open ModForge Settings"
-                    description="Open ModForge plugin settings">
+            <!-- Memory Management Actions -->
+            <action id="ModForge.OpenMemoryMonitorAction"
+                    class="com.modforge.intellij.plugin.memory.ui.OpenMemoryMonitorAction"
+                    text="Open Memory Monitor"
+                    description="Open the memory monitor">
+            </action>
+            <action id="ModForge.OpenMemoryVisualizationAction"
+                    class="com.modforge.intellij.plugin.memory.visualization.OpenMemoryVisualizationAction"
+                    text="Open Memory Visualization"
+                    description="Open the memory visualization tool">
             </action>
         </group>
         
-        <!-- Editor Popup Menu Actions -->
-        <action id="ModForge.EditorPopupAction" 
-                class="com.modforge.intellij.plugin.actions.EditorPopupAction"
-                text="ModForge AI Options"
-                description="ModForge AI options">
+        <!-- Editor Context Menu -->
+        <group id="ModForge.EditorPopupMenu" text="ModForge AI" description="ModForge AI actions for editor" popup="true">
             <add-to-group group-id="EditorPopupMenu" anchor="last"/>
-        </action>
+            <action id="ModForge.GenerateCodeEditorAction"
+                    class="com.modforge.intellij.plugin.actions.GenerateCodeAction"
+                    text="Generate Code with AI"
+                    description="Generate code using AI">
+            </action>
+            <action id="ModForge.FixErrorsEditorAction"
+                    class="com.modforge.intellij.plugin.actions.FixErrorsAction"
+                    text="Fix Errors with AI"
+                    description="Fix compilation errors using AI">
+            </action>
+        </group>
         
-        <!-- Project View Popup Menu Actions -->
-        <action id="ModForge.ProjectViewPopupAction" 
-                class="com.modforge.intellij.plugin.actions.ProjectViewPopupAction"
-                text="ModForge AI Options"
-                description="ModForge AI options">
+        <!-- Project View Context Menu -->
+        <group id="ModForge.ProjectViewPopupMenu" text="ModForge AI" description="ModForge AI actions for project view" popup="true">
             <add-to-group group-id="ProjectViewPopupMenu" anchor="last"/>
-        </action>
+            <action id="ModForge.GenerateCodeProjectAction"
+                    class="com.modforge.intellij.plugin.actions.GenerateCodeAction"
+                    text="Generate Code with AI"
+                    description="Generate code using AI">
+            </action>
+            <action id="ModForge.CreateFromTemplateProjectAction"
+                    class="com.modforge.intellij.plugin.actions.CreateFromTemplateAction"
+                    text="Create Mod from Template"
+                    description="Create a new mod from a template">
+            </action>
+        </group>
     </actions>
 </idea-plugin>
