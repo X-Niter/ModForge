@@ -214,8 +214,25 @@ public class MemoryStatusWidget implements StatusBarWidget, StatusBarWidget.Icon
         group.add(new AnAction("Memory Management Settings") {
             @Override
             public void actionPerformed(@NotNull AnActionEvent e) {
-                ActionManager.getInstance().getAction("ShowSettings").actionPerformed(e);
-                // TODO: Navigate to the memory management settings page
+                // Get the ShowSettingsAction instance
+                AnAction showSettingsAction = ActionManager.getInstance().getAction("ShowSettings");
+                
+                // Create an action event with the memory settings ID
+                AnActionEvent settingsEvent = AnActionEvent.createFromAnAction(
+                    showSettingsAction,
+                    mouseEvent,
+                    ActionPlaces.UNKNOWN,
+                    e.getDataContext()
+                );
+                
+                // Add the specific settings page ID to navigate directly to memory settings
+                settingsEvent.getPresentation().putClientProperty(
+                    "settings.preferedFocusedOption", 
+                    "com.modforge.intellij.plugin.memory.settings.MemoryManagementConfigurable"
+                );
+                
+                // Execute the action with our modified event
+                showSettingsAction.actionPerformed(settingsEvent);
             }
         });
         
