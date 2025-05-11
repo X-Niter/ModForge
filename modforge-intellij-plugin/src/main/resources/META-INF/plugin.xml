@@ -102,6 +102,8 @@
         <applicationService serviceImplementation="com.modforge.intellij.plugin.ai.pattern.PatternLearningSystem"/>
         <applicationService serviceImplementation="com.modforge.intellij.plugin.memory.MemoryManager"/>
         <applicationService serviceImplementation="com.modforge.intellij.plugin.memory.settings.MemoryManagementSettings"/>
+        <applicationService serviceImplementation="com.modforge.intellij.plugin.memory.recovery.MemoryRecoveryManager"/>
+        <applicationService serviceImplementation="com.modforge.intellij.plugin.memory.monitoring.MemoryHealthMonitor"/>
         
         <!-- Settings -->
         <applicationConfigurable parentId="tools" 
@@ -114,12 +116,17 @@
                                 id="com.modforge.intellij.plugin.ai.ui.PatternRecognitionSettingsPanel"
                                 displayName="Pattern Recognition"/>
                                 
+        <applicationConfigurable parentId="com.modforge.intellij.plugin.settings.ModForgeSettingsConfigurable"
+                                instance="com.modforge.intellij.plugin.memory.settings.MemoryManagementSettingsPanel"
+                                id="com.modforge.intellij.plugin.memory.settings.MemoryManagementSettingsPanel"
+                                displayName="Memory Management"/>
+                                
         <!-- Notifications -->
         <notificationGroup id="ModForge Notifications" 
                           displayType="BALLOON"/>
                           
         <!-- Status Bar Widgets -->
-        <statusBarWidgetFactory implementation="com.modforge.intellij.plugin.memory.ui.MemoryStatusBarWidget$Factory"/>
+        <statusBarWidgetFactory implementation="com.modforge.intellij.plugin.memory.ui.MemoryStatusWidget$Factory"/>
                           
         <!-- Startup Activities -->
         <postStartupActivity implementation="com.modforge.intellij.plugin.ModForgePluginActivator"/>

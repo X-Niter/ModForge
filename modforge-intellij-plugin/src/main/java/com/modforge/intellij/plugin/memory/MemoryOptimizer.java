@@ -1,242 +1,366 @@
 package com.modforge.intellij.plugin.memory;
 
+import com.intellij.codeInsight.daemon.DaemonCodeAnalyzer;
+import com.intellij.ide.CacheUpdater;
+import com.intellij.ide.IdeEventQueue;
+import com.intellij.ide.caches.CacheUpdaterFacade;
+import com.intellij.openapi.Disposable;
 import com.intellij.openapi.application.ApplicationManager;
-import com.intellij.openapi.components.Service;
 import com.intellij.openapi.diagnostic.Logger;
+import com.intellij.openapi.editor.EditorFactory;
+import com.intellij.openapi.progress.ProgressIndicator;
+import com.intellij.openapi.progress.ProgressManager;
+import com.intellij.openapi.progress.Task;
 import com.intellij.openapi.project.Project;
-import com.intellij.util.concurrency.AppExecutorUtil;
+import com.intellij.openapi.util.Disposer;
+import com.intellij.psi.PsiDocumentManager;
+import com.intellij.psi.PsiManager;
+import com.intellij.psi.impl.PsiManagerImpl;
+import com.intellij.util.ui.UIUtil;
 import org.jetbrains.annotations.NotNull;
 
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.Executor;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.function.Supplier;
 
 /**
- * Service for optimizing memory usage during long-running operations
- * Helps prevent out-of-memory errors during continuous development
+ * MemoryOptimizer is responsible for performing memory optimizations at different levels
  */
-@Service
-public final class MemoryOptimizer implements MemoryListener {
+public class MemoryOptimizer implements Disposable {
     private static final Logger LOG = Logger.getInstance(MemoryOptimizer.class);
     
     private final Project project;
-    private final AtomicBoolean optimizationInProgress = new AtomicBoolean(false);
-    private final Executor executor = AppExecutorUtil.getAppExecutorService();
+    private final AtomicBoolean optimizing = new AtomicBoolean(false);
+    private final List<OptimizationListener> listeners = new ArrayList<>();
     
-    // State flags
-    private final AtomicBoolean warningState = new AtomicBoolean(false);
-    private final AtomicBoolean criticalState = new AtomicBoolean(false);
-    private final AtomicBoolean emergencyState = new AtomicBoolean(false);
+    /**
+     * Optimization levels for memory optimization
+     */
+    public enum OptimizationLevel {
+        MINIMAL,       // Basic cleanup with minimal impact
+        CONSERVATIVE,  // Standard cleanup with low impact
+        NORMAL,        // Balanced cleanup with moderate impact
+        AGGRESSIVE     // Deep cleanup with higher impact
+    }
     
+    /**
+     * Constructor
+     * 
+     * @param project The project for this optimizer
+     */
     public MemoryOptimizer(Project project) {
         this.project = project;
-        
-        // Register as memory listener
-        MemoryManager.getInstance().addListener(this);
-        
-        LOG.info("Memory optimizer initialized for project " + project.getName());
     }
     
     /**
-     * Run a task with memory optimization
-     * 
-     * @param taskName The name of the task (for logging)
-     * @param task The task to run
-     * @param <T> The return type of the task
-     * @return A CompletableFuture that will complete with the result of the task
-     */
-    public <T> CompletableFuture<T> runWithOptimization(@NotNull String taskName, @NotNull Supplier<T> task) {
-        return CompletableFuture.supplyAsync(() -> {
-            LOG.info("Starting optimized task: " + taskName);
-            
-            // Check memory before starting
-            MemorySnapshot snapshot = MemoryManager.getInstance().getCurrentSnapshot();
-            double usagePercentage = snapshot.getUsagePercentage();
-            
-            // Perform pre-emptive optimization if memory usage is already high
-            if (usagePercentage > 70.0) {
-                LOG.info("Pre-emptive memory optimization before task " + taskName + 
-                        " (current usage: " + usagePercentage + "%)");
-                performOptimization(OptimizationLevel.NORMAL);
-            }
-            
-            // Run the task
-            T result = task.get();
-            
-            // Perform cleanup afterwards
-            ApplicationManager.getApplication().invokeLater(() -> {
-                performOptimization(OptimizationLevel.LIGHT);
-            });
-            
-            LOG.info("Completed optimized task: " + taskName);
-            return result;
-        }, executor);
-    }
-    
-    /**
-     * Perform memory optimization
+     * Optimize memory at the specified level
      * 
      * @param level The optimization level
      */
-    public void performOptimization(@NotNull OptimizationLevel level) {
-        // Avoid multiple concurrent optimizations
-        if (!optimizationInProgress.compareAndSet(false, true)) {
-            LOG.info("Optimization already in progress, skipping");
+    public void optimize(OptimizationLevel level) {
+        if (project.isDisposed()) {
+            LOG.warn("Cannot optimize: project is disposed");
             return;
         }
         
-        try {
-            LOG.info("Performing memory optimization at level: " + level);
+        if (optimizing.compareAndSet(false, true)) {
+            LOG.info("Starting memory optimization at level " + level);
+            notifyOptimizationStarted(level);
             
-            switch (level) {
-                case LIGHT:
-                    // Light optimization - just clear small caches
-                    cleanSmallCaches();
-                    break;
-                    
-                case NORMAL:
-                    // Normal optimization - clear all caches and run GC
-                    cleanSmallCaches();
-                    cleanLargeCaches();
-                    System.gc();
-                    break;
-                    
-                case AGGRESSIVE:
-                    // Aggressive optimization - clear everything and run GC multiple times
-                    cleanSmallCaches();
-                    cleanLargeCaches();
-                    cleanTemporaryFiles();
-                    System.gc();
-                    System.gc();
-                    break;
-                    
-                case EMERGENCY:
-                    // Emergency optimization - last resort before OOM
-                    cleanSmallCaches();
-                    cleanLargeCaches();
-                    cleanTemporaryFiles();
-                    shutdownNonEssentialServices();
-                    System.gc();
-                    System.gc();
-                    System.gc();
-                    break;
+            ProgressManager.getInstance().run(new Task.Backgroundable(project, "Memory Optimization", true) {
+                @Override
+                public void run(@NotNull ProgressIndicator indicator) {
+                    try {
+                        indicator.setIndeterminate(false);
+                        indicator.setText("Preparing optimization...");
+                        indicator.setFraction(0.0);
+                        
+                        long beforeMemory = MemoryUtils.getUsedMemory();
+                        LOG.info("Memory before optimization: " + MemoryUtils.formatMemorySize(beforeMemory));
+                        
+                        // Always perform minimal optimizations
+                        performMinimalOptimizations(indicator);
+                        
+                        // Perform higher level optimizations based on the specified level
+                        if (level.ordinal() >= OptimizationLevel.CONSERVATIVE.ordinal()) {
+                            performConservativeOptimizations(indicator);
+                        }
+                        
+                        if (level.ordinal() >= OptimizationLevel.NORMAL.ordinal()) {
+                            performNormalOptimizations(indicator);
+                        }
+                        
+                        if (level.ordinal() >= OptimizationLevel.AGGRESSIVE.ordinal()) {
+                            performAggressiveOptimizations(indicator);
+                        }
+                        
+                        // Final steps
+                        indicator.setText("Requesting garbage collection...");
+                        indicator.setFraction(0.95);
+                        MemoryUtils.requestGarbageCollection();
+                        
+                        indicator.setText("Optimization complete");
+                        indicator.setFraction(1.0);
+                        
+                        long afterMemory = MemoryUtils.getUsedMemory();
+                        long memoryReduction = beforeMemory - afterMemory;
+                        double percentReduction = beforeMemory > 0 ? (memoryReduction * 100.0 / beforeMemory) : 0.0;
+                        
+                        LOG.info("Memory after optimization: " + MemoryUtils.formatMemorySize(afterMemory));
+                        LOG.info("Memory reduction: " + MemoryUtils.formatMemorySize(memoryReduction) + 
+                                " (" + String.format("%.2f", percentReduction) + "%)");
+                        
+                        notifyOptimizationCompleted(level, beforeMemory, afterMemory);
+                    } catch (Exception e) {
+                        LOG.error("Error during memory optimization", e);
+                        notifyOptimizationFailed(level, e);
+                    } finally {
+                        optimizing.set(false);
+                    }
+                }
+            });
+        } else {
+            LOG.warn("Memory optimization already in progress");
+        }
+    }
+    
+    /**
+     * Perform minimal optimizations (level 0) - lowest impact
+     * 
+     * @param indicator Progress indicator
+     */
+    private void performMinimalOptimizations(ProgressIndicator indicator) {
+        indicator.setText("Performing minimal optimizations...");
+        indicator.setFraction(0.1);
+        
+        LOG.info("Performing minimal optimizations");
+        
+        // Process pending UI events
+        UIUtil.dispatchAllInvocationEvents();
+        indicator.setFraction(0.15);
+        
+        // Clear editor caches
+        ApplicationManager.getApplication().invokeLater(() -> {
+            EditorFactory.getInstance().refreshAllEditors();
+        });
+        indicator.setFraction(0.2);
+        
+        // Commit documents
+        ApplicationManager.getApplication().invokeLater(() -> {
+            PsiDocumentManager.getInstance(project).commitAllDocuments();
+        });
+        indicator.setFraction(0.25);
+    }
+    
+    /**
+     * Perform conservative optimizations (level 1) - low impact
+     * 
+     * @param indicator Progress indicator
+     */
+    private void performConservativeOptimizations(ProgressIndicator indicator) {
+        indicator.setText("Performing conservative optimizations...");
+        indicator.setFraction(0.3);
+        
+        LOG.info("Performing conservative optimizations");
+        
+        // Clear PSI caches
+        ApplicationManager.getApplication().invokeLater(() -> {
+            PsiManager psiManager = PsiManager.getInstance(project);
+            if (psiManager instanceof PsiManagerImpl) {
+                ((PsiManagerImpl) psiManager).dropPsiCaches();
             }
-            
-            // Log memory after optimization
-            MemorySnapshot snapshot = MemoryManager.getInstance().getCurrentSnapshot();
-            LOG.info("Memory after optimization: " + snapshot.getUsedHeapMB() + "MB / " + 
-                    snapshot.getMaxHeapMB() + "MB (" + snapshot.getUsagePercentage() + "%)");
-            
-        } catch (Exception e) {
-            LOG.error("Error during memory optimization", e);
-        } finally {
-            optimizationInProgress.set(false);
+        });
+        indicator.setFraction(0.35);
+        
+        // Process pending UI events again
+        UIUtil.dispatchAllInvocationEvents();
+        indicator.setFraction(0.4);
+    }
+    
+    /**
+     * Perform normal optimizations (level 2) - moderate impact
+     * 
+     * @param indicator Progress indicator
+     */
+    private void performNormalOptimizations(ProgressIndicator indicator) {
+        indicator.setText("Performing normal optimizations...");
+        indicator.setFraction(0.5);
+        
+        LOG.info("Performing normal optimizations");
+        
+        // Clear inspector caches
+        ApplicationManager.getApplication().invokeLater(() -> {
+            DaemonCodeAnalyzer.getInstance(project).restart();
+        });
+        indicator.setFraction(0.6);
+        
+        // Clear event queue
+        IdeEventQueue.getInstance().flushQueue();
+        indicator.setFraction(0.65);
+        
+        // Process pending UI events again
+        UIUtil.dispatchAllInvocationEvents();
+        indicator.setFraction(0.7);
+    }
+    
+    /**
+     * Perform aggressive optimizations (level 3) - higher impact
+     * 
+     * @param indicator Progress indicator
+     */
+    private void performAggressiveOptimizations(ProgressIndicator indicator) {
+        indicator.setText("Performing aggressive optimizations...");
+        indicator.setFraction(0.75);
+        
+        LOG.info("Performing aggressive optimizations");
+        
+        // Update all caches
+        ApplicationManager.getApplication().invokeLater(() -> {
+            CacheUpdaterFacade.getInstance(project).processAllCacheUpdaters(new CacheUpdater() {
+                @Override
+                public void processFile(int fileId) {}
+                
+                @Override
+                public int[] queryNeededFiles() {
+                    return new int[0];
+                }
+                
+                @Override
+                public void update() {}
+            });
+        });
+        indicator.setFraction(0.85);
+        
+        // Process pending UI events again
+        UIUtil.dispatchAllInvocationEvents();
+        indicator.setFraction(0.9);
+    }
+    
+    /**
+     * Check if optimization is in progress
+     * 
+     * @return True if optimization is in progress
+     */
+    public boolean isOptimizing() {
+        return optimizing.get();
+    }
+    
+    /**
+     * Add an optimization listener
+     * 
+     * @param listener The listener to add
+     */
+    public void addOptimizationListener(OptimizationListener listener) {
+        synchronized (listeners) {
+            listeners.add(listener);
         }
     }
     
     /**
-     * Clean small caches (fast and low impact)
+     * Remove an optimization listener
+     * 
+     * @param listener The listener to remove
      */
-    private void cleanSmallCaches() {
-        // In a real implementation, this would clear:
-        // - Small in-memory caches
-        // - Recently used files lists
-        // - Undo history beyond a certain point
-        LOG.info("Cleaning small caches");
-    }
-    
-    /**
-     * Clean large caches (slower but more effective)
-     */
-    private void cleanLargeCaches() {
-        // In a real implementation, this would clear:
-        // - Image caches
-        // - Code analysis results
-        // - Search index caches
-        LOG.info("Cleaning large caches");
-    }
-    
-    /**
-     * Clean temporary files
-     */
-    private void cleanTemporaryFiles() {
-        // In a real implementation, this would:
-        // - Delete temporary compilation outputs
-        // - Clear log files
-        // - Remove temporary downloads
-        LOG.info("Cleaning temporary files");
-    }
-    
-    /**
-     * Shut down non-essential services
-     */
-    private void shutdownNonEssentialServices() {
-        // In a real implementation, this would:
-        // - Disable background indexing
-        // - Disable code analysis
-        // - Pause synchronization tasks
-        // - Disable auto-save
-        LOG.info("Shutting down non-essential services");
-    }
-    
-    @Override
-    public void onWarningMemoryPressure(MemorySnapshot snapshot) {
-        // If this is a new warning (not already in warning state)
-        if (warningState.compareAndSet(false, true)) {
-            LOG.warn("Memory warning detected, performing normal optimization");
-            performOptimization(OptimizationLevel.NORMAL);
-        }
-    }
-    
-    @Override
-    public void onCriticalMemoryPressure(MemorySnapshot snapshot) {
-        // Always respond to critical pressure
-        criticalState.set(true);
-        warningState.set(true);
-        
-        LOG.warn("Critical memory pressure detected, performing aggressive optimization");
-        performOptimization(OptimizationLevel.AGGRESSIVE);
-    }
-    
-    @Override
-    public void onEmergencyMemoryPressure(MemorySnapshot snapshot) {
-        // Always respond to emergency pressure
-        emergencyState.set(true);
-        criticalState.set(true);
-        warningState.set(true);
-        
-        LOG.error("Emergency memory pressure detected, performing emergency optimization");
-        performOptimization(OptimizationLevel.EMERGENCY);
-    }
-    
-    @Override
-    public void onNormalMemory(MemorySnapshot snapshot) {
-        // Reset state flags
-        boolean wasInHighPressure = warningState.getAndSet(false) || 
-                                  criticalState.getAndSet(false) || 
-                                  emergencyState.getAndSet(false);
-        
-        if (wasInHighPressure) {
-            LOG.info("Memory pressure returned to normal");
+    public void removeOptimizationListener(OptimizationListener listener) {
+        synchronized (listeners) {
+            listeners.remove(listener);
         }
     }
     
     /**
-     * Dispose the memory optimizer
+     * Notify listeners that optimization has started
+     * 
+     * @param level The optimization level
      */
+    private void notifyOptimizationStarted(OptimizationLevel level) {
+        List<OptimizationListener> listenersCopy;
+        synchronized (listeners) {
+            listenersCopy = new ArrayList<>(listeners);
+        }
+        
+        for (OptimizationListener listener : listenersCopy) {
+            try {
+                listener.optimizationStarted(level);
+            } catch (Exception e) {
+                LOG.warn("Error notifying optimization listener", e);
+            }
+        }
+    }
+    
+    /**
+     * Notify listeners that optimization has completed
+     * 
+     * @param level The optimization level
+     * @param beforeMemory Memory usage before optimization
+     * @param afterMemory Memory usage after optimization
+     */
+    private void notifyOptimizationCompleted(OptimizationLevel level, long beforeMemory, long afterMemory) {
+        List<OptimizationListener> listenersCopy;
+        synchronized (listeners) {
+            listenersCopy = new ArrayList<>(listeners);
+        }
+        
+        for (OptimizationListener listener : listenersCopy) {
+            try {
+                listener.optimizationCompleted(level, beforeMemory, afterMemory);
+            } catch (Exception e) {
+                LOG.warn("Error notifying optimization listener", e);
+            }
+        }
+    }
+    
+    /**
+     * Notify listeners that optimization has failed
+     * 
+     * @param level The optimization level
+     * @param error The error that occurred
+     */
+    private void notifyOptimizationFailed(OptimizationLevel level, Exception error) {
+        List<OptimizationListener> listenersCopy;
+        synchronized (listeners) {
+            listenersCopy = new ArrayList<>(listeners);
+        }
+        
+        for (OptimizationListener listener : listenersCopy) {
+            try {
+                listener.optimizationFailed(level, error);
+            } catch (Exception e) {
+                LOG.warn("Error notifying optimization listener", e);
+            }
+        }
+    }
+    
+    @Override
     public void dispose() {
-        MemoryManager.getInstance().removeListener(this);
-        LOG.info("Memory optimizer disposed for project " + project.getName());
+        listeners.clear();
     }
     
     /**
-     * Levels of memory optimization
+     * Interface for optimization listeners
      */
-    public enum OptimizationLevel {
-        LIGHT,     // Light optimization (fast, minimal impact)
-        NORMAL,    // Normal optimization (balanced)
-        AGGRESSIVE, // Aggressive optimization (thorough)
-        EMERGENCY  // Emergency optimization (last resort)
+    public interface OptimizationListener {
+        /**
+         * Called when optimization starts
+         * 
+         * @param level The optimization level
+         */
+        default void optimizationStarted(OptimizationLevel level) {}
+        
+        /**
+         * Called when optimization completes successfully
+         * 
+         * @param level The optimization level
+         * @param beforeMemory Memory usage before optimization
+         * @param afterMemory Memory usage after optimization
+         */
+        default void optimizationCompleted(OptimizationLevel level, long beforeMemory, long afterMemory) {}
+        
+        /**
+         * Called when optimization fails
+         * 
+         * @param level The optimization level
+         * @param error The error that occurred
+         */
+        default void optimizationFailed(OptimizationLevel level, Exception error) {}
     }
 }
