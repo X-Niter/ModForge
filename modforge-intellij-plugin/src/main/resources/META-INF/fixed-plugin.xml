@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<idea-plugin require-restart="true">
+    <id>com.modforge.intellij.plugin</id>
+    <name>ModForge AI</name>
+    <vendor email="support@modforge.dev" url="https://www.modforge.dev">ModForge</vendor>
+    <!-- Explicit compatibility with IntelliJ IDEA 2025.1.1.1 (Build #IC-251.25410.129) -->
+    <idea-version since-build="233" until-build="251.25410.129"/>
+    
+    <description><![CDATA[
+    <p>ModForge AI - Smart Minecraft Mod Development</p>
+    <p><b>Optimized for IntelliJ IDEA 2025.1 with Java 21 support</b></p>
+    <p>This plugin provides AI-powered assistance for Minecraft mod development:</p>
+    <ul>
+        <li>Multi-mod loader support (Forge, Fabric, Quilt, Architectury)</li>
+        <li>AI-driven code generation</li>
+        <li>Automatic error detection and fixing</li>
+        <li>Pattern recognition to reduce API costs</li>
+        <li>Continuous development for 24/7 improvement</li>
+        <li>Java 21 virtual thread optimization for improved performance</li>
+        <li>Full compatibility with IntelliJ IDEA 2025.1</li>
+    </ul>
+    ]]></description>
+    
+    <!-- Required plugins -->
+    <depends>com.intellij.modules.java</depends>
+    
+    <!-- Optional plugins with fallbacks in our code -->
+    <depends optional="true" config-file="git-integration.xml">Git4Idea</depends>
+    <depends optional="true" config-file="github-integration.xml">org.jetbrains.plugins.github</depends>
+    <depends optional="true" config-file="minecraft-dev-integration.xml">com.demonwav.minecraft-dev</depends>
+</idea-plugin>
