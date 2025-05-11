@@ -22,7 +22,7 @@ set "COMPATIBILITY_REPORT=%LOG_DIR%\compatibility-issues.md"
 set "MISSING_METHODS_REPORT=%LOG_DIR%\missing-methods.md"
 set "RESOLUTION_ERRORS_REPORT=%LOG_DIR%\resolution-errors.md"
 set "SOURCE_DIR=src\main\java"
-set "MAX_BUILD_ATTEMPTS=2"
+set "MAX_BUILD_ATTEMPTS=3"
 
 echo ===== ModForge Ultimate Builder =====
 echo.
@@ -48,7 +48,18 @@ echo Attempt %BUILD_ATTEMPT% of %MAX_BUILD_ATTEMPTS%...
 echo.
 
 echo Building plugin with Gradle...
-call gradlew.bat clean buildPlugin --stacktrace > "%BUILD_LOG%" 2>&1
+
+REM Different build commands for different attempts
+if %BUILD_ATTEMPT% equ 1 (
+    echo Standard build attempt...
+    call gradlew.bat clean buildPlugin --stacktrace > "%BUILD_LOG%" 2>&1
+) else if %BUILD_ATTEMPT% equ 2 (
+    echo Enhanced build with additional memory...
+    call gradlew.bat clean buildPlugin --stacktrace --max-workers=2 -Dorg.gradle.jvmargs="-Xmx2048m" > "%BUILD_LOG%" 2>&1
+) else (
+    echo Full error reporting build with -Xmaxerrs...
+    call gradlew.bat clean buildPlugin --stacktrace -Dcompiler.args="-Xmaxerrs 0 -Xmaxwarns 0" > "%BUILD_LOG%" 2>&1
+)
 
 REM Check if build succeeded
 findstr /i /c:"BUILD SUCCESSFUL" "%BUILD_LOG%" > nul
