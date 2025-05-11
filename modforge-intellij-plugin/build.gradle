@@ -28,19 +28,22 @@ dependencies {
 
 // Configure Gradle IntelliJ Plugin
 intellij {
-    version = '2025.1'
-    type = 'IC' // Target IDE: IntelliJ IDEA Community Edition
+    // IMPORTANT: We can use either 'version' or 'localPath', but not both
+    
+    // OPTION 1: Use a specific version from repositories (uncomment these two lines)
+    // version = '2025.1'
+    // type = 'IC' // Target IDE: IntelliJ IDEA Community Edition
+    
+    // OPTION 2: Use your local IntelliJ installation (RECOMMENDED)
+    // Change this path to match your local IntelliJ installation
+    localPath = 'C:/Program Files/JetBrains/IntelliJ IDEA Community Edition 2025.1'
+    
+    // Alternative paths for other operating systems:
+    // macOS: localPath = '/Applications/IntelliJ IDEA.app/Contents'
+    // Linux: localPath = '/opt/intellij-idea-community'
+    
     downloadSources = true
     updateSinceUntilBuild = true
-    
-    // When building against 2025.1, we need to use your local IntelliJ installation
-    // since the remote plugin repository may not have the exact plugins we need
-    localPath = System.getProperty('user.home') + '/.IntelliJIdea2025.1'
-    
-    // If local path doesn't work, uncomment and modify this with your actual installation path
-    // For Windows: localPath = 'C:/Program Files/JetBrains/IntelliJ IDEA Community Edition 2025.1'
-    // For macOS: localPath = '/Applications/IntelliJ IDEA.app/Contents'
-    // For Linux: localPath = '/opt/intellij-idea-community'
     
     // Only specify built-in plugins that are part of the IDE
     plugins = [
