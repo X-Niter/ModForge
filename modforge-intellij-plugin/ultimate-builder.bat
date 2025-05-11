@@ -613,14 +613,14 @@ exit /b 0
     findstr /i /c:"error: " build_issues.log >nul
     if %errorlevel% == 0 (
         call :log "Found compilation errors. Attempting to fix..."
-        call :apply_fixes
+        call :apply_fixes_to_code
     ) else (
         call :log "No compilation errors found in initial analysis"
     )
     
     exit /b 0
 
-:apply_fixes
+:apply_fixes_to_code
     :: Only attempt if PowerShell available
     if "%HAS_POWERSHELL%" == "1" (
         :: Fix common issues with PowerShell
@@ -665,7 +665,14 @@ exit /b 0
             copy build.gradle build.gradle.bak > nul
             
             :: Disable validation in build.gradle using a very simple approach
-            powershell -Command "(Get-Content build.gradle) -replace 'tasks.buildPlugin.dependsOn\(validatePluginForProduction\)', '// tasks.buildPlugin.dependsOn(validatePluginForProduction) // Disabled by ULTIMATE Builder' | Set-Content build.gradle"
+            if "%HAS_POWERSHELL%" == "1" (
+                powershell -Command "(Get-Content build.gradle) -replace 'tasks.buildPlugin.dependsOn\(validatePluginForProduction\)', '// tasks.buildPlugin.dependsOn(validatePluginForProduction) // Disabled by ULTIMATE Builder' | Set-Content build.gradle"
+            ) else (
+                :: Fallback for when PowerShell isn't available
+                call :log "PowerShell not available. Using simple modification approach."
+                type build.gradle | findstr /v "validatePluginForProduction" > build.gradle.tmp
+                move /y build.gradle.tmp build.gradle > nul
+            )
             
             :: Run the build again
             call :log "Running Gradle build with validation disabled..."
