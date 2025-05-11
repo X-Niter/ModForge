@@ -1,5 +1,7 @@
 package com.modforge.intellij.plugin.utils;
 
+import com.intellij.openapi.application.ApplicationManager;
+import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vfs.LocalFileSystem;
 import com.intellij.openapi.vfs.VirtualFile;
 import org.jetbrains.annotations.NotNull;
@@ -59,5 +61,30 @@ public class VirtualFileUtil {
         }
         file.refresh(false, false);
         return file;
+    }
+    
+    /**
+     * Refreshes all file systems and synchronizes with the local file system.
+     * This is a thread-safe wrapper around the file system refresh functionality.
+     */
+    public static void refreshAll() {
+        ApplicationManager.getApplication().invokeLater(() -> {
+            ApplicationManager.getApplication().runWriteAction(() -> {
+                LocalFileSystem.getInstance().refresh(true);
+            });
+        });
+    }
+    
+    /**
+     * Gets a virtual file by a relative path from the project base directory.
+     * 
+     * @param project the project
+     * @param relativePath the relative path from the project base directory
+     * @return the virtual file or null if it doesn't exist
+     */
+    @Nullable
+    public static VirtualFile getModFileByRelativePath(@NotNull Project project, @NotNull String relativePath) {
+        VirtualFile baseDir = CompatibilityUtil.getProjectBaseDir(project);
+        return baseDir != null ? baseDir.findFileByRelativePath(relativePath) : null;
     }
 }

@@ -159,4 +159,31 @@ public class CompatibilityUtil {
             }
         });
     }
+    
+    /**
+     * Clears various caches in the IDE for a project.
+     * This is a compatibility replacement for CacheUpdaterFacade functionality
+     * which was removed in IntelliJ IDEA 2025.1.1.1.
+     *
+     * @param project the project
+     */
+    public static void clearCaches(@NotNull Project project) {
+        if (project.isDisposed()) {
+            return;
+        }
+        
+        // Run in read action to be thread-safe
+        runReadAction(() -> {
+            // Clear PsiManager caches
+            PsiManager psiManager = PsiManager.getInstance(project);
+            if (psiManager instanceof PsiManagerImpl) {
+                ((PsiManagerImpl) psiManager).dropPsiCaches();
+            }
+            
+            // Refresh file system
+            VirtualFileUtil.refreshAll();
+            
+            return null;
+        });
+    }
 }

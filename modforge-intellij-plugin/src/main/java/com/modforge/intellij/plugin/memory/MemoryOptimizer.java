@@ -1,9 +1,8 @@
 package com.modforge.intellij.plugin.memory;
 
 import com.intellij.codeInsight.daemon.DaemonCodeAnalyzer;
-import com.intellij.ide.CacheUpdater;
 import com.intellij.ide.IdeEventQueue;
-import com.intellij.ide.caches.CacheUpdaterFacade;
+import com.modforge.intellij.plugin.utils.CompatibilityUtil;
 import com.intellij.openapi.Disposable;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.diagnostic.Logger;
@@ -214,20 +213,13 @@ public class MemoryOptimizer implements Disposable {
         
         LOG.info("Performing aggressive optimizations");
         
-        // Update all caches
+        // Update all caches - using compatible approach for IntelliJ 2025.1.1.1
         ApplicationManager.getApplication().invokeLater(() -> {
-            CacheUpdaterFacade.getInstance(project).processAllCacheUpdaters(new CacheUpdater() {
-                @Override
-                public void processFile(int fileId) {}
-                
-                @Override
-                public int[] queryNeededFiles() {
-                    return new int[0];
-                }
-                
-                @Override
-                public void update() {}
-            });
+            // Clear file type manager cache
+            CompatibilityUtil.clearCaches(project);
+            
+            // Reset daemon code analyzer (more thorough than restart)
+            DaemonCodeAnalyzer.getInstance(project).restart();
         });
         indicator.setFraction(0.85);
         
