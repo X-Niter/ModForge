@@ -12,10 +12,11 @@ IntelliJ IDEA plugin for the ModForge autonomous Minecraft mod development platf
 ### Automated Installation
 
 1. Download the plugin ZIP file
-2. Run the super-smart builder script: `super-smart-builder.bat`
-   - This is the most reliable builder that works in any environment
-   - It's intelligent enough to fix encoding issues and fallback to multiple methods
-   - It even creates a Gradle wrapper if one is missing
+2. Run the universal builder script: `ultimate-builder.bat`
+   - This is the ULTIMATE all-in-one builder that works in ANY environment
+   - It automatically adapts to your command shell (Cmd or PowerShell)
+   - It intelligently fixes encoding issues and handles all edge cases
+   - It can download & install Java 21, create Gradle wrappers, and fix compilation errors
 3. Follow the on-screen prompts
 
 The script will automatically:
