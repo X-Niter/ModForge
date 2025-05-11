@@ -187,10 +187,10 @@ tasks.register('validatePluginForProduction') {
         println "✓ Java version check passed: $javaVersion"
         
         // Check plugin version
-        if (version == '1.0-SNAPSHOT') {
+        if (project.version == '1.0-SNAPSHOT') {
             throw new GradleException("Plugin version is still set to development snapshot. Set a proper release version.")
         }
-        println "✓ Plugin version check passed: $version"
+        println "✓ Plugin version check passed: ${project.version}"
         
         // Validate build number format
         def untilBuild = tasks.patchPluginXml.untilBuild.get()
