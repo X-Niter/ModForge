@@ -1,0 +1,310 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<idea-plugin require-restart="true">
+    <id>com.modforge.intellij.plugin</id>
+    <name>ModForge AI</name>
+    <vendor email="support@modforge.dev" url="https://www.modforge.dev">ModForge</vendor>
+    <!-- Explicit compatibility with IntelliJ IDEA 2025.1.1.1 (Build: 251.25410.129) -->
+    <idea-version since-build="233" until-build="251.*"/>
+    
+    <description><![CDATA[
+    <p>ModForge AI - Smart Minecraft Mod Development</p>
+    <p><b>Optimized for IntelliJ IDEA 2025.1 with Java 21 support</b></p>
+    <p>This plugin provides AI-powered assistance for Minecraft mod development:</p>
+    <ul>
+        <li>Multi-mod loader support (Forge, Fabric, Quilt, Architectury)</li>
+        <li>AI-driven code generation</li>
+        <li>Automatic error detection and fixing</li>
+        <li>Pattern recognition to reduce API costs</li>
+        <li>Continuous development for 24/7 improvement</li>
+        <li>Java 21 virtual thread optimization for improved performance</li>
+        <li>Full compatibility with IntelliJ IDEA 2025.1</li>
+    </ul>
+    <p>Features:</p>
+    <ul>
+        <li>Generate code with AI by describing what you want</li>
+        <li>Fix compilation errors automatically</li>
+        <li>Continuous development that keeps working even when you're not</li>
+        <li>Cost optimization through pattern recognition</li>
+        <li>GitHub integration for version control</li>
+        <li>Enhanced network operations with smart retry logic</li>
+        <li>Circuit breaker protection to prevent cascading failures</li>
+    </ul>
+    <p><b>System Requirements:</b></p>
+    <ul>
+        <li>IntelliJ IDEA 2025.1 (Build #IC-251.23774.435) or compatible</li>
+        <li>Java Development Kit (JDK) 21.0.6 or later</li>
+        <li>Minecraft Development plugin (latest version)</li>
+    </ul>
+    ]]></description>
+    
+    <!-- Required plugins -->
+    <depends>com.intellij.modules.platform</depends>
+    <depends>com.intellij.modules.java</depends>
+    
+    <!-- Optional plugins with fallbacks in our code -->
+    <depends optional="true" config-file="git-integration.xml">Git4Idea</depends>
+    <depends optional="true" config-file="github-integration.xml">org.jetbrains.plugins.github</depends>
+    <depends optional="true" config-file="minecraft-dev-integration.xml">com.demonwav.minecraft-dev</depends>
+    
+    <extensionPoints>
+        <extensionPoint name="modLoaderContributor" 
+                       interface="com.modforge.intellij.plugin.utils.ModLoaderContributor" 
+                       dynamic="true"/>
+    </extensionPoints>
+    
+    <extensions defaultExtensionNs="com.intellij">
+        <!-- Tool Windows -->
+        <toolWindow id="ModForge AI" 
+                    anchor="right" 
+                    factoryClass="com.modforge.intellij.plugin.ui.ModForgeToolWindowFactory" 
+                    icon="/icons/modforge.svg"/>
+                    
+        <toolWindow id="Minecraft Performance" 
+                    anchor="bottom" 
+                    factoryClass="com.modforge.intellij.plugin.debug.ui.MinecraftPerformanceToolWindow" 
+                    icon="/icons/modforge.svg"/>
+                    
+        <toolWindow id="Advancement Designer" 
+                    anchor="bottom" 
+                    factoryClass="com.modforge.intellij.plugin.designers.advancement.AdvancementDesignerToolWindowFactory" 
+                    icon="/icons/modforge.svg"/>
+                    
+        <toolWindow id="Recipe Designer" 
+                    anchor="bottom" 
+                    factoryClass="com.modforge.intellij.plugin.designers.recipe.RecipeDesignerToolWindowFactory" 
+                    icon="/icons/modforge.svg"/>
+                    
+        <toolWindow id="Structure Designer" 
+                    anchor="bottom" 
+                    factoryClass="com.modforge.intellij.plugin.designers.structure.StructureDesignerToolWindowFactory" 
+                    icon="/icons/modforge.svg"/>
+                    
+        <toolWindow id="Memory Monitor" 
+                    anchor="bottom" 
+                    factoryClass="com.modforge.intellij.plugin.memory.ui.MemoryToolWindowFactory" 
+                    icon="/icons/modforge.svg"/>
+                    
+        <toolWindow id="Memory Visualization" 
+                    anchor="bottom" 
+                    factoryClass="com.modforge.intellij.plugin.memory.visualization.MemoryVisualizationToolWindowFactory" 
+                    icon="/icons/memory.svg"/>
+        
+        <!-- Project Services -->
+        <projectService serviceImplementation="com.modforge.intellij.plugin.services.AutonomousCodeGenerationService"/>
+        <projectService serviceImplementation="com.modforge.intellij.plugin.services.ContinuousDevelopmentService"/>
+        <projectService serviceImplementation="com.modforge.intellij.plugin.services.MemoryAwareContinuousService"/>
+        <projectService serviceImplementation="com.modforge.intellij.plugin.ai.PatternRecognitionService"/>
+        <projectService serviceImplementation="com.modforge.intellij.plugin.ai.generation.MinecraftCodeGenerator"/>
+        <projectService serviceImplementation="com.modforge.intellij.plugin.debug.MinecraftDebugService"/>
+        <projectService serviceImplementation="com.modforge.intellij.plugin.debug.MinecraftPerformanceMonitor"/>
+        <projectService serviceImplementation="com.modforge.intellij.plugin.designers.advancement.AdvancementManager"/>
+        <projectService serviceImplementation="com.modforge.intellij.plugin.designers.recipe.RecipeManager"/>
+        <projectService serviceImplementation="com.modforge.intellij.plugin.designers.structure.StructureManager"/>
+        <projectService serviceImplementation="com.modforge.intellij.plugin.memory.MemoryOptimizer"/>
+        <projectService serviceImplementation="com.modforge.intellij.plugin.services.MemoryRecoveryService"/>
+        <projectService serviceImplementation="com.modforge.intellij.plugin.github.GitHubIntegrationService"/>
+        <projectService serviceImplementation="com.modforge.intellij.plugin.notifications.ModForgeNotificationService"/>
+        <projectService serviceImplementation="com.modforge.intellij.plugin.templates.ModTemplateService"/>
+        
+        <!-- Application Services -->
+        <applicationService serviceImplementation="com.modforge.intellij.plugin.auth.ModAuthenticationManager"/>
+        <applicationService serviceImplementation="com.modforge.intellij.plugin.settings.ModForgeSettings"/>
+        <applicationService serviceImplementation="com.modforge.intellij.plugin.ai.pattern.PatternLearningSystem"/>
+        <applicationService serviceImplementation="com.modforge.intellij.plugin.memory.MemoryManager"/>
+        <applicationService serviceImplementation="com.modforge.intellij.plugin.memory.settings.MemoryManagementSettings"/>
+        <applicationService serviceImplementation="com.modforge.intellij.plugin.memory.recovery.MemoryRecoveryManager"/>
+        <applicationService serviceImplementation="com.modforge.intellij.plugin.memory.monitoring.MemoryHealthMonitor"/>
+        <applicationService serviceImplementation="com.modforge.intellij.plugin.memory.monitoring.MemorySnapshotManager"/>
+        <applicationService serviceImplementation="com.modforge.intellij.plugin.memory.config.MemoryThresholdConfig"/>
+        
+        <!-- Settings -->
+        <applicationConfigurable parentId="tools" 
+                                instance="com.modforge.intellij.plugin.settings.ModForgeSettingsConfigurable"
+                                id="com.modforge.intellij.plugin.settings.ModForgeSettingsConfigurable" 
+                                displayName="ModForge AI Settings"/>
+                                
+        <applicationConfigurable parentId="com.modforge.intellij.plugin.settings.ModForgeSettingsConfigurable"
+                                instance="com.modforge.intellij.plugin.ai.ui.PatternRecognitionSettingsPanel"
+                                id="com.modforge.intellij.plugin.ai.ui.PatternRecognitionSettingsPanel"
+                                displayName="Pattern Recognition"/>
+                                
+        <applicationConfigurable parentId="com.modforge.intellij.plugin.settings.ModForgeSettingsConfigurable"
+                                instance="com.modforge.intellij.plugin.memory.settings.MemoryManagementSettingsPanel"
+                                id="com.modforge.intellij.plugin.memory.settings.MemoryManagementSettingsPanel"
+                                displayName="Memory Management"/>
+                                
+        <applicationConfigurable parentId="com.modforge.intellij.plugin.memory.settings.MemoryManagementSettingsPanel"
+                                instance="com.modforge.intellij.plugin.memory.config.MemoryThresholdConfigPanel"
+                                id="com.modforge.intellij.plugin.memory.config.MemoryThresholdConfigPanel"
+                                displayName="Memory Thresholds"/>
+                                
+        <!-- Notifications -->
+        <notificationGroup id="ModForge Notifications" 
+                          displayType="BALLOON"/>
+                          
+        <!-- Status Bar Widgets -->
+        <statusBarWidgetFactory implementation="com.modforge.intellij.plugin.memory.ui.MemoryStatusWidget$Factory"/>
+                          
+        <!-- Startup Activities -->
+        <postStartupActivity implementation="com.modforge.intellij.plugin.ModForgePluginActivator"/>
+        <postStartupActivity implementation="com.modforge.intellij.plugin.run.MinecraftRunConfigurationService"/>
+        <postStartupActivity implementation="com.modforge.intellij.plugin.memory.MemoryManagementStartupActivity"/>
+        <postStartupActivity implementation="com.modforge.intellij.plugin.memory.integration.MemoryAwareServiceIntegration"/>
+                          
+        <!-- Mod Loader Contributors -->
+        <com.modforge.intellij.plugin.modLoaderContributor implementation="com.modforge.intellij.plugin.loaders.ForgeLoaderContributor"/>
+        <com.modforge.intellij.plugin.modLoaderContributor implementation="com.modforge.intellij.plugin.loaders.FabricLoaderContributor"/>
+        <com.modforge.intellij.plugin.modLoaderContributor implementation="com.modforge.intellij.plugin.loaders.QuiltLoaderContributor"/>
+        <com.modforge.intellij.plugin.modLoaderContributor implementation="com.modforge.intellij.plugin.loaders.ArchitecturyLoaderContributor"/>
+        
+        <!-- Run Configurations -->
+        <configurationType implementation="com.modforge.intellij.plugin.run.MinecraftRunConfigurationType"/>
+    </extensions>
+    
+    <actions>
+        <!-- Actions Group -->
+        <group id="ModForge.ActionGroup" text="ModForge AI" description="ModForge AI actions" popup="true">
+            <add-to-group group-id="ToolsMenu" anchor="last"/>
+            
+            <!-- Authentication Actions -->
+            <action id="ModForge.LoginAction"
+                    class="com.modforge.intellij.plugin.actions.LoginAction"
+                    text="Login to ModForge"
+                    description="Login to ModForge server">
+            </action>
+            <action id="ModForge.LogoutAction"
+                    class="com.modforge.intellij.plugin.actions.LogoutAction"
+                    text="Logout from ModForge server"
+                    description="Logout from ModForge server">
+            </action>
+            <separator/>
+            
+            <!-- Code Generation Actions -->
+            <action id="ModForge.GenerateCodeAction"
+                    class="com.modforge.intellij.plugin.actions.GenerateCodeAction"
+                    text="Generate Code with AI"
+                    description="Generate code using AI">
+                <keyboard-shortcut keymap="$default" first-keystroke="alt shift G"/>
+            </action>
+            <action id="ModForge.GenerateMinecraftCodeAction"
+                    class="com.modforge.intellij.plugin.actions.GenerateMinecraftCodeAction"
+                    text="Generate Minecraft Code"
+                    description="Generate Minecraft-specific code with templates">
+                <keyboard-shortcut keymap="$default" first-keystroke="alt shift M"/>
+            </action>
+            <action id="ModForge.FixErrorsAction"
+                    class="com.modforge.intellij.plugin.actions.FixErrorsAction"
+                    text="Fix Errors with AI"
+                    description="Fix compilation errors using AI">
+                <keyboard-shortcut keymap="$default" first-keystroke="alt shift F"/>
+            </action>
+            <separator/>
+            
+            <!-- Template Actions -->
+            <action id="ModForge.CreateFromTemplateAction"
+                    class="com.modforge.intellij.plugin.actions.CreateFromTemplateAction"
+                    text="Create Mod from Template"
+                    description="Create a new mod from a template">
+            </action>
+            <separator/>
+            
+            <!-- Continuous Development Actions -->
+            <action id="ModForge.ToggleContinuousDevelopmentAction"
+                    class="com.modforge.intellij.plugin.actions.ToggleContinuousDevelopmentAction"
+                    text="Toggle Continuous Development"
+                    description="Enable or disable continuous development">
+            </action>
+            <action id="ModForge.ToggleMemoryAwareContinuousServiceAction"
+                    class="com.modforge.intellij.plugin.memory.actions.ToggleMemoryAwareContinuousServiceAction"
+                    text="Toggle Memory-Aware Continuous Service"
+                    description="Enable or disable memory-aware continuous service">
+            </action>
+            <action id="ModForge.TogglePatternRecognitionAction"
+                    class="com.modforge.intellij.plugin.actions.TogglePatternRecognitionAction"
+                    text="Toggle Pattern Recognition"
+                    description="Enable or disable pattern recognition">
+            </action>
+            <action id="ModForge.OptimizeMemoryAction"
+                    class="com.modforge.intellij.plugin.memory.actions.OptimizeMemoryAction"
+                    text="Optimize Memory"
+                    description="Perform memory optimization">
+            </action>
+            <action id="ModForge.ResetMemorySystemAction"
+                    class="com.modforge.intellij.plugin.actions.ResetMemorySystemAction"
+                    text="Reset Memory Management System"
+                    description="Reset all memory management components and services">
+            </action>
+            <separator/>
+            
+            <!-- GitHub Actions -->
+            <action id="ModForge.PushToGitHubAction"
+                    class="com.modforge.intellij.plugin.actions.PushToGitHubAction"
+                    text="Push to GitHub"
+                    description="Push mod to GitHub repository">
+            </action>
+            <separator/>
+            
+            <!-- Run Configuration Actions -->
+            <action id="ModForge.AutoConfigureMinecraftRunAction"
+                    class="com.modforge.intellij.plugin.run.AutoConfigureMinecraftRunAction"
+                    text="Auto-Configure Minecraft Runs"
+                    description="Automatically create run configurations for client, server, and data generation">
+            </action>
+            <separator/>
+            
+            <!-- Designer Actions -->
+            <action id="ModForge.OpenAdvancementDesignerAction"
+                    class="com.modforge.intellij.plugin.designers.advancement.OpenAdvancementDesignerAction"
+                    text="Open Advancement Designer"
+                    description="Open the Minecraft advancement designer">
+            </action>
+            <action id="ModForge.OpenRecipeDesignerAction"
+                    class="com.modforge.intellij.plugin.designers.recipe.OpenRecipeDesignerAction"
+                    text="Open Recipe Designer"
+                    description="Open the Minecraft recipe designer">
+            </action>
+            <action id="ModForge.OpenStructureDesignerAction"
+                    class="com.modforge.intellij.plugin.designers.structure.OpenStructureDesignerAction"
+                    text="Open Structure Designer"
+                    description="Open the Minecraft structure designer">
+            </action>
+            <separator/>
+            
+            <!-- Optimization Actions -->
+            <action id="ModForge.AnalyzeModPerformanceAction"
+                    class="com.modforge.intellij.plugin.actions.AnalyzeModPerformanceAction"
+                    text="Analyze Mod Performance"
+                    description="Analyze your mod for performance issues">
+            </action>
+            <action id="ModForge.OptimizeModCodeAction"
+                    class="com.modforge.intellij.plugin.actions.OptimizeModCodeAction"
+                    text="Optimize Mod Code"
+                    description="Optimize your mod code for better performance">
+            </action>
+            <separator/>
+            
+            <!-- Settings Actions -->
+            <action id="ModForge.OpenSettingsAction"
+                    class="com.modforge.intellij.plugin.actions.OpenSettingsAction"
+                    text="Open ModForge Settings"
+                    description="Open ModForge plugin settings">
+            </action>
+        </group>
+        
+        <!-- Editor Popup Menu Actions -->
+        <action id="ModForge.EditorPopupAction" 
+                class="com.modforge.intellij.plugin.actions.EditorPopupAction"
+                text="ModForge AI Options"
+                description="ModForge AI options">
+            <add-to-group group-id="EditorPopupMenu" anchor="last"/>
+        </action>
+        
+        <!-- Project View Popup Menu Actions -->
+        <action id="ModForge.ProjectViewPopupAction" 
+                class="com.modforge.intellij.plugin.actions.ProjectViewPopupAction"
+                text="ModForge AI Options"
+                description="ModForge AI options">
+            <add-to-group group-id="ProjectViewPopupMenu" anchor="last"/>
+        </action>
+    </actions>
+</idea-plugin>
