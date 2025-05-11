@@ -595,6 +595,8 @@ for %%m in (getBaseDir findFileByPath getInstanceEx getFileSystem resolveFile) d
             echo **Suggested fix:** Use VirtualFileManager.getInstance().getFileSystem(StandardFileSystems.FILE_PROTOCOL) >> "%RESOLUTION_ERRORS_REPORT%"
         ) else if "%%m"=="resolveFile" (
             echo **Suggested fix:** Use CompatibilityUtil.findPsiFile(project, file) >> "%RESOLUTION_ERRORS_REPORT%"
+        ) else (
+            echo **Suggested fix:** Use compatibility wrapper methods >> "%RESOLUTION_ERRORS_REPORT%"
         )
         
         echo. >> "%RESOLUTION_ERRORS_REPORT%"
