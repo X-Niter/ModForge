@@ -1,16 +1,16 @@
 <idea-plugin>
-    <extensions defaultExtensionNs="com.intellij">
-        <!-- GitHub integration services -->
-        <projectService serviceImplementation="com.modforge.intellij.plugin.github.GitHubIntegrationService"/>
-    </extensions>
-    
-    <actions>
-        <group id="ModForge.GitHub.ActionGroup">
-            <action id="ModForge.PushToGitHubAction"
-                    class="com.modforge.intellij.plugin.actions.PushToGitHubAction"
-                    text="Push to GitHub"
-                    description="Push mod to GitHub repository">
-            </action>
-        </group>
-    </actions>
+  <extensions defaultExtensionNs="com.intellij">
+    <!-- GitHub integration services -->
+    <projectService serviceImplementation="com.modforge.intellij.plugin.github.GitHubIntegrationService"/>
+  </extensions>
+  
+  <actions>
+    <group id="ModForge.GitHubGroup">
+      <action id="ModForge.PushToGitHubAction"
+              class="com.modforge.intellij.plugin.actions.PushToGitHubAction"
+              text="Push to GitHub"
+              description="Push mod to GitHub repository">
+      </action>
+    </group>
+  </actions>
 </idea-plugin>

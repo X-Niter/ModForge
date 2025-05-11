@@ -1,26 +1,6 @@
 <idea-plugin>
-    <extensions defaultExtensionNs="com.intellij">
-        <!-- Minecraft-specific services -->
-        <projectService serviceImplementation="com.modforge.intellij.plugin.minecraft.MinecraftIntegrationService"/>
-    </extensions>
-    
-    <actions>
-        <group id="ModForge.Minecraft.ActionGroup">
-            <action id="ModForge.OpenAdvancementDesignerAction"
-                    class="com.modforge.intellij.plugin.designers.advancement.OpenAdvancementDesignerAction"
-                    text="Open Advancement Designer"
-                    description="Open the Minecraft advancement designer">
-            </action>
-            <action id="ModForge.OpenRecipeDesignerAction"
-                    class="com.modforge.intellij.plugin.designers.recipe.OpenRecipeDesignerAction"
-                    text="Open Recipe Designer"
-                    description="Open the Minecraft recipe designer">
-            </action>
-            <action id="ModForge.OpenStructureDesignerAction"
-                    class="com.modforge.intellij.plugin.designers.structure.OpenStructureDesignerAction"
-                    text="Open Structure Designer"
-                    description="Open the Minecraft structure designer">
-            </action>
-        </group>
-    </actions>
+  <extensions defaultExtensionNs="com.intellij">
+    <!-- Minecraft development integration services -->
+    <projectService serviceImplementation="com.modforge.intellij.plugin.minecraft.MinecraftIntegrationService"/>
+  </extensions>
 </idea-plugin>

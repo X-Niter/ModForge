@@ -1,6 +1,6 @@
 <idea-plugin>
-    <extensions defaultExtensionNs="com.intellij">
-        <!-- Git integration services -->
-        <projectService serviceImplementation="com.modforge.intellij.plugin.git.GitIntegrationService"/>
-    </extensions>
+  <extensions defaultExtensionNs="com.intellij">
+    <!-- Git integration services -->
+    <projectService serviceImplementation="com.modforge.intellij.plugin.git.GitIntegrationService"/>
+  </extensions>
 </idea-plugin>
