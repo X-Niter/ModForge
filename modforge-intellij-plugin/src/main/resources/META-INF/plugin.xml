@@ -79,6 +79,11 @@
                     anchor="bottom" 
                     factoryClass="com.modforge.intellij.plugin.memory.ui.MemoryToolWindowFactory" 
                     icon="/icons/modforge.svg"/>
+                    
+        <toolWindow id="Memory Visualization" 
+                    anchor="bottom" 
+                    factoryClass="com.modforge.intellij.plugin.memory.visualization.MemoryVisualizationToolWindowFactory" 
+                    icon="/icons/memory.svg"/>
         
         <!-- Project Services -->
         <projectService serviceImplementation="com.modforge.intellij.plugin.services.AutonomousCodeGenerationService"/>
@@ -123,6 +128,11 @@
                                 instance="com.modforge.intellij.plugin.memory.settings.MemoryManagementSettingsPanel"
                                 id="com.modforge.intellij.plugin.memory.settings.MemoryManagementSettingsPanel"
                                 displayName="Memory Management"/>
+                                
+        <applicationConfigurable parentId="com.modforge.intellij.plugin.memory.settings.MemoryManagementSettingsPanel"
+                                instance="com.modforge.intellij.plugin.memory.config.MemoryThresholdConfigPanel"
+                                id="com.modforge.intellij.plugin.memory.config.MemoryThresholdConfigPanel"
+                                displayName="Memory Thresholds"/>
                                 
         <!-- Notifications -->
         <notificationGroup id="ModForge Notifications" 

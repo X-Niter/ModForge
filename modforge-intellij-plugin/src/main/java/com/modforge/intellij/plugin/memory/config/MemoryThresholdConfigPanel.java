@@ -28,7 +28,7 @@ import java.util.Map;
 /**
  * Configuration panel for memory thresholds
  */
-public class MemoryThresholdConfigPanel extends ConfigurableBase<MemoryThresholdConfigPanel, MemoryThresholdConfig.State> {
+public class MemoryThresholdConfigPanel extends ConfigurableBase<MemoryThresholdConfigPanel.Form, MemoryThresholdConfig.State> {
     private JPanel mainPanel;
     private JComboBox<String> environmentComboBox;
     private JButton addEnvironmentButton;
