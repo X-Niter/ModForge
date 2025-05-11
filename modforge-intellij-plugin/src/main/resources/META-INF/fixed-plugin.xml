@@ -33,6 +33,9 @@
     <extensions defaultExtensionNs="com.intellij">
         <!-- Services -->
         <projectService serviceImplementation="com.modforge.intellij.plugin.services.ModForgeNotificationService"/>
+        <projectService serviceImplementation="com.modforge.intellij.plugin.services.AutonomousCodeGenerationService"/>
+        <applicationService serviceImplementation="com.modforge.intellij.plugin.services.ModAuthenticationManager"/>
+        <applicationService serviceImplementation="com.modforge.intellij.plugin.settings.ModForgeSettings"/>
         
         <!-- Notification Group -->
         <notificationGroup id="ModForge Notifications" displayType="BALLOON" />
