@@ -37,11 +37,11 @@ intellij {
     // or provide a path to your local IntelliJ installation that has these plugins
     plugins = [
         'java',
-        'Git4Idea:251.12.23774.435', // Explicitly use version that matches IntelliJ IDEA 2025.1
-        'org.jetbrains.plugins.github:251.12.23774.435',
-        'org.jetbrains.plugins.terminal:251.12.23774.435',
+        'git4idea', // Use lowercase plugin ID without version for built-in plugins
+        'github',   // Use lowercase plugin ID without version for built-in plugins
+        'terminal', // Use lowercase plugin ID without version for built-in plugins
         // Minecraft Development plugin is required per plugin.xml dependency
-        'com.demonwav.minecraft-dev:2025.1-1.8.4'
+        'com.demonwav.minecraft-dev:2025.1.2+' // Use a more flexible version matching
     ]
     
     // Uncomment and modify the following line to use your local IntelliJ installation
