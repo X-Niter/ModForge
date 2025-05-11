@@ -1,5 +1,6 @@
 package com.modforge.intellij.plugin.ai.generation;
 
+import java.util.Arrays;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.components.Service;
 import com.intellij.openapi.diagnostic.Logger;

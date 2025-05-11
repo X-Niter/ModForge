@@ -1,6 +1,6 @@
 package com.modforge.intellij.plugin.listeners;
 
-import com.intellij.compiler.CompilationStatusListener;
+import com.intellij.openapi.compiler.CompilationStatusListener;
 import com.intellij.notification.Notification;
 import com.intellij.notification.NotificationType;
 import com.intellij.notification.Notifications;

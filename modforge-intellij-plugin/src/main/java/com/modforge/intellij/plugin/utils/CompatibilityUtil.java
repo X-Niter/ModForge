@@ -5,43 +5,43 @@ import com.intellij.openapi.vfs.VirtualFile;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import java.nio.file.Path;
+import java.nio.file.Paths;
+
 /**
- * Utilities for maintaining compatibility with different versions of IntelliJ IDEA.
- * Contains methods to handle API changes between versions.
+ * Utility class for handling compatibility with different IntelliJ versions.
+ * This helps maintain backward compatibility while supporting newer IntelliJ API.
  */
 public class CompatibilityUtil {
 
     /**
-     * Gets the project base directory in a way that's compatible with all IntelliJ versions.
-     * Replaces the deprecated Project.getBaseDir() method with modern equivalents.
+     * Gets the base directory for a project, handling API changes between IntelliJ versions.
+     * Replaces the deprecated Project.getBaseDir() method with a compatible implementation.
      *
-     * @param project The project
-     * @return The project base directory, or null if not available
+     * @param project the IntelliJ project
+     * @return the base directory virtual file, or null if not available
      */
     @Nullable
     public static VirtualFile getProjectBaseDir(@NotNull Project project) {
-        try {
-            // First try the newer API (2020.3+): ProjectUtil.guessProjectDir()
-            try {
-                Class<?> projectUtilClass = Class.forName("com.intellij.openapi.project.ProjectUtil");
-                java.lang.reflect.Method guessProjectDirMethod = 
-                        projectUtilClass.getMethod("guessProjectDir", Project.class);
-                return (VirtualFile) guessProjectDirMethod.invoke(null, project);
-            } catch (Exception ignored) {
-                // Fall back to older API
-            }
-            
-            // Fall back to the deprecated method for older versions
-            try {
-                java.lang.reflect.Method getBaseDirMethod = Project.class.getMethod("getBaseDir");
-                return (VirtualFile) getBaseDirMethod.invoke(project);
-            } catch (Exception ignored) {
-                // Neither method is available
-            }
-            
-            return null;
-        } catch (Exception e) {
+        // In IntelliJ 2020.3+, getBasePath() is the preferred method
+        String basePath = project.getBasePath();
+        if (basePath == null) {
             return null;
         }
+        
+        // Convert the path to a VirtualFile
+        Path path = Paths.get(basePath);
+        return VirtualFileUtil.pathToVirtualFile(path);
+    }
+    
+    /**
+     * Gets the base directory path for a project as a string.
+     *
+     * @param project the IntelliJ project
+     * @return the base directory path, or null if not available
+     */
+    @Nullable
+    public static String getProjectBasePath(@NotNull Project project) {
+        return project.getBasePath();
     }
 }

@@ -1,0 +1,63 @@
+package com.modforge.intellij.plugin.utils;
+
+import com.intellij.openapi.vfs.LocalFileSystem;
+import com.intellij.openapi.vfs.VirtualFile;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
+
+import java.io.File;
+import java.nio.file.Path;
+
+/**
+ * Utility class for working with VirtualFile operations.
+ */
+public class VirtualFileUtil {
+
+    /**
+     * Converts a java.nio.file.Path to a VirtualFile.
+     *
+     * @param path The Path to convert
+     * @return The VirtualFile, or null if the file doesn't exist
+     */
+    @Nullable
+    public static VirtualFile pathToVirtualFile(@NotNull Path path) {
+        return LocalFileSystem.getInstance().findFileByIoFile(path.toFile());
+    }
+
+    /**
+     * Converts a java.io.File to a VirtualFile.
+     *
+     * @param file The File to convert
+     * @return The VirtualFile, or null if the file doesn't exist
+     */
+    @Nullable
+    public static VirtualFile fileToVirtualFile(@NotNull File file) {
+        return LocalFileSystem.getInstance().findFileByIoFile(file);
+    }
+
+    /**
+     * Converts a path string to a VirtualFile.
+     *
+     * @param path The path string to convert
+     * @return The VirtualFile, or null if the path doesn't exist
+     */
+    @Nullable
+    public static VirtualFile stringToVirtualFile(@NotNull String path) {
+        return LocalFileSystem.getInstance().findFileByPath(path);
+    }
+
+    /**
+     * Refreshes a VirtualFile to ensure its contents are up-to-date.
+     *
+     * @param file The VirtualFile to refresh
+     * @return The refreshed VirtualFile, or null if the file is null
+     */
+    @Nullable
+    public static VirtualFile refreshAndGetFile(@Nullable VirtualFile file) {
+        if (file == null) {
+            return null;
+        }
+        file.refresh(false, false);
+        return file;
+    }
+}
