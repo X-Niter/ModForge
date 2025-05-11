@@ -13,19 +13,23 @@ setlocal EnableDelayedExpansion
 :: - Installs to IntelliJ automatically
 :: ========================================================
 
-:: Script configuration
-set "VERSION=3.0.0"
-set "PLUGIN_VERSION=2.1.0"
-set "LOG_FILE=ultimate-builder.log"
-set "MIN_JAVA_VERSION=21"
-set "JDK_DOWNLOAD_URL=https://download.oracle.com/java/21/latest/jdk-21_windows-x64_bin.exe"
-set "ADOPTIUM_URL=https://api.adoptium.net/v3/installer/latest/21/ga/windows/x64/jdk/hotspot/normal/eclipse"
-set "BACKUP_DIR=backup_%DATE:~-4%-%DATE:~4,2%-%DATE:~7,2%_%TIME:~0,2%%TIME:~3,2%%TIME:~6,2%"
-set "BACKUP_DIR=%BACKUP_DIR: =0%"
-set "FOUND_JAVA21=0"
-set "FOUND_GRADLE=0"
-set "BUILD_SUCCESS=0"
-set "IJ_PLUGIN_PATH=build\distributions\modforge-intellij-plugin-%PLUGIN_VERSION%.zip"
+:: ===================================
+:: CONFIGURATION SECTION
+:: ===================================
+SET "VERSION=3.0.1"
+SET "PLUGIN_VERSION=2.1.0"
+SET "LOG_FILE=ultimate-builder.log"
+SET "MIN_JAVA_VERSION=21"
+SET "JDK_DOWNLOAD_URL=https://download.oracle.com/java/21/latest/jdk-21_windows-x64_bin.exe"
+SET "ADOPTIUM_URL=https://api.adoptium.net/v3/installer/latest/21/ga/windows/x64/jdk/hotspot/normal/eclipse"
+SET "BACKUP_DIR=backup_%DATE:~-4%-%DATE:~4,2%-%DATE:~7,2%_%TIME:~0,2%%TIME:~3,2%%TIME:~6,2%"
+SET "BACKUP_DIR=%BACKUP_DIR: =0%"
+SET "FOUND_JAVA21=0"
+SET "FOUND_GRADLE=0"
+SET "BUILD_SUCCESS=0"
+SET "HAS_POWERSHELL=0"
+SET "IS_ADMIN=0"
+SET "IJ_PLUGIN_PATH=build\distributions\modforge-intellij-plugin-%PLUGIN_VERSION%.zip"
 
 :: Make sure script works in all shells
 chcp 65001 > nul 2>&1
@@ -36,207 +40,577 @@ echo ModForge IntelliJ IDEA Plugin - ULTIMATE Builder v%VERSION% > "%LOG_FILE%"
 echo Started: %DATE% %TIME% >> "%LOG_FILE%"
 echo ======================================================== >> "%LOG_FILE%"
 
-:: Display header - compatible with all command shells
+:: ===================================
+:: DISPLAY HEADER
+:: ===================================
 cls
 echo.
 echo ========================================================
 echo   ModForge IntelliJ Plugin - ULTIMATE Universal Builder
 echo ========================================================
+echo   Version %VERSION% - Building plugin v%PLUGIN_VERSION%
+echo ========================================================
 echo.
 
-:: Check if running with admin privileges
+:: Log function
+:: Usage: CALL :LOG "Your message here"
+:LOG
+    echo %* >> "%LOG_FILE%"
+    echo %*
+    goto :EOF
+
+:: ===================================
+:: CHECK PERMISSIONS & CAPABILITIES
+:: ===================================
 net session >nul 2>&1
 if %errorlevel% == 0 (
-    set "IS_ADMIN=1"
-    call :log "Running with administrator privileges."
+    SET "IS_ADMIN=1"
+    CALL :LOG "Running with administrator privileges."
 ) else (
-    set "IS_ADMIN=0"
-    call :log "Not running with administrator privileges. Some operations may require elevation."
+    SET "IS_ADMIN=0"
+    CALL :LOG "Not running with administrator privileges. Some operations may require elevation."
 )
 
-:: Check for PowerShell support - but we'll only use it if necessary
+:: Check for PowerShell support
 powershell -Command "exit" 2>nul
 if %errorlevel% equ 0 (
-    set "HAS_POWERSHELL=1"
+    SET "HAS_POWERSHELL=1"
+    CALL :LOG "PowerShell is available."
 ) else (
-    set "HAS_POWERSHELL=0"
+    SET "HAS_POWERSHELL=0"
+    CALL :LOG "PowerShell is not available. Some features will be limited."
 )
 
-:: Create backup
-call :backup_project
+:: ===================================
+:: BACKUP PROJECT FILES
+:: ===================================
+CALL :LOG "Creating backup in %BACKUP_DIR%"
 
-:: 1. Check for Java 21
-call :check_java
+if not exist "%BACKUP_DIR%" mkdir "%BACKUP_DIR%"
+
+if exist "src" xcopy /E /Y /Q src "%BACKUP_DIR%\src\" > nul
+if exist "build.gradle" copy build.gradle "%BACKUP_DIR%\build.gradle" > nul
+if exist "gradle.properties" copy gradle.properties "%BACKUP_DIR%\gradle.properties" > nul
+
+CALL :LOG "Backup completed"
+
+:: ===================================
+:: JAVA DETECTION
+:: ===================================
+CALL :LOG "Checking for Java installation..."
+
+:: First check if Java is in PATH
+java -version >nul 2>&1
+if %errorlevel% == 0 (
+    for /f "tokens=*" %%v in ('java -version 2^>^&1 ^| findstr /i "version"') do (
+        SET "JAVA_VERSION=%%v"
+        
+        echo !JAVA_VERSION! | findstr /i "21" >nul
+        if !errorlevel! == 0 (
+            CALL :LOG "Found Java 21 in PATH: !JAVA_VERSION!"
+            
+            :: Find proper Java home - looking for a real JDK
+            CALL :FIND_REAL_JAVA_HOME
+            
+            SET "FOUND_JAVA21=1"
+        ) else (
+            CALL :LOG "Found Java in PATH but not version 21: !JAVA_VERSION!"
+            
+            SET /P USER_CHOICE="Would you like to download and install Java 21? (y/n): "
+            if /i "!USER_CHOICE!" == "y" (
+                CALL :DOWNLOAD_JAVA
+            ) else (
+                CALL :LOG "Continuing with existing Java version. This might cause issues."
+                
+                for /f "tokens=*" %%j in ('where java 2^>nul') do (
+                    SET "JAVA_EXE=%%j"
+                    :: Get parent directory
+                    for %%i in ("!JAVA_EXE!") do SET "JAVA_BIN_DIR=%%~dpi"
+                    for %%i in ("!JAVA_BIN_DIR:~0,-1!") do SET "POTENTIAL_JAVA_HOME=%%~dpi"
+                    SET "POTENTIAL_JAVA_HOME=!POTENTIAL_JAVA_HOME:~0,-1!"
+                    
+                    if exist "!JAVA_BIN_DIR!javac.exe" (
+                        SET "JAVA_PATH=!POTENTIAL_JAVA_HOME!"
+                    ) else (
+                        SET "JAVA_PATH=!JAVA_BIN_DIR!.."
+                    )
+                    CALL :LOG "Java path: !JAVA_PATH!"
+                )
+                
+                SET "FOUND_JAVA21=1"
+            )
+        )
+    )
+) else (
+    CALL :LOG "Java not found in PATH."
+    
+    :: Check JAVA_HOME
+    if defined JAVA_HOME (
+        CALL :LOG "JAVA_HOME is set to: %JAVA_HOME%"
+        if exist "%JAVA_HOME%\bin\java.exe" (
+            "%JAVA_HOME%\bin\java.exe" -version >nul 2>&1
+            if !errorlevel! == 0 (
+                CALL :LOG "Found Java via JAVA_HOME"
+                SET "JAVA_PATH=%JAVA_HOME%"
+                
+                "%JAVA_HOME%\bin\java.exe" -version 2>&1 | findstr /i "21" >nul
+                if !errorlevel! == 0 (
+                    CALL :LOG "Found Java 21 in JAVA_HOME"
+                    SET "FOUND_JAVA21=1"
+                ) else (
+                    CALL :LOG "JAVA_HOME points to Java but not version 21"
+                    
+                    SET /P USER_CHOICE="Would you like to download and install Java 21? (y/n): "
+                    if /i "!USER_CHOICE!" == "y" (
+                        CALL :DOWNLOAD_JAVA
+                    ) else (
+                        CALL :LOG "Continuing with existing Java version. This might cause issues."
+                        SET "FOUND_JAVA21=1"
+                    )
+                )
+            )
+        ) else (
+            CALL :LOG "JAVA_HOME is set but java.exe not found at %JAVA_HOME%\bin\java.exe"
+        )
+    )
+    
+    if "!FOUND_JAVA21!" == "0" (
+        :: Comprehensive search
+        CALL :LOG "Performing comprehensive search for Java 21..."
+        CALL :SEARCH_JAVA21_COMPREHENSIVE
+        
+        if "!FOUND_JAVA21!" == "0" (
+            SET /P USER_CHOICE="Java 21 not found. Would you like to download and install it? (y/n): "
+            if /i "!USER_CHOICE!" == "y" (
+                CALL :DOWNLOAD_JAVA
+            ) else (
+                CALL :LOG "Cannot continue without Java 21."
+                pause
+                exit /b 1
+            )
+        )
+    )
+)
+
+:: Ensure we have the normalized path for Gradle
+SET "JAVA_PATH_NORMALIZED=%JAVA_PATH:\=/%"
+CALL :LOG "Using Java path: %JAVA_PATH%"
+CALL :LOG "Normalized Java path: %JAVA_PATH_NORMALIZED%"
+
 if "%FOUND_JAVA21%" == "0" (
-    call :log "Cannot continue without Java 21."
+    CALL :LOG "Failed to find or install Java 21. Cannot continue."
     pause
     exit /b 1
 )
 
-:: 2. Check for Gradle
-call :check_gradle
+:: ===================================
+:: GRADLE SETUP
+:: ===================================
+CALL :LOG "Checking Gradle installation..."
+
+:: First look for Gradle wrapper
+if exist "gradlew" (
+    CALL :LOG "Found Gradle wrapper (gradlew)"
+    SET "GRADLE_CMD=.\gradlew"
+    SET "FOUND_GRADLE=1"
+) else if exist "gradlew.bat" (
+    CALL :LOG "Found Gradle wrapper (gradlew.bat)"
+    SET "GRADLE_CMD=.\gradlew.bat"
+    SET "FOUND_GRADLE=1"
+) else (
+    :: Check for Gradle in PATH
+    gradle --version >nul 2>&1
+    if !errorlevel! == 0 (
+        for /f "tokens=*" %%g in ('where gradle 2^>nul') do (
+            SET "GRADLE_EXE=%%g"
+            CALL :LOG "Found Gradle in PATH: !GRADLE_EXE!"
+        )
+        SET "GRADLE_CMD=gradle"
+        SET "FOUND_GRADLE=1"
+    ) else (
+        :: Create wrapper
+        CALL :LOG "Gradle not found. Creating Gradle wrapper..."
+        CALL :CREATE_GRADLE_WRAPPER
+    )
+)
+
 if "%FOUND_GRADLE%" == "0" (
-    call :log "Cannot continue without Gradle."
+    CALL :LOG "Failed to find or create Gradle. Cannot continue."
     pause
     exit /b 1
 )
 
-:: 3. Configure Gradle
-call :configure_gradle
+:: ===================================
+:: GRADLE CONFIGURATION
+:: ===================================
+CALL :LOG "Configuring Gradle for build..."
 
-:: 4. Fix code issues
-call :fix_code_issues
+:: Check if build.gradle exists
+if not exist "build.gradle" (
+    CALL :LOG "build.gradle not found. Cannot continue."
+    pause
+    exit /b 1
+)
 
-:: 5. Build the plugin
-call :build_plugin
+:: Create or update gradle.properties
+if exist "gradle.properties" (
+    copy gradle.properties gradle.properties.bak > nul
+    CALL :LOG "Backed up gradle.properties"
+)
+
+:: Create or update gradle.properties with the correct Java path
+(
+    echo # Gradle properties for ModForge - Generated by ULTIMATE Builder
+    echo # %DATE% %TIME%
+    echo.
+    echo # Set Java home for building
+    echo org.gradle.java.home=%JAVA_PATH_NORMALIZED%
+    echo.
+    echo # Disable configuration cache to avoid issues
+    echo org.gradle.configuration-cache=false
+    echo.
+    echo # Increase memory for Gradle tasks
+    echo org.gradle.jvmargs=-Xmx2048m --add-opens=java.base/java.util=ALL-UNNAMED --add-opens=java.base/java.lang=ALL-UNNAMED -XX:+HeapDumpOnOutOfMemoryError -Dfile.encoding=UTF-8
+    echo.
+    echo # Enable parallel execution
+    echo org.gradle.parallel=true
+    echo.
+    echo # Optimize Gradle daemon
+    echo org.gradle.daemon=true
+    echo org.gradle.caching=true
+) > gradle.properties
+
+CALL :LOG "Updated gradle.properties with correct Java home path: %JAVA_PATH_NORMALIZED%"
+
+:: ===================================
+:: BUILD PROCESS
+:: ===================================
+CALL :LOG "Checking for and fixing common code issues..."
+
+:: Apply fixes for common issues
+if "%HAS_POWERSHELL%" == "1" (
+    CALL :LOG "Applying automated fixes using PowerShell..."
+    
+    :: Fix common import issues
+    powershell -Command "& { $ErrorActionPreference = 'SilentlyContinue'; $allFiles = Get-ChildItem -Path 'src\main\java' -Filter '*.java' -Recurse; foreach ($file in $allFiles) { $content = Get-Content $file.FullName -Raw; if ($content -match 'Arrays\.' -and -not ($content -match 'import java\.util\.Arrays')) { $content = $content -replace 'package com\.modforge', 'package com.modforge\r\n\r\nimport java.util.Arrays;'; $content | Set-Content $file.FullName -Encoding UTF8 }; if ($content -match 'CompletableFuture' -and -not ($content -match 'import java\.util\.concurrent\.CompletableFuture')) { $content = $content -replace 'package com\.modforge', 'package com.modforge\r\n\r\nimport java.util.concurrent.CompletableFuture;'; $content | Set-Content $file.FullName -Encoding UTF8 }; if ($content -match 'problem\.getDescription\(\)') { $content = $content -replace 'problem\.getDescription\(\)', 'problem.toString()'; $content | Set-Content $file.FullName -Encoding UTF8 }; if ($content -match 'WebSocketClient' -and -not ($content -match 'import org\.java_websocket\.client\.WebSocketClient')) { $content = $content -replace 'package com\.modforge', 'package com.modforge\r\n\r\nimport org.java_websocket.client.WebSocketClient;\r\nimport org.java_websocket.handshake.ServerHandshake;'; $content | Set-Content $file.FullName -Encoding UTF8 }; if ($content -match 'NotificationType' -and -not ($content -match 'import com\.intellij\.notification\.NotificationType')) { $content = $content -replace 'package com\.modforge', 'package com.modforge\r\n\r\nimport com.intellij.notification.NotificationType;'; $content | Set-Content $file.FullName -Encoding UTF8 }; if ($content -match 'Messages\.showInfoDialog\(') { $content = $content -replace 'Messages\.showInfoDialog\((.*?),(.*?),(.*?)\)', 'Messages.showMessageDialog($1,$2,$3, Messages.getInformationIcon())'; $content | Set-Content $file.FullName -Encoding UTF8 }; if ($content -match 'notificationService\.showInfo\(') { $content = $content -replace 'notificationService\.showInfo\((.*?),(.*?)\)', 'notificationService.notify($1,$2,NotificationType.INFORMATION)'; $content | Set-Content $file.FullName -Encoding UTF8 }; if ($content -match 'notificationService\.showError\(') { $content = $content -replace 'notificationService\.showError\((.*?),(.*?)\)', 'notificationService.notify($1,$2,NotificationType.ERROR)'; $content | Set-Content $file.FullName -Encoding UTF8 }; if ($content -match 'AutonomousCodeGenerationService\.getInstance\(project\)') { $content = $content -replace 'AutonomousCodeGenerationService\.getInstance\(project\)', 'project.getService(AutonomousCodeGenerationService.class)'; $content | Set-Content $file.FullName -Encoding UTF8 }; } }"
+    
+    :: Fix PushToGitHubDialog issues
+    powershell -Command "& { $dialogFiles = Get-ChildItem -Path 'src\main\java' -Filter 'PushToGitHubDialog.java' -Recurse; foreach ($file in $dialogFiles) { $content = Get-Content $file.FullName -Raw; if ($content -match 'public String getOwner\(\)') { $content = $content -replace 'public String getOwner\(\)', 'public String getRepositoryOwner()'; $content = $content -replace 'getOwner\(\)', 'getRepositoryOwner()'; $content | Set-Content $file.FullName -Encoding UTF8 } } }"
+    
+    :: Update plugin.xml compatibility
+    if exist "src\main\resources\META-INF\plugin.xml" (
+        powershell -Command "& { $content = Get-Content 'src\main\resources\META-INF\plugin.xml' -Raw; if ($content -match 'idea-version since-build') { $content = $content -replace '(since-build=.+? until-build=.)([^\"]+)(.)', '$1251.*$3'; $content | Set-Content 'src\main\resources\META-INF\plugin.xml' -Encoding UTF8; } }"
+        CALL :LOG "Updated plugin.xml compatibility version"
+    )
+) else (
+    CALL :LOG "PowerShell not available for automated fixes. Proceeding without code fixes."
+)
+
+:: ===================================
+:: BUILD THE PLUGIN
+:: ===================================
+CALL :LOG "Building ModForge IntelliJ plugin..."
+
+:: Run the build
+CALL :LOG "Running Gradle build..."
+%GRADLE_CMD% clean build > build.log 2>&1
+
+:: Check if build succeeded
+if exist "%IJ_PLUGIN_PATH%" (
+    CALL :LOG "Plugin built successfully!"
+    SET "BUILD_SUCCESS=1"
+) else (
+    :: Try with validation disabled
+    CALL :LOG "Build failed, trying with validation disabled..."
+    
+    :: Create a temporary copy of build.gradle
+    if exist "build.gradle" (
+        copy build.gradle build.gradle.bak > nul
+        
+        :: Disable validation in build.gradle
+        if "%HAS_POWERSHELL%" == "1" (
+            :: Using PowerShell for more precise replacement
+            powershell -Command "(Get-Content build.gradle) -replace 'tasks.buildPlugin.dependsOn\(validatePluginForProduction\)', '// tasks.buildPlugin.dependsOn(validatePluginForProduction) // Disabled by ULTIMATE Builder' | Set-Content build.gradle"
+        ) else (
+            :: Fallback method without PowerShell - simple replacement
+            type build.gradle | findstr /v "validatePluginForProduction" > build.gradle.tmp
+            move /y build.gradle.tmp build.gradle > nul
+        )
+        
+        :: Run the build again
+        CALL :LOG "Running Gradle build with validation disabled..."
+        %GRADLE_CMD% clean build > build_simple.log 2>&1
+        
+        :: Restore the original build.gradle
+        move /y build.gradle.bak build.gradle > nul
+        
+        if exist "%IJ_PLUGIN_PATH%" (
+            CALL :LOG "Plugin built successfully with validation disabled!"
+            SET "BUILD_SUCCESS=1"
+        ) else (
+            :: Check for specific errors in the build log
+            CALL :LOG "Build still failed. Here are the most recent errors:"
+            findstr /i /c:"error: " build_simple.log
+            CALL :LOG "See build_simple.log for more details."
+            CALL :LOG "Build failed. Cannot continue."
+            pause
+            exit /b 1
+        )
+    ) else (
+        CALL :LOG "build.gradle not found. Cannot continue."
+        pause
+        exit /b 1
+    )
+)
+
 if "%BUILD_SUCCESS%" == "0" (
-    call :log "Build failed. Try running with validation disabled."
+    CALL :LOG "Build failed. Try running with validation disabled."
     pause
     exit /b 1
 )
 
-:: 6. Install the plugin if desired
-call :install_plugin
+:: ===================================
+:: PLUGIN INSTALLATION
+:: ===================================
+CALL :LOG "Plugin file created at: %CD%\%IJ_PLUGIN_PATH%"
 
-:: Display completion message
+SET /P INSTALL_CHOICE="Would you like to install the plugin to IntelliJ IDEA? (y/n): "
+if /i not "%INSTALL_CHOICE%" == "y" (
+    CALL :LOG "User declined plugin installation."
+    CALL :LOG "Plugin file is available at: %CD%\%IJ_PLUGIN_PATH%"
+    CALL :LOG "You can install it manually via Settings → Plugins → ⚙ → Install Plugin from Disk..."
+    goto :COMPLETION
+)
+
+:: Find IntelliJ installations
+CALL :LOG "Searching for IntelliJ IDEA installations..."
+SET "FOUND_INTELLIJ=0"
+SET "INTELLIJ_PATHS="
+
+:: Check common IntelliJ installation paths
+SET "SEARCH_PATHS=%PROGRAMFILES%\JetBrains %PROGRAMFILES(X86)%\JetBrains %LOCALAPPDATA%\JetBrains"
+
+for %%p in (%SEARCH_PATHS%) do (
+    if exist "%%p" (
+        for /d %%d in ("%%p\IntelliJ*") do (
+            if exist "%%d\bin\idea64.exe" (
+                CALL :LOG "Found IntelliJ IDEA: %%d"
+                SET "INTELLIJ_PATHS=!INTELLIJ_PATHS! %%d"
+                SET "FOUND_INTELLIJ=1"
+            )
+        )
+    )
+)
+
+:: Check JetBrains Toolbox locations
+if exist "%LOCALAPPDATA%\JetBrains\Toolbox" (
+    for /d %%d in ("%LOCALAPPDATA%\JetBrains\Toolbox\apps\IDEA-C\ch-*" "%LOCALAPPDATA%\JetBrains\Toolbox\apps\IDEA-U\ch-*") do (
+        if exist "%%d\bin\idea64.exe" (
+            CALL :LOG "Found IntelliJ IDEA (Toolbox): %%d"
+            SET "INTELLIJ_PATHS=!INTELLIJ_PATHS! %%d"
+            SET "FOUND_INTELLIJ=1"
+        )
+    )
+)
+
+:: Verify we found IntelliJ
+if not defined INTELLIJ_PATHS (
+    CALL :LOG "No IntelliJ IDEA installations found."
+    CALL :LOG "Plugin file is available at: %CD%\%IJ_PLUGIN_PATH%"
+    CALL :LOG "You can install it manually via Settings → Plugins → ⚙ → Install Plugin from Disk..."
+    goto :COMPLETION
+)
+
+:: Parse IntelliJ paths and let user select
+echo Found IntelliJ IDEA installations:
+SET "IDX=0"
+for %%p in (%INTELLIJ_PATHS%) do (
+    if not "%%p" == "" (
+        SET /a "IDX+=1"
+        SET "IJ_PATH_!IDX!=%%p"
+        echo !IDX!^) %%p
+    )
+)
+
+if %IDX% gtr 1 (
+    SET /p "IJ_CHOICE=Select IntelliJ IDEA installation (1-%IDX%): "
+) else (
+    SET "IJ_CHOICE=1"
+)
+
+SET "INTELLIJ_PATH=!IJ_PATH_%IJ_CHOICE%!"
+
+:: Find plugins directory
+SET "PLUGINS_DIR=%INTELLIJ_PATH%\plugins"
+if not exist "!PLUGINS_DIR!" (
+    SET "PLUGINS_DIR=%INTELLIJ_PATH%\config\plugins"
+)
+
+if not exist "!PLUGINS_DIR!" (
+    CALL :LOG "Cannot find plugins directory."
+    CALL :LOG "Plugin file is available at: %CD%\%IJ_PLUGIN_PATH%"
+    CALL :LOG "You can install it manually via Settings → Plugins → ⚙ → Install Plugin from Disk..."
+    goto :COMPLETION
+)
+
+:: Check if IntelliJ is running
+tasklist /fi "imagename eq idea64.exe" | find "idea64.exe" > nul
+if not !errorlevel! == 1 (
+    CALL :LOG "IntelliJ IDEA is currently running."
+    CALL :LOG "Please close all instances before continuing."
+    
+    SET /P CLOSE_IDEA="Have you closed all IntelliJ IDEA instances? (y/n): "
+    if /i not "!CLOSE_IDEA!" == "y" (
+        CALL :LOG "Installation aborted."
+        CALL :LOG "Plugin file is available at: %CD%\%IJ_PLUGIN_PATH%"
+        goto :COMPLETION
+    )
+)
+
+:: Install the plugin
+CALL :LOG "Installing plugin to !PLUGINS_DIR!..."
+
+:: Extract and install the plugin
+SET "PLUGIN_NAME=modforge-intellij-plugin"
+SET "TEMP_DIR=%TEMP%\modforge_plugin_install"
+
+:: Clean up any previous temp dir
+if exist "!TEMP_DIR!" rd /s /q "!TEMP_DIR!" > nul
+
+:: Create temp dir for extraction
+mkdir "!TEMP_DIR!" > nul
+
+:: Extract the plugin
+if "%HAS_POWERSHELL%" == "1" (
+    powershell -Command "& { Add-Type -AssemblyName System.IO.Compression.FileSystem; [System.IO.Compression.ZipFile]::ExtractToDirectory('%CD%\%IJ_PLUGIN_PATH%', '%TEMP_DIR%') }"
+) else (
+    CALL :LOG "PowerShell not available for extraction. Using alternative method..."
+    :: Use built-in expand command as fallback
+    expand -r "%IJ_PLUGIN_PATH%" "!TEMP_DIR!" > nul
+)
+
+:: Check if extraction worked
+if not exist "!TEMP_DIR!\%PLUGIN_NAME%" (
+    CALL :LOG "Plugin extraction failed. Cannot install."
+    CALL :LOG "Plugin file is available at: %CD%\%IJ_PLUGIN_PATH%"
+    CALL :LOG "You can install it manually via Settings → Plugins → ⚙ → Install Plugin from Disk..."
+    goto :COMPLETION
+)
+
+:: Remove existing plugin if present
+if exist "!PLUGINS_DIR!\%PLUGIN_NAME%" rd /s /q "!PLUGINS_DIR!\%PLUGIN_NAME%" > nul
+
+:: Copy the plugin to the plugins directory
+xcopy /e /i /y "!TEMP_DIR!\%PLUGIN_NAME%" "!PLUGINS_DIR!\%PLUGIN_NAME%" > nul
+
+:: Clean up
+rd /s /q "!TEMP_DIR!" > nul
+
+if exist "!PLUGINS_DIR!\%PLUGIN_NAME!" (
+    CALL :LOG "Plugin installed successfully!"
+    CALL :LOG "Please restart IntelliJ IDEA to use the new plugin."
+) else (
+    CALL :LOG "Plugin installation failed."
+    CALL :LOG "Plugin file is available at: %CD%\%IJ_PLUGIN_PATH%"
+    CALL :LOG "You can install it manually via Settings → Plugins → ⚙ → Install Plugin from Disk..."
+)
+
+:: ===================================
+:: COMPLETION
+:: ===================================
+:COMPLETION
 echo.
 echo ========================================================
 echo  ModForge Plugin Build Complete!
 echo ========================================================
 echo.
-call :log "Thank you for using ModForge ULTIMATE Builder!"
-call :log "Log file available at: %LOG_FILE%"
+CALL :LOG "Thank you for using ModForge ULTIMATE Builder!"
+CALL :LOG "Log file available at: %LOG_FILE%"
 
 pause
 exit /b 0
 
 :: ===================================
-:: Utility Functions
+:: SUPPORTING FUNCTIONS
 :: ===================================
-
-:log
-    echo %* >> "%LOG_FILE%"
-    echo %*
-    exit /b 0
-
-:backup_project
-    call :log "Creating backup in %BACKUP_DIR%"
+:FIND_REAL_JAVA_HOME
+    CALL :LOG "Finding proper Java home directory..."
     
-    if not exist "%BACKUP_DIR%" mkdir "%BACKUP_DIR%"
-    
-    if exist "src" xcopy /E /Y /Q src "%BACKUP_DIR%\src\" > nul
-    if exist "build.gradle" copy build.gradle "%BACKUP_DIR%\build.gradle" > nul
-    if exist "gradle.properties" copy gradle.properties "%BACKUP_DIR%\gradle.properties" > nul
-    
-    call :log "Backup completed"
-    exit /b 0
-
-:get_user_consent
-    set "USER_CHOICE="
-    set /p "USER_CHOICE=%~1 (y/n): "
-    if /i "!USER_CHOICE!" == "y" (
-        exit /b 0
-    ) else (
-        exit /b 1
+    :: First try the java.exe path
+    for /f "tokens=*" %%j in ('where java 2^>nul') do (
+        SET "JAVA_EXE=%%j"
+        :: Get parent directory
+        for %%i in ("!JAVA_EXE!") do SET "JAVA_BIN_DIR=%%~dpi"
+        for %%i in ("!JAVA_BIN_DIR:~0,-1!") do SET "POTENTIAL_JAVA_HOME=%%~dpi"
+        SET "POTENTIAL_JAVA_HOME=!POTENTIAL_JAVA_HOME:~0,-1!"
+        
+        CALL :LOG "Checking potential Java home: !POTENTIAL_JAVA_HOME!"
+        
+        :: Check if this is a valid JDK (has javac.exe)
+        if exist "!JAVA_BIN_DIR!javac.exe" (
+            SET "JAVA_PATH=!POTENTIAL_JAVA_HOME!"
+            SET "JAVA_PATH_NORMALIZED=!JAVA_PATH:\=/!"
+            CALL :LOG "Found valid JDK at: !JAVA_PATH!"
+            goto :EOF
+        ) else (
+            CALL :LOG "Not a JDK (missing javac.exe), looking deeper..."
+        )
     )
-
-:: ===================================
-:: Java Functions
-:: ===================================
-
-:check_java
-    call :log "Checking for Java installation..."
     
-    :: First check if Java is in PATH
-    java -version >nul 2>&1
-    if %errorlevel% == 0 (
-        for /f "tokens=*" %%v in ('java -version 2^>^&1 ^| findstr /i "version"') do (
-            set "JAVA_VERSION=%%v"
-            
-            echo !JAVA_VERSION! | findstr /i "21" >nul
+    :: If we're here, we didn't find a JDK based on java.exe location
+    :: Search for standard JDK locations
+    SET "JDK_SEARCH_PATHS=^
+    C:\Program Files\Java\jdk*^
+    C:\Program Files\Eclipse Adoptium\jdk*^
+    %LOCALAPPDATA%\Programs\Eclipse Adoptium\jdk*^
+    %USERPROFILE%\.jdks\jdk*"
+    
+    for %%p in (!JDK_SEARCH_PATHS!) do (
+        for /d %%j in (%%p) do (
+            if exist "%%j\bin\javac.exe" (
+                "%%j\bin\java.exe" -version 2>&1 | findstr /i "21" >nul
+                if !errorlevel! == 0 (
+                    SET "JAVA_PATH=%%j"
+                    SET "JAVA_PATH_NORMALIZED=!JAVA_PATH:\=/!"
+                    CALL :LOG "Found JDK 21: !JAVA_PATH!"
+                    goto :EOF
+                )
+            )
+        )
+    )
+    
+    :: If we've reached here and still haven't found a JDK, use JAVA_HOME
+    if defined JAVA_HOME (
+        if exist "%JAVA_HOME%\bin\javac.exe" (
+            "%JAVA_HOME%\bin\java.exe" -version 2>&1 | findstr /i "21" >nul
             if !errorlevel! == 0 (
-                call :log "Found Java 21 in PATH: !JAVA_VERSION!"
-                
-                :: Find proper Java home - looking for a real JDK
-                call :find_real_java_home
-                
-                set "FOUND_JAVA21=1"
-            ) else (
-                call :log "Found Java in PATH but not version 21: !JAVA_VERSION!"
-                
-                call :get_user_consent "Would you like to download and install Java 21?"
-                if !errorlevel! == 0 (
-                    call :download_java
-                ) else (
-                    call :log "Continuing with existing Java version. This might cause issues."
-                    
-                    for /f "tokens=*" %%j in ('where java 2^>nul') do (
-                        set "JAVA_EXE=%%j"
-                        set "JAVA_PATH=!JAVA_EXE:~0,-9!.."
-                        call :log "Java path: !JAVA_PATH!"
-                    )
-                    
-                    set "FOUND_JAVA21=1"
-                )
-            )
-        )
-    ) else (
-        call :log "Java not found in PATH."
-        
-        :: Check JAVA_HOME
-        if defined JAVA_HOME (
-            call :log "JAVA_HOME is set to: %JAVA_HOME%"
-            if exist "%JAVA_HOME%\bin\java.exe" (
-                "%JAVA_HOME%\bin\java.exe" -version >nul 2>&1
-                if !errorlevel! == 0 (
-                    call :log "Found Java via JAVA_HOME"
-                    set "JAVA_PATH=%JAVA_HOME%"
-                    
-                    "%JAVA_HOME%\bin\java.exe" -version 2>&1 | findstr /i "21" >nul
-                    if !errorlevel! == 0 (
-                        call :log "Found Java 21 in JAVA_HOME"
-                        set "FOUND_JAVA21=1"
-                    ) else (
-                        call :log "JAVA_HOME points to Java but not version 21"
-                        
-                        call :get_user_consent "Would you like to download and install Java 21?"
-                        if !errorlevel! == 0 (
-                            call :download_java
-                        ) else (
-                            call :log "Continuing with existing Java version. This might cause issues."
-                            set "FOUND_JAVA21=1"
-                        )
-                    )
-                )
-            ) else (
-                call :log "JAVA_HOME is set but java.exe not found at %JAVA_HOME%\bin\java.exe"
-            )
-        )
-        
-        if "!FOUND_JAVA21!" == "0" (
-            :: Comprehensive search
-            call :log "Performing comprehensive search for Java 21..."
-            call :search_java21_comprehensive
-            
-            if "!FOUND_JAVA21!" == "0" (
-                call :get_user_consent "Java 21 not found. Would you like to download and install it?"
-                if !errorlevel! == 0 (
-                    call :download_java
-                ) else (
-                    call :log "Cannot continue without Java 21."
-                    exit /b 1
-                )
+                SET "JAVA_PATH=%JAVA_HOME%"
+                SET "JAVA_PATH_NORMALIZED=!JAVA_PATH:\=/!"
+                CALL :LOG "Using JAVA_HOME as JDK: !JAVA_PATH!"
+                goto :EOF
             )
         )
     )
     
-    exit /b 0
+    :: Last resort: use a simple path - most likely it's just a JRE
+    for /f "tokens=*" %%j in ('where java 2^>nul') do (
+        SET "JAVA_EXE=%%j"
+        for %%i in ("!JAVA_EXE!") do SET "JAVA_BIN_DIR=%%~dpi"
+        SET "JAVA_PATH=!JAVA_BIN_DIR!.."
+        SET "JAVA_PATH_NORMALIZED=!JAVA_PATH:\=/!"
+        CALL :LOG "Using JRE path as fallback: !JAVA_PATH!"
+        goto :EOF
+    )
+    
+    :: If we got here, we couldn't find any usable Java
+    CALL :LOG "Failed to locate a usable Java installation."
+    goto :EOF
 
-:search_java21_comprehensive
-    call :log "Running comprehensive Java 21 search..."
+:SEARCH_JAVA21_COMPREHENSIVE
+    CALL :LOG "Running comprehensive Java 21 search..."
     
     :: Common installation paths
-    set "JAVA_PATHS=^
+    SET "JAVA_PATHS=^
     C:\Program Files\Java^
     C:\Program Files (x86)\Java^
     C:\Java^
@@ -250,12 +624,12 @@ exit /b 0
                 if exist "%%j\bin\java.exe" (
                     "%%j\bin\java.exe" -version 2>&1 | findstr /i "21" >nul
                     if !errorlevel! == 0 (
-                        call :log "Found Java 21: %%j"
-                        set "JAVA_PATH=%%j"
-                        set "JAVA_PATH_NORMALIZED=%%j"
-                        set "JAVA_PATH_NORMALIZED=!JAVA_PATH_NORMALIZED:\=/!"
-                        set "FOUND_JAVA21=1"
-                        exit /b 0
+                        CALL :LOG "Found Java 21: %%j"
+                        SET "JAVA_PATH=%%j"
+                        SET "JAVA_PATH_NORMALIZED=%%j"
+                        SET "JAVA_PATH_NORMALIZED=!JAVA_PATH_NORMALIZED:\=/!"
+                        SET "FOUND_JAVA21=1"
+                        goto :EOF
                     )
                 )
             )
@@ -263,7 +637,7 @@ exit /b 0
     )
     
     :: Check JetBrains bundled JDKs
-    set "JB_PATHS=^
+    SET "JB_PATHS=^
     %LOCALAPPDATA%\JetBrains\Toolbox\apps\IDEA-C^
     %LOCALAPPDATA%\JetBrains\Toolbox\apps\IDEA-U^
     %LOCALAPPDATA%\JetBrains\Toolbox\apps\AndroidStudio^
@@ -277,10 +651,12 @@ exit /b 0
                 if exist "%%j\bin\java.exe" (
                     "%%j\bin\java.exe" -version 2>&1 | findstr /i "21" >nul
                     if !errorlevel! == 0 (
-                        call :log "Found JetBrains Bundled Java 21: %%j"
-                        set "JAVA_PATH=%%j"
-                        set "FOUND_JAVA21=1"
-                        exit /b 0
+                        CALL :LOG "Found JetBrains Bundled Java 21: %%j"
+                        SET "JAVA_PATH=%%j"
+                        SET "JAVA_PATH_NORMALIZED=%%j"
+                        SET "JAVA_PATH_NORMALIZED=!JAVA_PATH_NORMALIZED:\=/!"
+                        SET "FOUND_JAVA21=1"
+                        goto :EOF
                     )
                 )
             )
@@ -295,125 +671,62 @@ exit /b 0
                 if !errorlevel! == 0 (
                     "%%j\bin\java.exe" -version 2>&1 | findstr /i "21" >nul
                     if !errorlevel! == 0 (
-                        call :log "Found Java 21 in .jdks: %%j"
-                        set "JAVA_PATH=%%j"
-                        set "FOUND_JAVA21=1"
-                        exit /b 0
+                        CALL :LOG "Found Java 21 in .jdks: %%j"
+                        SET "JAVA_PATH=%%j"
+                        SET "JAVA_PATH_NORMALIZED=%%j"
+                        SET "JAVA_PATH_NORMALIZED=!JAVA_PATH_NORMALIZED:\=/!"
+                        SET "FOUND_JAVA21=1"
+                        goto :EOF
                     )
                 )
             )
         )
     )
     
-    exit /b 0
+    goto :EOF
 
-:find_real_java_home
-    call :log "Finding proper Java home directory..."
-    
-    :: First try the java.exe path
-    for /f "tokens=*" %%j in ('where java 2^>nul') do (
-        set "JAVA_EXE=%%j"
-        :: Get parent directory
-        for %%i in ("!JAVA_EXE!") do set "JAVA_BIN_DIR=%%~dpi"
-        for %%i in ("!JAVA_BIN_DIR:~0,-1!") do set "POTENTIAL_JAVA_HOME=%%~dpi"
-        set "POTENTIAL_JAVA_HOME=!POTENTIAL_JAVA_HOME:~0,-1!"
-        
-        call :log "Checking potential Java home: !POTENTIAL_JAVA_HOME!"
-        
-        :: Check if this is a valid JDK (has javac.exe)
-        if exist "!JAVA_BIN_DIR!javac.exe" (
-            set "JAVA_PATH=!POTENTIAL_JAVA_HOME!"
-            set "JAVA_PATH_NORMALIZED=!JAVA_PATH:\=/!"
-            call :log "Found valid JDK at: !JAVA_PATH!"
-            exit /b 0
-        ) else (
-            call :log "Not a JDK (missing javac.exe), looking deeper..."
-        )
-    )
-    
-    :: If we're here, we didn't find a JDK based on java.exe location
-    :: Search for standard JDK locations
-    set "JDK_SEARCH_PATHS=^
-    C:\Program Files\Java\jdk*^
-    C:\Program Files\Eclipse Adoptium\jdk*^
-    %LOCALAPPDATA%\Programs\Eclipse Adoptium\jdk*^
-    %USERPROFILE%\.jdks\jdk*"
-    
-    for %%p in (!JDK_SEARCH_PATHS!) do (
-        for /d %%j in (%%p) do (
-            if exist "%%j\bin\javac.exe" (
-                "%%j\bin\java.exe" -version 2>&1 | findstr /i "21" >nul
-                if !errorlevel! == 0 (
-                    set "JAVA_PATH=%%j"
-                    set "JAVA_PATH_NORMALIZED=!JAVA_PATH:\=/!"
-                    call :log "Found JDK 21: !JAVA_PATH!"
-                    exit /b 0
-                )
-            )
-        )
-    )
-    
-    :: If we've reached here and still haven't found a JDK, use JAVA_HOME
-    if defined JAVA_HOME (
-        if exist "%JAVA_HOME%\bin\javac.exe" (
-            "%JAVA_HOME%\bin\java.exe" -version 2>&1 | findstr /i "21" >nul
-            if !errorlevel! == 0 (
-                set "JAVA_PATH=%JAVA_HOME%"
-                set "JAVA_PATH_NORMALIZED=!JAVA_PATH:\=/!"
-                call :log "Using JAVA_HOME as JDK: !JAVA_PATH!"
-                exit /b 0
-            )
-        )
-    )
-    
-    :: Last resort: hardcode a default JDK path
-    set "JAVA_PATH=C:\Program Files\Java\jdk-21"
-    set "JAVA_PATH_NORMALIZED=C:/Program Files/Java/jdk-21"
-    call :log "Falling back to default JDK path: !JAVA_PATH!"
-    exit /b 0
-
-:download_java
-    call :log "Preparing to download Java 21..."
+:DOWNLOAD_JAVA
+    CALL :LOG "Preparing to download Java 21..."
     
     :: Choose JDK type
     echo Which Java 21 distribution would you prefer?
     echo 1) Oracle JDK 21 (official Oracle build)
     echo 2) Eclipse Temurin 21 (community build, recommended)
-    set /p JAVA_CHOICE="Enter choice (1/2): "
+    SET /p JAVA_CHOICE="Enter choice (1/2): "
     
     if "%JAVA_CHOICE%" == "1" (
-        set "DOWNLOAD_URL=%JDK_DOWNLOAD_URL%"
-        set "INSTALLER_NAME=jdk21_installer.exe"
-        set "JAVA_VENDOR=Oracle"
+        SET "DOWNLOAD_URL=%JDK_DOWNLOAD_URL%"
+        SET "INSTALLER_NAME=jdk21_installer.exe"
+        SET "JAVA_VENDOR=Oracle"
     ) else (
-        set "DOWNLOAD_URL=%ADOPTIUM_URL%"
-        set "INSTALLER_NAME=temurin21_installer.exe"
-        set "JAVA_VENDOR=Temurin"
+        SET "DOWNLOAD_URL=%ADOPTIUM_URL%"
+        SET "INSTALLER_NAME=temurin21_installer.exe"
+        SET "JAVA_VENDOR=Temurin"
     )
     
     :: Download the installer
-    call :log "Downloading %JAVA_VENDOR% JDK 21 installer..."
+    CALL :LOG "Downloading %JAVA_VENDOR% JDK 21 installer..."
     echo This may take a few minutes depending on your internet connection.
     
     if "%HAS_POWERSHELL%" == "1" (
         powershell -Command "& {[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; Invoke-WebRequest -Uri '%DOWNLOAD_URL%' -OutFile '%INSTALLER_NAME%'; if ($?) { Write-Host 'Download completed successfully' } else { Write-Host 'Download failed' }}"
     ) else (
-        call :log "Attempting to download using bitsadmin..."
+        CALL :LOG "Attempting to download using bitsadmin..."
         bitsadmin /transfer "Java21Download" "%DOWNLOAD_URL%" "%CD%\%INSTALLER_NAME%" >nul
     )
     
     if not exist "%INSTALLER_NAME%" (
-        call :log "Failed to download Java 21 installer."
-        exit /b 1
+        CALL :LOG "Failed to download Java 21 installer."
+        goto :EOF
     )
     
     :: Install Java 21
-    call :log "Installing Java 21 (%JAVA_VENDOR% JDK)..."
+    CALL :LOG "Installing Java 21 (%JAVA_VENDOR% JDK)..."
     
     :: Check if admin rights are needed
     if "%IS_ADMIN%" == "0" (
-        call :log "Administrator privileges are required to install Java."
-        call :log "Please accept the UAC prompt that will appear."
+        CALL :LOG "Administrator privileges are required to install Java."
+        CALL :LOG "Please accept the UAC prompt that will appear."
         
         :: Run installer with elevation
         powershell -Command "Start-Process -FilePath '%INSTALLER_NAME%' -ArgumentList '/s' -Verb RunAs -Wait" 2>nul
@@ -426,101 +739,66 @@ exit /b 0
     if exist "%INSTALLER_NAME%" del "%INSTALLER_NAME%"
     
     :: Verify installation
-    call :log "Verifying Java 21 installation..."
+    CALL :LOG "Verifying Java 21 installation..."
     
     :: Reset the previously found flag
-    set "FOUND_JAVA21=0"
+    SET "FOUND_JAVA21=0"
     
     :: Expected installation paths
     if "%JAVA_VENDOR%" == "Oracle" (
-        set "EXPECTED_PATH=C:\Program Files\Java\jdk-21"
+        SET "EXPECTED_PATH=C:\Program Files\Java\jdk-21"
     ) else (
-        set "EXPECTED_PATH=C:\Program Files\Eclipse Adoptium\jdk-21"
+        SET "EXPECTED_PATH=C:\Program Files\Eclipse Adoptium\jdk-21"
     )
     
     if exist "%EXPECTED_PATH%\bin\java.exe" (
         "%EXPECTED_PATH%\bin\java.exe" -version 2>&1 | findstr /i "21" >nul
         if !errorlevel! == 0 (
-            call :log "Confirmed Java 21 installation at %EXPECTED_PATH%"
-            set "JAVA_PATH=%EXPECTED_PATH%"
-            set "FOUND_JAVA21=1"
+            CALL :LOG "Confirmed Java 21 installation at %EXPECTED_PATH%"
+            SET "JAVA_PATH=%EXPECTED_PATH%"
+            SET "JAVA_PATH_NORMALIZED=%EXPECTED_PATH:\=/%"
+            SET "FOUND_JAVA21=1"
         )
     )
     
     :: If we still can't find it, search again
     if "%FOUND_JAVA21%" == "0" (
-        call :log "Java 21 installation location not found at expected path."
-        call :log "Searching for the newly installed Java 21..."
-        call :search_java21_comprehensive
+        CALL :LOG "Java 21 installation location not found at expected path."
+        CALL :LOG "Searching for the newly installed Java 21..."
+        CALL :SEARCH_JAVA21_COMPREHENSIVE
     )
     
     if "%FOUND_JAVA21%" == "1" (
-        call :log "Java 21 installation successful: %JAVA_PATH%"
+        CALL :LOG "Java 21 installation successful: %JAVA_PATH%"
         
         :: Make sure we have the normalized path
-        set "JAVA_PATH_NORMALIZED=%JAVA_PATH:\=/%"
-        call :log "Normalized Java path: %JAVA_PATH_NORMALIZED%"
+        SET "JAVA_PATH_NORMALIZED=%JAVA_PATH:\=/%"
+        CALL :LOG "Normalized Java path: %JAVA_PATH_NORMALIZED%"
         
         :: Ask if user wants to set JAVA_HOME
-        call :get_user_consent "Would you like to set JAVA_HOME to point to the installed Java 21?"
-        if !errorlevel! == 0 (
+        SET /P USER_CHOICE="Would you like to set JAVA_HOME to point to the installed Java 21? (y/n): "
+        if /i "!USER_CHOICE!" == "y" (
             if "%IS_ADMIN%" == "1" (
                 setx JAVA_HOME "%JAVA_PATH%" /M >nul
-                call :log "Set JAVA_HOME to %JAVA_PATH% system-wide."
+                CALL :LOG "Set JAVA_HOME to %JAVA_PATH% system-wide."
             ) else (
                 setx JAVA_HOME "%JAVA_PATH%" >nul
-                call :log "Set JAVA_HOME to %JAVA_PATH% for current user."
+                CALL :LOG "Set JAVA_HOME to %JAVA_PATH% for current user."
             )
         )
         
         :: Set for current session
-        set "JAVA_HOME=%JAVA_PATH%"
-        set "PATH=%JAVA_PATH%\bin;%PATH%"
-        call :log "Environment configured for Java 21 in this session."
+        SET "JAVA_HOME=%JAVA_PATH%"
+        SET "PATH=%JAVA_PATH%\bin;%PATH%"
+        CALL :LOG "Environment configured for Java 21 in this session."
     ) else (
-        call :log "Java 21 installation verification failed."
-        exit /b 1
+        CALL :LOG "Java 21 installation verification failed."
     )
     
-    exit /b 0
+    goto :EOF
 
-:: ===================================
-:: Gradle Functions
-:: ===================================
-
-:check_gradle
-    call :log "Checking Gradle installation..."
-    
-    :: First look for Gradle wrapper
-    if exist "gradlew" (
-        call :log "Found Gradle wrapper (gradlew)"
-        set "GRADLE_CMD=.\gradlew"
-        set "FOUND_GRADLE=1"
-    ) else if exist "gradlew.bat" (
-        call :log "Found Gradle wrapper (gradlew.bat)"
-        set "GRADLE_CMD=.\gradlew.bat"
-        set "FOUND_GRADLE=1"
-    ) else (
-        :: Check for Gradle in PATH
-        gradle --version >nul 2>&1
-        if !errorlevel! == 0 (
-            for /f "tokens=*" %%g in ('where gradle 2^>nul') do (
-                set "GRADLE_EXE=%%g"
-                call :log "Found Gradle in PATH: !GRADLE_EXE!"
-            )
-            set "GRADLE_CMD=gradle"
-            set "FOUND_GRADLE=1"
-        ) else (
-            :: Create wrapper
-            call :log "Gradle not found. Creating Gradle wrapper..."
-            call :create_gradle_wrapper
-        )
-    )
-    
-    exit /b 0
-
-:create_gradle_wrapper
-    call :log "Creating basic Gradle wrapper files..."
+:CREATE_GRADLE_WRAPPER
+    CALL :LOG "Creating basic Gradle wrapper files..."
     
     :: Create gradlew.bat for Windows
     (
@@ -552,298 +830,8 @@ exit /b 0
         echo )
     ) > gradlew.bat
     
-    call :log "Created gradlew.bat"
-    set "GRADLE_CMD=.\gradlew.bat"
-    set "FOUND_GRADLE=1"
+    CALL :LOG "Created gradlew.bat"
+    SET "GRADLE_CMD=.\gradlew.bat"
+    SET "FOUND_GRADLE=1"
     
-    exit /b 0
-
-:configure_gradle
-    call :log "Configuring Gradle for build..."
-    
-    :: Check if build.gradle exists
-    if not exist "build.gradle" (
-        call :log "build.gradle not found. Cannot continue."
-        exit /b 1
-    )
-    
-    :: Create or update gradle.properties
-    if exist "gradle.properties" (
-        copy gradle.properties gradle.properties.bak > nul
-        call :log "Backed up gradle.properties"
-    )
-    
-    :: Create or update gradle.properties with the correct Java path
-    (
-        echo # Gradle properties for ModForge - Generated by ULTIMATE Builder
-        echo # %DATE% %TIME%
-        echo.
-        echo # Set Java home for building
-        echo org.gradle.java.home=%JAVA_PATH_NORMALIZED%
-        echo.
-        echo # Disable configuration cache to avoid issues
-        echo org.gradle.configuration-cache=false
-        echo.
-        echo # Increase memory for Gradle tasks
-        echo org.gradle.jvmargs=-Xmx2048m --add-opens=java.base/java.util=ALL-UNNAMED --add-opens=java.base/java.lang=ALL-UNNAMED -XX:+HeapDumpOnOutOfMemoryError -Dfile.encoding=UTF-8
-        echo.
-        echo # Enable parallel execution
-        echo org.gradle.parallel=true
-        echo.
-        echo # Optimize Gradle daemon
-        echo org.gradle.daemon=true
-        echo org.gradle.caching=true
-    ) > gradle.properties
-    
-    call :log "Updated gradle.properties with correct Java home path: %JAVA_PATH_NORMALIZED%"
-    exit /b 0
-
-:: ===================================
-:: Build Functions
-:: ===================================
-
-:fix_code_issues
-    call :log "Checking for and fixing common code issues..."
-    
-    :: Run a diagnostic build to get error information
-    call :log "Running diagnostic build to identify issues..."
-    %GRADLE_CMD% compileJava --info > build_issues.log 2>&1
-    
-    :: Check for compilation errors
-    findstr /i /c:"error: " build_issues.log >nul
-    if %errorlevel% == 0 (
-        call :log "Found compilation errors. Attempting to fix..."
-        call :apply_fixes_to_code
-    ) else (
-        call :log "No compilation errors found in initial analysis"
-    )
-    
-    exit /b 0
-
-:apply_fixes_to_code
-    :: Only attempt if PowerShell available
-    if "%HAS_POWERSHELL%" == "1" (
-        :: Fix common issues with PowerShell
-        call :log "Applying automated fixes using PowerShell..."
-        
-        :: Run PowerShell command to fix common issues
-        powershell -Command "& { $ErrorActionPreference = 'SilentlyContinue'; $allFiles = Get-ChildItem -Path 'src\main\java' -Filter '*.java' -Recurse; foreach ($file in $allFiles) { $content = Get-Content $file.FullName -Raw; if ($content -match 'Arrays\.' -and -not ($content -match 'import java\.util\.Arrays')) { $content = $content -replace 'package com\.modforge', 'package com.modforge\r\n\r\nimport java.util.Arrays;'; $content | Set-Content $file.FullName -Encoding UTF8 }; if ($content -match 'CompletableFuture' -and -not ($content -match 'import java\.util\.concurrent\.CompletableFuture')) { $content = $content -replace 'package com\.modforge', 'package com.modforge\r\n\r\nimport java.util.concurrent.CompletableFuture;'; $content | Set-Content $file.FullName -Encoding UTF8 }; if ($content -match 'problem\.getDescription\(\)') { $content = $content -replace 'problem\.getDescription\(\)', 'problem.toString()'; $content | Set-Content $file.FullName -Encoding UTF8 }; if ($content -match 'WebSocketClient' -and -not ($content -match 'import org\.java_websocket\.client\.WebSocketClient')) { $content = $content -replace 'package com\.modforge', 'package com.modforge\r\n\r\nimport org.java_websocket.client.WebSocketClient;\r\nimport org.java_websocket.handshake.ServerHandshake;'; $content | Set-Content $file.FullName -Encoding UTF8 }; if ($content -match 'NotificationType' -and -not ($content -match 'import com\.intellij\.notification\.NotificationType')) { $content = $content -replace 'package com\.modforge', 'package com.modforge\r\n\r\nimport com.intellij.notification.NotificationType;'; $content | Set-Content $file.FullName -Encoding UTF8 }; if ($content -match 'Messages\.showInfoDialog\(') { $content = $content -replace 'Messages\.showInfoDialog\((.*?),(.*?),(.*?)\)', 'Messages.showMessageDialog($1,$2,$3, Messages.getInformationIcon())'; $content | Set-Content $file.FullName -Encoding UTF8 }; if ($content -match 'notificationService\.showInfo\(') { $content = $content -replace 'notificationService\.showInfo\((.*?),(.*?)\)', 'notificationService.notify($1,$2,NotificationType.INFORMATION)'; $content | Set-Content $file.FullName -Encoding UTF8 }; if ($content -match 'notificationService\.showError\(') { $content = $content -replace 'notificationService\.showError\((.*?),(.*?)\)', 'notificationService.notify($1,$2,NotificationType.ERROR)'; $content | Set-Content $file.FullName -Encoding UTF8 }; if ($content -match 'AutonomousCodeGenerationService\.getInstance\(project\)') { $content = $content -replace 'AutonomousCodeGenerationService\.getInstance\(project\)', 'project.getService(AutonomousCodeGenerationService.class)'; $content | Set-Content $file.FullName -Encoding UTF8 }; } }"
-        
-        :: Check specifically for issue with PushToGitHubDialog class
-        powershell -Command "& { $dialogFiles = Get-ChildItem -Path 'src\main\java' -Filter 'PushToGitHubDialog.java' -Recurse; foreach ($file in $dialogFiles) { $content = Get-Content $file.FullName -Raw; if ($content -match 'public String getOwner\(\)') { $content = $content -replace 'public String getOwner\(\)', 'public String getRepositoryOwner()'; $content = $content -replace 'getOwner\(\)', 'getRepositoryOwner()'; $content | Set-Content $file.FullName -Encoding UTF8 } } }"
-        
-        :: Check plugin.xml for compatibility version
-        if exist "src\main\resources\META-INF\plugin.xml" (
-            powershell -Command "& { $content = Get-Content 'src\main\resources\META-INF\plugin.xml' -Raw; if ($content -match 'idea-version since-build') { $content = $content -replace '(since-build=.+? until-build=.)([^\"]+)(.)', '$1251.*$3'; $content | Set-Content 'src\main\resources\META-INF\plugin.xml' -Encoding UTF8; } }"
-            call :log "Updated plugin.xml compatibility version"
-        )
-        
-        call :log "Applied fixes for common code issues"
-    ) else (
-        call :log "PowerShell not available for automated fixes. Attempting simple build..."
-    )
-    
-    exit /b 0
-
-:build_plugin
-    call :log "Building ModForge IntelliJ plugin..."
-    
-    :: Run the build
-    call :log "Running Gradle build..."
-    %GRADLE_CMD% clean build > build.log 2>&1
-    
-    :: Check if build succeeded
-    if exist "%IJ_PLUGIN_PATH%" (
-        call :log "Plugin built successfully!"
-        set "BUILD_SUCCESS=1"
-    ) else (
-        :: Try with validation disabled
-        call :log "Build failed, trying with validation disabled..."
-        
-        :: Create a temporary copy of build.gradle
-        if exist "build.gradle" (
-            copy build.gradle build.gradle.bak > nul
-            
-            :: Disable validation in build.gradle using a very simple approach
-            if "%HAS_POWERSHELL%" == "1" (
-                powershell -Command "(Get-Content build.gradle) -replace 'tasks.buildPlugin.dependsOn\(validatePluginForProduction\)', '// tasks.buildPlugin.dependsOn(validatePluginForProduction) // Disabled by ULTIMATE Builder' | Set-Content build.gradle"
-            ) else (
-                :: Fallback for when PowerShell isn't available
-                call :log "PowerShell not available. Using simple modification approach."
-                type build.gradle | findstr /v "validatePluginForProduction" > build.gradle.tmp
-                move /y build.gradle.tmp build.gradle > nul
-            )
-            
-            :: Run the build again
-            call :log "Running Gradle build with validation disabled..."
-            %GRADLE_CMD% clean build > build_simple.log 2>&1
-            
-            :: Restore the original build.gradle
-            move /y build.gradle.bak build.gradle > nul
-            
-            if exist "%IJ_PLUGIN_PATH%" (
-                call :log "Plugin built successfully with validation disabled!"
-                set "BUILD_SUCCESS=1"
-            ) else (
-                :: Check for specific errors in the build log
-                call :log "Build still failed. Here are the most recent errors:"
-                findstr /i /c:"error: " build_simple.log
-                call :log "See build_simple.log for more details."
-                exit /b 1
-            )
-        ) else (
-            call :log "build.gradle not found. Cannot continue."
-            exit /b 1
-        )
-    )
-    
-    call :log "Plugin file created at: %CD%\%IJ_PLUGIN_PATH%"
-    exit /b 0
-
-:install_plugin
-    if not "%BUILD_SUCCESS%" == "1" (
-        call :log "Cannot install plugin as build was not successful."
-        exit /b 1
-    )
-    
-    call :log "Preparing to install plugin..."
-    
-    :: Ask user if they want to install the plugin
-    call :get_user_consent "Would you like to install the plugin to IntelliJ IDEA?"
-    if !errorlevel! == 1 (
-        call :log "User declined plugin installation."
-        call :log "Plugin file is available at: %CD%\%IJ_PLUGIN_PATH%"
-        call :log "You can install it manually via Settings → Plugins → ⚙ → Install Plugin from Disk..."
-        exit /b 0
-    )
-    
-    :: Find IntelliJ installations
-    call :log "Searching for IntelliJ IDEA installations..."
-    call :find_intellij_installations
-    
-    :: Verify we found IntelliJ
-    if not defined INTELLIJ_PATHS (
-        call :log "No IntelliJ IDEA installations found."
-        call :log "Plugin file is available at: %CD%\%IJ_PLUGIN_PATH%"
-        call :log "You can install it manually via Settings → Plugins → ⚙ → Install Plugin from Disk..."
-        exit /b 0
-    )
-    
-    :: Parse IntelliJ paths and let user select
-    echo Found IntelliJ IDEA installations:
-    set "IDX=0"
-    for %%p in (%INTELLIJ_PATHS%) do (
-        if not "%%p" == "" (
-            set /a "IDX+=1"
-            set "IJ_PATH_!IDX!=%%p"
-            echo !IDX!^) %%p
-        )
-    )
-    
-    if %IDX% gtr 1 (
-        set /p "IJ_CHOICE=Select IntelliJ IDEA installation (1-%IDX%): "
-    ) else (
-        set "IJ_CHOICE=1"
-    )
-    
-    set "INTELLIJ_PATH=!IJ_PATH_%IJ_CHOICE%!"
-    
-    :: Find plugins directory
-    set "PLUGINS_DIR=%INTELLIJ_PATH%\plugins"
-    if not exist "!PLUGINS_DIR!" (
-        set "PLUGINS_DIR=%INTELLIJ_PATH%\config\plugins"
-    )
-    
-    if not exist "!PLUGINS_DIR!" (
-        call :log "Cannot find plugins directory."
-        call :log "Plugin file is available at: %CD%\%IJ_PLUGIN_PATH%"
-        call :log "You can install it manually via Settings → Plugins → ⚙ → Install Plugin from Disk..."
-        exit /b 0
-    )
-    
-    :: Check if IntelliJ is running
-    tasklist /fi "imagename eq idea64.exe" | find "idea64.exe" > nul
-    if not !errorlevel! == 1 (
-        call :log "IntelliJ IDEA is currently running."
-        call :log "Please close all instances before continuing."
-        
-        call :get_user_consent "Have you closed all IntelliJ IDEA instances?"
-        if !errorlevel! == 1 (
-            call :log "Installation aborted."
-            call :log "Plugin file is available at: %CD%\%IJ_PLUGIN_PATH%"
-            exit /b 0
-        )
-    )
-    
-    :: Install the plugin
-    call :log "Installing plugin to !PLUGINS_DIR!..."
-    
-    :: Extract and install the plugin
-    set "PLUGIN_NAME=modforge-intellij-plugin"
-    set "TEMP_DIR=%TEMP%\modforge_plugin_install"
-    
-    :: Clean up any previous temp dir
-    if exist "!TEMP_DIR!" rd /s /q "!TEMP_DIR!" > nul
-    
-    :: Create temp dir and extract plugin
-    mkdir "!TEMP_DIR!" > nul
-    
-    :: Extract the plugin
-    if "%HAS_POWERSHELL%" == "1" (
-        powershell -Command "& { Add-Type -AssemblyName System.IO.Compression.FileSystem; [System.IO.Compression.ZipFile]::ExtractToDirectory('%CD%\%IJ_PLUGIN_PATH%', '%TEMP_DIR%') }"
-    ) else (
-        call :log "PowerShell not available for extraction. Skipping extraction step."
-        exit /b 1
-    )
-    
-    :: Remove existing plugin if present
-    if exist "!PLUGINS_DIR!\%PLUGIN_NAME%" rd /s /q "!PLUGINS_DIR!\%PLUGIN_NAME%" > nul
-    
-    :: Copy the plugin to the plugins directory
-    xcopy /e /i /y "!TEMP_DIR!\%PLUGIN_NAME%" "!PLUGINS_DIR!\%PLUGIN_NAME%" > nul
-    
-    :: Clean up
-    rd /s /q "!TEMP_DIR!" > nul
-    
-    if exist "!PLUGINS_DIR!\%PLUGIN_NAME!" (
-        call :log "Plugin installed successfully!"
-        call :log "Please restart IntelliJ IDEA to use the new plugin."
-    ) else (
-        call :log "Plugin installation failed."
-        call :log "Plugin file is available at: %CD%\%IJ_PLUGIN_PATH%"
-        call :log "You can install it manually via Settings → Plugins → ⚙ → Install Plugin from Disk..."
-    )
-    
-    exit /b 0
-
-:find_intellij_installations
-    set "FOUND_INTELLIJ=0"
-    set "INTELLIJ_PATHS="
-    
-    :: Check common IntelliJ installation paths
-    set "SEARCH_PATHS=%PROGRAMFILES%\JetBrains %PROGRAMFILES(X86)%\JetBrains %LOCALAPPDATA%\JetBrains"
-    
-    for %%p in (%SEARCH_PATHS%) do (
-        if exist "%%p" (
-            for /d %%d in ("%%p\IntelliJ*") do (
-                if exist "%%d\bin\idea64.exe" (
-                    call :log "Found IntelliJ IDEA: %%d"
-                    set "INTELLIJ_PATHS=!INTELLIJ_PATHS! %%d"
-                    set "FOUND_INTELLIJ=1"
-                )
-            )
-        )
-    )
-    
-    :: Check JetBrains Toolbox locations
-    if exist "%LOCALAPPDATA%\JetBrains\Toolbox" (
-        for /d %%d in ("%LOCALAPPDATA%\JetBrains\Toolbox\apps\IDEA-C\ch-*" "%LOCALAPPDATA%\JetBrains\Toolbox\apps\IDEA-U\ch-*") do (
-            if exist "%%d\bin\idea64.exe" (
-                call :log "Found IntelliJ IDEA (Toolbox): %%d"
-                set "INTELLIJ_PATHS=!INTELLIJ_PATHS! %%d"
-                set "FOUND_INTELLIJ=1"
-            )
-        )
-    )
-    
-    exit /b 0
+    goto :EOF

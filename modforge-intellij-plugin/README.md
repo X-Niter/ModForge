@@ -13,10 +13,10 @@ IntelliJ IDEA plugin for the ModForge autonomous Minecraft mod development platf
 
 1. Download the plugin ZIP file
 2. Run the universal builder script: `ultimate-builder.bat`
-   - This is the ULTIMATE all-in-one builder that works in ANY environment
-   - It automatically adapts to your command shell (Cmd or PowerShell)
-   - It intelligently fixes encoding issues and handles all edge cases
-   - It can download & install Java 21, create Gradle wrappers, and fix compilation errors
+   - This is a Bulletproof Universal Builder that uses totally redesigned flow
+   - It automatically adapts to your command shell (Cmd/PowerShell)
+   - It intelligently finds and configures Java 21 and handles all edge cases
+   - It automatically fixes common issues and provides detailed logs
 3. Follow the on-screen prompts
 
 The script will automatically:
