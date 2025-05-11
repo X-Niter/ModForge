@@ -240,14 +240,20 @@ export function setupAuth(app: Express) {
 
   passport.deserializeUser(async (id: number, done) => {
     try {
+      console.log(`[Auth Debug] Deserializing user ID: ${id}`);
       const [user] = await db.select().from(users).where(eq(users.id, id));
+      
       if (!user) {
+        console.warn(`[Auth Debug] User with ID ${id} not found during deserialization`);
         return done(null, false);
       }
       
       // Use our utility to ensure metadata is valid
-      done(null, ensureMetadataType(user));
+      const userWithMetadata = ensureMetadataType(user);
+      console.log(`[Auth Debug] Successfully deserialized user: ${user.username} (ID: ${user.id})`);
+      done(null, userWithMetadata);
     } catch (error) {
+      console.error(`[Auth Debug] Error deserializing user:`, error);
       done(error);
     }
   });
