@@ -170,74 +170,96 @@ public class MemoryHealthMonitor implements Disposable {
     
     /**
      * Analyze memory trends and predict potential issues
+     * Uses linear regression to identify trends and predict future memory usage
      */
     private void analyzeMemoryTrends() {
         List<MemorySnapshot> history;
         synchronized (memoryHistory) {
+            // Create a defensive copy to avoid concurrency issues
             history = new ArrayList<>(memoryHistory);
         }
         
         int size = history.size();
         if (size < 5) {
-            return; // Need at least 5 data points
+            return; // Need at least 5 data points for meaningful trend analysis
         }
         
-        // Calculate the slope of memory usage over time (simple linear regression)
-        double sumX = 0;
-        double sumY = 0;
-        double sumXX = 0;
-        double sumXY = 0;
-        
-        for (int i = 0; i < size; i++) {
-            MemorySnapshot snapshot = history.get(i);
-            double x = i; // use index as time (uniform intervals)
-            double y = snapshot.getUsagePercentage();
+        try {
+            // Calculate the slope of memory usage over time (simple linear regression)
+            // Uses the most recent samples for more accurate prediction
+            double sumX = 0;
+            double sumY = 0;
+            double sumXX = 0;
+            double sumXY = 0;
             
-            sumX += x;
-            sumY += y;
-            sumXX += x * x;
-            sumXY += x * y;
-        }
-        
-        double meanX = sumX / size;
-        double meanY = sumY / size;
-        
-        // Calculate slope (m) of trend line
-        double numerator = sumXY - size * meanX * meanY;
-        double denominator = sumXX - size * meanX * meanX;
-        
-        if (Math.abs(denominator) < 1e-10) {
-            // Avoid division by zero
-            return;
-        }
-        
-        double slope = numerator / denominator;
-        double intercept = meanY - slope * meanX;
-        
-        // Predict future memory usage
-        double currentUsage = history.get(size - 1).getUsagePercentage();
-        double predictedUsageIn10Minutes = intercept + slope * (size + PREDICTION_THRESHOLD_MINUTES);
-        
-        LOG.debug("Memory trend analysis: current=" + String.format("%.2f", currentUsage) + 
-                "%, predicted in " + PREDICTION_THRESHOLD_MINUTES + " minutes=" + 
-                String.format("%.2f", predictedUsageIn10Minutes) + "%, slope=" + 
-                String.format("%.4f", slope) + "% per minute");
-        
-        // Check if we're predicting a problem
-        if (slope > 0.5 && predictedUsageIn10Minutes > 80) {
-            // Memory is growing quickly and will reach a high level soon
-            LOG.warn("Memory trend analysis predicts high memory usage (" + 
-                    String.format("%.1f", predictedUsageIn10Minutes) + 
-                    "%) in the next " + PREDICTION_THRESHOLD_MINUTES + " minutes");
+            // Use timestamps rather than indices to handle potential irregular sampling
+            long baseTime = history.get(0).getTimestamp();
             
-            // Notify listeners
-            notifyPredictedMemoryPressure(predictedUsageIn10Minutes, PREDICTION_THRESHOLD_MINUTES);
-            
-            // Take preemptive action if prediction is severe
-            if (predictedUsageIn10Minutes > 90) {
-                LOG.warn("Taking preemptive action due to predicted critical memory usage");
-                triggerPreemptiveRecovery();
+            for (int i = 0; i < size; i++) {
+                MemorySnapshot snapshot = history.get(i);
+                
+                // Normalize time to minutes for better numerical stability
+                double x = (snapshot.getTimestamp() - baseTime) / 60000.0; 
+                double y = snapshot.getUsagePercentage();
+                
+                sumX += x;
+                sumY += y;
+                sumXX += x * x;
+                sumXY += x * y;
             }
+            
+            double meanX = sumX / size;
+            double meanY = sumY / size;
+            
+            // Calculate slope (m) of trend line
+            double numerator = sumXY - size * meanX * meanY;
+            double denominator = sumXX - size * meanX * meanX;
+            
+            if (Math.abs(denominator) < 1e-10) {
+                // Avoid division by zero
+                LOG.debug("Skipping memory trend analysis due to insufficient variance in time values");
+                return;
+            }
+            
+            double slope = numerator / denominator;
+            double intercept = meanY - slope * meanX;
+            
+            // Predict future memory usage
+            double currentUsage = history.get(size - 1).getUsagePercentage();
+            
+            // Calculate the time value for prediction: current time plus prediction threshold
+            double latestTimeValue = (history.get(size - 1).getTimestamp() - baseTime) / 60000.0;
+            double futureTimeValue = latestTimeValue + PREDICTION_THRESHOLD_MINUTES;
+            double predictedUsageIn10Minutes = intercept + slope * futureTimeValue;
+            
+            // Clamp predicted value to reasonable range (0-100%)
+            predictedUsageIn10Minutes = Math.max(0, Math.min(100, predictedUsageIn10Minutes));
+            
+            LOG.debug("Memory trend analysis: current=" + String.format("%.2f", currentUsage) + 
+                    "%, predicted in " + PREDICTION_THRESHOLD_MINUTES + " minutes=" + 
+                    String.format("%.2f", predictedUsageIn10Minutes) + "%, slope=" + 
+                    String.format("%.4f", slope) + "% per minute");
+            
+            // Check if we're predicting a problem
+            // Only trigger for positive slopes (increasing memory usage)
+            if (slope > 0.5 && predictedUsageIn10Minutes > 80) {
+                // Memory is growing quickly and will reach a high level soon
+                LOG.warn("Memory trend analysis predicts high memory usage (" + 
+                        String.format("%.1f", predictedUsageIn10Minutes) + 
+                        "%) in the next " + PREDICTION_THRESHOLD_MINUTES + " minutes");
+                
+                // Notify listeners
+                notifyPredictedMemoryPressure(predictedUsageIn10Minutes, PREDICTION_THRESHOLD_MINUTES);
+                
+                // Take preemptive action if prediction is severe
+                if (predictedUsageIn10Minutes > 90) {
+                    LOG.warn("Taking preemptive action due to predicted critical memory usage");
+                    triggerPreemptiveRecovery();
+                }
+            }
+        } catch (Exception e) {
+            // Ensure trend analysis failures don't crash the monitoring
+            LOG.error("Error analyzing memory trends", e);
         }
     }
     

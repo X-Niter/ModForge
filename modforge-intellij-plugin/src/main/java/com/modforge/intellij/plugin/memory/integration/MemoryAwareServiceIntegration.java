@@ -176,7 +176,8 @@ public class MemoryAwareServiceIntegration implements StartupActivity {
                         else if (predictedUsagePercentage > moderateThreshold && minutesAway <= moderateMinutesThreshold) {
                             LOG.info("Taking light preemptive recovery action due to predicted memory pressure: " +
                                     String.format("%.1f", predictedUsagePercentage) + "% in " + minutesAway + " minutes");
-                            recoveryManager.initiateRecovery(MemoryRecoveryManager.RecoveryLevel.LEVEL1);
+                            // Use performRecovery instead of initiateRecovery, with correct enum type
+                            recoveryManager.performRecovery(MemoryRecoveryManager.RecoveryPriority.MEDIUM);
                         }
                     } catch (Exception ex) {
                         LOG.error("Error handling predicted memory pressure", ex);
@@ -202,11 +203,13 @@ public class MemoryAwareServiceIntegration implements StartupActivity {
                         switch (status) {
                             case CRITICAL:
                                 LOG.warn("Critical memory health status detected, initiating recovery");
-                                recoveryManager.initiateRecovery(MemoryRecoveryManager.RecoveryLevel.LEVEL2);
+                                // Use performRecovery instead of initiateRecovery, with correct enum type
+                                recoveryManager.performRecovery(MemoryRecoveryManager.RecoveryPriority.HIGH);
                                 break;
                             case PROBLEMATIC:
                                 LOG.info("Problematic memory health status detected, initiating light recovery");
-                                recoveryManager.initiateRecovery(MemoryRecoveryManager.RecoveryLevel.LEVEL1);
+                                // Use performRecovery instead of initiateRecovery, with correct enum type
+                                recoveryManager.performRecovery(MemoryRecoveryManager.RecoveryPriority.MEDIUM);
                                 break;
                             case HEALTHY:
                                 LOG.debug("Memory health status is healthy, no action needed");
