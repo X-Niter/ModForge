@@ -120,6 +120,14 @@ java {
 
 tasks {
     // Set compatibility specifically for IntelliJ IDEA 2025.1.1.1 (Build: 251.25410.129) 
+    // Use custom preprocessed plugin.xml file to ensure correct name tag
+    processResources {
+        from('/home/runner/workspace/plugin-preprocessed.xml') {
+            into('META-INF')
+            rename('plugin-preprocessed.xml', 'plugin.xml')
+        }
+    }
+    
     patchPluginXml {
         sinceBuild.set("233") // Support from 2023.3
         untilBuild.set("251.25410.129") // Support specifically for 2025.1.1.1
