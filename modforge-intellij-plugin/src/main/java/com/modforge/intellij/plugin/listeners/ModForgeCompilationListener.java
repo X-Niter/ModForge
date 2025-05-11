@@ -47,7 +47,34 @@ public class ModForgeCompilationListener implements CompilationStatusListener {
             
             if (continuousDevelopmentService != null && continuousDevelopmentService.isRunning()) {
                 LOG.info("Triggering error fixing through continuous development service");
-                // TODO: Implement error fixing through continuous development service
+                
+                // Extract error information from the compile context
+                com.intellij.openapi.compiler.CompilerMessage[] errorMessages = compileContext.getMessages(com.intellij.openapi.compiler.CompilerMessageCategory.ERROR);
+                
+                if (errorMessages != null && errorMessages.length > 0) {
+                    LOG.info("Found " + errorMessages.length + " error messages from compiler");
+                    
+                    // Process errors in batches to avoid overwhelming the system
+                    java.util.List<String> errorDescriptions = new java.util.ArrayList<>();
+                    for (com.intellij.openapi.compiler.CompilerMessage message : errorMessages) {
+                        if (message != null) {
+                            String errorText = message.getMessage();
+                            String fileName = message.getVirtualFile() != null ? message.getVirtualFile().getName() : "unknown";
+                            int line = message.getLine();
+                            
+                            String errorDescription = String.format("%s (file: %s, line: %d)", 
+                                    errorText, fileName, line);
+                            errorDescriptions.add(errorDescription);
+                            
+                            LOG.debug("Error details: " + errorDescription);
+                        }
+                    }
+                    
+                    // Delegate error fixing to the continuous development service
+                    continuousDevelopmentService.fixCompilationErrors(errorDescriptions);
+                } else {
+                    LOG.warn("No error messages found in compile context despite errors > 0");
+                }
             }
         }
     }

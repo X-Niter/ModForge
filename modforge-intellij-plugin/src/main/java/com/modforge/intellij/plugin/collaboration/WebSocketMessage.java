@@ -89,17 +89,38 @@ public class WebSocketMessage {
     @Nullable
     public static WebSocketMessage fromJson(@NotNull String json) {
         try {
+            // Use specific type parameter for GSON.fromJson
             @SuppressWarnings("unchecked")
-            Map<String, Object> map = GSON.fromJson(json, Map.class);
+            Map<String, Object> map = GSON.fromJson(json, HashMap.class);
             
-            String type = (String) map.get("type");
-            String userId = (String) map.get("userId");
+            if (map == null) {
+                return null;
+            }
             
-            @SuppressWarnings("unchecked")
-            Map<String, Object> data = (Map<String, Object>) map.get("data");
+            Object typeObj = map.get("type");
+            Object userIdObj = map.get("userId");
+            Object dataObj = map.get("data");
+            
+            // Verify objects are of the expected types
+            if (!(typeObj instanceof String) || !(userIdObj instanceof String)) {
+                return null;
+            }
+            
+            String type = (String) typeObj;
+            String userId = (String) userIdObj;
+            
+            // Safely handle the data map
+            Map<String, Object> data = null;
+            if (dataObj instanceof Map) {
+                @SuppressWarnings("unchecked")
+                Map<String, Object> tempData = (Map<String, Object>) dataObj;
+                data = tempData;
+            }
             
             return new WebSocketMessage(type, userId, data);
         } catch (Exception e) {
+            com.intellij.openapi.diagnostic.Logger.getInstance(WebSocketMessage.class)
+                .warn("Failed to parse WebSocket message: " + e.getMessage());
             return null;
         }
     }

@@ -390,9 +390,14 @@ public final class CollaborationService {
             return;
         }
         
+        // Define operationMap outside try block to maintain scope
+        Map<String, Object> operationMap;
+        
         try {
             @SuppressWarnings("unchecked")
-            Map<String, Object> operationMap = (Map<String, Object>) operationObj;
+            Map<String, Object> tempMap = (Map<String, Object>) operationObj;
+            operationMap = tempMap;
+            
             if (operationMap.isEmpty()) {
                 LOG.warn("Received operation map is empty");
                 return;

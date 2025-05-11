@@ -275,10 +275,30 @@ public final class MemorySnapshotManager {
             }
             
             try (ObjectInputStream ois = new ObjectInputStream(new FileInputStream(file))) {
-                @SuppressWarnings("unchecked")
-                List<MemorySnapshot> loadedSnapshots = (List<MemorySnapshot>) ois.readObject();
+                // Safely handle deserialization with proper validation
+                Object obj = ois.readObject();
                 
-                if (loadedSnapshots != null && !loadedSnapshots.isEmpty()) {
+                if (!(obj instanceof List)) {
+                    LOG.warn("Invalid snapshot file format: expected List, got " + 
+                             (obj != null ? obj.getClass().getName() : "null"));
+                    return false;
+                }
+                
+                @SuppressWarnings("unchecked")
+                List<?> rawList = (List<?>) obj;
+                
+                // Validate list contents before casting
+                List<MemorySnapshot> loadedSnapshots = new ArrayList<>();
+                for (Object item : rawList) {
+                    if (item instanceof MemorySnapshot) {
+                        loadedSnapshots.add((MemorySnapshot) item);
+                    } else {
+                        LOG.warn("Invalid item in snapshot list: expected MemorySnapshot, got " + 
+                                (item != null ? item.getClass().getName() : "null"));
+                    }
+                }
+                
+                if (!loadedSnapshots.isEmpty()) {
                     try {
                         snapshotsLock.writeLock().lock();
                         
