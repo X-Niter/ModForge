@@ -1,0 +1,56 @@
+esolve mutations for :validatePluginForProduction (Thread[#813,Execution worker Thread 2,5,main]) started.
+:initializeIntelliJPlugin (Thread[#815,Execution worker Thread 4,5,main]) started.
+:validatePluginForProduction (Thread[#813,Execution worker Thread 2,5,main]) started.
+
+> Task :validatePluginForProduction FAILED
+Caching disabled for task ':validatePluginForProduction' because:
+  Gradle would require more information to cache this task
+Task ':validatePluginForProduction' is not up-to-date because:
+  Task has not declared any outputs despite executing actions.
+Validating plugin for production deployment...
+Γ£ô Java version check passed: 21.0.5
+Γ£ô Plugin version check passed: unspecified
+
+> Task :initializeIntelliJPlugin
+Caching disabled for task ':initializeIntelliJPlugin' because:
+  Task is untracked because: Should always be run to initialize the plugin
+Task ':initializeIntelliJPlugin' is not up-to-date because:
+  Task is untracked because: Should always be run to initialize the plugin
+[gradle-intellij-plugin] Resolving Gradle IntelliJ Plugin version with: jar:file:/C:/Users/riley/.gradle/caches/modules-2/files-2.1/org.jetbrains.intellij.plugins/gradle-intellij-plugin/1.17.2/55ecde4ccb37895b9588e75ebd9c7e061667bb9a/gradle-intellij-plugin-1.17.2.jar!/META-INF/MANIFEST.MF
+Invalidating in-memory cache of C:\Users\riley\.gradle\caches\journal-1\file-access.bin
+
+FAILURE: Build completed with 2 failures.
+
+1: Task failed with an exception.
+-----------
+* Where:
+Build file 'G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\build.gradle' line: 196
+
+* What went wrong:
+Execution failed for task ':validatePluginForProduction'.
+> Cannot reference a Gradle script object from a Groovy closure as these are not supported with the configuration cache.
+
+* Try:
+> Run with --stacktrace option to get the stack trace.
+> Run with --debug option to get more log output.
+> Run with --scan to get full insights.
+> Get more help at https://help.gradle.org.
+==============================================================================
+
+2: Task failed with an exception.
+-----------
+* Where:
+Build file 'G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\build.gradle' line: 190
+
+* What went wrong:
+Configuration cache problems found in this build.
+
+2 problems were found storing the configuration cache.
+- Build file 'build.gradle': line 190: invocation of 'Task.project' at execution time is unsupported.
+  See https://docs.gradle.org/8.5/userguide/configuration_cache.html#config_cache:requirements:use_project_during_execution
+- Build file 'build.gradle': line 193: invocation of 'Task.project' at execution time is unsupported.
+  See https://docs.gradle.org/8.5/userguide/configuration_cache.html#config_cache:requirements:use_project_during_execution
+
+See the complete report at file:///G:/JavaMinecraftProjects/ModForge/modforge-intellij-plugin/build/reports/configuration-cache/7hkbv1itqiyxdu4b2mughjyeb/22w3e4qy725k92iob4xhoqse9/configuration-cache-report.html
+> Invocation of 'Task.project' by task ':validatePluginForProduction' at execution time is unsupported.
+> Invocation of 'Task.project' by task ':validatePluginForProduction' at execution time is unsupported.
