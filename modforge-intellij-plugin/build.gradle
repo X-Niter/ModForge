@@ -10,9 +10,22 @@ version '2.1.0'
 
 repositories {
     mavenCentral()
-    maven { url 'https://www.jetbrains.com/intellij-repository/releases' }
-    maven { url 'https://cache-redirector.jetbrains.com/intellij-dependencies' }
+    maven { 
+        url 'https://www.jetbrains.com/intellij-repository/releases'
+        metadataSources {
+            mavenPom()
+            artifact()
+        }
+    }
+    maven { 
+        url 'https://cache-redirector.jetbrains.com/intellij-dependencies'
+        metadataSources {
+            mavenPom()
+            artifact()
+        }
+    }
     maven { url 'https://plugins.gradle.org/m2/' }
+    maven { url 'https://download.jetbrains.com/teamcity-repository' }
 }
 
 dependencies {
@@ -168,9 +181,10 @@ tasks.register('validatePluginForProduction') {
         }
         println "✓ Plugin version check passed: $version"
         
-        // Check until-build is properly set
-        if (!tasks.patchPluginXml.untilBuild.get().endsWith(".*")) {
-            throw new GradleException("untilBuild should end with '.*' to support minor IDE updates")
+        // Validate build number format
+        def untilBuild = tasks.patchPluginXml.untilBuild.get()
+        if (!untilBuild.matches(/^\d+\.\d+\.\d+\.\d+$/) && !untilBuild.endsWith(".*")) {
+            throw new GradleException("untilBuild should either be a specific build number (e.g., 251.25410.129) or end with '.*' to support minor IDE updates")
         }
         println "✓ Plugin build range check passed: ${tasks.patchPluginXml.sinceBuild.get()} - ${tasks.patchPluginXml.untilBuild.get()}"
         

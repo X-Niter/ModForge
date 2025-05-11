@@ -4,7 +4,10 @@ IntelliJ IDEA plugin for ModForge - the AI-powered Minecraft mod development pla
 
 ## Build Status
 
-This plugin is fully compatible with IntelliJ IDEA 2025.1, optimized for use with Java 21.
+This plugin is fully compatible with IntelliJ IDEA 2025.1.1.1 (Build: 251.25410.129), optimized for use with Java 21.
+
+![Compatible with IntelliJ IDEA 2025.1.1.1](https://img.shields.io/badge/IntelliJ_IDEA-2025.1.1.1-blue)
+![Java](https://img.shields.io/badge/Java-21-orange)
 
 ## Building the Plugin
 
@@ -12,7 +15,7 @@ This plugin is fully compatible with IntelliJ IDEA 2025.1, optimized for use wit
 
 - JDK 17+ (JDK 21 recommended)
 - Gradle 8.5+
-- IntelliJ IDEA 2023.3.6+ or IntelliJ IDEA 2025.1
+- IntelliJ IDEA 2023.3.6+ or IntelliJ IDEA 2025.1.1.1
 
 ### Build Commands
 
@@ -48,16 +51,25 @@ intellij {
 
 ```groovy
 intellij {
-    localPath = 'C:/Program Files/JetBrains/IntelliJ IDEA Community Edition 2025.1'
+    localPath = 'C:/Program Files/JetBrains/IntelliJ IDEA Community Edition 2025.1.1.1'
 }
 ```
 
-## Troubleshooting
+## Build Options for 2025.1.1.1
 
-If you're building for IntelliJ 2025.1, you have two options:
+### Option 1: Use helper scripts (Recommended)
 
-1. **Repository Build**: Use version `2023.3.6` for building but set compatibility to include `untilBuild = 251.*`
-2. **Local Build**: Comment out the `version` and use `localPath` pointing to your local IntelliJ 2025.1 installation
+We've provided helper scripts for building with IntelliJ 2025.1.1.1:
+
+- **Windows**: Run `build-for-2025.1.1.1.bat` or `build-plugin-local.bat`
+- **Mac/Linux**: Run `./build-for-2025.1.1.1.sh`
+
+### Option 2: Manual configuration
+
+You have two approaches for building the plugin:
+
+1. **Repository Build**: Use version `2023.3.6` for building but set compatibility to include `untilBuild = 251.25410.129`
+2. **Local Build**: Comment out the `version` and use `localPath` pointing to your local IntelliJ 2025.1.1.1 installation
 
 ## Plugin Features
 
@@ -70,9 +82,9 @@ If you're building for IntelliJ 2025.1, you have two options:
 
 ## System Requirements
 
-- IntelliJ IDEA 2023.3+ (2025.1 recommended)
-- JDK 17+ (JDK 21 recommended for 2025.1)
-- Minecraft Development plugin (required dependency)
+- IntelliJ IDEA 2023.3+ (2025.1.1.1 recommended)
+- JDK 17+ (JDK 21 required for 2025.1.1.1)
+- Minecraft Development plugin (optional, with fallback mechanism)
 
 ## License
 

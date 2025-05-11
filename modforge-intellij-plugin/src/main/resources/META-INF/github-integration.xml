@@ -5,10 +5,12 @@
     </extensions>
     
     <actions>
-        <action id="ModForge.PushToGitHubAction"
-                class="com.modforge.intellij.plugin.actions.PushToGitHubAction"
-                text="Push to GitHub"
-                description="Push mod to GitHub repository">
-        </action>
+        <group id="ModForge.GitHub.ActionGroup">
+            <action id="ModForge.PushToGitHubAction"
+                    class="com.modforge.intellij.plugin.actions.PushToGitHubAction"
+                    text="Push to GitHub"
+                    description="Push mod to GitHub repository">
+            </action>
+        </group>
     </actions>
 </idea-plugin>
