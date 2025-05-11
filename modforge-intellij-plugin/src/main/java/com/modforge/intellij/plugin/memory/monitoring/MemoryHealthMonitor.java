@@ -362,6 +362,26 @@ public class MemoryHealthMonitor implements Disposable {
         }
     }
     
+    /**
+     * Reset the memory health monitor
+     * Clears all history and restarts monitoring if it was running
+     */
+    public void reset() {
+        LOG.info("Resetting memory health monitor");
+        
+        boolean wasRunning = running.get();
+        stop();
+        
+        synchronized (memoryHistory) {
+            memoryHistory.clear();
+        }
+        
+        if (wasRunning) {
+            LOG.info("Restarting memory health monitor after reset");
+            start();
+        }
+    }
+    
     @Override
     public void dispose() {
         stop();

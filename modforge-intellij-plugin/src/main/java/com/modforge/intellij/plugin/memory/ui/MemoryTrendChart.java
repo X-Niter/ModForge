@@ -427,6 +427,18 @@ public class MemoryTrendChart extends JPanel {
     }
     
     /**
+     * Reset the chart data and display
+     */
+    public void reset() {
+        synchronized (displaySnapshots) {
+            displaySnapshots.clear();
+        }
+        hoverPoint = null;
+        hoverSnapshot = null;
+        repaint();
+    }
+    
+    /**
      * Get the chart title based on the chart type
      *
      * @return The chart title
