@@ -67,6 +67,8 @@
         <projectService serviceImplementation="com.modforge.intellij.plugin.ai.generation.MinecraftCodeGenerator"/>
         <projectService serviceImplementation="com.modforge.intellij.plugin.debug.MinecraftDebugService"/>
         <projectService serviceImplementation="com.modforge.intellij.plugin.debug.MinecraftPerformanceMonitor"/>
+        <projectService serviceImplementation="com.modforge.intellij.plugin.designers.advancement.AdvancementManager"/>
+        <projectService serviceImplementation="com.modforge.intellij.plugin.designers.recipe.RecipeManager"/>
         <projectService serviceImplementation="com.modforge.intellij.plugin.github.GitHubIntegrationService"/>
         <projectService serviceImplementation="com.modforge.intellij.plugin.notifications.ModForgeNotificationService"/>
         <projectService serviceImplementation="com.modforge.intellij.plugin.templates.ModTemplateService"/>
