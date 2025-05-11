@@ -284,10 +284,152 @@ public class MemoryDetailsDialog extends DialogWrapper {
      */
     private JPanel createMemoryTrendPanel() {
         JPanel panel = new JPanel(new BorderLayout());
+        panel.setBorder(JBUI.Borders.empty(10));
         
-        // TODO: Implement memory trend graph
+        // Create memory trend chart
+        MemoryTrendChart trendChart = new MemoryTrendChart();
+        
+        // Create control panel for chart options
+        JPanel controlPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        
+        // Time range selector
+        JComboBox<String> timeRangeSelector = new JComboBox<>(new String[]{
+                "Last 5 minutes", "Last 15 minutes", "Last 30 minutes", "Last hour", "Last 3 hours", "All data"
+        });
+        timeRangeSelector.setSelectedIndex(1); // Default to 15 minutes
+        timeRangeSelector.addActionListener(e -> {
+            int selectedIndex = timeRangeSelector.getSelectedIndex();
+            int minutesBack;
+            
+            switch (selectedIndex) {
+                case 0: minutesBack = 5; break;
+                case 1: minutesBack = 15; break;
+                case 2: minutesBack = 30; break;
+                case 3: minutesBack = 60; break;
+                case 4: minutesBack = 180; break;
+                case 5: minutesBack = -1; break; // All data
+                default: minutesBack = 15;
+            }
+            
+            trendChart.setTimeRange(minutesBack);
+        });
+        
+        // Chart type selector
+        JComboBox<String> chartTypeSelector = new JComboBox<>(new String[]{
+                "Used Memory", "Memory Usage %", "Free Memory", "All Memory Types"
+        });
+        chartTypeSelector.addActionListener(e -> {
+            int selectedIndex = chartTypeSelector.getSelectedIndex();
+            trendChart.setChartType(selectedIndex);
+        });
+        
+        // Refresh button
+        JButton refreshButton = new JButton("Refresh");
+        refreshButton.addActionListener(e -> trendChart.refreshData());
+        
+        // Export button
+        JButton exportButton = new JButton("Export Data");
+        exportButton.addActionListener(e -> exportMemoryTrendData());
+        
+        // Add components to control panel
+        controlPanel.add(new JLabel("Time Range:"));
+        controlPanel.add(timeRangeSelector);
+        controlPanel.add(Box.createHorizontalStrut(10));
+        controlPanel.add(new JLabel("Chart Type:"));
+        controlPanel.add(chartTypeSelector);
+        controlPanel.add(Box.createHorizontalStrut(10));
+        controlPanel.add(refreshButton);
+        controlPanel.add(Box.createHorizontalStrut(10));
+        controlPanel.add(exportButton);
+        
+        // Add components to panel
+        panel.add(controlPanel, BorderLayout.NORTH);
+        panel.add(trendChart, BorderLayout.CENTER);
+        
+        // Create a legend panel
+        JPanel legendPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        legendPanel.setBorder(BorderFactory.createTitledBorder("Legend"));
+        
+        // Add legend items
+        addLegendItem(legendPanel, new Color(45, 183, 93), "Normal");
+        addLegendItem(legendPanel, new Color(255, 170, 0), "Warning");
+        addLegendItem(legendPanel, new Color(255, 102, 0), "Critical");
+        addLegendItem(legendPanel, new Color(232, 17, 35), "Emergency");
+        
+        panel.add(legendPanel, BorderLayout.SOUTH);
         
         return panel;
+    }
+    
+    /**
+     * Add a legend item to the panel
+     * 
+     * @param panel The panel to add the legend item to
+     * @param color The color of the legend item
+     * @param label The label of the legend item
+     */
+    private void addLegendItem(JPanel panel, Color color, String label) {
+        JPanel colorBox = new JPanel();
+        colorBox.setBackground(color);
+        colorBox.setPreferredSize(new Dimension(20, 20));
+        panel.add(colorBox);
+        panel.add(new JLabel(label));
+        panel.add(Box.createHorizontalStrut(15));
+    }
+    
+    /**
+     * Export memory trend data to a file
+     */
+    private void exportMemoryTrendData() {
+        // Create a file chooser
+        JFileChooser fileChooser = new JFileChooser();
+        fileChooser.setDialogTitle("Export Memory Trend Data");
+        fileChooser.setFileSelectionMode(JFileChooser.FILES_ONLY);
+        
+        // Set the file filter
+        fileChooser.setFileFilter(new javax.swing.filechooser.FileFilter() {
+            @Override
+            public boolean accept(File f) {
+                return f.isDirectory() || f.getName().toLowerCase().endsWith(".csv");
+            }
+            
+            @Override
+            public String getDescription() {
+                return "CSV Files (*.csv)";
+            }
+        });
+        
+        // Show the file chooser
+        if (fileChooser.showSaveDialog(this.getContentPane()) == JFileChooser.APPROVE_OPTION) {
+            File selectedFile = fileChooser.getSelectedFile();
+            
+            // Add .csv extension if not present
+            if (!selectedFile.getName().toLowerCase().endsWith(".csv")) {
+                selectedFile = new File(selectedFile.getAbsolutePath() + ".csv");
+            }
+            
+            // Get the memory snapshot manager
+            com.modforge.intellij.plugin.memory.monitoring.MemorySnapshotManager snapshotManager = 
+                    com.modforge.intellij.plugin.memory.monitoring.MemorySnapshotManager.getInstance();
+            
+            // Export the snapshots
+            boolean success = snapshotManager.exportSnapshotsToCSV(selectedFile);
+            
+            // Show a message
+            if (success) {
+                JOptionPane.showMessageDialog(
+                        this.getContentPane(), 
+                        "Memory trend data exported successfully to:\n" + selectedFile.getAbsolutePath(),
+                        "Export Successful",
+                        JOptionPane.INFORMATION_MESSAGE);
+            } else {
+                JOptionPane.showMessageDialog(
+                        this.getContentPane(),
+                        "Failed to export memory trend data",
+                        "Export Failed",
+                        JOptionPane.ERROR_MESSAGE);
+            }
+        }
     }
     
     /**

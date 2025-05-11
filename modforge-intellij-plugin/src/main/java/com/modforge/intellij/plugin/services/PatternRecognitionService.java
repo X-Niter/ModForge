@@ -313,6 +313,9 @@ public final class PatternRecognitionService {
         }
         
         LOG.info("Cleaned up " + toRemove + " least used patterns");
+        
+        // Save patterns after cleanup
+        savePatterns();
     }
     
     /**
@@ -335,6 +338,9 @@ public final class PatternRecognitionService {
             entry.updateEffectiveness(delta);
             LOG.info("Updated pattern effectiveness: " + entry.effectiveness + 
                      " for category: " + category);
+            
+            // Save patterns to persistent storage after effectiveness update
+            savePatterns();
         }
     }
     
