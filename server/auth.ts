@@ -6,6 +6,9 @@ import session from "express-session";
 import { scrypt, randomBytes, timingSafeEqual } from "crypto";
 import { promisify } from "util";
 import jwt from "jsonwebtoken";
+import connectPgSimple from 'connect-pg-simple';
+import { pool } from './db';
+
 /**
  * Define a properly typed JWT sign function to avoid type issues
  * This wraps the jsonwebtoken sign function to provide better type safety
@@ -165,15 +168,23 @@ export function setupAuth(app: Express) {
   // Configure sessions
   const sessionSecret = process.env.SESSION_SECRET || randomBytes(32).toString("hex");
   
+  // Set up PostgreSQL session store
+  const PgSession = connectPgSimple(session);
+  const sessionStore = new PgSession({
+    pool,
+    tableName: 'session', // default table name
+    createTableIfMissing: true // automatically create the sessions table if it doesn't exist
+  });
+  
   const sessionSettings: session.SessionOptions = {
+    store: sessionStore,
     secret: sessionSecret,
     resave: false,
     saveUninitialized: false,
     cookie: {
       secure: process.env.NODE_ENV === "production",
       maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
-    },
-    // We'll use the storage.sessionStore here if using database storage
+    }
   };
   
   app.use(session(sessionSettings));
