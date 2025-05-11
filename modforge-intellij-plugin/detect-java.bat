@@ -1,135 +1,201 @@
 @echo off
-:: Java 21 Detection Tool for ModForge IntelliJ Plugin
-:: This script will find all Java 21 installations on your system
+:: Java 21 Detection Script for ModForge IntelliJ Plugin
+:: This script finds all Java 21 installations on the system
+
+echo ===== Java 21 Detection Tool =====
+echo.
+echo Searching for Java 21 installations...
+echo.
 
 setlocal EnableDelayedExpansion
 
-echo ===== Java 21 Detection Tool for ModForge =====
-echo.
-echo This tool will scan your system for all Java 21 installations
-echo to help identify which one to use for building the plugin.
-echo.
+:: Create results file
+echo -- Java 21 Installations Found -- > java21_locations.txt
 
-:: Current Java in path
-echo Checking current Java version:
-for /f "tokens=* USEBACKQ" %%v in ('java -version 2^>^&1') do (
-    echo %%v | findstr /i "version" > nul
-    if not errorlevel 1 (
-        echo %%v
-        echo %%v | findstr /i "21" > nul
+:: Set flag to track if any Java 21 was found
+set FOUND_JAVA21=0
+
+:: Check common installation paths
+set PATHS_TO_CHECK=^
+C:\Program Files\Java^
+C:\Program Files (x86)\Java^
+C:\Java^
+%LOCALAPPDATA%\Programs\Eclipse Adoptium^
+%USERPROFILE%\.jdks
+
+:: Check JetBrains bundled JDKs
+set JB_PATHS_TO_CHECK=^
+%USERPROFILE%\.jdks^
+%LOCALAPPDATA%\JetBrains\Toolbox\apps\IDEA-C^
+%LOCALAPPDATA%\JetBrains\Toolbox\apps\IDEA-U^
+%LOCALAPPDATA%\JetBrains\Toolbox\apps\AndroidStudio^
+%LOCALAPPDATA%\JetBrains\IntelliJIdea*^
+%PROGRAMFILES%\JetBrains\IntelliJ*
+
+echo Checking standard Java installation paths...
+
+:: Loop through each path
+for %%p in (%PATHS_TO_CHECK%) do (
+    if exist "%%p" (
+        :: Find all Java installations in this path
+        for /d %%j in ("%%p\*") do (
+            set "JAVA_PATH=%%j"
+            
+            :: Check if java.exe exists
+            if exist "!JAVA_PATH!\bin\java.exe" (
+                :: Get Java version
+                "!JAVA_PATH!\bin\java.exe" -version 2>temp_version.txt
+                findstr /c:"version" /c:"openjdk version" /c:"java version" temp_version.txt > nul
+                if not errorlevel 1 (
+                    findstr /c:"21" /c:"21." temp_version.txt > nul
+                    if not errorlevel 1 (
+                        echo FOUND Java 21: !JAVA_PATH!
+                        echo !JAVA_PATH! >> java21_locations.txt
+                        set FOUND_JAVA21=1
+                    )
+                )
+                del temp_version.txt > nul 2>&1
+            )
+        )
+    )
+)
+
+echo.
+echo Checking JetBrains bundled Java installations...
+
+:: Loop through JetBrains paths
+for %%p in (%JB_PATHS_TO_CHECK%) do (
+    if exist "%%p" (
+        :: Find all potential JBR installations recursively
+        for /f "tokens=*" %%j in ('dir /b /s "%%p\jbr" 2^>nul') do (
+            set "JAVA_PATH=%%j"
+            
+            :: Check if java.exe exists
+            if exist "!JAVA_PATH!\bin\java.exe" (
+                :: Get Java version
+                "!JAVA_PATH!\bin\java.exe" -version 2>temp_version.txt
+                findstr /c:"version" /c:"openjdk version" /c:"java version" temp_version.txt > nul
+                if not errorlevel 1 (
+                    findstr /c:"21" /c:"21." temp_version.txt > nul
+                    if not errorlevel 1 (
+                        echo FOUND JetBrains Bundled Java 21: !JAVA_PATH!
+                        echo !JAVA_PATH! [JetBrains Bundled] >> java21_locations.txt
+                        set FOUND_JAVA21=1
+                    )
+                )
+                del temp_version.txt > nul 2>&1
+            )
+        )
+        
+        :: Check direct .jdks entries which might be symlinks
+        if "%%p"=="%USERPROFILE%\.jdks" (
+            for /d %%j in ("%USERPROFILE%\.jdks\*") do (
+                set "JAVA_PATH=%%j"
+                
+                :: Check if this might be a Java 21 installation
+                echo "!JAVA_PATH!" | findstr /c:"21" /c:"jbr-21" /c:"jbr-17" > nul
+                if not errorlevel 1 (
+                    if exist "!JAVA_PATH!\bin\java.exe" (
+                        :: Get Java version
+                        "!JAVA_PATH!\bin\java.exe" -version 2>temp_version.txt
+                        findstr /c:"version" /c:"openjdk version" /c:"java version" temp_version.txt > nul
+                        if not errorlevel 1 (
+                            findstr /c:"21" /c:"21." temp_version.txt > nul
+                            if not errorlevel 1 (
+                                echo FOUND JetBrains .jdks Java 21: !JAVA_PATH!
+                                echo !JAVA_PATH! [JetBrains .jdks] >> java21_locations.txt
+                                set FOUND_JAVA21=1
+                            )
+                        )
+                        del temp_version.txt > nul 2>&1
+                    )
+                )
+            )
+        )
+    )
+)
+
+echo.
+echo Checking JAVA_HOME environment variable...
+
+:: Check JAVA_HOME
+if defined JAVA_HOME (
+    if exist "%JAVA_HOME%\bin\java.exe" (
+        "%JAVA_HOME%\bin\java.exe" -version 2>temp_version.txt
+        findstr /c:"version" /c:"openjdk version" /c:"java version" temp_version.txt > nul
         if not errorlevel 1 (
-            echo DEFAULT JAVA: ^ Java 21 is already your default Java!
-            for /f "tokens=*" %%j in ('where java') do (
-                echo Path: %%~dpj..
+            findstr /c:"21" /c:"21." temp_version.txt > nul
+            if not errorlevel 1 (
+                echo FOUND Java 21 in JAVA_HOME: %JAVA_HOME%
+                echo %JAVA_HOME% [JAVA_HOME] >> java21_locations.txt
+                set FOUND_JAVA21=1
+            ) else (
+                echo JAVA_HOME points to a non-Java-21 installation: %JAVA_HOME%
             )
         )
+        del temp_version.txt > nul 2>&1
+    ) else (
+        echo WARNING: JAVA_HOME is set but doesn't contain bin\java.exe: %JAVA_HOME%
     )
-)
-
-echo.
-echo ===== SCANNING FOR ALL JAVA 21 INSTALLATIONS =====
-echo.
-
-:: Make a comprehensive list of all places to search
-echo Scanning IntelliJ IDEA locations...
-echo.
-
-set FOUND=0
-
-:: Check IntelliJ IDEA JDKs directory
-if exist "%USERPROFILE%\.jdks" (
-    echo Scanning IntelliJ IDEA JDKs folder...
-    for /f "tokens=*" %%i in ('dir /b "%USERPROFILE%\.jdks"') do (
-        if exist "%USERPROFILE%\.jdks\%%i\bin\java.exe" (
-            for /f "tokens=*" %%v in ('"%USERPROFILE%\.jdks\%%i\bin\java.exe" -version 2^>^&1') do (
-                echo %%v | findstr /i "version" > nul
-                if not errorlevel 1 (
-                    echo %%v | findstr /i "21" > nul
-                    if not errorlevel 1 (
-                        echo [FOUND] Java 21 in JDKs folder: %USERPROFILE%\.jdks\%%i
-                        set /a FOUND+=1
-                    )
-                )
-            )
-        )
-    )
-)
-
-:: Check JetBrains Toolbox installations
-if exist "%LOCALAPPDATA%\JetBrains\Toolbox" (
-    echo Scanning JetBrains Toolbox locations...
-    for /f "tokens=*" %%d in ('dir /b /s /a:d "%LOCALAPPDATA%\JetBrains\Toolbox\apps\*jbr*"') do (
-        if exist "%%d\bin\java.exe" (
-            for /f "tokens=*" %%v in ('%%d\bin\java.exe -version 2^>^&1') do (
-                echo %%v | findstr /i "version" > nul
-                if not errorlevel 1 (
-                    echo %%v | findstr /i "21" > nul
-                    if not errorlevel 1 (
-                        echo [FOUND] Java 21 in Toolbox: %%d
-                        set /a FOUND+=1
-                    )
-                )
-            )
-        )
-    )
-)
-
-:: Check standard IntelliJ installations
-if exist "%LOCALAPPDATA%\JetBrains" (
-    echo Scanning IntelliJ IDEA installations...
-    for /f "tokens=*" %%d in ('dir /b "%LOCALAPPDATA%\JetBrains"') do (
-        if exist "%LOCALAPPDATA%\JetBrains\%%d\jbr\bin\java.exe" (
-            for /f "tokens=*" %%v in ('"%LOCALAPPDATA%\JetBrains\%%d\jbr\bin\java.exe" -version 2^>^&1') do (
-                echo %%v | findstr /i "version" > nul
-                if not errorlevel 1 (
-                    echo %%v | findstr /i "21" > nul
-                    if not errorlevel 1 (
-                        echo [FOUND] Java 21 in IntelliJ installation: %LOCALAPPDATA%\JetBrains\%%d\jbr
-                        set /a FOUND+=1
-                    )
-                )
-            )
-        )
-    )
-)
-
-:: Check Program Files locations
-echo.
-echo Scanning standard installation locations...
-echo.
-
-set "STD_PATTERNS=Eclipse Adoptium\jdk-21* Java\jdk-21* BellSoft\LibericaJDK-21* Amazon Corretto\jdk21*"
-
-for %%d in ("%ProgramFiles%" "%ProgramFiles(x86)%" "C:\") do (
-    for %%p in (%STD_PATTERNS%) do (
-        if exist "%%~d\%%p\bin\java.exe" (
-            for /f "tokens=*" %%j in ('dir /b /a:d "%%~d\%%p"') do (
-                echo [FOUND] Java 21 at: %%~d\%%p
-                set /a FOUND+=1
-            )
-        )
-    )
-)
-
-echo.
-echo ===== SCAN COMPLETE =====
-echo.
-
-if !FOUND! EQU 0 (
-    echo No Java 21 installations were found on this system.
-    echo.
-    echo Please install Java 21 from one of these sources:
-    echo 1. IntelliJ IDEA: File ^> Project Structure ^> Project ^> SDK ^> Add SDK ^> Download JDK
-    echo 2. Eclipse Adoptium: https://adoptium.net/
-    echo 3. Oracle: https://www.oracle.com/java/technologies/javase/jdk21-archive-downloads.html
 ) else (
-    echo Found !FOUND! Java 21 installation^(s^) on your system.
-    echo.
-    echo To use one of these Java installations for building:
-    echo 1. Run the fix-build.bat script which will auto-detect Java 21
-    echo 2. Or manually edit gradle.properties and add this line with the correct path:
-    echo    org.gradle.java.home=PATH_TO_JAVA_21
+    echo JAVA_HOME is not set
 )
+
 echo.
-echo Press any key to exit...
-pause > nul
+echo Checking system PATH for Java 21...
+
+:: Check for Java in PATH
+where java 2>nul >nul
+if not errorlevel 1 (
+    for /f "tokens=*" %%j in ('where java') do (
+        set "JAVA_EXE=%%j"
+        set "JAVA_PATH=!JAVA_EXE:~0,-9!"
+        
+        "!JAVA_EXE!" -version 2>temp_version.txt
+        findstr /c:"version" /c:"openjdk version" /c:"java version" temp_version.txt > nul
+        if not errorlevel 1 (
+            findstr /c:"21" /c:"21." temp_version.txt > nul
+            if not errorlevel 1 (
+                echo FOUND Java 21 in PATH: !JAVA_PATH!
+                echo !JAVA_PATH! [PATH] >> java21_locations.txt
+                set FOUND_JAVA21=1
+            ) else (
+                echo Current PATH Java is not version 21
+            )
+        )
+        del temp_version.txt > nul 2>&1
+    )
+) else (
+    echo Java is not in PATH
+)
+
+echo.
+if %FOUND_JAVA21%==1 (
+    echo ===== Java 21 installations found =====
+    echo The following Java 21 installations were found:
+    echo.
+    type java21_locations.txt
+    echo.
+    echo These locations have been saved to java21_locations.txt
+    echo To use one of these installations, either:
+    echo 1. Set org.gradle.java.home in gradle.properties to the path
+    echo 2. Set JAVA_HOME environment variable before building
+    echo 3. Use the compatible-build.bat script which will prompt you for the path
+) else (
+    echo ===== No Java 21 installations found =====
+    echo.
+    echo Please install Java 21 and try again.
+    echo Recommended downloads:
+    echo - Eclipse Temurin: https://adoptium.net/
+    echo - Oracle JDK: https://www.oracle.com/java/technologies/downloads/
+    echo.
+    echo Alternatively, download Java 21 through IntelliJ IDEA:
+    echo 1. Open IntelliJ IDEA
+    echo 2. Go to File → Project Structure → Platform Settings → SDKs
+    echo 3. Click + and select "Download JDK..."
+    echo 4. Select version 21 and a vendor (e.g., Eclipse Temurin)
+    echo 5. Click Download
+)
+
+echo.
+endlocal
