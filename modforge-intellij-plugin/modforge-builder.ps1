@@ -397,11 +397,15 @@ function Configure-JavaForBuild {
     # Backup gradle.properties
     if (Test-Path "gradle.properties") {
         Copy-Item -Path "gradle.properties" -Destination "gradle.properties.bak" -Force
+    } else {
+        # Create default gradle.properties if it doesn't exist
+        "# Gradle properties file for ModForge" | Out-File -FilePath "gradle.properties" -Encoding ASCII
     }
     
     # Configure gradle.properties to use our Java 21
     $gradleProperties = Get-Content -Path "gradle.properties" -Raw
-    $gradleProperties = $gradleProperties -replace '#\s*org\.gradle\.java\.home.*', "org.gradle.java.home=$($script:JavaPath -replace '\\', '\\')"
+    $normalizedPath = $script:JavaPath -replace '\\', '\\'
+    $gradleProperties = $gradleProperties -replace '#\s*org\.gradle\.java\.home.*', "org.gradle.java.home=$normalizedPath"
     
     # Check if replacement was successful
     if (-not ($gradleProperties -match "org.gradle.java.home=")) {
@@ -428,7 +432,25 @@ function Fix-CommonErrors {
     
     # First run a partial build to get error information
     Write-Log "Running diagnostic build to identify issues..."
-    & gradlew compileJava --info | Out-File -FilePath "build_errors.log"
+    
+    # Make sure we're using the correct path to gradlew
+    $gradlewPath = "./gradlew"
+    if (-not (Test-Path $gradlewPath)) {
+        # Try alternate paths
+        if (Test-Path "gradlew") {
+            $gradlewPath = "gradlew"
+        } elseif (Test-Path "../gradlew") {
+            $gradlewPath = "../gradlew"
+        } else {
+            Write-Log "Could not find gradlew executable. Creating a simple wrapper script." -Level "WARNING"
+            # Create a simple wrapper
+            "@echo off`ngradle %*" | Out-File -FilePath "gradlew.bat" -Encoding ASCII
+            "gradle `"$@`"" | Out-File -FilePath "gradlew" -Encoding ASCII
+            $gradlewPath = "./gradlew"
+        }
+    }
+    
+    & $gradlewPath compileJava --info | Out-File -FilePath "build_errors.log"
     
     # Check for errors and fix them
     $hasErrors = Select-String -Path "build_errors.log" -Pattern "error: " -Quiet
@@ -515,7 +537,22 @@ function Build-Plugin {
     
     # Final build attempt
     Write-Log "Running plugin build..."
-    & gradlew clean build --info | Out-File -FilePath "final_build.log"
+    
+    # Make sure we're using the correct path to gradlew
+    $gradlewPath = "./gradlew"
+    if (-not (Test-Path $gradlewPath)) {
+        # Try alternate paths
+        if (Test-Path "gradlew") {
+            $gradlewPath = "gradlew"
+        } elseif (Test-Path "../gradlew") {
+            $gradlewPath = "../gradlew"
+        } else {
+            Write-Log "Could not find gradlew executable. Using gradle directly." -Level "WARNING"
+            $gradlewPath = "gradle"
+        }
+    }
+    
+    & $gradlewPath clean build --info | Out-File -FilePath "final_build.log"
     
     # Check if build succeeded
     if (Test-Path $IjPluginPath) {
@@ -534,7 +571,7 @@ function Build-Plugin {
         $buildGradle | Set-Content -Path "build.gradle"
         
         # Try building again
-        & gradlew clean build --info | Out-File -FilePath "simple_build.log"
+        & $gradlewPath clean build --info | Out-File -FilePath "simple_build.log"
         
         if (Test-Path $IjPluginPath) {
             Write-Log "Plugin built successfully with simplified configuration!" -Level "SUCCESS"

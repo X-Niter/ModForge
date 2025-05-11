@@ -39,8 +39,12 @@ If you're having issues building the plugin:
 
 1. Ensure you're using Java 21 - check with `java -version`
 2. Make sure your `JAVA_HOME` is set correctly
-3. Run `modforge-builder.bat` which handles most common build issues automatically
+3. Run the appropriate builder based on your environment:
+   - For all Windows environments: `modforge-builder-launcher.bat`
+   - For PowerShell: `.\modforge-builder.ps1` 
+   - For Command Prompt: `modforge-builder.bat`
 4. Check the logs in `modforge-builder.log` for detailed error information
+5. If running in PowerShell, you may need to adjust execution policy: `Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass`
 
 ### Java 21 Configuration
 

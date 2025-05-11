@@ -1,0 +1,63 @@
+  ModForge IntelliJ Plugin - Ultimate Builder
+===============================================
+
+Starting ModForge plugin build process
+Not running with administrator privileges.
+Some operations may require elevation.
+Creating backup in backup_2025-05-11_114348
+Backup completed
+Checking for Java 21 installation...
+Checking Java in PATH...
+Found Java 21 in PATH: C:\Program Files\Common Files\Oracle\Java
+Configuring build environment for Java 21...
+Set JAVA_HOME to C:\Program Files\Common Files\Oracle\Java for this session
+Build environment configured to use Java 21
+True
+Checking for and fixing common Java code issues...
+Running diagnostic build to identify issues...
+& : The term 'gradlew' is not recognized as the name of a cmdlet, function, script file, or operable program. Check
+the spelling of the name, or if a path was included, verify that the path is correct and try again.
+At G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\modforge-builder.ps1:431 char:7
++     & gradlew compileJava --info | Out-File -FilePath "build_errors.l ...
++       ~~~~~~~
+    + CategoryInfo          : ObjectNotFound: (gradlew:String) [], CommandNotFoundException
+    + FullyQualifiedErrorId : CommandNotFoundException
+
+No compilation errors found in the initial analysis
+True
+Building ModForge IntelliJ plugin...
+Running plugin build...
+& : The term 'gradlew' is not recognized as the name of a cmdlet, function, script file, or operable program. Check
+the spelling of the name, or if a path was included, verify that the path is correct and try again.
+At G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\modforge-builder.ps1:518 char:7
++     & gradlew clean build --info | Out-File -FilePath "final_build.lo ...
++       ~~~~~~~
+    + CategoryInfo          : ObjectNotFound: (gradlew:String) [], CommandNotFoundException
+    + FullyQualifiedErrorId : CommandNotFoundException
+
+Build failed. Attempting with simpler configuration...
+Attempting build with validation disabled...
+& : The term 'gradlew' is not recognized as the name of a cmdlet, function, script file, or operable program. Check
+the spelling of the name, or if a path was included, verify that the path is correct and try again.
+At G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\modforge-builder.ps1:537 char:11
++         & gradlew clean build --info | Out-File -FilePath "simple_bui ...
++           ~~~~~~~
+    + CategoryInfo          : ObjectNotFound: (gradlew:String) [], CommandNotFoundException
+    + FullyQualifiedErrorId : CommandNotFoundException
+
+Build still failed. See simple_build.log for details.
+Select-String : Cannot find path 'G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\simple_build.log' because
+it does not exist.
+At G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\modforge-builder.ps1:546 char:23
++ ...   $errors = Select-String -Path "simple_build.log" -Pattern "error: " ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : ObjectNotFound: (G:\JavaMinecraf...imple_build.log:String) [Select-String], ItemNotFound
+   Exception
+    + FullyQualifiedErrorId : PathNotFound,Microsoft.PowerShell.Commands.SelectStringCommand
+
+
+==========================================
+Build failed. Check logs for details.
+==========================================
+Build failed
+Press Enter to exit:
