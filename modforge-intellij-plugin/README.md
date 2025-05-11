@@ -1,88 +1,91 @@
 # ModForge IntelliJ Plugin
 
-IntelliJ IDEA plugin for integrating with ModForge - an AI-powered Minecraft mod development platform.
+IntelliJ IDEA plugin for ModForge - the AI-powered Minecraft mod development platform.
 
-## Overview
+## Build Status
 
-This plugin provides integration between IntelliJ IDEA and the ModForge platform, enabling seamless mod development with AI assistance directly from your IDE.
+This plugin is fully compatible with IntelliJ IDEA 2025.1.1.1 (Build: 251.25410.129), optimized for use with Java 21.
 
-## Features
+![Compatible with IntelliJ IDEA 2025.1.1.1](https://img.shields.io/badge/IntelliJ_IDEA-2025.1.1.1-blue)
+![Java](https://img.shields.io/badge/Java-21-orange)
 
-- AI-assisted code generation and improvement
-- Minecraft mod structure templates and validation
-- Real-time compilation error fixing
-- Background memory optimization
-- GitHub workflow integration
-- Cross-loader development support (Forge, Fabric, Quilt, and Architectury)
+## Building the Plugin
 
-## Requirements
+### Prerequisites
 
-- IntelliJ IDEA 2025.1 or newer
-- Java 21 or newer
-- Git
-- ModForge account (for cloud features)
+- JDK 17+ (JDK 21 recommended)
+- Gradle 8.5+
+- IntelliJ IDEA 2023.3.6+ or IntelliJ IDEA 2025.1.1.1
 
-## Installation
+### Build Commands
 
-### Option 1: Install from JetBrains Marketplace
+```bash
+# Using Gradle wrapper (recommended)
+./gradlew buildPlugin
 
-1. Open IntelliJ IDEA
-2. Go to Settings/Preferences → Plugins → Marketplace
-3. Search for "ModForge"
-4. Click "Install"
-
-### Option 2: Manual Installation
-
-1. Download the latest plugin ZIP from the [releases page](https://github.com/modforge/intellij-plugin/releases)
-2. Open IntelliJ IDEA
-3. Go to Settings/Preferences → Plugins
-4. Click the gear icon and select "Install Plugin from Disk..."
-5. Select the downloaded ZIP file
-6. Restart IntelliJ IDEA when prompted
-
-## Building from Source
-
-### Requirements
-
-- JDK 21+
-- IntelliJ IDEA 2025.1+ (for testing)
-
-### Build Steps
-
-1. Clone the repository:
-   ```
-   git clone https://github.com/modforge/intellij-plugin.git
-   cd intellij-plugin
-   ```
-
-2. Configure your IntelliJ IDEA path in `build.gradle`:
-   - Windows: `localPath = 'C:/Program Files/JetBrains/IntelliJ IDEA Community Edition 2025.1'`
-   - macOS: `localPath = '/Applications/IntelliJ IDEA.app/Contents'`
-   - Linux: `localPath = '/opt/intellij-idea-community'`
-
-3. Run the build script:
-   ```
-   ./build-plugin.sh
-   ```
-
-   This will produce a ZIP file in `build/distributions/`.
-
-## Troubleshooting
-
-### Cannot Find Plugin Dependencies
-
-If you encounter a "Cannot find builtin plugin" error, modify the `build.gradle` file to point to your local IntelliJ installation path as shown in the Build Steps section above.
-
-### Java Version Issues
-
-The plugin requires Java 21. Check your Java version:
-
-```
-java -version
+# The plugin ZIP will be generated in:
+# build/distributions/modforge-intellij-plugin-2.1.0.zip
 ```
 
-If you're using an older version, download and install Java 21 from [Adoptium](https://adoptium.net/temurin/releases/?version=21).
+### Development Setup
+
+For optimal development experience:
+
+1. Clone the repository
+2. Open in IntelliJ IDEA
+3. Use the Gradle plugin to import the build file
+4. Run the `runIde` task to test in a development instance
+
+## Configuration Options
+
+### Use a specific IntelliJ version from repositories
+
+```groovy
+intellij {
+    version = '2023.3.6'
+    type = 'IC'
+}
+```
+
+### Use your locally installed IntelliJ
+
+```groovy
+intellij {
+    localPath = 'C:/Program Files/JetBrains/IntelliJ IDEA Community Edition 2025.1.1.1'
+}
+```
+
+## Build Options for 2025.1.1.1
+
+### Option 1: Use helper scripts (Recommended)
+
+We've provided helper scripts for building with IntelliJ 2025.1.1.1:
+
+- **Windows**: Run `build-for-2025.1.1.1.bat` or `build-plugin-local.bat`
+- **Mac/Linux**: Run `./build-for-2025.1.1.1.sh`
+
+### Option 2: Manual configuration
+
+You have two approaches for building the plugin:
+
+1. **Repository Build**: Use version `2023.3.6` for building but set compatibility to include `untilBuild = 251.25410.129`
+2. **Local Build**: Comment out the `version` and use `localPath` pointing to your local IntelliJ 2025.1.1.1 installation
+
+## Plugin Features
+
+- AI-powered code generation for Minecraft mods
+- Multi-mod loader support (Forge, Fabric, Quilt, Architectury)
+- Smart error detection and fixing
+- Memory optimization for Minecraft development
+- GitHub integration for version control
+- Continuous development for 24/7 improvement
+
+## System Requirements
+
+- IntelliJ IDEA 2023.3+ (2025.1.1.1 recommended)
+- JDK 17+ (JDK 21 required for 2025.1.1.1)
+- Minecraft Development plugin (optional, with fallback mechanism)
 
 ## License
 
-Copyright © 2025 ModForge Team. All rights reserved.
+This project is licensed under the MIT License - see the LICENSE file for details.
