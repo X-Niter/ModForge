@@ -49,6 +49,27 @@ public class MinecraftRunConfiguration extends RunConfigurationBase<MinecraftRun
         return (MinecraftRunConfigurationOptions) super.getOptions();
     }
     
+    /**
+     * Create default options for this configuration
+     * 
+     * @return Default configuration options
+     */
+    @Override
+    public @NotNull ConfigurationPerRunnerSettings createRunnerSettings(@NotNull ConfigurationSettingsBean settings) {
+        return new ConfigurationPerRunnerSettings();
+    }
+    
+    /**
+     * Check if configuration is valid
+     * 
+     * @return True if the configuration is valid
+     */
+    @Override
+    public boolean checkConfiguration() {
+        // Basic validation - we could add more specific checks here
+        return true;
+    }
+    
     @Override
     public void readExternal(@NotNull org.jdom.Element element) {
         super.readExternal(element);
