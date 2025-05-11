@@ -12,7 +12,9 @@ IntelliJ IDEA plugin for the ModForge autonomous Minecraft mod development platf
 ### Automated Installation
 
 1. Download the plugin ZIP file
-2. Run the `modforge-builder.bat` script (Windows)
+2. Run the universal launcher script: `modforge-builder-launcher.bat`
+   - This will automatically choose the best script for your environment
+   - Or run directly: Command Prompt (`modforge-builder.bat`) or PowerShell (`.\modforge-builder.ps1`)
 3. Follow the on-screen prompts
 
 The script will automatically:

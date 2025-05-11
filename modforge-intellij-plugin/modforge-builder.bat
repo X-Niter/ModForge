@@ -23,15 +23,47 @@ set "FOUND_JAVA21=0"
 set "INSTALLATION_SUCCESSFUL=0"
 set "IJ_PLUGIN_PATH=build\distributions\modforge-intellij-plugin-%PLUGIN_VERSION%.zip"
 
-:: Color codes for prettier console output
-set "RED=[91m"
-set "GREEN=[92m"
-set "YELLOW=[93m"
-set "BLUE=[94m"
-set "MAGENTA=[95m"
-set "CYAN=[96m"
-set "WHITE=[97m"
-set "RESET=[0m"
+:: Color codes for prettier console output (disabled by default for compatibility)
+:: Using conditional ANSI detection to ensure batch scripts run in any environment
+set "RED="
+set "GREEN="
+set "YELLOW="
+set "BLUE="
+set "MAGENTA="
+set "CYAN="
+set "WHITE="
+set "RESET="
+
+:: Check if running in an ANSI-capable terminal
+for /f "tokens=2 delims=[]" %%a in ('ver') do set "winver=%%a"
+set "winver=%winver:~0,2%"
+
+:: Windows 10+ supports ANSI by default in most terminals
+if %winver% geq 10 (
+    :: Windows Terminal, ConEmu, and other modern terminals
+    if defined WT_SESSION (
+        set "RED=[91m"
+        set "GREEN=[92m"
+        set "YELLOW=[93m"
+        set "BLUE=[94m"
+        set "MAGENTA=[95m"
+        set "CYAN=[96m"
+        set "WHITE=[97m"
+        set "RESET=[0m"
+    )
+    
+    :: Check for ConEmu/Cmder
+    if defined ConEmuPID (
+        set "RED=[91m"
+        set "GREEN=[92m"
+        set "YELLOW=[93m"
+        set "BLUE=[94m"
+        set "MAGENTA=[95m"
+        set "CYAN=[96m"
+        set "WHITE=[97m"
+        set "RESET=[0m"
+    )
+)
 
 :: Initialize log file with timestamp
 echo ModForge IntelliJ Plugin Builder Log - %DATE% %TIME% > "%LOG_FILE%"
