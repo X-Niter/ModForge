@@ -169,23 +169,23 @@ echo. >> "%ERROR_LOG%"
 REM Extract specific error details
 echo ### Cannot Find Symbol Errors >> "%ERROR_LOG%"
 echo. >> "%ERROR_LOG%"
-echo ```java >> "%ERROR_LOG%"
+echo --- Java Code --- >> "%ERROR_LOG%"
 type "%TEMP_DIR%\symbol_errors.txt" >> "%ERROR_LOG%"
-echo ``` >> "%ERROR_LOG%"
+echo --- End Code --- >> "%ERROR_LOG%"
 echo. >> "%ERROR_LOG%"
 
 echo ### Incompatible Types Errors >> "%ERROR_LOG%"
 echo. >> "%ERROR_LOG%"
-echo ```java >> "%ERROR_LOG%"
+echo --- Java Code --- >> "%ERROR_LOG%"
 type "%TEMP_DIR%\type_errors.txt" >> "%ERROR_LOG%"
-echo ``` >> "%ERROR_LOG%"
+echo --- End Code --- >> "%ERROR_LOG%"
 echo. >> "%ERROR_LOG%"
 
 echo ### Override Errors >> "%ERROR_LOG%"
 echo. >> "%ERROR_LOG%"
-echo ```java >> "%ERROR_LOG%"
+echo --- Java Code --- >> "%ERROR_LOG%"
 type "%TEMP_DIR%\override_errors.txt" >> "%ERROR_LOG%"
-echo ``` >> "%ERROR_LOG%"
+echo --- End Code --- >> "%ERROR_LOG%"
 echo. >> "%ERROR_LOG%"
 
 REM Perform in-depth compatibility analysis
@@ -310,25 +310,25 @@ if exist "%TEMP_DIR%\matches.txt" (
     for /f "tokens=1,2 delims=:" %%a in (%TEMP_DIR%\matches.txt) do (
         echo ### Issue in %%a >> "%COMPATIBILITY_REPORT%"
         echo. >> "%COMPATIBILITY_REPORT%"
-        echo * Potential problem: `%%b` >> "%COMPATIBILITY_REPORT%"
+        echo * Potential problem: %%b >> "%COMPATIBILITY_REPORT%"
         
         REM Add suggested fix based on pattern
         if "%%b"=="getBaseDir" (
-            echo * **Suggested fix:** Replace `Project.getBaseDir()` with `CompatibilityUtil.getProjectBaseDir(project)` >> "%COMPATIBILITY_REPORT%"
+            echo * **Suggested fix:** Replace Project.getBaseDir() with CompatibilityUtil.getProjectBaseDir(project) >> "%COMPATIBILITY_REPORT%"
         ) else if "%%b"=="CacheUpdater" (
-            echo * **Suggested fix:** Replace with `CompatibilityUtil.refreshAll(project)` >> "%COMPATIBILITY_REPORT%"
+            echo * **Suggested fix:** Replace with CompatibilityUtil.refreshAll(project) >> "%COMPATIBILITY_REPORT%"
         ) else if "%%b"=="runReadAction" (
-            echo * **Suggested fix:** Replace with `CompatibilityUtil.runReadAction(() -> { ... })` >> "%COMPATIBILITY_REPORT%"
+            echo * **Suggested fix:** Replace with CompatibilityUtil.runReadAction(() -^> { ... }) >> "%COMPATIBILITY_REPORT%"
         ) else if "%%b"=="runWriteAction" (
-            echo * **Suggested fix:** Replace with `CompatibilityUtil.runWriteAction(() -> { ... })` >> "%COMPATIBILITY_REPORT%"
+            echo * **Suggested fix:** Replace with CompatibilityUtil.runWriteAction(() -^> { ... }) >> "%COMPATIBILITY_REPORT%"
         ) else if "%%b"=="getSelectedTextEditor" (
-            echo * **Suggested fix:** Replace with `CompatibilityUtil.getSelectedTextEditor(project)` >> "%COMPATIBILITY_REPORT%"
+            echo * **Suggested fix:** Replace with CompatibilityUtil.getSelectedTextEditor(project) >> "%COMPATIBILITY_REPORT%"
         ) else if "%%b"=="ProjectComponent" (
-            echo * **Suggested fix:** Replace with `@Service(Service.Level.PROJECT)` annotation >> "%COMPATIBILITY_REPORT%"
+            echo * **Suggested fix:** Replace with @Service(Service.Level.PROJECT) annotation >> "%COMPATIBILITY_REPORT%"
         ) else if "%%b"=="ApplicationComponent" (
-            echo * **Suggested fix:** Replace with `@Service(Service.Level.APPLICATION)` annotation >> "%COMPATIBILITY_REPORT%"
+            echo * **Suggested fix:** Replace with @Service(Service.Level.APPLICATION) annotation >> "%COMPATIBILITY_REPORT%"
         ) else (
-            echo * **Suggested fix:** Check compatibility with IntelliJ IDEA 2025.1.1.1 and use `CompatibilityUtil` methods where appropriate >> "%COMPATIBILITY_REPORT%"
+            echo * **Suggested fix:** Check compatibility with IntelliJ IDEA 2025.1.1.1 and use CompatibilityUtil methods where appropriate >> "%COMPATIBILITY_REPORT%"
         )
         
         echo. >> "%COMPATIBILITY_REPORT%"
@@ -394,7 +394,7 @@ if exist "%TEMP_DIR%\missing_methods.txt" (
     if exist "%TEMP_DIR%\settings_locations.txt" (
         echo The following methods might be missing from ModForgeSettings: >> "%MISSING_METHODS_REPORT%"
         echo. >> "%MISSING_METHODS_REPORT%"
-        echo ```java >> "%MISSING_METHODS_REPORT%"
+        echo --- Java Code --- >> "%MISSING_METHODS_REPORT%"
         echo // Required methods: >> "%MISSING_METHODS_REPORT%"
         echo public class ModForgeSettings { >> "%MISSING_METHODS_REPORT%"
         echo     public String getAccessToken() { ... } >> "%MISSING_METHODS_REPORT%"
@@ -403,7 +403,7 @@ if exist "%TEMP_DIR%\missing_methods.txt" (
         echo     public void openSettings(Project project) { ... } >> "%MISSING_METHODS_REPORT%"
         echo     // other methods... >> "%MISSING_METHODS_REPORT%"
         echo } >> "%MISSING_METHODS_REPORT%"
-        echo ``` >> "%MISSING_METHODS_REPORT%"
+        echo --- End Code --- >> "%MISSING_METHODS_REPORT%"
         echo. >> "%MISSING_METHODS_REPORT%"
     )
     
@@ -413,7 +413,7 @@ if exist "%TEMP_DIR%\missing_methods.txt" (
     if exist "%TEMP_DIR%\auth_locations.txt" (
         echo The following methods might be missing from ModAuthenticationManager: >> "%MISSING_METHODS_REPORT%"
         echo. >> "%MISSING_METHODS_REPORT%"
-        echo ```java >> "%MISSING_METHODS_REPORT%"
+        echo --- Java Code --- >> "%MISSING_METHODS_REPORT%"
         echo // Required methods: >> "%MISSING_METHODS_REPORT%"
         echo public class ModAuthenticationManager { >> "%MISSING_METHODS_REPORT%"
         echo     public boolean login(String username, String password) { ... } >> "%MISSING_METHODS_REPORT%"
@@ -421,7 +421,7 @@ if exist "%TEMP_DIR%\missing_methods.txt" (
         echo     public String getUsername() { ... } >> "%MISSING_METHODS_REPORT%"
         echo     // other methods... >> "%MISSING_METHODS_REPORT%"
         echo } >> "%MISSING_METHODS_REPORT%"
-        echo ``` >> "%MISSING_METHODS_REPORT%"
+        echo --- End Code --- >> "%MISSING_METHODS_REPORT%"
         echo. >> "%MISSING_METHODS_REPORT%"
     )
     
@@ -431,7 +431,7 @@ if exist "%TEMP_DIR%\missing_methods.txt" (
     if exist "%TEMP_DIR%\codegen_locations.txt" (
         echo The following methods might be missing from AutonomousCodeGenerationService: >> "%MISSING_METHODS_REPORT%"
         echo. >> "%MISSING_METHODS_REPORT%"
-        echo ```java >> "%MISSING_METHODS_REPORT%"
+        echo --- Java Code --- >> "%MISSING_METHODS_REPORT%"
         echo // Required static method: >> "%MISSING_METHODS_REPORT%"
         echo public class AutonomousCodeGenerationService { >> "%MISSING_METHODS_REPORT%"
         echo     public static AutonomousCodeGenerationService getInstance(Project project) { ... } >> "%MISSING_METHODS_REPORT%"
@@ -439,12 +439,12 @@ if exist "%TEMP_DIR%\missing_methods.txt" (
         echo     // Required instance methods: >> "%MISSING_METHODS_REPORT%"
         echo     public String generateCode(String prompt, VirtualFile contextFile, String language) { ... } >> "%MISSING_METHODS_REPORT%"
         echo     public String fixCode(String code, String errorMessage, String language) { ... } >> "%MISSING_METHODS_REPORT%"
-        echo     public CompletableFuture<String> generateDocumentation(String code, Object options) { ... } >> "%MISSING_METHODS_REPORT%"
-        echo     public CompletableFuture<String> explainCode(String code, Object options) { ... } >> "%MISSING_METHODS_REPORT%"
+        echo     public CompletableFuture^<String^> generateDocumentation(String code, Object options) { ... } >> "%MISSING_METHODS_REPORT%"
+        echo     public CompletableFuture^<String^> explainCode(String code, Object options) { ... } >> "%MISSING_METHODS_REPORT%"
         echo     public boolean generateImplementation(String interfaceName, String packageName, String className) { ... } >> "%MISSING_METHODS_REPORT%"
         echo     // other methods... >> "%MISSING_METHODS_REPORT%"
         echo } >> "%MISSING_METHODS_REPORT%"
-        echo ``` >> "%MISSING_METHODS_REPORT%"
+        echo --- End Code --- >> "%MISSING_METHODS_REPORT%"
         echo. >> "%MISSING_METHODS_REPORT%"
     )
     
@@ -454,9 +454,9 @@ if exist "%TEMP_DIR%\missing_methods.txt" (
     if exist "%TEMP_DIR%\type_issues.txt" (
         echo The following type compatibility issues were found: >> "%MISSING_METHODS_REPORT%"
         echo. >> "%MISSING_METHODS_REPORT%"
-        echo ```java >> "%MISSING_METHODS_REPORT%"
+        echo --- Java Code --- >> "%MISSING_METHODS_REPORT%"
         type "%TEMP_DIR%\type_issues.txt" >> "%MISSING_METHODS_REPORT%"
-        echo ``` >> "%MISSING_METHODS_REPORT%"
+        echo --- End Code --- >> "%MISSING_METHODS_REPORT%"
         echo. >> "%MISSING_METHODS_REPORT%"
         echo Ensure parameter types match exactly between method calls and definitions. >> "%MISSING_METHODS_REPORT%"
         echo. >> "%MISSING_METHODS_REPORT%"
