@@ -5,6 +5,8 @@ import com.intellij.notification.NotificationType;
 import com.intellij.notification.Notifications;
 import com.intellij.openapi.actionSystem.AnAction;
 import com.intellij.openapi.actionSystem.AnActionEvent;
+import com.intellij.openapi.actionSystem.Presentation;
+import com.intellij.openapi.util.IconLoader;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.progress.ProgressIndicator;
 import com.intellij.openapi.progress.ProgressManager;
@@ -19,6 +21,7 @@ import org.jetbrains.annotations.NotNull;
  */
 public class ResetMemorySystemAction extends AnAction {
     private static final Logger LOG = Logger.getInstance(ResetMemorySystemAction.class);
+    private static final javax.swing.Icon ICON = IconLoader.getIcon("/icons/reset_memory.svg", ResetMemorySystemAction.class);
 
     @Override
     public void actionPerformed(@NotNull AnActionEvent e) {
@@ -84,6 +87,10 @@ public class ResetMemorySystemAction extends AnAction {
     public void update(@NotNull AnActionEvent e) {
         // Enable the action only if we have a valid project
         Project project = e.getProject();
-        e.getPresentation().setEnabledAndVisible(project != null && !project.isDisposed());
+        Presentation presentation = e.getPresentation();
+        presentation.setEnabledAndVisible(project != null && !project.isDisposed());
+        
+        // Set icon
+        presentation.setIcon(ICON);
     }
 }

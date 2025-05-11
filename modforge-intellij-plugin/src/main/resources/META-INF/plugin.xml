@@ -225,6 +225,11 @@
                     text="Optimize Memory"
                     description="Perform memory optimization">
             </action>
+            <action id="ModForge.ResetMemorySystemAction"
+                    class="com.modforge.intellij.plugin.actions.ResetMemorySystemAction"
+                    text="Reset Memory Management System"
+                    description="Reset all memory management components and services">
+            </action>
             <separator/>
             
             <!-- GitHub Actions -->
@@ -285,6 +290,12 @@
                     class="com.modforge.intellij.plugin.actions.GenerateModElementAction"
                     text="Generate Minecraft Element"
                     description="Generate a Minecraft element (block, item, etc.)">
+            </action>
+            <separator/>
+            <action id="ModForge.ResetMemorySystemProjectAction"
+                    class="com.modforge.intellij.plugin.actions.ResetMemorySystemAction"
+                    text="Reset Memory Management System"
+                    description="Reset all memory management components and services">
             </action>
         </group>
     </actions>

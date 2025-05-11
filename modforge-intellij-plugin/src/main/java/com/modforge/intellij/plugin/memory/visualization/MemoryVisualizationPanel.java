@@ -50,6 +50,7 @@ public class MemoryVisualizationPanel extends JBPanel<MemoryVisualizationPanel> 
     private final JCheckBox showPredictionCheckBox;
     private final JButton refreshButton;
     private final JButton exportButton;
+    private final JButton resetButton;
     
     private Timer updateTimer;
     private int timeRangeMinutes = DEFAULT_TIME_RANGE_MINUTES;
