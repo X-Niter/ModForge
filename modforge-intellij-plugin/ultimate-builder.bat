@@ -392,7 +392,7 @@ if exist "%TEMP_DIR%\missing_methods.txt" (
     echo. >> "%MISSING_METHODS_REPORT%"
     findstr /i /c:"settings" "%TEMP_DIR%\locations.txt" > "%TEMP_DIR%\settings_locations.txt"
     if exist "%TEMP_DIR%\settings_locations.txt" (
-        echo The following methods might be missing from ModForgeSettings: >> "%MISSING_METHODS_REPORT%"
+        echo Methods possibly missing from ModForgeSettings: >> "%MISSING_METHODS_REPORT%"
         echo. >> "%MISSING_METHODS_REPORT%"
         echo --- Java Code --- >> "%MISSING_METHODS_REPORT%"
         echo // Required methods: >> "%MISSING_METHODS_REPORT%"
@@ -411,7 +411,7 @@ if exist "%TEMP_DIR%\missing_methods.txt" (
     echo. >> "%MISSING_METHODS_REPORT%"
     findstr /i /c:"authManager" "%TEMP_DIR%\locations.txt" > "%TEMP_DIR%\auth_locations.txt"
     if exist "%TEMP_DIR%\auth_locations.txt" (
-        echo The following methods might be missing from ModAuthenticationManager: >> "%MISSING_METHODS_REPORT%"
+        echo Methods possibly missing from ModAuthenticationManager: >> "%MISSING_METHODS_REPORT%"
         echo. >> "%MISSING_METHODS_REPORT%"
         echo --- Java Code --- >> "%MISSING_METHODS_REPORT%"
         echo // Required methods: >> "%MISSING_METHODS_REPORT%"
@@ -547,7 +547,7 @@ dir /s /b "%SOURCE_DIR%\*.java" > "%TEMP_DIR%\java_files_resolution.txt" 2>nul
 REM Extract imports from files
 echo ## Potentially Problematic Imports >> "%RESOLUTION_ERRORS_REPORT%"
 echo. >> "%RESOLUTION_ERRORS_REPORT%"
-echo The following imports may cause resolution issues: >> "%RESOLUTION_ERRORS_REPORT%"
+echo Imports causing resolution issues: >> "%RESOLUTION_ERRORS_REPORT%"
 echo. >> "%RESOLUTION_ERRORS_REPORT%"
 
 set "FOUND_ISSUES=0"
@@ -569,7 +569,7 @@ for /f "tokens=*" %%p in (%TEMP_DIR%\relocation_patterns.txt) do (
 REM Check for deprecated method calls
 echo ## Potentially Problematic Method Calls >> "%RESOLUTION_ERRORS_REPORT%"
 echo. >> "%RESOLUTION_ERRORS_REPORT%"
-echo The following method calls may cause resolution issues: >> "%RESOLUTION_ERRORS_REPORT%"
+echo Method calls causing resolution issues: >> "%RESOLUTION_ERRORS_REPORT%"
 echo. >> "%RESOLUTION_ERRORS_REPORT%"
 
 set "METHODS_FOUND=0"
@@ -590,7 +590,7 @@ for %%m in (getBaseDir findFileByPath getInstanceEx getFileSystem resolveFile) d
         ) else if "%%m"=="findFileByPath" (
             echo **Suggested fix:** Use VirtualFileUtil.findFileByPath(path) >> "%RESOLUTION_ERRORS_REPORT%"
         ) else if "%%m"=="getInstanceEx" (
-            echo **Suggested fix:** Use the standard .getInstance() method >> "%RESOLUTION_ERRORS_REPORT%"
+            echo **Suggested fix:** Use getInstance() method >> "%RESOLUTION_ERRORS_REPORT%"
         ) else if "%%m"=="getFileSystem" (
             echo **Suggested fix:** Use VirtualFileManager.getInstance().getFileSystem(StandardFileSystems.FILE_PROTOCOL) >> "%RESOLUTION_ERRORS_REPORT%"
         ) else if "%%m"=="resolveFile" (
@@ -612,7 +612,7 @@ findstr /i /c:"cannot find symbol" "%BUILD_LOG%" > "%TEMP_DIR%\build_resolution_
 if exist "%TEMP_DIR%\build_resolution_errors.txt" (
     echo ## Resolution Errors from Build Log >> "%RESOLUTION_ERRORS_REPORT%"
     echo. >> "%RESOLUTION_ERRORS_REPORT%"
-    echo The following resolution errors were found during compilation: >> "%RESOLUTION_ERRORS_REPORT%"
+    echo Resolution errors found during compilation: >> "%RESOLUTION_ERRORS_REPORT%"
     echo. >> "%RESOLUTION_ERRORS_REPORT%"
     echo --- Java Code --- >> "%RESOLUTION_ERRORS_REPORT%"
     type "%TEMP_DIR%\build_resolution_errors.txt" >> "%RESOLUTION_ERRORS_REPORT%"
