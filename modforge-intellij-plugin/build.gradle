@@ -108,7 +108,7 @@ tasks {
     // Set compatibility specifically for IntelliJ IDEA 2025.1.1.1 (Build: 251.25410.129)
     patchPluginXml {
         sinceBuild.set("233") // Support from 2023.3
-        untilBuild.set("251.25410.129") // Specifically for 2025.1.1.1 build
+        untilBuild.set("251.*") // Support all 2025.1.x versions
         changeNotes.set("""
             <h2>Version 2.1.0 - May 11, 2025</h2>
             <ul>
