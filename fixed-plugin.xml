@@ -19,25 +19,9 @@
         <li>Java 21 virtual thread optimization for improved performance</li>
         <li>Full compatibility with IntelliJ IDEA 2025.1</li>
     </ul>
-    <p>Features:</p>
-    <ul>
-        <li>Generate code with AI by describing what you want</li>
-        <li>Fix compilation errors automatically</li>
-        <li>Continuous development that keeps working even when you're not</li>
-        <li>Cost optimization through pattern recognition</li>
-        <li>GitHub integration for version control</li>
-        <li>Enhanced network operations with smart retry logic</li>
-        <li>Circuit breaker protection to prevent cascading failures</li>
-    </ul>
-    <p><b>System Requirements:</b></p>
-    <ul>
-        <li>IntelliJ IDEA 2025.1 (Build #IC-251.23774.435) or compatible</li>
-        <li>Java Development Kit (JDK) 21.0.6 or later</li>
-        <li>Minecraft Development plugin (latest version)</li>
-    </ul>
     ]]></description>
     
-    <!-- Required plugins - Platform is automatically included and should not be explicitly specified -->
+    <!-- Required plugins -->
     <depends>com.intellij.modules.java</depends>
     
     <!-- Optional plugins with fallbacks in our code -->
