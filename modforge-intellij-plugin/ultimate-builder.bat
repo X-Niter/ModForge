@@ -468,9 +468,9 @@ if exist "%TEMP_DIR%\missing_methods.txt" (
     if exist "%TEMP_DIR%\override_issues.txt" (
         echo The following method override issues were found: >> "%MISSING_METHODS_REPORT%"
         echo. >> "%MISSING_METHODS_REPORT%"
-        echo ```java >> "%MISSING_METHODS_REPORT%"
+        echo --- Java Code --- >> "%MISSING_METHODS_REPORT%"
         type "%TEMP_DIR%\override_issues.txt" >> "%MISSING_METHODS_REPORT%"
-        echo ``` >> "%MISSING_METHODS_REPORT%"
+        echo --- End Code --- >> "%MISSING_METHODS_REPORT%"
         echo. >> "%MISSING_METHODS_REPORT%"
         echo Ensure overridden methods have exactly the same return type as the parent class method. >> "%MISSING_METHODS_REPORT%"
         echo. >> "%MISSING_METHODS_REPORT%"
@@ -557,9 +557,9 @@ for /f "tokens=*" %%p in (%TEMP_DIR%\relocation_patterns.txt) do (
         set "FOUND_ISSUES=1"
         echo ### References to %%p >> "%RESOLUTION_ERRORS_REPORT%"
         echo. >> "%RESOLUTION_ERRORS_REPORT%"
-        echo ```java >> "%RESOLUTION_ERRORS_REPORT%"
+        echo --- Java Code --- >> "%RESOLUTION_ERRORS_REPORT%"
         type "%TEMP_DIR%\problem_imports_%%p.txt" >> "%RESOLUTION_ERRORS_REPORT%"
-        echo ``` >> "%RESOLUTION_ERRORS_REPORT%"
+        echo --- End Code --- >> "%RESOLUTION_ERRORS_REPORT%"
         echo. >> "%RESOLUTION_ERRORS_REPORT%"
         echo Consider updating these imports to use the latest API. >> "%RESOLUTION_ERRORS_REPORT%"
         echo. >> "%RESOLUTION_ERRORS_REPORT%"
@@ -579,22 +579,22 @@ for %%m in (getBaseDir findFileByPath getInstanceEx getFileSystem resolveFile) d
         set "METHODS_FOUND=1"
         echo ### Calls to %%m >> "%RESOLUTION_ERRORS_REPORT%"
         echo. >> "%RESOLUTION_ERRORS_REPORT%"
-        echo ```java >> "%RESOLUTION_ERRORS_REPORT%"
+        echo --- Java Code --- >> "%RESOLUTION_ERRORS_REPORT%"
         type "%TEMP_DIR%\problem_methods_%%m.txt" >> "%RESOLUTION_ERRORS_REPORT%"
-        echo ``` >> "%RESOLUTION_ERRORS_REPORT%"
+        echo --- End Code --- >> "%RESOLUTION_ERRORS_REPORT%"
         echo. >> "%RESOLUTION_ERRORS_REPORT%"
         
         REM Add specific suggestions
         if "%%m"=="getBaseDir" (
-            echo **Suggested fix:** Replace with `CompatibilityUtil.getProjectBaseDir(project)` >> "%RESOLUTION_ERRORS_REPORT%"
+            echo **Suggested fix:** Replace with CompatibilityUtil.getProjectBaseDir(project) >> "%RESOLUTION_ERRORS_REPORT%"
         ) else if "%%m"=="findFileByPath" (
-            echo **Suggested fix:** Use `VirtualFileUtil.findFileByPath(path)` >> "%RESOLUTION_ERRORS_REPORT%"
+            echo **Suggested fix:** Use VirtualFileUtil.findFileByPath(path) >> "%RESOLUTION_ERRORS_REPORT%"
         ) else if "%%m"=="getInstanceEx" (
-            echo **Suggested fix:** Use the standard `.getInstance()` method instead >> "%RESOLUTION_ERRORS_REPORT%"
+            echo **Suggested fix:** Use the standard .getInstance() method instead >> "%RESOLUTION_ERRORS_REPORT%"
         ) else if "%%m"=="getFileSystem" (
-            echo **Suggested fix:** Use `VirtualFileManager.getInstance().getFileSystem(StandardFileSystems.FILE_PROTOCOL)` >> "%RESOLUTION_ERRORS_REPORT%"
+            echo **Suggested fix:** Use VirtualFileManager.getInstance().getFileSystem(StandardFileSystems.FILE_PROTOCOL) >> "%RESOLUTION_ERRORS_REPORT%"
         ) else if "%%m"=="resolveFile" (
-            echo **Suggested fix:** Use `CompatibilityUtil.findPsiFile(project, file)` >> "%RESOLUTION_ERRORS_REPORT%"
+            echo **Suggested fix:** Use CompatibilityUtil.findPsiFile(project, file) >> "%RESOLUTION_ERRORS_REPORT%"
         )
         
         echo. >> "%RESOLUTION_ERRORS_REPORT%"
@@ -614,9 +614,9 @@ if exist "%TEMP_DIR%\build_resolution_errors.txt" (
     echo. >> "%RESOLUTION_ERRORS_REPORT%"
     echo The following resolution errors were found during compilation: >> "%RESOLUTION_ERRORS_REPORT%"
     echo. >> "%RESOLUTION_ERRORS_REPORT%"
-    echo ```java >> "%RESOLUTION_ERRORS_REPORT%"
+    echo --- Java Code --- >> "%RESOLUTION_ERRORS_REPORT%"
     type "%TEMP_DIR%\build_resolution_errors.txt" >> "%RESOLUTION_ERRORS_REPORT%"
-    echo ``` >> "%RESOLUTION_ERRORS_REPORT%"
+    echo --- End Code --- >> "%RESOLUTION_ERRORS_REPORT%"
     echo. >> "%RESOLUTION_ERRORS_REPORT%"
 )
 
