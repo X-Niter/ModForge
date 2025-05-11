@@ -499,7 +499,7 @@ echo ## Overview >> "%RESOLUTION_ERRORS_REPORT%"
 echo. >> "%RESOLUTION_ERRORS_REPORT%"
 echo This scan identifies problematic packages and classes: >> "%RESOLUTION_ERRORS_REPORT%"
 echo. >> "%RESOLUTION_ERRORS_REPORT%"
-echo 1. Relocated to a different package >> "%RESOLUTION_ERRORS_REPORT%"
+echo 1. Relocated into other packages >> "%RESOLUTION_ERRORS_REPORT%"
 echo 2. Renamed or significantly changed >> "%RESOLUTION_ERRORS_REPORT%"
 echo 3. Removed entirely in IntelliJ IDEA 2025.1.1.1 >> "%RESOLUTION_ERRORS_REPORT%"
 echo. >> "%RESOLUTION_ERRORS_REPORT%"
@@ -561,7 +561,7 @@ for /f "tokens=*" %%p in (%TEMP_DIR%\relocation_patterns.txt) do (
         type "%TEMP_DIR%\problem_imports_%%p.txt" >> "%RESOLUTION_ERRORS_REPORT%"
         echo --- End Code --- >> "%RESOLUTION_ERRORS_REPORT%"
         echo. >> "%RESOLUTION_ERRORS_REPORT%"
-        echo Consider updating these imports to use the latest API. >> "%RESOLUTION_ERRORS_REPORT%"
+        echo Consider updating these imports with latest API. >> "%RESOLUTION_ERRORS_REPORT%"
         echo. >> "%RESOLUTION_ERRORS_REPORT%"
     )
 )
@@ -623,11 +623,11 @@ if exist "%TEMP_DIR%\build_resolution_errors.txt" (
 REM Add implementation recommendations
 echo ## Fix Recommendations >> "%RESOLUTION_ERRORS_REPORT%"
 echo. >> "%RESOLUTION_ERRORS_REPORT%"
-echo 1. **Update imports** for latest package paths >> "%RESOLUTION_ERRORS_REPORT%"
+echo 1. **Update imports** with latest packages >> "%RESOLUTION_ERRORS_REPORT%"
 echo 2. **Use CompatibilityUtil** on deprecated methods >> "%RESOLUTION_ERRORS_REPORT%"
-echo 3. **Fix method signatures** to match caller requirements >> "%RESOLUTION_ERRORS_REPORT%"
-echo 4. **Add missing methods** to service classes >> "%RESOLUTION_ERRORS_REPORT%"
-echo 5. **Implement proper getInstance()** methods for service classes >> "%RESOLUTION_ERRORS_REPORT%"
+echo 3. **Fix method signatures** correctly >> "%RESOLUTION_ERRORS_REPORT%"
+echo 4. **Add missing methods** in service classes >> "%RESOLUTION_ERRORS_REPORT%"
+echo 5. **Implement proper getInstance()** methods in services >> "%RESOLUTION_ERRORS_REPORT%"
 echo. >> "%RESOLUTION_ERRORS_REPORT%"
 
 echo Resolution errors analysis complete.
