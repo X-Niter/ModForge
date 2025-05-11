@@ -221,7 +221,7 @@ echo. >> "%COMPATIBILITY_REPORT%"
 echo ## Overview >> "%COMPATIBILITY_REPORT%"
 echo. >> "%COMPATIBILITY_REPORT%"
 echo This scan looks for deprecated APIs, problematic patterns, and compatibility issues >> "%COMPATIBILITY_REPORT%"
-echo that might affect the plugin's functionality with IntelliJ IDEA 2025.1.1.1. >> "%COMPATIBILITY_REPORT%"
+echo that might affect plugin functionality for IntelliJ IDEA 2025.1.1.1. >> "%COMPATIBILITY_REPORT%"
 echo. >> "%COMPATIBILITY_REPORT%"
 echo ## Known Deprecated APIs and Replacements >> "%COMPATIBILITY_REPORT%"
 echo. >> "%COMPATIBILITY_REPORT%"
@@ -328,7 +328,7 @@ if exist "%TEMP_DIR%\matches.txt" (
         ) else if "%%b"=="ApplicationComponent" (
             echo * **Suggested fix:** Use @Service(Service.Level.APPLICATION) annotation >> "%COMPATIBILITY_REPORT%"
         ) else (
-            echo * **Suggested fix:** Check compatibility with IntelliJ IDEA 2025.1.1.1 and use CompatibilityUtil methods where appropriate >> "%COMPATIBILITY_REPORT%"
+            echo * **Suggested fix:** Check compatibility with IntelliJ IDEA 2025.1.1.1. Use CompatibilityUtil methods. >> "%COMPATIBILITY_REPORT%"
         )
         
         echo. >> "%COMPATIBILITY_REPORT%"
@@ -429,7 +429,7 @@ if exist "%TEMP_DIR%\missing_methods.txt" (
     echo. >> "%MISSING_METHODS_REPORT%"
     findstr /i /c:"codeGenService" /c:"AutonomousCodeGenerationService" "%TEMP_DIR%\locations.txt" > "%TEMP_DIR%\codegen_locations.txt"
     if exist "%TEMP_DIR%\codegen_locations.txt" (
-        echo The following methods might be missing from AutonomousCodeGenerationService: >> "%MISSING_METHODS_REPORT%"
+        echo Methods possibly missing from AutonomousCodeGenerationService: >> "%MISSING_METHODS_REPORT%"
         echo. >> "%MISSING_METHODS_REPORT%"
         echo --- Java Code --- >> "%MISSING_METHODS_REPORT%"
         echo // Required static method: >> "%MISSING_METHODS_REPORT%"
@@ -452,7 +452,7 @@ if exist "%TEMP_DIR%\missing_methods.txt" (
     echo. >> "%MISSING_METHODS_REPORT%"
     findstr /i /c:"incompatible types:" "%BUILD_LOG%" > "%TEMP_DIR%\type_issues.txt"
     if exist "%TEMP_DIR%\type_issues.txt" (
-        echo The following type compatibility issues were found: >> "%MISSING_METHODS_REPORT%"
+        echo Type compatibility issues found: >> "%MISSING_METHODS_REPORT%"
         echo. >> "%MISSING_METHODS_REPORT%"
         echo --- Java Code --- >> "%MISSING_METHODS_REPORT%"
         type "%TEMP_DIR%\type_issues.txt" >> "%MISSING_METHODS_REPORT%"
@@ -466,7 +466,7 @@ if exist "%TEMP_DIR%\missing_methods.txt" (
     echo. >> "%MISSING_METHODS_REPORT%"
     findstr /i /c:"cannot override" "%BUILD_LOG%" > "%TEMP_DIR%\override_issues.txt"
     if exist "%TEMP_DIR%\override_issues.txt" (
-        echo The following method override issues were found: >> "%MISSING_METHODS_REPORT%"
+        echo Method override issues found: >> "%MISSING_METHODS_REPORT%"
         echo. >> "%MISSING_METHODS_REPORT%"
         echo --- Java Code --- >> "%MISSING_METHODS_REPORT%"
         type "%TEMP_DIR%\override_issues.txt" >> "%MISSING_METHODS_REPORT%"
