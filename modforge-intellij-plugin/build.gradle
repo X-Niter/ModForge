@@ -26,11 +26,13 @@ dependencies {
 intellij {
     version = '2025.1'
     type = 'IC' // Target IDE: IntelliJ IDEA Community Edition
+    downloadSources = true
+    updateSinceUntilBuild = true
     plugins = [
         'java',
-        'git4idea',
-        'org.jetbrains.plugins.github',
-        'org.jetbrains.plugins.terminal',
+        'Git4Idea:251.12.23774.435', // Explicitly use version that matches IntelliJ IDEA 2025.1
+        'org.jetbrains.plugins.github:251.12.23774.435',
+        'org.jetbrains.plugins.terminal:251.12.23774.435',
         // Minecraft Development plugin is required per plugin.xml dependency
         'com.demonwav.minecraft-dev:2025.1-1.8.4'
     ]
