@@ -2,7 +2,7 @@
 setlocal enabledelayedexpansion
 
 REM ===================================
-REM ModForge Ultimate Builder
+REM ModForge Ultimate Builder (Fixed Version)
 REM ===================================
 REM
 REM This script handles the complete build process for ModForge IntelliJ Plugin
@@ -312,24 +312,8 @@ if exist "%TEMP_DIR%\matches.txt" (
         echo. >> "%COMPATIBILITY_REPORT%"
         echo * Potential problem: %%b >> "%COMPATIBILITY_REPORT%"
         
-        REM Add suggested fix based on pattern
-        if "%%b"=="getBaseDir" (
-            echo * **Suggested fix:** Use CompatibilityUtil.getProjectBaseDir(project) >> "%COMPATIBILITY_REPORT%"
-        ) else if "%%b"=="CacheUpdater" (
-            echo * **Suggested fix:** Use CompatibilityUtil.refreshAll(project) >> "%COMPATIBILITY_REPORT%"
-        ) else if "%%b"=="runReadAction" (
-            echo * **Suggested fix:** Use CompatibilityUtil.runReadAction(lambda) >> "%COMPATIBILITY_REPORT%"
-        ) else if "%%b"=="runWriteAction" (
-            echo * **Suggested fix:** Use CompatibilityUtil.runWriteAction(lambda) >> "%COMPATIBILITY_REPORT%"
-        ) else if "%%b"=="getSelectedTextEditor" (
-            echo * **Suggested fix:** Use CompatibilityUtil.getSelectedTextEditor(project) >> "%COMPATIBILITY_REPORT%"
-        ) else if "%%b"=="ProjectComponent" (
-            echo * **Suggested fix:** Use @Service(Service.Level.PROJECT) annotation >> "%COMPATIBILITY_REPORT%"
-        ) else if "%%b"=="ApplicationComponent" (
-            echo * **Suggested fix:** Use @Service(Service.Level.APPLICATION) annotation >> "%COMPATIBILITY_REPORT%"
-        ) else (
-            echo * **Suggested fix:** Check compatibility with IntelliJ IDEA 2025.1.1.1. Use CompatibilityUtil methods. >> "%COMPATIBILITY_REPORT%"
-        )
+        REM Add pattern-specific suggestions
+        call :ADD_COMPATIBILITY_SUGGESTION "%%b" "%COMPATIBILITY_REPORT%"
         
         echo. >> "%COMPATIBILITY_REPORT%"
     )
@@ -584,20 +568,8 @@ for %%m in (getBaseDir findFileByPath getInstanceEx getFileSystem resolveFile) d
         echo --- End Code --- >> "%RESOLUTION_ERRORS_REPORT%"
         echo. >> "%RESOLUTION_ERRORS_REPORT%"
         
-        REM Add specific suggestions
-        if "%%m"=="getBaseDir" (
-            echo **Suggested fix:** Use CompatibilityUtil.getProjectBaseDir(project) >> "%RESOLUTION_ERRORS_REPORT%"
-        ) else if "%%m"=="findFileByPath" (
-            echo **Suggested fix:** Use VirtualFileUtil.findFileByPath(path) >> "%RESOLUTION_ERRORS_REPORT%"
-        ) else if "%%m"=="getInstanceEx" (
-            echo **Suggested fix:** Use getInstance() method >> "%RESOLUTION_ERRORS_REPORT%"
-        ) else if "%%m"=="getFileSystem" (
-            echo **Suggested fix:** Use VirtualFileManager.getInstance().getFileSystem(StandardFileSystems.FILE_PROTOCOL) >> "%RESOLUTION_ERRORS_REPORT%"
-        ) else if "%%m"=="resolveFile" (
-            echo **Suggested fix:** Use CompatibilityUtil.findPsiFile(project, file) >> "%RESOLUTION_ERRORS_REPORT%"
-        ) else (
-            echo **Suggested fix:** Use compatibility wrapper methods >> "%RESOLUTION_ERRORS_REPORT%"
-        )
+        REM Add method-specific suggestions
+        call :ADD_METHOD_SUGGESTION "%%m" "%RESOLUTION_ERRORS_REPORT%"
         
         echo. >> "%RESOLUTION_ERRORS_REPORT%"
     )
@@ -647,5 +619,75 @@ echo All operations are complete. Please review the generated reports.
 echo.
 echo Thank you for using ModForge Ultimate Builder!
 echo.
+
+REM ===================================
+REM Compatibility Suggestion Subroutine
+REM ===================================
+:ADD_COMPATIBILITY_SUGGESTION
+set "PATTERN=%~1"
+set "OUTPUT_FILE=%~2"
+
+if "%PATTERN%"=="getBaseDir" (
+    echo * **Suggested fix:** Use CompatibilityUtil.getProjectBaseDir(project) >> "%OUTPUT_FILE%"
+    goto :EOF
+)
+if "%PATTERN%"=="CacheUpdater" (
+    echo * **Suggested fix:** Use CompatibilityUtil.refreshAll(project) >> "%OUTPUT_FILE%"
+    goto :EOF
+)
+if "%PATTERN%"=="runReadAction" (
+    echo * **Suggested fix:** Use CompatibilityUtil.runReadAction(lambda) >> "%OUTPUT_FILE%"
+    goto :EOF
+)
+if "%PATTERN%"=="runWriteAction" (
+    echo * **Suggested fix:** Use CompatibilityUtil.runWriteAction(lambda) >> "%OUTPUT_FILE%"
+    goto :EOF
+)
+if "%PATTERN%"=="getSelectedTextEditor" (
+    echo * **Suggested fix:** Use CompatibilityUtil.getSelectedTextEditor(project) >> "%OUTPUT_FILE%"
+    goto :EOF
+)
+if "%PATTERN%"=="ProjectComponent" (
+    echo * **Suggested fix:** Use @Service(Service.Level.PROJECT) annotation >> "%OUTPUT_FILE%"
+    goto :EOF
+)
+if "%PATTERN%"=="ApplicationComponent" (
+    echo * **Suggested fix:** Use @Service(Service.Level.APPLICATION) annotation >> "%OUTPUT_FILE%"
+    goto :EOF
+)
+
+echo * **Suggested fix:** Check compatibility with IntelliJ IDEA 2025.1.1.1. Use CompatibilityUtil methods. >> "%OUTPUT_FILE%"
+goto :EOF
+
+REM ===================================
+REM Method Suggestion Subroutine
+REM ===================================
+:ADD_METHOD_SUGGESTION
+set "METHOD_NAME=%~1"
+set "OUTPUT_FILE=%~2"
+
+if "%METHOD_NAME%"=="getBaseDir" (
+    echo **Suggested fix:** Use CompatibilityUtil.getProjectBaseDir(project) >> "%OUTPUT_FILE%"
+    goto :EOF
+)
+if "%METHOD_NAME%"=="findFileByPath" (
+    echo **Suggested fix:** Use VirtualFileUtil.findFileByPath(path) >> "%OUTPUT_FILE%"
+    goto :EOF
+)
+if "%METHOD_NAME%"=="getInstanceEx" (
+    echo **Suggested fix:** Use getInstance() method >> "%OUTPUT_FILE%"
+    goto :EOF
+)
+if "%METHOD_NAME%"=="getFileSystem" (
+    echo **Suggested fix:** Use VirtualFileManager.getInstance().getFileSystem(StandardFileSystems.FILE_PROTOCOL) >> "%OUTPUT_FILE%"
+    goto :EOF
+)
+if "%METHOD_NAME%"=="resolveFile" (
+    echo **Suggested fix:** Use CompatibilityUtil.findPsiFile(project, file) >> "%OUTPUT_FILE%"
+    goto :EOF
+)
+
+echo **Suggested fix:** Use compatibility wrapper methods >> "%OUTPUT_FILE%"
+goto :EOF
 
 endlocal
