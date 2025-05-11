@@ -564,6 +564,201 @@ public final class ContinuousDevelopmentService {
     }
     
     /**
+     * Fix compilation errors reported from the compiler
+     * This method handles compilation errors from the ModForgeCompilationListener
+     * 
+     * @param errorDescriptions List of error descriptions from the compiler
+     */
+    public void fixCompilationErrors(@NotNull List<String> errorDescriptions) {
+        if (!running.get() || project.isDisposed()) {
+            LOG.info("Cannot fix compilation errors: service not running or project disposed");
+            return;
+        }
+        
+        if (errorDescriptions.isEmpty()) {
+            LOG.info("No compilation errors to fix");
+            return;
+        }
+        
+        LOG.info("Fixing " + errorDescriptions.size() + " compilation errors");
+        addActionLog("Attempting to fix " + errorDescriptions.size() + " compilation errors");
+        
+        try {
+            // Get code generation service
+            AutonomousCodeGenerationService codeGenService =
+                    project.getService(AutonomousCodeGenerationService.class);
+            
+            if (codeGenService == null) {
+                LOG.error("Code generation service is not available");
+                return;
+            }
+            
+            // Build error message from error descriptions
+            StringBuilder errorMessage = new StringBuilder();
+            errorMessage.append("Compilation errors detected:\n\n");
+            
+            for (String errorDescription : errorDescriptions) {
+                errorMessage.append("- ").append(errorDescription).append("\n");
+            }
+            
+            // Extract file path patterns to identify problematic files
+            Set<String> potentialFileNames = new HashSet<>();
+            for (String errorDesc : errorDescriptions) {
+                // Extract file name using regex for "file: X"
+                java.util.regex.Pattern pattern = java.util.regex.Pattern.compile("file:\\s*([^,)]+)");
+                java.util.regex.Matcher matcher = pattern.matcher(errorDesc);
+                if (matcher.find()) {
+                    potentialFileNames.add(matcher.group(1).trim());
+                }
+            }
+            
+            // Find files that match potential file names
+            PsiManager psiManager = PsiManager.getInstance(project);
+            FixCompilationTask fixTask = new FixCompilationTask(
+                    project, errorMessage.toString(), potentialFileNames, psiManager, codeGenService);
+            
+            // Run fix task in background
+            ApplicationManager.getApplication().executeOnPooledThread(fixTask);
+            
+            // Record attempt
+            fixCount.incrementAndGet();
+            
+        } catch (Exception e) {
+            LOG.error("Error fixing compilation errors", e);
+            addActionLog("Error fixing compilation errors: " + e.getMessage());
+        }
+    }
+    
+    /**
+     * Task to fix compilation errors
+     * Handles the actual fixing of compilation errors in a background thread
+     */
+    private class FixCompilationTask implements Runnable {
+        private final Project project;
+        private final String errorMessage;
+        private final Set<String> potentialFileNames;
+        private final PsiManager psiManager;
+        private final AutonomousCodeGenerationService codeGenService;
+        
+        FixCompilationTask(Project project, String errorMessage, Set<String> potentialFileNames,
+                           PsiManager psiManager, AutonomousCodeGenerationService codeGenService) {
+            this.project = project;
+            this.errorMessage = errorMessage;
+            this.potentialFileNames = potentialFileNames;
+            this.psiManager = psiManager;
+            this.codeGenService = codeGenService;
+        }
+        
+        @Override
+        public void run() {
+            try {
+                if (project.isDisposed() || !running.get()) {
+                    return;
+                }
+                
+                // Find files from potential file names
+                Set<VirtualFile> filesToFix = new HashSet<>();
+                com.intellij.openapi.vfs.VirtualFileManager vfm = com.intellij.openapi.vfs.VirtualFileManager.getInstance();
+                
+                // First try direct file paths
+                for (String fileName : potentialFileNames) {
+                    com.intellij.openapi.vfs.VirtualFile file = vfm.findFileByUrl("file://" + fileName);
+                    if (file != null && file.exists()) {
+                        filesToFix.add(file);
+                    }
+                }
+                
+                // If no files found, search in project
+                if (filesToFix.isEmpty()) {
+                    // Search in project content roots
+                    com.intellij.openapi.roots.ProjectRootManager rootManager = com.intellij.openapi.roots.ProjectRootManager.getInstance(project);
+                    com.intellij.openapi.vfs.VirtualFile[] contentRoots = rootManager.getContentRoots();
+                    
+                    for (com.intellij.openapi.vfs.VirtualFile root : contentRoots) {
+                        for (String fileName : potentialFileNames) {
+                            // Use recursion to find files in subdirectories
+                            findFiles(root, fileName, filesToFix);
+                        }
+                    }
+                }
+                
+                // Fix each file
+                LOG.info("Found " + filesToFix.size() + " files to fix from compilation errors");
+                
+                for (VirtualFile file : filesToFix) {
+                    fixFile(file);
+                }
+                
+                LOG.info("Compilation error fixing task complete");
+                addActionLog("Compilation error fixing completed for " + filesToFix.size() + " files");
+                
+            } catch (Exception e) {
+                LOG.error("Error in fix compilation task", e);
+                addActionLog("Error fixing compilation errors: " + e.getMessage());
+            }
+        }
+        
+        private void findFiles(VirtualFile dir, String fileName, Set<VirtualFile> results) {
+            if (!dir.isDirectory()) {
+                return;
+            }
+            
+            for (VirtualFile child : dir.getChildren()) {
+                if (child.isDirectory()) {
+                    findFiles(child, fileName, results);
+                } else if (child.getName().equals(fileName)) {
+                    results.add(child);
+                }
+            }
+        }
+        
+        private void fixFile(VirtualFile file) {
+            try {
+                // Get file content
+                PsiFile psiFile = psiManager.findFile(file);
+                if (psiFile == null) {
+                    return;
+                }
+                
+                String code = psiFile.getText();
+                
+                // Get language from file extension
+                String language = getLanguageFromExtension(file.getExtension());
+                
+                // Fix code
+                LOG.info("Attempting to fix compilation errors in " + file.getName());
+                String fixedCode = codeGenService.fixCode(code, errorMessage, language)
+                        .exceptionally(e -> {
+                            LOG.error("Error fixing compilation errors in file " + file.getName(), e);
+                            return null;
+                        })
+                        .join();
+                
+                // Apply fixed code
+                if (fixedCode != null && !fixedCode.isEmpty() && !fixedCode.equals(code)) {
+                    LOG.info("Applying fixed code to file " + file.getName());
+                    
+                    ApplicationManager.getApplication().invokeLater(() -> {
+                        ApplicationManager.getApplication().runWriteAction(() -> {
+                            try {
+                                // Write fixed code to file
+                                file.setBinaryContent(fixedCode.getBytes());
+                                
+                                // Record successful fix
+                                addActionLog("Fixed compilation errors in file " + file.getName());
+                            } catch (Exception e) {
+                                LOG.error("Error writing fixed code to file " + file.getName(), e);
+                            }
+                        });
+                    });
+                }
+            } catch (Exception e) {
+                LOG.error("Error fixing compilation errors in file " + file.getName(), e);
+            }
+        }
+    }
+    
+    /**
      * Perform code enhancement
      * This method looks for opportunities to improve code quality, modularity, etc.
      */

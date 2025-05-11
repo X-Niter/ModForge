@@ -195,4 +195,98 @@ public final class PatternCachingService {
         
         LOG.info("Cleaned up " + toRemove + " least used cache entries");
     }
+    
+    /**
+     * Loads stored patterns from disk.
+     * @return Map of stored patterns
+     */
+    @NotNull
+    public Map<String, String> loadStoredPatterns() {
+        LOG.info("Loading stored patterns from disk...");
+        Map<String, String> result = new HashMap<>();
+        
+        try {
+            // Get storage directory
+            java.nio.file.Path storageDir = getStorageDirectory();
+            java.nio.file.Path patternFile = storageDir.resolve("patterns.dat");
+            
+            if (!java.nio.file.Files.exists(patternFile)) {
+                LOG.info("No pattern file found at: " + patternFile);
+                return result;
+            }
+            
+            // Load data
+            java.util.List<String> lines = java.nio.file.Files.readAllLines(patternFile);
+            
+            for (String line : lines) {
+                // Format: key=value
+                int separatorIndex = line.indexOf('=');
+                if (separatorIndex > 0) {
+                    String key = line.substring(0, separatorIndex);
+                    String value = line.substring(separatorIndex + 1);
+                    result.put(key, value);
+                }
+            }
+            
+            LOG.info("Loaded " + result.size() + " patterns from disk");
+            
+        } catch (Exception e) {
+            LOG.error("Error loading patterns from disk", e);
+        }
+        
+        return result;
+    }
+    
+    /**
+     * Saves stored patterns to disk.
+     * @param patterns The patterns to save
+     */
+    public void saveStoredPatterns(@NotNull Map<String, String> patterns) {
+        LOG.info("Saving " + patterns.size() + " patterns to disk...");
+        
+        try {
+            // Get storage directory
+            java.nio.file.Path storageDir = getStorageDirectory();
+            java.nio.file.Files.createDirectories(storageDir);
+            
+            java.nio.file.Path patternFile = storageDir.resolve("patterns.dat");
+            
+            // Build content
+            StringBuilder content = new StringBuilder();
+            for (Map.Entry<String, String> entry : patterns.entrySet()) {
+                content.append(entry.getKey())
+                       .append('=')
+                       .append(entry.getValue())
+                       .append(System.lineSeparator());
+            }
+            
+            // Write to file
+            java.nio.file.Files.writeString(patternFile, content.toString());
+            
+            LOG.info("Successfully saved patterns to: " + patternFile);
+            
+        } catch (Exception e) {
+            LOG.error("Error saving patterns to disk", e);
+        }
+    }
+    
+    /**
+     * Gets the storage directory path.
+     * @return The storage directory path
+     */
+    @NotNull
+    private java.nio.file.Path getStorageDirectory() throws java.io.IOException {
+        // Use system property for user home
+        String userHome = System.getProperty("user.home");
+        
+        // Create .modforge directory if it doesn't exist
+        java.nio.file.Path modforgeDir = java.nio.file.Paths.get(userHome, ".modforge");
+        java.nio.file.Files.createDirectories(modforgeDir);
+        
+        // Create patterns directory
+        java.nio.file.Path patternsDir = modforgeDir.resolve("patterns");
+        java.nio.file.Files.createDirectories(patternsDir);
+        
+        return patternsDir;
+    }
 }

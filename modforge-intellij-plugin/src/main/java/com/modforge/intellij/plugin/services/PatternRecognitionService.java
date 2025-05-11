@@ -109,16 +109,109 @@ public final class PatternRecognitionService {
      * Loads patterns from storage.
      */
     private void loadPatterns() {
-        // TODO: Implement pattern loading from persistent storage
         LOG.info("Loading patterns from storage...");
+        
+        try {
+            // Get patterns from caching service
+            Map<String, String> storedPatterns = patternCachingService.loadStoredPatterns();
+            
+            if (storedPatterns == null || storedPatterns.isEmpty()) {
+                LOG.info("No stored patterns found");
+                return;
+            }
+            
+            int loadedCount = 0;
+            
+            // Process each stored pattern
+            for (Map.Entry<String, String> entry : storedPatterns.entrySet()) {
+                try {
+                    String key = entry.getKey();
+                    String serializedValue = entry.getValue();
+                    
+                    // Parse the key to get category
+                    String[] keyParts = key.split(":", 2);
+                    if (keyParts.length != 2) {
+                        LOG.warn("Invalid pattern key format: " + key);
+                        continue;
+                    }
+                    
+                    // Get category from key
+                    PatternCategory category;
+                    try {
+                        category = PatternCategory.valueOf(keyParts[0]);
+                    } catch (IllegalArgumentException e) {
+                        LOG.warn("Unknown pattern category: " + keyParts[0]);
+                        continue;
+                    }
+                    
+                    // Parse serialized pattern entry
+                    String[] valueParts = serializedValue.split("\\|\\|\\|", 5);
+                    if (valueParts.length < 3) {
+                        LOG.warn("Invalid pattern value format: " + serializedValue);
+                        continue;
+                    }
+                    
+                    String pattern = valueParts[0];
+                    String result = valueParts[1];
+                    int useCount = Integer.parseInt(valueParts[2]);
+                    float effectiveness = valueParts.length > 3 ? Float.parseFloat(valueParts[3]) : 0.5f;
+                    long timestamp = valueParts.length > 4 ? Long.parseLong(valueParts[4]) : System.currentTimeMillis();
+                    
+                    // Create and store pattern entry
+                    PatternEntry patternEntry = new PatternEntry(pattern, result, category);
+                    patternEntry.useCount = useCount;
+                    patternEntry.effectiveness = effectiveness;
+                    
+                    // Add to patterns map
+                    patterns.put(key, patternEntry);
+                    loadedCount++;
+                    
+                } catch (Exception e) {
+                    LOG.warn("Error parsing stored pattern", e);
+                }
+            }
+            
+            LOG.info("Loaded " + loadedCount + " patterns from storage");
+            
+        } catch (Exception e) {
+            LOG.error("Error loading patterns from storage", e);
+        }
     }
     
     /**
      * Saves patterns to storage.
      */
     private void savePatterns() {
-        // TODO: Implement pattern saving to persistent storage
         LOG.info("Saving patterns to storage...");
+        
+        try {
+            // Create storage map
+            Map<String, String> storageMap = new HashMap<>();
+            
+            // Serialize each pattern
+            for (Map.Entry<String, PatternEntry> entry : patterns.entrySet()) {
+                String key = entry.getKey();
+                PatternEntry patternEntry = entry.getValue();
+                
+                // Format: pattern|||result|||useCount|||effectiveness|||timestamp
+                String serializedValue = String.format("%s|||%s|||%d|||%f|||%d",
+                        patternEntry.pattern,
+                        patternEntry.result,
+                        patternEntry.useCount,
+                        patternEntry.effectiveness,
+                        patternEntry.timestamp);
+                
+                storageMap.put(key, serializedValue);
+            }
+            
+            // Save to storage
+            patternCachingService.saveStoredPatterns(storageMap);
+            
+            LOG.info("Saved " + storageMap.size() + " patterns to storage");
+            
+        } catch (Exception e) {
+            LOG.error("Error saving patterns to storage", e);
+        }
     }
     
     /**
@@ -146,6 +239,9 @@ public final class PatternRecognitionService {
         });
         
         LOG.info("Registered new pattern in category: " + category);
+        
+        // Save patterns to persistent storage
+        savePatterns();
     }
     
     /**
