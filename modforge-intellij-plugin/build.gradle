@@ -33,20 +33,23 @@ intellij {
     downloadSources = true
     updateSinceUntilBuild = true
     
-    // When building against 2025.1, we need to specify the exact plugin versions
-    // or provide a path to your local IntelliJ installation that has these plugins
+    // When building against 2025.1, we need to use your local IntelliJ installation
+    // since the remote plugin repository may not have the exact plugins we need
+    localPath = System.getProperty('user.home') + '/.IntelliJIdea2025.1'
+    
+    // If local path doesn't work, uncomment and modify this with your actual installation path
+    // For Windows: localPath = 'C:/Program Files/JetBrains/IntelliJ IDEA Community Edition 2025.1'
+    // For macOS: localPath = '/Applications/IntelliJ IDEA.app/Contents'
+    // For Linux: localPath = '/opt/intellij-idea-community'
+    
+    // Only specify built-in plugins that are part of the IDE
     plugins = [
         'java',
-        'git4idea', // Use lowercase plugin ID without version for built-in plugins
-        'github',   // Use lowercase plugin ID without version for built-in plugins
-        'terminal', // Use lowercase plugin ID without version for built-in plugins
-        // Minecraft Development plugin is required per plugin.xml dependency
-        'com.demonwav.minecraft-dev:2025.1.2+' // Use a more flexible version matching
+        'git4idea',
+        'GitHub',
+        'terminal'
+        // Removed Minecraft plugin as it should be installed in the IDE
     ]
-    
-    // Uncomment and modify the following line to use your local IntelliJ installation
-    // This is helpful if the downloaded plugins aren't working correctly
-    // localPath = 'C:/Program Files/JetBrains/IntelliJ IDEA Community Edition 2025.1'
 }
 
 // Configure Java sourceSets
