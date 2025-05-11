@@ -92,6 +92,8 @@
         <projectService serviceImplementation="com.modforge.intellij.plugin.designers.recipe.RecipeManager"/>
         <projectService serviceImplementation="com.modforge.intellij.plugin.designers.structure.StructureManager"/>
         <projectService serviceImplementation="com.modforge.intellij.plugin.memory.MemoryOptimizer"/>
+        <projectService serviceImplementation="com.modforge.intellij.plugin.services.MemoryAwareContinuousService"/>
+        <projectService serviceImplementation="com.modforge.intellij.plugin.services.MemoryRecoveryService"/>
         <projectService serviceImplementation="com.modforge.intellij.plugin.github.GitHubIntegrationService"/>
         <projectService serviceImplementation="com.modforge.intellij.plugin.notifications.ModForgeNotificationService"/>
         <projectService serviceImplementation="com.modforge.intellij.plugin.templates.ModTemplateService"/>
@@ -132,6 +134,7 @@
         <postStartupActivity implementation="com.modforge.intellij.plugin.ModForgePluginActivator"/>
         <postStartupActivity implementation="com.modforge.intellij.plugin.run.MinecraftRunConfigurationService"/>
         <postStartupActivity implementation="com.modforge.intellij.plugin.memory.MemoryManagementStartupActivity"/>
+        <postStartupActivity implementation="com.modforge.intellij.plugin.memory.integration.MemoryAwareServiceIntegration"/>
                           
         <!-- Mod Loader Contributors -->
         <com.modforge.intellij.plugin.modLoaderContributor implementation="com.modforge.intellij.plugin.loaders.ForgeLoaderContributor"/>
