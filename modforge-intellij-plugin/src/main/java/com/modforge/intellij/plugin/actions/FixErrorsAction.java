@@ -158,7 +158,9 @@ public class FixErrorsAction extends AnAction {
             }
             return false;
         })) {
-            problemSolver.processProblems(problems, file);
+            // In IntelliJ IDEA 2025.1.1.1, the signature has changed
+            // Create a compatible wrapper for processProblems
+            collectProblemsForFile(problemSolver, file, problems);
         }
         
         return problems;
@@ -177,10 +179,52 @@ public class FixErrorsAction extends AnAction {
         
         StringBuilder sb = new StringBuilder();
         for (Problem problem : problems) {
-            sb.append(problem.getDescription()).append("\n");
+            // Compatible way to get problem description in IntelliJ IDEA 2025.1.1.1
+            sb.append(getProblemDescription(problem)).append("\n");
         }
         
         return sb.toString();
+    }
+    
+    /**
+     * Compatibility method to collect problems for a file using available APIs in IntelliJ IDEA 2025.1.1.1
+     * 
+     * @param problemSolver The problem solver
+     * @param file The file to check
+     * @param problems The collection to populate with problems
+     */
+    private void collectProblemsForFile(
+            @NotNull WolfTheProblemSolver problemSolver,
+            @NotNull VirtualFile file,
+            @NotNull Collection<Problem> problems) {
+        
+        // Use the newer API available in 2025.1.1.1
+        problemSolver.getProblemFiles().forEach(problemFile -> {
+            if (problemFile.equals(file)) {
+                problemSolver.getAllProblems().stream()
+                    .filter(problem -> {
+                        VirtualFile problemFile1 = problem.getVirtualFile();
+                        return problemFile1 != null && problemFile1.equals(file);
+                    })
+                    .forEach(problems::add);
+            }
+        });
+    }
+    
+    /**
+     * Get the description of a problem in a compatible way
+     * 
+     * @param problem The problem
+     * @return The description
+     */
+    private String getProblemDescription(@NotNull Problem problem) {
+        try {
+            // First try the standard method (may not be available in 2025.1.1.1)
+            return problem.getDescription();
+        } catch (NoSuchMethodError e) {
+            // Fall back to toString() which should contain the important info
+            return problem.toString();
+        }
     }
     
     /**

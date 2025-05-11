@@ -489,8 +489,9 @@ public class CreateFromTemplateAction extends AnAction {
             
             // Check if output directory is empty
             if (outputDir.exists() && outputDir.listFiles() != null && outputDir.listFiles().length > 0) {
+                // Use the compatible version with Project parameter in IntelliJ IDEA 2025.1.1.1
                 int result = Messages.showYesNoDialog(
-                        getContentPanel(),
+                        project,
                         "Output directory is not empty. Continue?",
                         "Output Directory Not Empty",
                         "Continue",

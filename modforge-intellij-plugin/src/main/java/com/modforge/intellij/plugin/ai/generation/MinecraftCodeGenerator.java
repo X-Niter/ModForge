@@ -219,7 +219,7 @@ public final class MinecraftCodeGenerator {
         }
         
         // Detect from project
-        ModLoader detected = ModLoaderDetector.detectModLoader(project, null);
+        ModLoader detected = ModLoaderDetector.detectModLoader(project);
         
         // If unable to detect, default to Forge
         if (detected == ModLoader.UNKNOWN) {
