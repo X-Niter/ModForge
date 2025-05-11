@@ -79,6 +79,7 @@
                           
         <!-- Startup Activities -->
         <postStartupActivity implementation="com.modforge.intellij.plugin.ModForgePluginActivator"/>
+        <postStartupActivity implementation="com.modforge.intellij.plugin.run.MinecraftRunConfigurationService"/>
                           
         <!-- Mod Loader Contributors -->
         <com.modforge.intellij.plugin.modLoaderContributor implementation="com.modforge.intellij.plugin.loaders.ForgeLoaderContributor"/>
@@ -149,6 +150,14 @@
                     class="com.modforge.intellij.plugin.actions.PushToGitHubAction"
                     text="Push to GitHub"
                     description="Push mod to GitHub repository">
+            </action>
+            <separator/>
+            
+            <!-- Run Configuration Actions -->
+            <action id="ModForge.AutoConfigureMinecraftRunAction"
+                    class="com.modforge.intellij.plugin.run.AutoConfigureMinecraftRunAction"
+                    text="Auto-Configure Minecraft Runs"
+                    description="Automatically create run configurations for client, server, and data generation">
             </action>
         </group>
         
