@@ -295,4 +295,13 @@ public final class ModAuthenticationManager implements PersistentStateComponent<
     public void setRememberGitHubCredentials(boolean rememberGitHubCredentials) {
         this.rememberGitHubCredentials = rememberGitHubCredentials;
     }
+    
+    /**
+     * Check if the user is authenticated to any service
+     * 
+     * @return true if authenticated to any service, false otherwise
+     */
+    public boolean isAuthenticated() {
+        return isGitHubTokenValid() || isOpenAIApiKeyValid();
+    }
 }

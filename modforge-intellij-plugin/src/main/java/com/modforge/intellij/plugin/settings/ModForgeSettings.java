@@ -286,4 +286,23 @@ public final class ModForgeSettings implements PersistentStateComponent<ModForge
     public void loadState(@NotNull ModForgeSettings state) {
         XmlSerializerUtil.copyBean(state, this);
     }
+    
+    /**
+     * Check if pattern recognition is enabled.
+     *
+     * @return True if enabled, false otherwise
+     */
+    public boolean isPatternRecognition() {
+        return enablePatternRecognition;
+    }
+    
+    /**
+     * Get the access token for ModForge API access.
+     *
+     * @return The access token
+     */
+    public String getAccessToken() {
+        // For backward compatibility, default to GitHub token if no separate access token is stored
+        return githubToken;
+    }
 }

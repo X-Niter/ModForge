@@ -55,7 +55,7 @@ public class MinecraftRunConfiguration extends RunConfigurationBase<MinecraftRun
      * @return Default configuration options
      */
     @Override
-    public @NotNull ConfigurationPerRunnerSettings createRunnerSettings(@NotNull ConfigurationSettingsBean settings) {
+    public @NotNull ConfigurationPerRunnerSettings createRunnerSettings(@NotNull Object settings) {
         return new ConfigurationPerRunnerSettings();
     }
     
