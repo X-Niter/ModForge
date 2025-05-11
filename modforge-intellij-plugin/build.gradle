@@ -42,31 +42,33 @@ dependencies {
 
 // Configure Gradle IntelliJ Plugin
 intellij {
-    // IMPORTANT: We're using a multi-stage approach here:
-    // 1. Build with the specific target version when available in the repository
-    // 2. Set plugin.xml compatibility to exactly match your IntelliJ version
-    // 3. For LOCAL DEVELOPMENT, uncomment localPath if version is not in repository
-
-    // Target IntelliJ IDEA 2025.1.1.1 (Build: 251.25410.129)
-    // Note: As this version may not be available in repositories yet, we use:
-    // - Build with 2023.3.6 (stable version from repository)
-    // - Set plugin.xml compatibility to support 251.25410.129 specifically
-    version = '2023.3.6' // For BUILDING (plugin.xml compatibility ensures it works with 2025.1.1.1)
-    type = 'IC' // Target IDE: IntelliJ IDEA Community Edition
+    // IMPORTANT: Best practice for targeting IntelliJ IDEA 2025.1.1.1
+    // - Use stable 2023.3.6 for build compatibility
+    // - Set XML compatibility for 251.25410.129
+    // - Use localPath for direct 2025.1.1.1 testing
     
-    // Explicitly use JetBrains official repository
-    intellijRepository = 'https://www.jetbrains.com/intellij-repository/releases'
+    // Target version approach depends on your needs:
+    // Option 1: Repository build (easier, more compatible, recommended for CI)
+    version = '2023.3.6' 
+    type = 'IC' // Community Edition
     
-    // Only include essential plugins
+    // Alternative Option: Local build for exact version testing
+    // - Comment out the version line above
+    // - Uncomment the localPath line below with your IntelliJ path
+    // localPath = 'C:/Program Files/JetBrains/IntelliJ IDEA Community Edition 2025.1.1.1'
+    
+    // Essential configuration
+    downloadSources = true
+    updateSinceUntilBuild = false
+    pluginDependencyCaching = false
+    
+    // Use only essential plugins - make GitHub/etc optional with fallbacks
     plugins = ['java']
     
-    // Don't update build numbers automatically
-    updateSinceUntilBuild = false
+    // Access multiple repositories for better dependency resolution
+    intellijRepository = 'https://www.jetbrains.com/intellij-repository/releases'
     
-    // FOR LOCAL DEVELOPMENT WITH 2025.1.1.1:
-    // 1. Comment out the "version = '2023.3.6'" line above
-    // 2. Uncomment this localPath line with your installed IntelliJ path
-    // localPath = 'C:/Program Files/JetBrains/IntelliJ IDEA Community Edition 2025.1.1.1'
+    // This is duplicated in the comment above - can be removed
 }
 
 // Configure Java sourceSets - using standard Gradle setup

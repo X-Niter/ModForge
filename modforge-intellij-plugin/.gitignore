@@ -1,20 +1,41 @@
-# Build output
-build/
-out/
-
 # Gradle
 .gradle/
+build/
+out/
+classes/
 
-# IDE
+# Eclipse
+.project
+.classpath
+.settings/
+
+# IntelliJ IDEA
 .idea/
 *.iml
-*.iws
 *.ipr
+*.iws
+*.iml
 
-# Logs
-*.log
+# Visual Studio Code
+.vscode/
+.settings/
+.factorypath
+
+# Project specific
 logs/
-
-# OS specific
+tmp/
+.env
+*.log
 .DS_Store
-Thumbs.db
+*.bak
+
+# Gradle wrapper
+!gradle/wrapper/gradle-wrapper.jar
+
+# npm
+node_modules/
+package-lock.json
+npm-debug.log
+
+# Generated files
+temp/

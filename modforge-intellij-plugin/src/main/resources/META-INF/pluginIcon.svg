@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 40 40" fill="none">
+  <rect width="40" height="40" rx="8" fill="#252525"/>
+  <path d="M7 7H33V33H7V7Z" fill="#252525"/>
+  
+  <!-- M letter -->
+  <path d="M11 11L11 29L15 29L15 17L19 25L23 17L23 29L27 29L27 11L23 11L19 20L15 11L11 11Z" fill="#41D0D5"/>
+  
+  <!-- Cube -->
+  <path d="M28 14L33 17V23L28 26L23 23V17L28 14Z" fill="#FF6D4A"/>
+  
+  <!-- Gear -->
+  <circle cx="10" cy="30" r="5" fill="#77CA55" stroke="#252525" stroke-width="1"/>
+  <circle cx="10" cy="30" r="2" fill="#252525"/>
+  <path d="M10 24V26" stroke="#77CA55" stroke-width="1.5" stroke-linecap="round"/>
+  <path d="M10 34V36" stroke="#77CA55" stroke-width="1.5" stroke-linecap="round"/>
+  <path d="M16 30L14 30" stroke="#77CA55" stroke-width="1.5" stroke-linecap="round"/>
+  <path d="M6 30L4 30" stroke="#77CA55" stroke-width="1.5" stroke-linecap="round"/>
+  <path d="M14.1421 25.8579L12.7279 27.2721" stroke="#77CA55" stroke-width="1.5" stroke-linecap="round"/>
+  <path d="M7.27208 32.7279L5.85787 34.1421" stroke="#77CA55" stroke-width="1.5" stroke-linecap="round"/>
+  <path d="M14.1421 34.1421L12.7279 32.7279" stroke="#77CA55" stroke-width="1.5" stroke-linecap="round"/>
+  <path d="M7.27208 27.2721L5.85787 25.8579" stroke="#77CA55" stroke-width="1.5" stroke-linecap="round"/>
+</svg>
