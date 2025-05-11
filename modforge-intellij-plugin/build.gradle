@@ -29,9 +29,17 @@ dependencies {
 
 // Configure Gradle IntelliJ Plugin
 intellij {
-    // Use the latest published stable IntelliJ version
-    version = '2023.3.6' // Last stable version with reliable repo access
+    // IMPORTANT: We're using a multi-stage approach here:
+    // 1. Build with a stable version from the repository
+    // 2. Set plugin.xml compatibility to support up to 2025.1.*
+    // 3. For LOCAL DEVELOPMENT with 2025.1, comment the version line and uncomment localPath
+
+    // The latest official IntelliJ version in repository
+    version = '2023.3.6' // Use 2023.3.6 for BUILDING (but plugin will work with 2025.1)
     type = 'IC' // Target IDE: IntelliJ IDEA Community Edition
+    
+    // Repository URL from JetBrains repository site
+    intellijRepository = 'https://www.jetbrains.com/intellij-repository/releases/'
     
     // Only include essential plugins
     plugins = ['java']
@@ -39,8 +47,9 @@ intellij {
     // Don't update build numbers automatically
     updateSinceUntilBuild = false
     
-    // For local testing, you can comment out the version above and uncomment this
-    // This will use your locally installed IntelliJ IDEA
+    // FOR LOCAL DEVELOPMENT WITH 2025.1:
+    // 1. Comment out the "version = '2023.3.6'" line above
+    // 2. Uncomment this localPath line with your installed IntelliJ 2025.1 path
     // localPath = 'C:/Program Files/JetBrains/IntelliJ IDEA Community Edition 2025.1'
 }
 

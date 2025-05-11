@@ -36,11 +36,14 @@
     </ul>
     ]]></description>
     
+    <!-- Required plugins -->
     <depends>com.intellij.modules.platform</depends>
     <depends>com.intellij.modules.java</depends>
-    <depends>Git4Idea</depends>
-    <depends>org.jetbrains.plugins.github</depends>
-    <depends>com.demonwav.minecraft-dev</depends>
+    
+    <!-- Optional plugins with fallbacks in our code -->
+    <depends optional="true" config-file="git-integration.xml">Git4Idea</depends>
+    <depends optional="true" config-file="github-integration.xml">org.jetbrains.plugins.github</depends>
+    <depends optional="true" config-file="minecraft-dev-integration.xml">com.demonwav.minecraft-dev</depends>
     
     <extensionPoints>
         <extensionPoint name="modLoaderContributor" 
