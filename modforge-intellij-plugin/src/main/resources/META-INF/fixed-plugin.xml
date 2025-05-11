@@ -28,4 +28,13 @@
     <depends optional="true" config-file="git-integration.xml">Git4Idea</depends>
     <depends optional="true" config-file="github-integration.xml">org.jetbrains.plugins.github</depends>
     <depends optional="true" config-file="minecraft-dev-integration.xml">com.demonwav.minecraft-dev</depends>
+    
+    <!-- Plugin Registration -->
+    <extensions defaultExtensionNs="com.intellij">
+        <!-- Services -->
+        <projectService serviceImplementation="com.modforge.intellij.plugin.services.ModForgeNotificationService"/>
+        
+        <!-- Notification Group -->
+        <notificationGroup id="ModForge Notifications" displayType="BALLOON" />
+    </extensions>
 </idea-plugin>
