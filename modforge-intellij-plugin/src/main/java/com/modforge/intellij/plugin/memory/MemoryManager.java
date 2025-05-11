@@ -51,6 +51,30 @@ public class MemoryManager {
     }
     
     /**
+     * Reinitialize the memory manager
+     * This can be called to restart memory monitoring and optimization after issues
+     */
+    public void reinitialize() {
+        LOG.info("Reinitializing MemoryManager");
+        
+        // Force restart of monitoring regardless of initialization state
+        startMemoryMonitoring();
+        
+        // Force restart of optimization regardless of initialization state
+        scheduleAutomaticOptimization();
+        
+        // Reset initialization flag if it was false
+        if (!initialized.get()) {
+            initialized.set(true);
+        }
+        
+        // Request garbage collection
+        MemoryUtils.requestGarbageCollection();
+        
+        LOG.info("MemoryManager reinitialized");
+    }
+    
+    /**
      * Check if the memory manager is currently optimizing memory
      * 
      * @return True if memory is being optimized

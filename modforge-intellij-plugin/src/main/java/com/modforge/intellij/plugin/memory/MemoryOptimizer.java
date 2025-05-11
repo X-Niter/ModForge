@@ -330,6 +330,32 @@ public class MemoryOptimizer implements Disposable {
         }
     }
     
+    /**
+     * Reset the optimizer state and perform a quick optimization
+     * This is useful when recovering from memory issues
+     */
+    public void reset() {
+        LOG.info("Resetting memory optimizer");
+        
+        // Reset optimization state
+        optimizing.set(false);
+        
+        // Perform a minimal optimization in the background
+        if (!project.isDisposed()) {
+            ApplicationManager.getApplication().executeOnPooledThread(() -> {
+                try {
+                    // Basic cleanup
+                    cancelRunningTasks();
+                    clearCaches();
+                    MemoryUtils.requestGarbageCollection();
+                    LOG.info("Memory optimizer reset completed");
+                } catch (Exception e) {
+                    LOG.error("Error during memory optimizer reset", e);
+                }
+            });
+        }
+    }
+    
     @Override
     public void dispose() {
         listeners.clear();

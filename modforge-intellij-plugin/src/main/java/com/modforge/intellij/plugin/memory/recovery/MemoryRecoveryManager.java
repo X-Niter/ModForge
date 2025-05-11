@@ -344,19 +344,61 @@ public class MemoryRecoveryManager implements MemoryManager.MemoryPressureListen
     
     /**
      * Restart critical services to recover memory
+     * This performs a more drastic recovery by restarting essential services
      */
     private void restartCriticalServices() {
         LOG.info("Restarting critical services");
         
-        // This is a more drastic recovery action that would restart essential services
-        // For now, we'll just simulate by stopping and starting memory monitoring
-        
-        if (monitoringTask != null) {
-            monitoringTask.cancel(false);
+        try {
+            // Restart memory monitoring service
+            if (monitoringTask != null) {
+                monitoringTask.cancel(false);
+            }
+            startMonitoring();
+            LOG.info("Memory monitoring service restarted");
+            
+            // Restart memory manager services
+            MemoryManager memoryManager = MemoryManager.getInstance();
+            if (memoryManager != null) {
+                LOG.info("Reinitializing memory manager");
+                memoryManager.reinitialize();
+            }
+            
+            // Restart memory-aware services in projects
+            Project[] projects = ProjectManager.getInstance().getOpenProjects();
+            for (Project project : projects) {
+                if (project == null || project.isDisposed()) continue;
+                
+                try {
+                    // Restart memory optimizer
+                    MemoryOptimizer optimizer = project.getService(MemoryOptimizer.class);
+                    if (optimizer != null) {
+                        LOG.info("Resetting memory optimizer for project: " + project.getName());
+                        optimizer.reset();
+                    }
+                    
+                    // Restart continuous services that were paused, if appropriate
+                    MemoryManagementSettings settings = MemoryManagementSettings.getInstance();
+                    if (settings != null && settings.isMemoryAwareContinuousServiceEnabled()) {
+                        com.modforge.intellij.plugin.services.MemoryAwareContinuousService maService = 
+                                project.getService(com.modforge.intellij.plugin.services.MemoryAwareContinuousService.class);
+                        
+                        if (maService != null && !maService.isRunning()) {
+                            LOG.info("Restarting memory-aware continuous service for project: " + project.getName());
+                            maService.start();
+                        }
+                    }
+                } catch (Exception e) {
+                    LOG.warn("Error restarting services for project: " + project.getName(), e);
+                }
+            }
+            
+            // Request garbage collection again after all services have been restarted
+            MemoryUtils.requestGarbageCollection();
+            
+        } catch (Exception e) {
+            LOG.error("Error restarting critical services", e);
         }
-        
-        LOG.info("Memory monitoring service restarted");
-        startMonitoring();
     }
     
     /**
