@@ -159,36 +159,64 @@ public class MemoryVisualizationPanel extends JBPanel<MemoryVisualizationPanel> 
      */
     private void updateVisualization() {
         try {
-            // Get current memory snapshot
-            MemorySnapshot currentSnapshot = MemoryManager.getInstance().getCurrentMemorySnapshot();
+            // Check if we have a valid memory manager
+            MemoryManager memoryManager = MemoryManager.getInstance();
+            if (memoryManager == null) {
+                LOG.warn("Memory manager is not available, skipping visualization update");
+                return;
+            }
             
-            // Add to history if it's a new snapshot
-            if (!memoryHistory.isEmpty()) {
-                MemorySnapshot lastSnapshot = memoryHistory.get(memoryHistory.size() - 1);
-                if (currentSnapshot.getTimestamp().isAfter(lastSnapshot.getTimestamp())) {
+            // Get current memory snapshot
+            MemorySnapshot currentSnapshot = memoryManager.getCurrentMemorySnapshot();
+            if (currentSnapshot == null) {
+                LOG.warn("Current memory snapshot is null, skipping visualization update");
+                return;
+            }
+            
+            // Thread-safe update of memory history using synchronization
+            synchronized (memoryHistory) {
+                // Add to history if it's a new snapshot
+                if (!memoryHistory.isEmpty()) {
+                    MemorySnapshot lastSnapshot = memoryHistory.get(memoryHistory.size() - 1);
+                    if (currentSnapshot.getTimestamp().isAfter(lastSnapshot.getTimestamp())) {
+                        memoryHistory.add(currentSnapshot);
+                    }
+                } else {
                     memoryHistory.add(currentSnapshot);
                 }
-            } else {
-                memoryHistory.add(currentSnapshot);
+                
+                // Limit history size
+                if (memoryHistory.size() > MAX_DATA_POINTS) {
+                    memoryHistory.subList(0, memoryHistory.size() - MAX_DATA_POINTS).clear();
+                }
+                
+                // Make a thread-safe copy of the current state for filtering and display
+                final List<MemorySnapshot> memoryCopy = new ArrayList<>(memoryHistory);
+                final int currentTimeRange = timeRangeMinutes;
+                final boolean currentShowPrediction = showPrediction;
+                final String currentMetric = selectedMetric;
+                
+                // Filter data based on time range
+                List<MemorySnapshot> filteredData = filterDataByTimeRange(memoryCopy, currentTimeRange);
+                
+                // Update chart in a thread-safe manner
+                chartPanel.updateData(filteredData, currentShowPrediction, currentMetric);
+                
+                // Update status label in the EDT
+                final MemorySnapshot finalSnapshot = currentSnapshot;
+                SwingUtilities.invokeLater(() -> {
+                    try {
+                        updateStatusLabel(finalSnapshot);
+                    } catch (Exception ex) {
+                        LOG.error("Error updating status label", ex);
+                    }
+                });
             }
-            
-            // Limit history size
-            if (memoryHistory.size() > MAX_DATA_POINTS) {
-                memoryHistory.subList(0, memoryHistory.size() - MAX_DATA_POINTS).clear();
-            }
-            
-            // Filter data based on time range
-            List<MemorySnapshot> filteredData = filterDataByTimeRange(memoryHistory, timeRangeMinutes);
-            
-            // Update chart
-            chartPanel.updateData(filteredData, showPrediction, selectedMetric);
-            
-            // Update status label
-            updateStatusLabel(currentSnapshot);
-            
         } catch (Exception ex) {
             LOG.error("Error updating memory visualization", ex);
-            statusLabel.setText("Error updating visualization: " + ex.getMessage());
+            SwingUtilities.invokeLater(() -> {
+                statusLabel.setText("Error updating visualization: " + ex.getMessage());
+            });
         }
     }
     
@@ -230,54 +258,147 @@ public class MemoryVisualizationPanel extends JBPanel<MemoryVisualizationPanel> 
      * @return The filtered data
      */
     private List<MemorySnapshot> filterDataByTimeRange(List<MemorySnapshot> data, int rangeMinutes) {
-        if (data.isEmpty()) {
+        if (data == null || data.isEmpty()) {
             return Collections.emptyList();
         }
         
-        LocalDateTime cutoffTime = LocalDateTime.now().minusMinutes(rangeMinutes);
-        return data.stream()
-                .filter(snapshot -> snapshot.getTimestamp().isAfter(cutoffTime))
-                .toList();
+        try {
+            // Ensure range is positive
+            int sanitizedRange = Math.max(1, rangeMinutes);
+            
+            // Get current time and calculate cutoff
+            LocalDateTime now = LocalDateTime.now();
+            LocalDateTime cutoffTime = now.minusMinutes(sanitizedRange);
+            
+            // Filter data
+            return data.stream()
+                    .filter(snapshot -> snapshot != null && snapshot.getTimestamp() != null)
+                    .filter(snapshot -> {
+                        try {
+                            return snapshot.getTimestamp().isAfter(cutoffTime);
+                        } catch (Exception ex) {
+                            LOG.debug("Error comparing timestamps in filter", ex);
+                            return false;
+                        }
+                    })
+                    .toList();
+                    
+        } catch (Exception ex) {
+            LOG.error("Error filtering data by time range", ex);
+            return Collections.emptyList();
+        }
     }
     
     /**
      * Export memory data to a CSV file
      */
     private void exportMemoryData() {
+        // Check if we have data to export
+        if (memoryHistory == null || memoryHistory.isEmpty()) {
+            SwingUtilities.invokeLater(() -> {
+                statusLabel.setText("No memory data available to export");
+            });
+            return;
+        }
+        
         try {
+            // Take a thread-safe snapshot of the data
+            final List<MemorySnapshot> dataToExport;
+            synchronized (memoryHistory) {
+                dataToExport = new ArrayList<>(memoryHistory);
+            }
+            
             // Create file chooser and get save location
             JFileChooser fileChooser = new JFileChooser();
             fileChooser.setDialogTitle("Save Memory Data");
-            fileChooser.setSelectedFile(new java.io.File("memory_data_" + 
-                    LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss")) + ".csv"));
+            fileChooser.setFileSelectionMode(JFileChooser.FILES_ONLY);
             
+            // Set default filename with timestamp
+            String defaultFilename = "memory_data_" + 
+                    LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss")) + ".csv";
+            fileChooser.setSelectedFile(new java.io.File(defaultFilename));
+            
+            // Show save dialog
             int result = fileChooser.showSaveDialog(this);
             if (result != JFileChooser.APPROVE_OPTION) {
+                LOG.info("User canceled memory data export");
                 return;
             }
             
+            // Get selected file
             java.io.File file = fileChooser.getSelectedFile();
+            
+            // Add .csv extension if missing
+            if (!file.getName().toLowerCase().endsWith(".csv")) {
+                file = new java.io.File(file.getAbsolutePath() + ".csv");
+            }
+            
+            // Check if file already exists
+            if (file.exists()) {
+                int overwrite = JOptionPane.showConfirmDialog(this,
+                        "File already exists. Overwrite?",
+                        "Confirm Overwrite",
+                        JOptionPane.YES_NO_OPTION,
+                        JOptionPane.WARNING_MESSAGE);
+                        
+                if (overwrite != JOptionPane.YES_OPTION) {
+                    LOG.info("User canceled overwriting existing file: " + file.getAbsolutePath());
+                    return;
+                }
+            }
+            
+            // Write data to file
             try (java.io.PrintWriter writer = new java.io.PrintWriter(file)) {
                 // Write header
                 writer.println("Timestamp,Used Memory (%),Used Memory (MB),Available Memory (MB),Total Memory (MB)");
                 
+                // Create date-time formatter for consistent output
+                DateTimeFormatter dtf = DateTimeFormatter.ISO_LOCAL_DATE_TIME;
+                
                 // Write data
-                for (MemorySnapshot snapshot : memoryHistory) {
-                    writer.println(
-                            snapshot.getTimestamp().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME) + "," +
-                            snapshot.getUsedMemoryPercent() + "," +
-                            snapshot.getUsedMemoryMB() + "," +
-                            snapshot.getAvailableMemoryMB() + "," +
-                            snapshot.getTotalMemoryMB()
-                    );
+                for (MemorySnapshot snapshot : dataToExport) {
+                    if (snapshot != null && snapshot.getTimestamp() != null) {
+                        try {
+                            writer.println(
+                                    snapshot.getTimestamp().format(dtf) + "," +
+                                    String.format("%.2f", snapshot.getUsedMemoryPercent()) + "," +
+                                    String.format("%.2f", snapshot.getUsedMemoryMB()) + "," +
+                                    String.format("%.2f", snapshot.getAvailableMemoryMB()) + "," +
+                                    String.format("%.2f", snapshot.getTotalMemoryMB())
+                            );
+                        } catch (Exception ex) {
+                            LOG.warn("Error writing snapshot to CSV: " + ex.getMessage());
+                            // Continue with next snapshot
+                        }
+                    }
                 }
             }
             
-            statusLabel.setText("Memory data exported to " + file.getAbsolutePath());
+            final String finalPath = file.getAbsolutePath();
+            SwingUtilities.invokeLater(() -> {
+                statusLabel.setText("Memory data exported to " + finalPath);
+                
+                // Show success notification
+                JOptionPane.showMessageDialog(this,
+                        "Memory data successfully exported to:\n" + finalPath,
+                        "Export Complete",
+                        JOptionPane.INFORMATION_MESSAGE);
+            });
+            
+            LOG.info("Memory data exported to " + file.getAbsolutePath() + 
+                    " (" + dataToExport.size() + " records)");
             
         } catch (Exception ex) {
             LOG.error("Error exporting memory data", ex);
-            statusLabel.setText("Error exporting memory data: " + ex.getMessage());
+            SwingUtilities.invokeLater(() -> {
+                statusLabel.setText("Error exporting memory data: " + ex.getMessage());
+                
+                // Show error notification
+                JOptionPane.showMessageDialog(this,
+                        "Failed to export memory data:\n" + ex.getMessage(),
+                        "Export Error",
+                        JOptionPane.ERROR_MESSAGE);
+            });
         }
     }
     
@@ -377,10 +498,20 @@ public class MemoryVisualizationPanel extends JBPanel<MemoryVisualizationPanel> 
          * @param metricType The metric type to display
          */
         public void updateData(List<MemorySnapshot> newData, boolean showPrediction, String metricType) {
-            this.data = new ArrayList<>(newData);
-            this.showPrediction = showPrediction;
-            this.metricType = metricType;
-            repaint();
+            // Thread-safe update by using a local copy
+            if (newData != null) {
+                final List<MemorySnapshot> dataCopy = new ArrayList<>(newData);
+                
+                // Use SwingUtilities.invokeLater for thread safety when updating the UI
+                SwingUtilities.invokeLater(() -> {
+                    this.data = dataCopy;
+                    this.showPrediction = showPrediction;
+                    this.metricType = metricType != null ? metricType : "Used Memory (%)";
+                    repaint();
+                });
+            } else {
+                LOG.warn("Attempted to update chart with null data");
+            }
         }
         
         @Override
@@ -695,27 +826,77 @@ public class MemoryVisualizationPanel extends JBPanel<MemoryVisualizationPanel> 
          * @return The slope and intercept
          */
         private double[] calculateLinearRegression() {
-            // Simple linear regression: y = mx + b
-            int n = data.size();
-            double sumX = 0;
-            double sumY = 0;
-            double sumXY = 0;
-            double sumXX = 0;
-            
-            for (int i = 0; i < n; i++) {
-                double x = i;
-                double y = getValueFromSnapshot(data.get(i));
+            try {
+                // Validate we have enough data points
+                if (data == null || data.size() < 2) {
+                    LOG.debug("Not enough data points for linear regression");
+                    return new double[]{0, 0}; // Default no-change prediction
+                }
                 
-                sumX += x;
-                sumY += y;
-                sumXY += x * y;
-                sumXX += x * x;
+                // Simple linear regression: y = mx + b
+                int n = data.size();
+                double sumX = 0;
+                double sumY = 0;
+                double sumXY = 0;
+                double sumXX = 0;
+                int validPoints = 0;
+                
+                for (int i = 0; i < n; i++) {
+                    try {
+                        MemorySnapshot snapshot = data.get(i);
+                        if (snapshot == null) {
+                            continue;
+                        }
+                        
+                        double x = i;
+                        double y = getValueFromSnapshot(snapshot);
+                        
+                        // Skip extreme outliers that would skew the regression
+                        if (Double.isNaN(y) || Double.isInfinite(y)) {
+                            continue;
+                        }
+                        
+                        sumX += x;
+                        sumY += y;
+                        sumXY += x * y;
+                        sumXX += x * x;
+                        validPoints++;
+                    } catch (Exception ex) {
+                        LOG.debug("Error processing data point for regression", ex);
+                        // Skip this data point
+                    }
+                }
+                
+                // Need at least 2 valid points for regression
+                if (validPoints < 2) {
+                    LOG.debug("Not enough valid data points for linear regression");
+                    return new double[]{0, 0}; // Default no-change prediction
+                }
+                
+                // Calculate regression coefficients with division by zero protection
+                double denominator = (validPoints * sumXX - sumX * sumX);
+                double slope = (Math.abs(denominator) < 0.0001) ? 
+                               0 : // Avoid division by zero
+                               (validPoints * sumXY - sumX * sumY) / denominator;
+                               
+                double intercept = (validPoints == 0) ? 
+                                   0 : // Avoid division by zero 
+                                   (sumY - slope * sumX) / validPoints;
+                
+                // Apply reasonable limits to avoid extreme projections
+                // Limit maximum change rate to 5% per data point
+                double maxSlope = 5.0;
+                if (Math.abs(slope) > maxSlope) {
+                    slope = Math.signum(slope) * maxSlope;
+                    LOG.debug("Limiting excessive slope in regression");
+                }
+                
+                return new double[]{slope, intercept};
+                
+            } catch (Exception ex) {
+                LOG.error("Error calculating linear regression", ex);
+                return new double[]{0, 0}; // Default no-change prediction in case of error
             }
-            
-            double slope = (n * sumXY - sumX * sumY) / (n * sumXX - sumX * sumX);
-            double intercept = (sumY - slope * sumX) / n;
-            
-            return new double[]{slope, intercept};
         }
         
         /**
@@ -770,13 +951,45 @@ public class MemoryVisualizationPanel extends JBPanel<MemoryVisualizationPanel> 
          * @return The value
          */
         private double getValueFromSnapshot(MemorySnapshot snapshot) {
-            return switch (metricType) {
-                case "Used Memory (%)" -> snapshot.getUsedMemoryPercent();
-                case "Used Memory (MB)" -> snapshot.getUsedMemoryMB();
-                case "Available Memory (MB)" -> snapshot.getAvailableMemoryMB();
-                case "Total Memory (MB)" -> snapshot.getTotalMemoryMB();
-                default -> snapshot.getUsedMemoryPercent();
-            };
+            if (snapshot == null) {
+                LOG.warn("Attempted to get value from null snapshot");
+                return 0.0; // Default value
+            }
+            
+            try {
+                return switch (metricType) {
+                    case "Used Memory (%)" -> {
+                        double value = snapshot.getUsedMemoryPercent();
+                        // Clamp to reasonable range
+                        yield Math.max(0.0, Math.min(100.0, value));
+                    }
+                    case "Used Memory (MB)" -> {
+                        double value = snapshot.getUsedMemoryMB();
+                        // Ensure non-negative
+                        yield Math.max(0.0, value);
+                    }
+                    case "Available Memory (MB)" -> {
+                        double value = snapshot.getAvailableMemoryMB();
+                        // Ensure non-negative
+                        yield Math.max(0.0, value);
+                    }
+                    case "Total Memory (MB)" -> {
+                        double value = snapshot.getTotalMemoryMB();
+                        // Ensure non-negative
+                        yield Math.max(0.0, value);
+                    }
+                    default -> {
+                        LOG.debug("Unknown metric type: " + metricType + ", defaulting to Used Memory (%)");
+                        // Default to used memory percent as fallback
+                        double value = snapshot.getUsedMemoryPercent();
+                        // Clamp to reasonable range
+                        yield Math.max(0.0, Math.min(100.0, value));
+                    }
+                };
+            } catch (Exception ex) {
+                LOG.warn("Error getting value from snapshot for metric: " + metricType, ex);
+                return 0.0; // Default value in case of error
+            }
         }
         
         /**

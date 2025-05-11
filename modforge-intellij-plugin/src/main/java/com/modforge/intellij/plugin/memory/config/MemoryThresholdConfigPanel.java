@@ -1,5 +1,6 @@
 package com.modforge.intellij.plugin.memory.config;
 
+import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.options.ConfigurableBase;
 import com.intellij.openapi.ui.ComboBox;
 import com.intellij.ui.components.JBCheckBox;
@@ -29,6 +30,8 @@ import java.util.Map;
  * Configuration panel for memory thresholds
  */
 public class MemoryThresholdConfigPanel extends ConfigurableBase<MemoryThresholdConfigPanel.Form, MemoryThresholdConfig.State> {
+    private static final Logger LOG = Logger.getInstance(MemoryThresholdConfigPanel.class);
+    
     private JPanel mainPanel;
     private JComboBox<String> environmentComboBox;
     private JButton addEnvironmentButton;
@@ -61,12 +64,30 @@ public class MemoryThresholdConfigPanel extends ConfigurableBase<MemoryThreshold
     
     @Override
     protected @NotNull MemoryThresholdConfig.State getSettings() {
-        return MemoryThresholdConfig.getInstance().getState();
+        MemoryThresholdConfig config = MemoryThresholdConfig.getInstance();
+        MemoryThresholdConfig.State state = config.getState();
+        if (state == null) {
+            // Fallback to default state if null
+            LOG.warn("Memory threshold config state is null, creating default state");
+            state = new MemoryThresholdConfig.State();
+            state.environmentConfigs.put("default", new MemoryThresholdConfig.EnvironmentConfig());
+        }
+        return state;
     }
     
     @Override
     protected Runnable enableSearch(String option) {
         return null; // No search functionality
+    }
+    
+    @Override
+    public String getDisplayName() {
+        return "Memory Thresholds";
+    }
+    
+    @Override
+    public String getHelpTopic() {
+        return "Memory Thresholds Configuration";
     }
     
     @Override

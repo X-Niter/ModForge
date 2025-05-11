@@ -100,16 +100,146 @@ public final class MemoryThresholdConfig implements PersistentStateComponent<Mem
     
     @Override
     public @Nullable State getState() {
-        return myState;
+        // Make a deep copy to avoid issues with mutable state objects
+        // This is important for the PersistentStateComponent infrastructure
+        State stateCopy = new State();
+        
+        // Copy all environment configs
+        for (Map.Entry<String, EnvironmentConfig> entry : myState.environmentConfigs.entrySet()) {
+            EnvironmentConfig configCopy = new EnvironmentConfig();
+            EnvironmentConfig original = entry.getValue();
+            
+            // Copy all properties
+            configCopy.warningThresholdPercent = original.warningThresholdPercent;
+            configCopy.criticalThresholdPercent = original.criticalThresholdPercent;
+            configCopy.emergencyThresholdPercent = original.emergencyThresholdPercent;
+            configCopy.availableMemoryWarningMb = original.availableMemoryWarningMb;
+            configCopy.availableMemoryCriticalMb = original.availableMemoryCriticalMb;
+            configCopy.availableMemoryEmergencyMb = original.availableMemoryEmergencyMb;
+            configCopy.memoryGrowthRateThresholdPctPerMin = original.memoryGrowthRateThresholdPctPerMin;
+            
+            stateCopy.environmentConfigs.put(entry.getKey(), configCopy);
+        }
+        
+        // Copy default config
+        if (myState.defaultConfig != null) {
+            EnvironmentConfig defaultCopy = new EnvironmentConfig();
+            EnvironmentConfig original = myState.defaultConfig;
+            
+            defaultCopy.warningThresholdPercent = original.warningThresholdPercent;
+            defaultCopy.criticalThresholdPercent = original.criticalThresholdPercent;
+            defaultCopy.emergencyThresholdPercent = original.emergencyThresholdPercent;
+            defaultCopy.availableMemoryWarningMb = original.availableMemoryWarningMb;
+            defaultCopy.availableMemoryCriticalMb = original.availableMemoryCriticalMb;
+            defaultCopy.availableMemoryEmergencyMb = original.availableMemoryEmergencyMb;
+            defaultCopy.memoryGrowthRateThresholdPctPerMin = original.memoryGrowthRateThresholdPctPerMin;
+            
+            stateCopy.defaultConfig = defaultCopy;
+        }
+        
+        // Copy other properties
+        stateCopy.autoDetectEnvironment = myState.autoDetectEnvironment;
+        stateCopy.selectedEnvironment = myState.selectedEnvironment;
+        
+        return stateCopy;
     }
     
     @Override
     public void loadState(@NotNull State state) {
-        myState = state;
-        
-        // Ensure default environment config always exists
-        if (!myState.environmentConfigs.containsKey("default")) {
+        try {
+            // Don't modify the passed state directly; make a deep copy
+            myState = new State();
+            
+            // Copy all environment configs
+            if (state.environmentConfigs != null) {
+                for (Map.Entry<String, EnvironmentConfig> entry : state.environmentConfigs.entrySet()) {
+                    if (entry.getKey() != null && entry.getValue() != null) {
+                        EnvironmentConfig configCopy = new EnvironmentConfig();
+                        EnvironmentConfig original = entry.getValue();
+                        
+                        // Copy all properties with validation
+                        configCopy.warningThresholdPercent = Math.max(0, Math.min(100, original.warningThresholdPercent));
+                        configCopy.criticalThresholdPercent = Math.max(0, Math.min(100, original.criticalThresholdPercent));
+                        configCopy.emergencyThresholdPercent = Math.max(0, Math.min(100, original.emergencyThresholdPercent));
+                        configCopy.availableMemoryWarningMb = Math.max(1, original.availableMemoryWarningMb);
+                        configCopy.availableMemoryCriticalMb = Math.max(1, original.availableMemoryCriticalMb);
+                        configCopy.availableMemoryEmergencyMb = Math.max(1, original.availableMemoryEmergencyMb);
+                        configCopy.memoryGrowthRateThresholdPctPerMin = Math.max(0.1, original.memoryGrowthRateThresholdPctPerMin);
+                        
+                        myState.environmentConfigs.put(entry.getKey(), configCopy);
+                    }
+                }
+            }
+            
+            // Copy default config
+            if (state.defaultConfig != null) {
+                EnvironmentConfig defaultCopy = new EnvironmentConfig();
+                EnvironmentConfig original = state.defaultConfig;
+                
+                defaultCopy.warningThresholdPercent = Math.max(0, Math.min(100, original.warningThresholdPercent));
+                defaultCopy.criticalThresholdPercent = Math.max(0, Math.min(100, original.criticalThresholdPercent));
+                defaultCopy.emergencyThresholdPercent = Math.max(0, Math.min(100, original.emergencyThresholdPercent));
+                defaultCopy.availableMemoryWarningMb = Math.max(1, original.availableMemoryWarningMb);
+                defaultCopy.availableMemoryCriticalMb = Math.max(1, original.availableMemoryCriticalMb);
+                defaultCopy.availableMemoryEmergencyMb = Math.max(1, original.availableMemoryEmergencyMb);
+                defaultCopy.memoryGrowthRateThresholdPctPerMin = Math.max(0.1, original.memoryGrowthRateThresholdPctPerMin);
+                
+                myState.defaultConfig = defaultCopy;
+            } else {
+                myState.defaultConfig = new EnvironmentConfig();
+            }
+            
+            // Copy other properties
+            myState.autoDetectEnvironment = state.autoDetectEnvironment;
+            myState.selectedEnvironment = state.selectedEnvironment;
+            
+            // Ensure default environment config always exists
+            if (!myState.environmentConfigs.containsKey("default")) {
+                myState.environmentConfigs.put("default", new EnvironmentConfig());
+            }
+            
+            // Validate threshold relationships
+            for (EnvironmentConfig config : myState.environmentConfigs.values()) {
+                validateThresholdRelationships(config);
+            }
+            validateThresholdRelationships(myState.defaultConfig);
+            
+            LOG.info("Successfully loaded memory threshold configuration with " + 
+                    myState.environmentConfigs.size() + " environment(s)");
+                    
+        } catch (Exception ex) {
+            LOG.error("Error loading memory threshold configuration, using defaults", ex);
+            myState = new State();
             myState.environmentConfigs.put("default", new EnvironmentConfig());
+        }
+    }
+    
+    /**
+     * Validate and fix the relationships between thresholds
+     * 
+     * @param config The environment configuration to validate
+     */
+    private void validateThresholdRelationships(EnvironmentConfig config) {
+        if (config == null) {
+            return;
+        }
+        
+        // Ensure warning < critical < emergency for percentage thresholds
+        if (config.warningThresholdPercent >= config.criticalThresholdPercent) {
+            config.warningThresholdPercent = config.criticalThresholdPercent - 5;
+        }
+        
+        if (config.criticalThresholdPercent >= config.emergencyThresholdPercent) {
+            config.criticalThresholdPercent = config.emergencyThresholdPercent - 5;
+        }
+        
+        // Ensure warning > critical > emergency for available memory thresholds
+        if (config.availableMemoryWarningMb <= config.availableMemoryCriticalMb) {
+            config.availableMemoryWarningMb = config.availableMemoryCriticalMb + 64;
+        }
+        
+        if (config.availableMemoryCriticalMb <= config.availableMemoryEmergencyMb) {
+            config.availableMemoryCriticalMb = config.availableMemoryEmergencyMb + 32;
         }
     }
     
