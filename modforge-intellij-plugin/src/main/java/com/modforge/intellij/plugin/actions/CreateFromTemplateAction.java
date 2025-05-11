@@ -20,6 +20,7 @@ import com.modforge.intellij.plugin.notifications.ModForgeNotificationService;
 import com.modforge.intellij.plugin.templates.ModTemplate;
 import com.modforge.intellij.plugin.templates.ModTemplateService;
 import com.modforge.intellij.plugin.templates.ModTemplateType;
+import com.modforge.intellij.plugin.utils.CompatibilityUtil;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -336,7 +337,7 @@ public class CreateFromTemplateAction extends AnAction {
             
             // Set default output directory
             if (project != null) {
-                VirtualFile baseDir = project.getBaseDir();
+                VirtualFile baseDir = CompatibilityUtil.getProjectBaseDir(project);
                 if (baseDir != null) {
                     File baseDirFile = new File(baseDir.getPath());
                     File defaultOutputDir = new File(baseDirFile, template.getVariable("modid"));

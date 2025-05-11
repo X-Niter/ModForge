@@ -20,6 +20,7 @@ import com.modforge.intellij.plugin.ai.generation.MinecraftCodeGenerator;
 import com.modforge.intellij.plugin.ai.generation.MinecraftCodeGenerator.GeneratedCode;
 import com.modforge.intellij.plugin.notifications.ModForgeNotificationService;
 import com.modforge.intellij.plugin.run.ModLoaderDetector.ModLoader;
+import com.modforge.intellij.plugin.utils.CompatibilityUtil;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -43,7 +44,7 @@ public class GenerateMinecraftCodeAction extends AnAction {
         // Get the currently selected directory or default to project root
         VirtualFile selectedDir = e.getData(CommonDataKeys.VIRTUAL_FILE);
         if (selectedDir == null || !selectedDir.isDirectory()) {
-            selectedDir = project.getBaseDir();
+            selectedDir = CompatibilityUtil.getProjectBaseDir(project);
         }
         
         // Get default target directory
