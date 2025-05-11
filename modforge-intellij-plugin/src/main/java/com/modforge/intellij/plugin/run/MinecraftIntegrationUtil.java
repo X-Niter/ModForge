@@ -5,6 +5,7 @@ import com.intellij.openapi.module.Module;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.projectRoots.Sdk;
 import com.intellij.openapi.roots.ModuleRootManager;
+import com.modforge.intellij.plugin.run.ModLoaderDetector;
 import com.modforge.intellij.plugin.run.ModLoaderDetector.ModLoader;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
