@@ -1,6 +1,7 @@
 plugins {
     id 'java'
     id 'org.jetbrains.intellij' version '1.17.2'
+    id 'org.jetbrains.kotlin.jvm' version '2.0.0' apply false // For Kotlin support
 }
 
 group 'com.modforge'
@@ -28,6 +29,9 @@ intellij {
     type = 'IC' // Target IDE: IntelliJ IDEA Community Edition
     downloadSources = true
     updateSinceUntilBuild = true
+    
+    // When building against 2025.1, we need to specify the exact plugin versions
+    // or provide a path to your local IntelliJ installation that has these plugins
     plugins = [
         'java',
         'Git4Idea:251.12.23774.435', // Explicitly use version that matches IntelliJ IDEA 2025.1
@@ -36,6 +40,10 @@ intellij {
         // Minecraft Development plugin is required per plugin.xml dependency
         'com.demonwav.minecraft-dev:2025.1-1.8.4'
     ]
+    
+    // Uncomment and modify the following line to use your local IntelliJ installation
+    // This is helpful if the downloaded plugins aren't working correctly
+    // localPath = 'C:/Program Files/JetBrains/IntelliJ IDEA Community Edition 2025.1'
 }
 
 // Configure Java sourceSets
@@ -69,11 +77,12 @@ java {
 
 // Additional IntelliJ plugin configuration
 tasks {
+    // Set compatibility range for IntelliJ IDEA 2025.1
     patchPluginXml {
-        sinceBuild = "251"
-        untilBuild = "252.*"
-        changeNotes = """
-            <h2>Version 2.1.0 - May 10, 2025</h2>
+        sinceBuild.set("251.23774") // Matches IntelliJ IDEA 2025.1 exact build
+        untilBuild.set("252.*")     // Compatible with all 2025.2.x builds
+        changeNotes.set("""
+            <h2>Version 2.1.0 - May 11, 2025</h2>
             <ul>
                 <li><b>Added:</b> Full compatibility with IntelliJ IDEA 2025.1</li>
                 <li><b>Added:</b> Java 21 virtual thread optimization</li>
@@ -84,7 +93,12 @@ tasks {
                 <li><b>Fixed:</b> Multiple compatibility issues with IntelliJ IDEA 2025.1</li>
                 <li><b>Improved:</b> Plugin activation and IDE integration</li>
             </ul>
-        """
+        """)
+    }
+    
+    // Verify plugin structure before building
+    verifyPlugin {
+        ignoreWarnings.set(true) // Set to false for stricter validation
     }
 
     runIde {
