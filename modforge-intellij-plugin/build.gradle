@@ -104,8 +104,18 @@ wrapper {
 }
 
 // Additional IntelliJ plugin configuration
+// Add improved Java 21 support (ensures explicit Java 21 configuration)
+// Uncomment if java {} is already defined elsewhere to avoid duplication
+java {
+    toolchain {
+        languageVersion.set(JavaLanguageVersion.of(21))
+    }
+    sourceCompatibility = JavaVersion.VERSION_21
+    targetCompatibility = JavaVersion.VERSION_21
+}
+
 tasks {
-    // Set compatibility specifically for IntelliJ IDEA 2025.1.1.1 (Build: 251.25410.129)
+    // Set compatibility specifically for IntelliJ IDEA 2025.1.1.1 (Build: 251.25410.129) 
     patchPluginXml {
         sinceBuild.set("233") // Support from 2023.3
         untilBuild.set("251.*") // Support all 2025.1.x versions
