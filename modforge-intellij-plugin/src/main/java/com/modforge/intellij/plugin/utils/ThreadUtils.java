@@ -1,166 +1,250 @@
 package com.modforge.intellij.plugin.utils;
 
 import com.intellij.openapi.diagnostic.Logger;
+import org.jetbrains.annotations.NotNull;
 
 import java.time.Duration;
 import java.util.concurrent.*;
-import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Supplier;
 
 /**
- * Utility class for thread management.
- * Compatible with IntelliJ IDEA 2025.1.1.1 and Java 21 virtual threads.
+ * Utilities for working with threads, including Java 21 virtual threads.
+ * Compatible with IntelliJ IDEA 2025.1.1.1
  */
 public final class ThreadUtils {
     private static final Logger LOG = Logger.getInstance(ThreadUtils.class);
     
-    private static final int CORE_POOL_SIZE = Math.max(2, Runtime.getRuntime().availableProcessors() / 2);
-    private static final int MAX_POOL_SIZE = Runtime.getRuntime().availableProcessors() * 2;
-    private static final long KEEP_ALIVE_TIME = 60L;
+    // Thread pool sizes
+    private static final int CORE_POOL_SIZE = Runtime.getRuntime().availableProcessors();
+    private static final int MAX_POOL_SIZE = Math.max(CORE_POOL_SIZE * 2, 8);
     
-    private static final ScheduledExecutorService SCHEDULER;
-    private static final ExecutorService EXECUTOR;
-    private static final AtomicInteger THREAD_COUNT = new AtomicInteger(0);
+    // Thread pools
+    private static final ExecutorService PLATFORM_EXECUTOR = Executors.newCachedThreadPool(
+            r -> {
+                Thread thread = new Thread(r);
+                thread.setDaemon(true);
+                return thread;
+            }
+    );
     
-    static {
-        // Initialize thread pool with a custom thread factory
-        ThreadFactory factory = r -> {
-            Thread thread = Thread.ofVirtual()
-                    .name("ModForge-Worker-" + THREAD_COUNT.incrementAndGet())
-                    .uncaughtExceptionHandler((t, e) -> LOG.error("Uncaught exception in thread " + t.getName(), e))
-                    .factory()
-                    .newThread(r);
-            return thread;
-        };
-        
-        // Create executor services
-        SCHEDULER = Executors.newScheduledThreadPool(CORE_POOL_SIZE, factory);
-        EXECUTOR = Executors.newThreadPerTaskExecutor(factory);
-        
-        LOG.info("ThreadUtils initialized with " + CORE_POOL_SIZE + " core threads and " + MAX_POOL_SIZE + " max threads");
-    }
+    private static final ExecutorService VIRTUAL_EXECUTOR = Executors.newVirtualThreadPerTaskExecutor();
     
+    private static final ScheduledExecutorService SCHEDULED_EXECUTOR = Executors.newScheduledThreadPool(
+            CORE_POOL_SIZE,
+            r -> {
+                Thread thread = new Thread(r);
+                thread.setDaemon(true);
+                return thread;
+            }
+    );
+
     private ThreadUtils() {
         // Private constructor to prevent instantiation
     }
 
     /**
-     * Runs a task asynchronously.
+     * Executes a task asynchronously using platform threads.
      *
-     * @param task The task to run.
-     * @return A CompletableFuture representing the result of the task.
+     * @param task The task to execute.
      */
-    public static CompletableFuture<Void> runAsync(Runnable task) {
-        return CompletableFuture.runAsync(task, EXECUTOR);
+    public static void runAsync(@NotNull Runnable task) {
+        PLATFORM_EXECUTOR.execute(() -> {
+            try {
+                task.run();
+            } catch (Exception e) {
+                LOG.error("Error executing task asynchronously", e);
+            }
+        });
     }
 
     /**
-     * Runs a task asynchronously with a result.
+     * Executes a task asynchronously using Java 21 virtual threads.
      *
-     * @param task The task to run.
-     * @param <T> The type of the result.
-     * @return A CompletableFuture representing the result of the task.
+     * @param task The task to execute.
      */
-    public static <T> CompletableFuture<T> supplyAsync(Callable<T> task) {
+    public static void runAsyncVirtual(@NotNull Runnable task) {
+        VIRTUAL_EXECUTOR.execute(() -> {
+            try {
+                task.run();
+            } catch (Exception e) {
+                LOG.error("Error executing task asynchronously on virtual thread", e);
+            }
+        });
+    }
+
+    /**
+     * Executes a task that returns a result asynchronously using platform threads.
+     *
+     * @param <T>      The result type.
+     * @param supplier The task to execute.
+     * @return A CompletableFuture with the result.
+     */
+    public static <T> CompletableFuture<T> supplyAsync(@NotNull Supplier<T> supplier) {
         return CompletableFuture.supplyAsync(() -> {
             try {
-                return task.call();
+                return supplier.get();
             } catch (Exception e) {
-                if (e instanceof RuntimeException) {
-                    throw (RuntimeException) e;
-                } else {
-                    throw new CompletionException(e);
-                }
+                LOG.error("Error executing supplier asynchronously", e);
+                throw e;
             }
-        }, EXECUTOR);
+        }, PLATFORM_EXECUTOR);
     }
 
     /**
-     * Runs a task after a delay.
+     * Executes a task that returns a result asynchronously using Java 21 virtual threads.
      *
-     * @param task The task to run.
-     * @param delay The delay.
-     * @param unit The time unit of the delay.
-     * @return A ScheduledFuture representing the scheduled task.
+     * @param <T>      The result type.
+     * @param supplier The task to execute.
+     * @return A CompletableFuture with the result.
      */
-    public static ScheduledFuture<?> runWithDelay(Runnable task, long delay, TimeUnit unit) {
-        return SCHEDULER.schedule(task, delay, unit);
+    public static <T> CompletableFuture<T> supplyAsyncVirtual(@NotNull Supplier<T> supplier) {
+        return CompletableFuture.supplyAsync(() -> {
+            try {
+                return supplier.get();
+            } catch (Exception e) {
+                LOG.error("Error executing supplier asynchronously on virtual thread", e);
+                throw e;
+            }
+        }, VIRTUAL_EXECUTOR);
     }
 
     /**
-     * Runs a task after a delay.
+     * Schedules a task to run after a delay using platform threads.
      *
-     * @param task The task to run.
-     * @param delay The delay.
+     * @param task  The task to execute.
+     * @param delay The delay before executing the task.
      * @return A ScheduledFuture representing the scheduled task.
      */
-    public static ScheduledFuture<?> runWithDelay(Runnable task, Duration delay) {
-        return SCHEDULER.schedule(task, delay.toMillis(), TimeUnit.MILLISECONDS);
+    public static ScheduledFuture<?> schedule(@NotNull Runnable task, @NotNull Duration delay) {
+        return SCHEDULED_EXECUTOR.schedule(task, delay.toMillis(), TimeUnit.MILLISECONDS);
     }
 
     /**
-     * Runs a task periodically.
+     * Schedules a task to run periodically using platform threads.
      *
-     * @param task The task to run.
-     * @param initialDelay The initial delay.
-     * @param period The period.
-     * @param unit The time unit of the delay and period.
+     * @param task     The task to execute.
+     * @param initialDelay The initial delay before executing the task.
+     * @param period   The period between successive executions.
      * @return A ScheduledFuture representing the scheduled task.
      */
-    public static ScheduledFuture<?> runPeriodically(Runnable task, long initialDelay, long period, TimeUnit unit) {
-        return SCHEDULER.scheduleAtFixedRate(task, initialDelay, period, unit);
-    }
-
-    /**
-     * Runs a task periodically.
-     *
-     * @param task The task to run.
-     * @param initialDelay The initial delay.
-     * @param period The period.
-     * @return A ScheduledFuture representing the scheduled task.
-     */
-    public static ScheduledFuture<?> runPeriodically(Runnable task, Duration initialDelay, Duration period) {
-        return SCHEDULER.scheduleAtFixedRate(
+    public static ScheduledFuture<?> scheduleAtFixedRate(@NotNull Runnable task, @NotNull Duration initialDelay, @NotNull Duration period) {
+        return SCHEDULED_EXECUTOR.scheduleAtFixedRate(
                 task,
                 initialDelay.toMillis(),
                 period.toMillis(),
-                TimeUnit.MILLISECONDS);
+                TimeUnit.MILLISECONDS
+        );
     }
 
     /**
-     * Creates a new virtual thread.
+     * Schedules a task to run periodically with a fixed delay between executions using platform threads.
      *
-     * @param name The thread name.
-     * @param task The task to run.
-     * @return The thread.
+     * @param task     The task to execute.
+     * @param initialDelay The initial delay before executing the task.
+     * @param delay    The delay between the termination of one execution and the commencement of the next.
+     * @return A ScheduledFuture representing the scheduled task.
      */
-    public static Thread newVirtualThread(String name, Runnable task) {
-        return Thread.ofVirtual()
-                .name(name)
-                .uncaughtExceptionHandler((t, e) -> LOG.error("Uncaught exception in thread " + t.getName(), e))
-                .start(task);
+    public static ScheduledFuture<?> scheduleWithFixedDelay(@NotNull Runnable task, @NotNull Duration initialDelay, @NotNull Duration delay) {
+        return SCHEDULED_EXECUTOR.scheduleWithFixedDelay(
+                task,
+                initialDelay.toMillis(),
+                delay.toMillis(),
+                TimeUnit.MILLISECONDS
+        );
     }
 
     /**
-     * Shuts down all thread pools.
-     */
-    public static void shutdown() {
-        LOG.info("Shutting down thread pools");
-        SCHEDULER.shutdown();
-        EXECUTOR.shutdown();
-    }
-
-    /**
-     * Checks if virtual threads are supported.
+     * Creates a new thread builder for a virtual thread.
      *
-     * @return Whether virtual threads are supported.
+     * @return A thread builder for a virtual thread.
      */
-    public static boolean isVirtualThreadSupported() {
+    public static Thread.Builder.OfVirtual virtualThreadBuilder() {
+        return Thread.ofVirtual();
+    }
+
+    /**
+     * Creates a new thread builder for a platform thread.
+     *
+     * @return A thread builder for a platform thread.
+     */
+    public static Thread.Builder.OfPlatform platformThreadBuilder() {
+        return Thread.ofPlatform();
+    }
+
+    /**
+     * Checks if the current thread is a virtual thread.
+     *
+     * @return Whether the current thread is a virtual thread.
+     */
+    public static boolean isVirtualThread() {
+        return Thread.currentThread().isVirtual();
+    }
+
+    /**
+     * Executes a task with a timeout using platform threads.
+     *
+     * @param <T>      The result type.
+     * @param supplier The task to execute.
+     * @param timeout  The timeout.
+     * @return The result of the task.
+     * @throws TimeoutException If the task times out.
+     * @throws ExecutionException If the task throws an exception.
+     */
+    public static <T> T executeWithTimeout(@NotNull Supplier<T> supplier, @NotNull Duration timeout) throws TimeoutException, ExecutionException {
         try {
-            Thread.ofVirtual().name("test-virtual-thread").start(() -> {}).join();
-            return true;
-        } catch (UnsupportedOperationException e) {
-            LOG.warn("Virtual threads are not supported", e);
-            return false;
+            return CompletableFuture.supplyAsync(supplier, PLATFORM_EXECUTOR)
+                    .orTimeout(timeout.toMillis(), TimeUnit.MILLISECONDS)
+                    .get();
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new ExecutionException("Task was interrupted", e);
         }
+    }
+
+    /**
+     * Executes a task with a timeout using Java 21 virtual threads.
+     *
+     * @param <T>      The result type.
+     * @param supplier The task to execute.
+     * @param timeout  The timeout.
+     * @return The result of the task.
+     * @throws TimeoutException If the task times out.
+     * @throws ExecutionException If the task throws an exception.
+     */
+    public static <T> T executeWithTimeoutVirtual(@NotNull Supplier<T> supplier, @NotNull Duration timeout) throws TimeoutException, ExecutionException {
+        try {
+            return CompletableFuture.supplyAsync(supplier, VIRTUAL_EXECUTOR)
+                    .orTimeout(timeout.toMillis(), TimeUnit.MILLISECONDS)
+                    .get();
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new ExecutionException("Task was interrupted", e);
+        }
+    }
+
+    /**
+     * Executes a task asynchronously and returns a result with a default value if the task fails.
+     *
+     * @param <T>          The result type.
+     * @param supplier     The task to execute.
+     * @param defaultValue The default value to return if the task fails.
+     * @return The result of the task or the default value if the task fails.
+     */
+    public static <T> T executeWithDefault(@NotNull Supplier<T> supplier, T defaultValue) {
+        try {
+            return supplier.get();
+        } catch (Exception e) {
+            LOG.error("Error executing task, returning default value", e);
+            return defaultValue;
+        }
+    }
+
+    /**
+     * Shuts down all executors.
+     */
+    public static void shutdownAll() {
+        PLATFORM_EXECUTOR.shutdown();
+        VIRTUAL_EXECUTOR.shutdown();
+        SCHEDULED_EXECUTOR.shutdown();
     }
 }

@@ -1,187 +1,245 @@
 package com.modforge.intellij.plugin.services;
 
-import com.intellij.notification.Notification;
-import com.intellij.notification.NotificationAction;
-import com.intellij.notification.NotificationGroupManager;
-import com.intellij.notification.NotificationType;
-import com.intellij.openapi.actionSystem.AnAction;
+import com.intellij.notification.*;
+import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.components.Service;
-import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.project.Project;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-import java.util.ArrayList;
-import java.util.List;
-
 /**
- * Notification service for ModForge.
+ * Service for showing notifications in the IDE.
  * Compatible with IntelliJ IDEA 2025.1.1.1
  */
-@Service(Service.Level.PROJECT)
+@Service
 public final class ModForgeNotificationService {
-    private static final Logger LOG = Logger.getInstance(ModForgeNotificationService.class);
-    private static final String NOTIFICATION_GROUP_ID = "ModForge.Notifications";
-    
-    private final Project project;
-    private final List<Notification> activeNotifications = new ArrayList<>();
+    private static final String DISPLAY_ID = "ModForge";
+    private static final NotificationGroup INFO_GROUP = NotificationGroupManager.getInstance().getNotificationGroup("ModForge.Info");
+    private static final NotificationGroup WARNING_GROUP = NotificationGroupManager.getInstance().getNotificationGroup("ModForge.Warning");
+    private static final NotificationGroup ERROR_GROUP = NotificationGroupManager.getInstance().getNotificationGroup("ModForge.Error");
 
     /**
-     * Creates a new instance of the notification service.
+     * Gets the instance of the service.
      *
-     * @param project The project.
+     * @return The service instance.
      */
-    public ModForgeNotificationService(Project project) {
-        this.project = project;
-        LOG.info("ModForgeNotificationService initialized for project: " + project.getName());
-    }
-
-    /**
-     * Gets the instance of the notification service for the specified project.
-     *
-     * @param project The project.
-     * @return The notification service.
-     */
-    public static ModForgeNotificationService getInstance(@NotNull Project project) {
-        return project.getService(ModForgeNotificationService.class);
+    public static ModForgeNotificationService getInstance() {
+        return ApplicationManager.getApplication().getService(ModForgeNotificationService.class);
     }
 
     /**
      * Shows an information notification.
      *
-     * @param title The title.
-     * @param content The content.
-     * @return The notification.
+     * @param title   The notification title.
+     * @param content The notification content.
      */
-    @NotNull
-    public Notification showInfo(@NotNull String title, @NotNull String content) {
-        return showNotification(title, content, NotificationType.INFORMATION, null);
+    public void showInfo(@NotNull String title, @NotNull String content) {
+        showNotification(INFO_GROUP, title, content, NotificationType.INFORMATION, null);
+    }
+
+    /**
+     * Shows an information notification with a project.
+     *
+     * @param project The project.
+     * @param title   The notification title.
+     * @param content The notification content.
+     */
+    public void showInfo(@NotNull Project project, @NotNull String title, @NotNull String content) {
+        showNotification(INFO_GROUP, title, content, NotificationType.INFORMATION, project);
     }
 
     /**
      * Shows a warning notification.
      *
-     * @param title The title.
-     * @param content The content.
-     * @return The notification.
+     * @param title   The notification title.
+     * @param content The notification content.
      */
-    @NotNull
-    public Notification showWarning(@NotNull String title, @NotNull String content) {
-        return showNotification(title, content, NotificationType.WARNING, null);
+    public void showWarning(@NotNull String title, @NotNull String content) {
+        showNotification(WARNING_GROUP, title, content, NotificationType.WARNING, null);
+    }
+
+    /**
+     * Shows a warning notification with a project.
+     *
+     * @param project The project.
+     * @param title   The notification title.
+     * @param content The notification content.
+     */
+    public void showWarning(@NotNull Project project, @NotNull String title, @NotNull String content) {
+        showNotification(WARNING_GROUP, title, content, NotificationType.WARNING, project);
     }
 
     /**
      * Shows an error notification.
      *
-     * @param title The title.
-     * @param content The content.
-     * @return The notification.
+     * @param title   The notification title.
+     * @param content The notification content.
      */
-    @NotNull
-    public Notification showError(@NotNull String title, @NotNull String content) {
-        return showNotification(title, content, NotificationType.ERROR, null);
+    public void showError(@NotNull String title, @NotNull String content) {
+        showNotification(ERROR_GROUP, title, content, NotificationType.ERROR, null);
     }
 
     /**
-     * Shows an information notification with actions.
+     * Shows an error notification with a project.
      *
-     * @param title The title.
-     * @param content The content.
-     * @param actions The actions.
-     * @return The notification.
+     * @param project The project.
+     * @param title   The notification title.
+     * @param content The notification content.
      */
-    @NotNull
-    public Notification showInfoWithActions(
-            @NotNull String title,
-            @NotNull String content,
-            @NotNull List<AnAction> actions) {
-        return showNotification(title, content, NotificationType.INFORMATION, actions);
+    public void showError(@NotNull Project project, @NotNull String title, @NotNull String content) {
+        showNotification(ERROR_GROUP, title, content, NotificationType.ERROR, project);
     }
 
     /**
-     * Shows a warning notification with actions.
+     * Shows a notification.
      *
-     * @param title The title.
-     * @param content The content.
-     * @param actions The actions.
-     * @return The notification.
+     * @param group   The notification group.
+     * @param title   The notification title.
+     * @param content The notification content.
+     * @param type    The notification type.
+     * @param project The project.
      */
-    @NotNull
-    public Notification showWarningWithActions(
-            @NotNull String title,
-            @NotNull String content,
-            @NotNull List<AnAction> actions) {
-        return showNotification(title, content, NotificationType.WARNING, actions);
-    }
-
-    /**
-     * Shows an error notification with actions.
-     *
-     * @param title The title.
-     * @param content The content.
-     * @param actions The actions.
-     * @return The notification.
-     */
-    @NotNull
-    public Notification showErrorWithActions(
-            @NotNull String title,
-            @NotNull String content,
-            @NotNull List<AnAction> actions) {
-        return showNotification(title, content, NotificationType.ERROR, actions);
-    }
-
-    /**
-     * Shows a notification with the specified type and actions.
-     *
-     * @param title The title.
-     * @param content The content.
-     * @param type The type.
-     * @param actions The actions.
-     * @return The notification.
-     */
-    @NotNull
-    public Notification showNotification(
+    private void showNotification(
+            @NotNull NotificationGroup group,
             @NotNull String title,
             @NotNull String content,
             @NotNull NotificationType type,
-            @Nullable List<AnAction> actions) {
+            @Nullable Project project) {
         
-        LOG.info("Showing notification: " + title + " - " + content);
+        Notification notification = group.createNotification(title, content, type);
         
-        Notification notification = NotificationGroupManager.getInstance()
-                .getNotificationGroup(NOTIFICATION_GROUP_ID)
-                .createNotification(title, content, type);
+        if (project != null && !project.isDisposed()) {
+            notification.notify(project);
+        } else {
+            notification.notify(null);
+        }
+    }
+
+    /**
+     * Shows a balloon notification.
+     *
+     * @param title   The notification title.
+     * @param content The notification content.
+     * @param type    The notification type.
+     * @param project The project.
+     */
+    public void showBalloon(
+            @NotNull String title,
+            @NotNull String content,
+            @NotNull NotificationType type,
+            @Nullable Project project) {
         
-        if (actions != null) {
-            for (AnAction action : actions) {
-                if (action instanceof NotificationAction) {
-                    notification.addAction((NotificationAction) action);
-                }
-            }
+        NotificationGroup balloonGroup = NotificationGroupManager.getInstance()
+                .getNotificationGroup("ModForge.Balloon");
+        
+        Notification notification = balloonGroup.createNotification(title, content, type);
+        
+        if (project != null && !project.isDisposed()) {
+            notification.notify(project);
+        } else {
+            notification.notify(null);
+        }
+    }
+
+    /**
+     * Shows a notification with actions.
+     *
+     * @param title         The notification title.
+     * @param content       The notification content.
+     * @param type          The notification type.
+     * @param project       The project.
+     * @param actionLabels  The action labels.
+     * @param actionHandler The action handler.
+     */
+    public void showNotificationWithActions(
+            @NotNull String title,
+            @NotNull String content,
+            @NotNull NotificationType type,
+            @Nullable Project project,
+            @NotNull String[] actionLabels,
+            @NotNull NotificationListener.UrlOpeningListener actionHandler) {
+        
+        NotificationGroup group;
+        
+        switch (type) {
+            case INFORMATION:
+                group = INFO_GROUP;
+                break;
+            case WARNING:
+                group = WARNING_GROUP;
+                break;
+            case ERROR:
+                group = ERROR_GROUP;
+                break;
+            default:
+                group = INFO_GROUP;
         }
         
-        // Add a close action that removes the notification from the active list
-        notification.whenExpired(() -> {
-            LOG.info("Notification expired: " + title);
-            activeNotifications.remove(notification);
-        });
+        Notification notification = group.createNotification(title, content, type);
         
-        notification.notify(project);
-        activeNotifications.add(notification);
+        for (String label : actionLabels) {
+            notification.addAction(NotificationAction.createSimple(label, () -> {
+                actionHandler.hyperlinkActivated(notification, null);
+            }));
+        }
+        
+        if (project != null && !project.isDisposed()) {
+            notification.notify(project);
+        } else {
+            notification.notify(null);
+        }
+    }
+
+    /**
+     * Shows a sticky notification that stays until explicitly closed.
+     *
+     * @param title   The notification title.
+     * @param content The notification content.
+     * @param type    The notification type.
+     * @param project The project.
+     * @return The notification object that can be used to dismiss the notification.
+     */
+    @NotNull
+    public Notification showStickyNotification(
+            @NotNull String title,
+            @NotNull String content,
+            @NotNull NotificationType type,
+            @Nullable Project project) {
+        
+        NotificationGroup group;
+        
+        switch (type) {
+            case INFORMATION:
+                group = INFO_GROUP;
+                break;
+            case WARNING:
+                group = WARNING_GROUP;
+                break;
+            case ERROR:
+                group = ERROR_GROUP;
+                break;
+            default:
+                group = INFO_GROUP;
+        }
+        
+        Notification notification = group.createNotification(title, content, type);
+        notification.setImportant(true);
+        
+        if (project != null && !project.isDisposed()) {
+            notification.notify(project);
+        } else {
+            notification.notify(null);
+        }
         
         return notification;
     }
 
     /**
-     * Expires all active notifications.
+     * Dismisses a notification.
+     *
+     * @param notification The notification to dismiss.
      */
-    public void expireAllNotifications() {
-        LOG.info("Expiring all notifications");
-        
-        for (Notification notification : new ArrayList<>(activeNotifications)) {
-            notification.expire();
-        }
-        
-        activeNotifications.clear();
+    public void dismissNotification(@NotNull Notification notification) {
+        notification.expire();
     }
 }

@@ -1,39 +1,43 @@
 package com.modforge.intellij.plugin.utils;
 
+import com.intellij.openapi.application.ApplicationManager;
+import com.intellij.openapi.application.WriteAction;
 import com.intellij.openapi.diagnostic.Logger;
-import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.fileEditor.FileDocumentManager;
 import com.intellij.openapi.project.Project;
+import com.intellij.openapi.util.text.StringUtil;
 import com.intellij.openapi.vfs.LocalFileSystem;
+import com.intellij.openapi.vfs.VfsUtil;
+import com.intellij.openapi.vfs.VfsUtilCore;
 import com.intellij.openapi.vfs.VirtualFile;
-import com.intellij.psi.PsiDirectory;
-import com.intellij.psi.PsiFile;
-import com.intellij.psi.PsiManager;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Predicate;
 
 /**
- * Utility class for working with virtual files.
+ * Utility class for working with VirtualFiles.
  * Compatible with IntelliJ IDEA 2025.1.1.1
  */
 public final class VirtualFileUtil {
     private static final Logger LOG = Logger.getInstance(VirtualFileUtil.class);
-    
+
     private VirtualFileUtil() {
         // Private constructor to prevent instantiation
     }
 
     /**
-     * Gets a virtual file from a path.
+     * Finds a file in the project by its path.
      *
-     * @param path The path.
-     * @return The virtual file, or null if not found.
+     * @param path The file path.
+     * @return The VirtualFile or null if not found.
      */
     @Nullable
     public static VirtualFile findFileByPath(@NotNull String path) {
@@ -41,296 +45,414 @@ public final class VirtualFileUtil {
     }
 
     /**
-     * Gets a virtual file from a file.
+     * Finds a file in the project by its Path object.
      *
-     * @param file The file.
-     * @return The virtual file, or null if not found.
+     * @param path The file Path.
+     * @return The VirtualFile or null if not found.
      */
     @Nullable
-    public static VirtualFile findFileByIoFile(@NotNull File file) {
-        return LocalFileSystem.getInstance().findFileByIoFile(file);
+    public static VirtualFile findFileByPath(@NotNull Path path) {
+        return VfsUtil.findFile(path, true);
     }
 
     /**
-     * Creates a directory recursively if it doesn't exist.
+     * Creates a new directory in the specified parent directory.
      *
-     * @param project The project.
-     * @param basePath The base path.
-     * @param directoryPath The directory path.
-     * @return The created directory, or null if creation failed.
+     * @param parent    The parent directory.
+     * @param dirName   The name of the directory to create.
+     * @return The created directory or null if creation failed.
      */
     @Nullable
-    public static PsiDirectory createDirectoryRecursively(
-            @NotNull Project project,
-            @NotNull String basePath,
-            @NotNull String directoryPath) {
-        
+    public static VirtualFile createDirectory(@NotNull VirtualFile parent, @NotNull String dirName) {
+        if (!parent.isDirectory()) {
+            LOG.error("Parent is not a directory: " + parent.getPath());
+            return null;
+        }
+
+        AtomicReference<VirtualFile> result = new AtomicReference<>();
         try {
-            // Find or create the base directory
-            VirtualFile baseDir = findFileByPath(basePath);
-            if (baseDir == null) {
-                LOG.error("Base directory not found: " + basePath);
-                return null;
-            }
-            
-            // Split the directory path into components
-            String[] pathComponents = directoryPath.split("/");
-            
-            return CompatibilityUtil.computeInWriteAction(() -> {
+            WriteAction.runAndWait(() -> {
                 try {
-                    VirtualFile currentDir = baseDir;
-                    PsiDirectory psiDir = PsiManager.getInstance(project).findDirectory(currentDir);
-                    
-                    // Create each directory in the path
-                    for (String component : pathComponents) {
-                        if (component.isEmpty()) continue;
-                        
-                        VirtualFile childDir = currentDir.findChild(component);
-                        if (childDir == null) {
-                            // Create the directory
-                            childDir = currentDir.createChildDirectory(null, component);
-                        }
-                        
-                        currentDir = childDir;
-                        psiDir = PsiManager.getInstance(project).findDirectory(currentDir);
-                    }
-                    
-                    return psiDir;
+                    result.set(parent.createChildDirectory(null, dirName));
                 } catch (IOException e) {
-                    LOG.error("Failed to create directory recursively: " + directoryPath, e);
-                    return null;
+                    LOG.error("Failed to create directory: " + dirName, e);
                 }
             });
         } catch (Exception e) {
-            LOG.error("Failed to create directory recursively: " + directoryPath, e);
-            return null;
+            LOG.error("Error during write action for directory creation", e);
         }
+
+        return result.get();
     }
 
     /**
-     * Creates a file in a directory.
+     * Creates a new file in the specified parent directory.
      *
-     * @param directory The directory.
-     * @param fileName The file name.
-     * @param content The file content.
-     * @return The created file, or null if creation failed.
+     * @param parent    The parent directory.
+     * @param fileName  The name of the file to create.
+     * @param content   The content of the file.
+     * @return The created file or null if creation failed.
      */
     @Nullable
-    public static PsiFile createFile(
-            @NotNull PsiDirectory directory,
-            @NotNull String fileName,
-            @NotNull String content) {
-        
+    public static VirtualFile createFile(@NotNull VirtualFile parent, @NotNull String fileName, @NotNull String content) {
+        if (!parent.isDirectory()) {
+            LOG.error("Parent is not a directory: " + parent.getPath());
+            return null;
+        }
+
+        AtomicReference<VirtualFile> result = new AtomicReference<>();
         try {
-            return CompatibilityUtil.computeInWriteAction(() -> {
-                // Check if the file already exists
-                PsiFile existingFile = directory.findFile(fileName);
-                if (existingFile != null) {
-                    LOG.warn("File already exists: " + fileName);
-                    
-                    // Update the content of the existing file
-                    Document document = FileDocumentManager.getInstance().getDocument(existingFile.getVirtualFile());
-                    if (document != null) {
-                        document.setText(content);
-                    }
-                    
-                    return existingFile;
+            WriteAction.runAndWait(() -> {
+                try {
+                    VirtualFile file = parent.createChildData(null, fileName);
+                    file.setBinaryContent(content.getBytes(StandardCharsets.UTF_8));
+                    result.set(file);
+                } catch (IOException e) {
+                    LOG.error("Failed to create file: " + fileName, e);
                 }
-                
-                // Create the file
-                PsiFile file = directory.createFile(fileName);
-                
-                // Set the content
-                Document document = FileDocumentManager.getInstance().getDocument(file.getVirtualFile());
-                if (document != null) {
-                    document.setText(content);
-                }
-                
-                return file;
             });
         } catch (Exception e) {
-            LOG.error("Failed to create file: " + fileName, e);
-            return null;
+            LOG.error("Error during write action for file creation", e);
         }
+
+        return result.get();
     }
 
     /**
-     * Gets the content of a virtual file.
+     * Writes content to a file.
      *
-     * @param file The virtual file.
-     * @return The content, or null if reading failed.
+     * @param file      The file to write to.
+     * @param content   The content to write.
+     * @return True if the write was successful, false otherwise.
      */
-    @Nullable
-    public static String getFileContent(@Nullable VirtualFile file) {
-        if (file == null) return null;
-        
+    public static boolean writeToFile(@NotNull VirtualFile file, @NotNull String content) {
         try {
-            return new String(file.contentsToByteArray(), StandardCharsets.UTF_8);
-        } catch (IOException e) {
-            LOG.error("Failed to read file content", e);
-            return null;
-        }
-    }
-
-    /**
-     * Writes content to a virtual file.
-     *
-     * @param file The virtual file.
-     * @param content The content.
-     * @return Whether writing succeeded.
-     */
-    public static boolean writeFileContent(@Nullable VirtualFile file, @NotNull String content) {
-        if (file == null) return false;
-        
-        try {
-            return CompatibilityUtil.computeInWriteAction(() -> {
+            WriteAction.runAndWait(() -> {
                 try {
                     file.setBinaryContent(content.getBytes(StandardCharsets.UTF_8));
-                    return true;
                 } catch (IOException e) {
-                    LOG.error("Failed to write file content", e);
-                    return false;
+                    LOG.error("Failed to write to file: " + file.getPath(), e);
+                    throw new RuntimeException(e);
                 }
             });
+            return true;
         } catch (Exception e) {
-            LOG.error("Failed to write file content", e);
+            LOG.error("Error during write action for file write", e);
             return false;
         }
     }
 
     /**
-     * Deletes a virtual file.
+     * Reads the content of a file.
      *
-     * @param file The virtual file.
-     * @return Whether deletion succeeded.
+     * @param file The file to read.
+     * @return The content of the file or null if reading failed.
      */
-    public static boolean deleteFile(@Nullable VirtualFile file) {
-        if (file == null) return false;
-        
+    @Nullable
+    public static String readFile(@NotNull VirtualFile file) {
         try {
-            return CompatibilityUtil.computeInWriteAction(() -> {
+            return VfsUtilCore.loadText(file);
+        } catch (IOException e) {
+            LOG.error("Failed to read file: " + file.getPath(), e);
+            return null;
+        }
+    }
+
+    /**
+     * Deletes a file or directory.
+     *
+     * @param file The file or directory to delete.
+     * @return True if the deletion was successful, false otherwise.
+     */
+    public static boolean delete(@NotNull VirtualFile file) {
+        try {
+            WriteAction.runAndWait(() -> {
                 try {
                     file.delete(null);
-                    return true;
                 } catch (IOException e) {
-                    LOG.error("Failed to delete file", e);
-                    return false;
+                    LOG.error("Failed to delete file: " + file.getPath(), e);
+                    throw new RuntimeException(e);
                 }
             });
+            return true;
         } catch (Exception e) {
-            LOG.error("Failed to delete file", e);
+            LOG.error("Error during write action for file deletion", e);
             return false;
         }
     }
 
     /**
-     * Gets all child files in a directory, recursively.
+     * Renames a file or directory.
      *
-     * @param directory The directory.
-     * @return The list of files.
+     * @param file    The file or directory to rename.
+     * @param newName The new name.
+     * @return True if the rename was successful, false otherwise.
      */
-    @NotNull
-    public static List<VirtualFile> getAllFiles(@Nullable VirtualFile directory) {
-        List<VirtualFile> result = new ArrayList<>();
-        if (directory == null) return result;
-        
-        collectFiles(directory, result);
-        return result;
+    public static boolean rename(@NotNull VirtualFile file, @NotNull String newName) {
+        try {
+            WriteAction.runAndWait(() -> {
+                try {
+                    file.rename(null, newName);
+                } catch (IOException e) {
+                    LOG.error("Failed to rename file: " + file.getPath(), e);
+                    throw new RuntimeException(e);
+                }
+            });
+            return true;
+        } catch (Exception e) {
+            LOG.error("Error during write action for file rename", e);
+            return false;
+        }
     }
 
     /**
-     * Recursive helper to collect files.
+     * Creates a directory structure from a path.
      *
-     * @param directory The directory.
-     * @param result The result list.
+     * @param baseDir The base directory.
+     * @param path    The path to create.
+     * @return The created directory or null if creation failed.
      */
-    private static void collectFiles(@NotNull VirtualFile directory, @NotNull List<VirtualFile> result) {
-        for (VirtualFile child : directory.getChildren()) {
-            if (child.isDirectory()) {
-                collectFiles(child, result);
-            } else {
-                result.add(child);
+    @Nullable
+    public static VirtualFile createDirectoryStructure(@NotNull VirtualFile baseDir, @NotNull String path) {
+        if (!baseDir.isDirectory()) {
+            LOG.error("Base directory is not a directory: " + baseDir.getPath());
+            return null;
+        }
+
+        // Split the path and create each directory in turn
+        String[] parts = path.split("/");
+        VirtualFile current = baseDir;
+
+        for (String part : parts) {
+            if (StringUtil.isEmpty(part)) {
+                continue;
+            }
+
+            VirtualFile child = current.findChild(part);
+            if (child == null) {
+                child = createDirectory(current, part);
+                if (child == null) {
+                    return null;
+                }
+            } else if (!child.isDirectory()) {
+                LOG.error("Path component is not a directory: " + child.getPath());
+                return null;
+            }
+
+            current = child;
+        }
+
+        return current;
+    }
+
+    /**
+     * Finds all files matching a predicate recursively in a directory.
+     *
+     * @param dir       The directory to search in.
+     * @param predicate The predicate to match.
+     * @return A list of matching files.
+     */
+    @NotNull
+    public static List<VirtualFile> findFilesRecursively(@NotNull VirtualFile dir, @NotNull Predicate<VirtualFile> predicate) {
+        List<VirtualFile> result = new ArrayList<>();
+        findFilesRecursively(dir, predicate, result);
+        return result;
+    }
+
+    private static void findFilesRecursively(@NotNull VirtualFile dir, @NotNull Predicate<VirtualFile> predicate, @NotNull List<VirtualFile> result) {
+        if (!dir.isDirectory()) {
+            return;
+        }
+
+        for (VirtualFile file : dir.getChildren()) {
+            if (file.isDirectory()) {
+                findFilesRecursively(file, predicate, result);
+            } else if (predicate.test(file)) {
+                result.add(file);
             }
         }
     }
 
     /**
-     * Gets all files with a specific extension in a directory, recursively.
+     * Gets the relative path of a file to a base directory.
      *
-     * @param directory The directory.
-     * @param extension The extension.
-     * @return The list of files.
+     * @param file    The file.
+     * @param baseDir The base directory.
+     * @return The relative path or null if the file is not under the base directory.
      */
-    @NotNull
-    public static List<VirtualFile> getFilesByExtension(
-            @Nullable VirtualFile directory,
-            @NotNull String extension) {
-        
-        List<VirtualFile> result = new ArrayList<>();
-        if (directory == null) return result;
-        
-        collectFilesByExtension(directory, extension, result);
-        return result;
+    @Nullable
+    public static String getRelativePath(@NotNull VirtualFile file, @NotNull VirtualFile baseDir) {
+        if (!baseDir.isDirectory()) {
+            LOG.error("Base directory is not a directory: " + baseDir.getPath());
+            return null;
+        }
+
+        return VfsUtilCore.getRelativePath(file, baseDir);
     }
 
     /**
-     * Recursive helper to collect files by extension.
+     * Gets the relative path of a file to a project base directory.
      *
-     * @param directory The directory.
-     * @param extension The extension.
-     * @param result The result list.
+     * @param file    The file.
+     * @param project The project.
+     * @return The relative path or null if the file is not under the project base directory.
      */
-    private static void collectFilesByExtension(
-            @NotNull VirtualFile directory,
-            @NotNull String extension,
-            @NotNull List<VirtualFile> result) {
-        
-        for (VirtualFile child : directory.getChildren()) {
-            if (child.isDirectory()) {
-                collectFilesByExtension(child, extension, result);
-            } else if (extension.equalsIgnoreCase(child.getExtension())) {
-                result.add(child);
-            }
+    @Nullable
+    public static String getRelativePathToProject(@NotNull VirtualFile file, @NotNull Project project) {
+        VirtualFile baseDir = CompatibilityUtil.getProjectBaseDir(project);
+        if (baseDir == null) {
+            LOG.error("Project base directory is null");
+            return null;
+        }
+
+        return getRelativePath(file, baseDir);
+    }
+
+    /**
+     * Refreshes a file.
+     *
+     * @param file The file to refresh.
+     */
+    public static void refreshFile(@NotNull VirtualFile file) {
+        file.refresh(false, false);
+    }
+
+    /**
+     * Refreshes a file with children.
+     *
+     * @param file The file to refresh.
+     */
+    public static void refreshFileWithChildren(@NotNull VirtualFile file) {
+        file.refresh(true, true);
+    }
+
+    /**
+     * Saves all documents.
+     */
+    public static void saveAllDocuments() {
+        ApplicationManager.getApplication().invokeAndWait(() -> {
+            FileDocumentManager.getInstance().saveAllDocuments();
+        });
+    }
+
+    /**
+     * Creates a Virtual File from a Path.
+     *
+     * @param path The path to convert.
+     * @return The VirtualFile or null if conversion failed.
+     */
+    @Nullable
+    public static VirtualFile pathToVirtualFile(@NotNull String path) {
+        return VfsUtil.findFile(Paths.get(path), true);
+    }
+
+    /**
+     * Creates a Path from a VirtualFile.
+     *
+     * @param file The file to convert.
+     * @return The Path.
+     */
+    @NotNull
+    public static Path virtualFileToPath(@NotNull VirtualFile file) {
+        return Paths.get(file.getPath());
+    }
+
+    /**
+     * Moves a file to a new parent directory.
+     *
+     * @param file      The file to move.
+     * @param newParent The new parent directory.
+     * @return True if the move was successful, false otherwise.
+     */
+    public static boolean moveFile(@NotNull VirtualFile file, @NotNull VirtualFile newParent) {
+        if (!newParent.isDirectory()) {
+            LOG.error("New parent is not a directory: " + newParent.getPath());
+            return false;
+        }
+
+        try {
+            WriteAction.runAndWait(() -> {
+                try {
+                    file.move(null, newParent);
+                } catch (IOException e) {
+                    LOG.error("Failed to move file: " + file.getPath(), e);
+                    throw new RuntimeException(e);
+                }
+            });
+            return true;
+        } catch (Exception e) {
+            LOG.error("Error during write action for file move", e);
+            return false;
         }
     }
 
     /**
-     * Gets all files matching a name pattern in a directory, recursively.
+     * Copies a file to a new parent directory.
      *
-     * @param directory The directory.
-     * @param pattern The name pattern.
-     * @return The list of files.
+     * @param file      The file to copy.
+     * @param newParent The new parent directory.
+     * @param newName   The new name.
+     * @return The copied file or null if copying failed.
      */
-    @NotNull
-    public static List<VirtualFile> getFilesByNamePattern(
-            @Nullable VirtualFile directory,
-            @NotNull String pattern) {
-        
-        List<VirtualFile> result = new ArrayList<>();
-        if (directory == null) return result;
-        
-        collectFilesByNamePattern(directory, pattern, result);
-        return result;
+    @Nullable
+    public static VirtualFile copyFile(@NotNull VirtualFile file, @NotNull VirtualFile newParent, @NotNull String newName) {
+        if (!newParent.isDirectory()) {
+            LOG.error("New parent is not a directory: " + newParent.getPath());
+            return null;
+        }
+
+        AtomicReference<VirtualFile> result = new AtomicReference<>();
+        try {
+            WriteAction.runAndWait(() -> {
+                try {
+                    result.set(file.copy(null, newParent, newName));
+                } catch (IOException e) {
+                    LOG.error("Failed to copy file: " + file.getPath(), e);
+                    throw new RuntimeException(e);
+                }
+            });
+            return result.get();
+        } catch (Exception e) {
+            LOG.error("Error during write action for file copy", e);
+            return null;
+        }
     }
 
     /**
-     * Recursive helper to collect files by name pattern.
+     * Gets the file extension.
      *
-     * @param directory The directory.
-     * @param pattern The name pattern.
-     * @param result The result list.
+     * @param file The file.
+     * @return The file extension or an empty string if none.
      */
-    private static void collectFilesByNamePattern(
-            @NotNull VirtualFile directory,
-            @NotNull String pattern,
-            @NotNull List<VirtualFile> result) {
-        
-        for (VirtualFile child : directory.getChildren()) {
-            if (child.isDirectory()) {
-                collectFilesByNamePattern(child, pattern, result);
-            } else if (child.getName().matches(pattern)) {
-                result.add(child);
-            }
+    @NotNull
+    public static String getFileExtension(@NotNull VirtualFile file) {
+        return file.getExtension() != null ? file.getExtension() : "";
+    }
+
+    /**
+     * Checks if a file exists at the given path.
+     *
+     * @param path The file path.
+     * @return True if the file exists, false otherwise.
+     */
+    public static boolean fileExists(@NotNull String path) {
+        return findFileByPath(path) != null;
+    }
+
+    /**
+     * Gets the project relative path for a file path.
+     *
+     * @param project  The project.
+     * @param filePath The file path.
+     * @return The project relative path or null if the file is not under the project base directory.
+     */
+    @Nullable
+    public static String getProjectRelativePath(@NotNull Project project, @NotNull String filePath) {
+        VirtualFile file = findFileByPath(filePath);
+        if (file == null) {
+            return null;
         }
+
+        return getRelativePathToProject(file, project);
     }
 }

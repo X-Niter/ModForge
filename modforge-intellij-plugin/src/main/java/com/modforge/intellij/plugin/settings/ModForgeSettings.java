@@ -6,12 +6,14 @@ import com.intellij.credentialStore.Credentials;
 import com.intellij.ide.passwordSafe.PasswordSafe;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.components.PersistentStateComponent;
+import com.intellij.openapi.components.Service;
 import com.intellij.openapi.components.State;
 import com.intellij.openapi.components.Storage;
-import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.options.ShowSettingsUtil;
 import com.intellij.openapi.project.Project;
 import com.intellij.util.xmlb.XmlSerializerUtil;
+import com.intellij.util.xmlb.annotations.Transient;
+import com.modforge.intellij.plugin.ui.ModForgeConfigurable;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -19,35 +21,44 @@ import org.jetbrains.annotations.Nullable;
  * Persistent settings for ModForge.
  * Compatible with IntelliJ IDEA 2025.1.1.1
  */
+@Service
 @State(
         name = "ModForgeSettings",
-        storages = {@Storage("modForgeSettings.xml")}
+        storages = @Storage("modForgeSettings.xml")
 )
 public class ModForgeSettings implements PersistentStateComponent<ModForgeSettings> {
-    private static final Logger LOG = Logger.getInstance(ModForgeSettings.class);
-    private static final String CREDENTIAL_SUBSYSTEM = "ModForge";
-    private static final String TOKEN_KEY = "accessToken";
+    private static final String CREDENTIAL_SERVICE_NAME = "ModForge";
+    private static final String ACCESS_TOKEN_KEY = "accessToken";
     
-    private String serverUrl = "https://api.modforge.dev";
-    private String githubUsername = "";
+    // Server settings
+    private String serverUrl = "https://modforge.ai";
+    
+    // GitHub settings
+    private String gitHubUsername = "";
     private boolean useGitHubAuthentication = true;
+    
+    // Feature settings
     private boolean patternRecognition = true;
     private boolean continuousDevelopment = false;
     private boolean analyticsEnabled = true;
-    private int maxThreads = 4;
-    private String defaultLanguage = "java";
-    private String gitExecutablePath = "";
-    private boolean autoCommit = true;
+    private boolean autoCommit = false;
     private boolean autoSave = true;
-    private int requestTimeout = 30;
-    private int minecraftVersion = 121; // 1.21
-    private String defaultModLoader = "forge";
-    private boolean autoSync = true;
+    private boolean autoSync = false;
     
+    // Minecraft settings
+    private String defaultLanguage = "java";
+    private String defaultModLoader = "forge";
+    private int minecraftVersion = 120;
+    
+    // Performance settings
+    private int maxThreads = 4;
+    private int requestTimeout = 30;
+    private String gitExecutablePath = "";
+
     /**
      * Gets the instance of the settings.
      *
-     * @return The settings.
+     * @return The settings instance.
      */
     public static ModForgeSettings getInstance() {
         return ApplicationManager.getApplication().getService(ModForgeSettings.class);
@@ -56,7 +67,7 @@ public class ModForgeSettings implements PersistentStateComponent<ModForgeSettin
     /**
      * Gets the state of the settings.
      *
-     * @return The state of the settings.
+     * @return The settings state.
      */
     @Nullable
     @Override
@@ -75,56 +86,21 @@ public class ModForgeSettings implements PersistentStateComponent<ModForgeSettin
     }
 
     /**
-     * Gets the access token.
+     * Opens the settings dialog.
      *
-     * @return The access token.
+     * @param project The project.
      */
-    @Nullable
-    public String getAccessToken() {
-        try {
-            CredentialAttributes attributes = createCredentialAttributes(TOKEN_KEY);
-            Credentials credentials = PasswordSafe.getInstance().get(attributes);
-            return credentials != null ? credentials.getPasswordAsString() : null;
-        } catch (Exception e) {
-            LOG.error("Failed to get access token", e);
-            return null;
-        }
+    public void openSettings(@NotNull Project project) {
+        ShowSettingsUtil.getInstance().showSettingsDialog(project, ModForgeConfigurable.class);
     }
 
-    /**
-     * Sets the access token.
-     *
-     * @param token The access token.
-     */
-    public void setAccessToken(@Nullable String token) {
-        try {
-            CredentialAttributes attributes = createCredentialAttributes(TOKEN_KEY);
-            Credentials credentials = new Credentials(TOKEN_KEY, token);
-            PasswordSafe.getInstance().set(attributes, credentials);
-        } catch (Exception e) {
-            LOG.error("Failed to set access token", e);
-        }
-    }
-
-    /**
-     * Creates credential attributes for a key.
-     *
-     * @param key The key.
-     * @return The credential attributes.
-     */
-    @NotNull
-    private CredentialAttributes createCredentialAttributes(@NotNull String key) {
-        return new CredentialAttributes(
-                CredentialAttributesKt.generateServiceName(CREDENTIAL_SUBSYSTEM, key)
-        );
-    }
+    // Getters and setters
 
     /**
      * Gets the server URL.
      *
      * @return The server URL.
      */
-    @NotNull
     public String getServerUrl() {
         return serverUrl;
     }
@@ -134,7 +110,7 @@ public class ModForgeSettings implements PersistentStateComponent<ModForgeSettin
      *
      * @param serverUrl The server URL.
      */
-    public void setServerUrl(@NotNull String serverUrl) {
+    public void setServerUrl(String serverUrl) {
         this.serverUrl = serverUrl;
     }
 
@@ -143,33 +119,65 @@ public class ModForgeSettings implements PersistentStateComponent<ModForgeSettin
      *
      * @return The GitHub username.
      */
-    @NotNull
     public String getGitHubUsername() {
-        return githubUsername;
+        return gitHubUsername;
     }
 
     /**
      * Sets the GitHub username.
      *
-     * @param githubUsername The GitHub username.
+     * @param gitHubUsername The GitHub username.
      */
-    public void setGitHubUsername(@NotNull String githubUsername) {
-        this.githubUsername = githubUsername;
+    public void setGitHubUsername(String gitHubUsername) {
+        this.gitHubUsername = gitHubUsername;
     }
 
     /**
-     * Checks if GitHub authentication is used.
+     * Gets the access token from the password safe.
      *
-     * @return Whether GitHub authentication is used.
+     * @return The access token.
+     */
+    @Transient
+    public String getAccessToken() {
+        CredentialAttributes attributes = createCredentialAttributes(ACCESS_TOKEN_KEY);
+        Credentials credentials = PasswordSafe.getInstance().get(attributes);
+        return credentials != null ? credentials.getPasswordAsString() : null;
+    }
+
+    /**
+     * Sets the access token in the password safe.
+     *
+     * @param accessToken The access token.
+     */
+    public void setAccessToken(@Nullable String accessToken) {
+        CredentialAttributes attributes = createCredentialAttributes(ACCESS_TOKEN_KEY);
+        Credentials credentials = new Credentials(gitHubUsername, accessToken);
+        PasswordSafe.getInstance().set(attributes, credentials);
+    }
+
+    /**
+     * Creates credential attributes for a key.
+     *
+     * @param key The key.
+     * @return The credential attributes.
+     */
+    private @NotNull CredentialAttributes createCredentialAttributes(@NotNull String key) {
+        return new CredentialAttributes(CredentialAttributesKt.generateServiceName(CREDENTIAL_SERVICE_NAME, key));
+    }
+
+    /**
+     * Checks if GitHub authentication is enabled.
+     *
+     * @return Whether GitHub authentication is enabled.
      */
     public boolean isUseGitHubAuthentication() {
         return useGitHubAuthentication;
     }
 
     /**
-     * Sets whether GitHub authentication is used.
+     * Sets whether GitHub authentication is enabled.
      *
-     * @param useGitHubAuthentication Whether GitHub authentication is used.
+     * @param useGitHubAuthentication Whether GitHub authentication is enabled.
      */
     public void setUseGitHubAuthentication(boolean useGitHubAuthentication) {
         this.useGitHubAuthentication = useGitHubAuthentication;
@@ -230,21 +238,57 @@ public class ModForgeSettings implements PersistentStateComponent<ModForgeSettin
     }
 
     /**
-     * Gets the maximum number of threads.
+     * Checks if auto commit is enabled.
      *
-     * @return The maximum number of threads.
+     * @return Whether auto commit is enabled.
      */
-    public int getMaxThreads() {
-        return maxThreads;
+    public boolean isAutoCommit() {
+        return autoCommit;
     }
 
     /**
-     * Sets the maximum number of threads.
+     * Sets whether auto commit is enabled.
      *
-     * @param maxThreads The maximum number of threads.
+     * @param autoCommit Whether auto commit is enabled.
      */
-    public void setMaxThreads(int maxThreads) {
-        this.maxThreads = maxThreads;
+    public void setAutoCommit(boolean autoCommit) {
+        this.autoCommit = autoCommit;
+    }
+
+    /**
+     * Checks if auto save is enabled.
+     *
+     * @return Whether auto save is enabled.
+     */
+    public boolean isAutoSave() {
+        return autoSave;
+    }
+
+    /**
+     * Sets whether auto save is enabled.
+     *
+     * @param autoSave Whether auto save is enabled.
+     */
+    public void setAutoSave(boolean autoSave) {
+        this.autoSave = autoSave;
+    }
+
+    /**
+     * Checks if auto sync is enabled.
+     *
+     * @return Whether auto sync is enabled.
+     */
+    public boolean isAutoSync() {
+        return autoSync;
+    }
+
+    /**
+     * Sets whether auto sync is enabled.
+     *
+     * @param autoSync Whether auto sync is enabled.
+     */
+    public void setAutoSync(boolean autoSync) {
+        this.autoSync = autoSync;
     }
 
     /**
@@ -252,7 +296,6 @@ public class ModForgeSettings implements PersistentStateComponent<ModForgeSettin
      *
      * @return The default language.
      */
-    @NotNull
     public String getDefaultLanguage() {
         return defaultLanguage;
     }
@@ -262,81 +305,26 @@ public class ModForgeSettings implements PersistentStateComponent<ModForgeSettin
      *
      * @param defaultLanguage The default language.
      */
-    public void setDefaultLanguage(@NotNull String defaultLanguage) {
+    public void setDefaultLanguage(String defaultLanguage) {
         this.defaultLanguage = defaultLanguage;
     }
 
     /**
-     * Gets the Git executable path.
+     * Gets the default mod loader.
      *
-     * @return The Git executable path.
+     * @return The default mod loader.
      */
-    @NotNull
-    public String getGitExecutablePath() {
-        return gitExecutablePath;
+    public String getDefaultModLoader() {
+        return defaultModLoader;
     }
 
     /**
-     * Sets the Git executable path.
+     * Sets the default mod loader.
      *
-     * @param gitExecutablePath The Git executable path.
+     * @param defaultModLoader The default mod loader.
      */
-    public void setGitExecutablePath(@NotNull String gitExecutablePath) {
-        this.gitExecutablePath = gitExecutablePath;
-    }
-
-    /**
-     * Checks if auto-commit is enabled.
-     *
-     * @return Whether auto-commit is enabled.
-     */
-    public boolean isAutoCommit() {
-        return autoCommit;
-    }
-
-    /**
-     * Sets whether auto-commit is enabled.
-     *
-     * @param autoCommit Whether auto-commit is enabled.
-     */
-    public void setAutoCommit(boolean autoCommit) {
-        this.autoCommit = autoCommit;
-    }
-
-    /**
-     * Checks if auto-save is enabled.
-     *
-     * @return Whether auto-save is enabled.
-     */
-    public boolean isAutoSave() {
-        return autoSave;
-    }
-
-    /**
-     * Sets whether auto-save is enabled.
-     *
-     * @param autoSave Whether auto-save is enabled.
-     */
-    public void setAutoSave(boolean autoSave) {
-        this.autoSave = autoSave;
-    }
-
-    /**
-     * Gets the request timeout in seconds.
-     *
-     * @return The request timeout.
-     */
-    public int getRequestTimeout() {
-        return requestTimeout;
-    }
-
-    /**
-     * Sets the request timeout in seconds.
-     *
-     * @param requestTimeout The request timeout.
-     */
-    public void setRequestTimeout(int requestTimeout) {
-        this.requestTimeout = requestTimeout;
+    public void setDefaultModLoader(String defaultModLoader) {
+        this.defaultModLoader = defaultModLoader;
     }
 
     /**
@@ -358,48 +346,56 @@ public class ModForgeSettings implements PersistentStateComponent<ModForgeSettin
     }
 
     /**
-     * Gets the default mod loader.
+     * Gets the maximum number of threads.
      *
-     * @return The default mod loader.
+     * @return The maximum number of threads.
      */
-    @NotNull
-    public String getDefaultModLoader() {
-        return defaultModLoader;
+    public int getMaxThreads() {
+        return maxThreads;
     }
 
     /**
-     * Sets the default mod loader.
+     * Sets the maximum number of threads.
      *
-     * @param defaultModLoader The default mod loader.
+     * @param maxThreads The maximum number of threads.
      */
-    public void setDefaultModLoader(@NotNull String defaultModLoader) {
-        this.defaultModLoader = defaultModLoader;
+    public void setMaxThreads(int maxThreads) {
+        this.maxThreads = maxThreads;
     }
 
     /**
-     * Checks if auto-sync is enabled.
+     * Gets the request timeout in seconds.
      *
-     * @return Whether auto-sync is enabled.
+     * @return The request timeout.
      */
-    public boolean isAutoSync() {
-        return autoSync;
+    public int getRequestTimeout() {
+        return requestTimeout;
     }
 
     /**
-     * Sets whether auto-sync is enabled.
+     * Sets the request timeout in seconds.
      *
-     * @param autoSync Whether auto-sync is enabled.
+     * @param requestTimeout The request timeout.
      */
-    public void setAutoSync(boolean autoSync) {
-        this.autoSync = autoSync;
+    public void setRequestTimeout(int requestTimeout) {
+        this.requestTimeout = requestTimeout;
     }
 
     /**
-     * Opens the settings dialog.
+     * Gets the Git executable path.
      *
-     * @param project The project.
+     * @return The Git executable path.
      */
-    public void openSettings(@NotNull Project project) {
-        ShowSettingsUtil.getInstance().showSettingsDialog(project, ModForgeConfigurable.class);
+    public String getGitExecutablePath() {
+        return gitExecutablePath;
+    }
+
+    /**
+     * Sets the Git executable path.
+     *
+     * @param gitExecutablePath The Git executable path.
+     */
+    public void setGitExecutablePath(String gitExecutablePath) {
+        this.gitExecutablePath = gitExecutablePath;
     }
 }

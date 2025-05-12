@@ -1,80 +1,127 @@
 package com.modforge.intellij.plugin.services;
 
+import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.components.Service;
 import com.intellij.openapi.diagnostic.Logger;
+import com.intellij.openapi.progress.ProgressIndicator;
+import com.intellij.openapi.progress.ProgressManager;
+import com.intellij.openapi.progress.Task;
 import com.intellij.openapi.project.Project;
+import com.intellij.util.concurrency.annotations.RequiresBackgroundThread;
+import com.intellij.util.concurrency.annotations.RequiresEdt;
 import com.modforge.intellij.plugin.settings.ModForgeSettings;
-import com.modforge.intellij.plugin.utils.CompatibilityUtil;
+import com.modforge.intellij.plugin.utils.ThreadUtils;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import java.io.IOException;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.time.Duration;
+import java.util.Base64;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 
 /**
- * Authentication manager for ModForge.
+ * Service for managing user authentication.
  * Compatible with IntelliJ IDEA 2025.1.1.1
  */
-@Service(Service.Level.PROJECT)
+@Service
 public final class ModAuthenticationManager {
     private static final Logger LOG = Logger.getInstance(ModAuthenticationManager.class);
     
-    private final Project project;
+    // Authentication states
+    private final AtomicBoolean isAuthenticated = new AtomicBoolean(false);
+    private final AtomicBoolean isAuthenticating = new AtomicBoolean(false);
+    
+    // Settings access
     private final ModForgeSettings settings;
     private final ModForgeNotificationService notificationService;
     
-    private String username;
-    private String token;
-    private boolean isAuthenticated = false;
-
+    // GitHub API endpoints
+    private static final String GITHUB_API_BASE = "https://api.github.com";
+    private static final String USER_ENDPOINT = GITHUB_API_BASE + "/user";
+    private static final int HTTP_OK = 200;
+    private static final int HTTP_UNAUTHORIZED = 401;
+    
     /**
-     * Creates a new instance of the authentication manager.
-     *
-     * @param project The project.
+     * Constructor.
      */
-    public ModAuthenticationManager(Project project) {
-        this.project = project;
+    public ModAuthenticationManager() {
         this.settings = ModForgeSettings.getInstance();
-        this.notificationService = ModForgeNotificationService.getInstance(project);
+        this.notificationService = ModForgeNotificationService.getInstance();
+    }
+
+    /**
+     * Gets the instance of the service.
+     *
+     * @return The service instance.
+     */
+    public static ModAuthenticationManager getInstance() {
+        return ApplicationManager.getApplication().getService(ModAuthenticationManager.class);
+    }
+
+    /**
+     * Logs in with username and password.
+     *
+     * @param username The username.
+     * @param password The password.
+     * @return A CompletableFuture with a boolean indicating if login was successful.
+     */
+    public CompletableFuture<Boolean> login(@NotNull String username, @NotNull String password) {
+        if (isAuthenticating.get()) {
+            LOG.warn("Authentication already in progress");
+            return CompletableFuture.completedFuture(false);
+        }
         
-        // Try to initialize from settings
-        this.token = settings.getAccessToken();
-        this.username = settings.getGitHubUsername();
-        this.isAuthenticated = this.token != null && !this.token.isEmpty();
+        isAuthenticating.set(true);
         
-        LOG.info("ModAuthenticationManager initialized for project: " + project.getName());
+        return ThreadUtils.supplyAsyncVirtual(() -> {
+            try {
+                LOG.info("Authenticating user: " + username);
+                
+                // Store credentials
+                settings.setGitHubUsername(username);
+                settings.setAccessToken(password);
+                
+                // Verify authentication
+                boolean authResult = verifyAuthentication();
+                isAuthenticated.set(authResult);
+                
+                LOG.info("Authentication " + (authResult ? "successful" : "failed") + " for user: " + username);
+                
+                return authResult;
+            } catch (Exception e) {
+                LOG.error("Authentication error", e);
+                return false;
+            } finally {
+                isAuthenticating.set(false);
+            }
+        });
     }
 
     /**
-     * Gets the instance of the authentication manager for the specified project.
-     *
-     * @param project The project.
-     * @return The authentication manager.
+     * Logs out the current user.
      */
-    public static ModAuthenticationManager getInstance(@NotNull Project project) {
-        return project.getService(ModAuthenticationManager.class);
-    }
-
-    /**
-     * Gets the username of the authenticated user.
-     *
-     * @return The username, or null if not authenticated.
-     */
-    @Nullable
-    public String getUsername() {
-        return username;
-    }
-
-    /**
-     * Gets the access token.
-     *
-     * @return The access token, or null if not authenticated.
-     */
-    @Nullable
-    public String getAccessToken() {
-        return token;
+    public void logout() {
+        if (isAuthenticating.get()) {
+            LOG.warn("Authentication in progress, cannot logout");
+            return;
+        }
+        
+        ThreadUtils.runAsyncVirtual(() -> {
+            LOG.info("Logging out user: " + getUsername());
+            
+            // Clear credentials
+            settings.setAccessToken(null);
+            
+            isAuthenticated.set(false);
+            
+            LOG.info("Logout complete");
+        });
     }
 
     /**
@@ -83,179 +130,223 @@ public final class ModAuthenticationManager {
      * @return Whether the user is authenticated.
      */
     public boolean isAuthenticated() {
-        return isAuthenticated;
-    }
-
-    /**
-     * Logs in with a username and password.
-     *
-     * @param username The username.
-     * @param password The password.
-     * @param callback Callback for success.
-     */
-    public void login(@NotNull String username, @NotNull String password, @NotNull Consumer<Boolean> callback) {
-        LOG.info("Logging in with username: " + username);
-        
-        CompletableFuture.supplyAsync(() -> {
-            try {
-                // In a real implementation, this would call the ModForge API to authenticate
-                // For now, simulate a successful login with a token
-                Thread.sleep(1000);
-                
-                // Generate a mock token (in the real implementation, this would come from the server)
-                String mockToken = "mf_" + System.currentTimeMillis();
-                
-                LOG.info("Successfully logged in as: " + username);
-                
-                return mockToken;
-            } catch (Exception e) {
-                LOG.error("Failed to log in", e);
-                return null;
+        // If we think we're authenticated, verify it
+        if (isAuthenticated.get() && !isAuthenticating.get()) {
+            String token = settings.getAccessToken();
+            if (token == null || token.isEmpty()) {
+                isAuthenticated.set(false);
+                return false;
             }
-        }).thenAccept(newToken -> {
-            CompatibilityUtil.executeOnUiThread(() -> {
-                if (newToken != null) {
-                    this.username = username;
-                    this.token = newToken;
-                    this.isAuthenticated = true;
-                    
-                    // Save to settings
-                    settings.setAccessToken(newToken);
-                    settings.setGitHubUsername(username);
-                    
-                    notificationService.showInfo("Login Successful", "Successfully logged in as " + username);
-                    callback.accept(true);
-                } else {
-                    notificationService.showError("Login Failed", "Failed to log in as " + username);
-                    callback.accept(false);
+            
+            // Periodically re-verify authentication
+            // This is done in a background thread to avoid blocking the UI
+            ThreadUtils.runAsyncVirtual(() -> {
+                try {
+                    boolean verified = verifyAuthentication();
+                    if (!verified) {
+                        LOG.warn("Authentication token is no longer valid");
+                        isAuthenticated.set(false);
+                    }
+                } catch (Exception e) {
+                    LOG.error("Error verifying authentication", e);
                 }
             });
-        });
-    }
-
-    /**
-     * Logs in with a token.
-     *
-     * @param token The token.
-     * @param callback Callback for success.
-     */
-    public void loginWithToken(@NotNull String token, @NotNull Consumer<Boolean> callback) {
-        LOG.info("Logging in with token");
+        }
         
-        CompletableFuture.supplyAsync(() -> {
-            try {
-                // In a real implementation, this would call the ModForge API to validate the token
-                // For now, simulate a successful token validation and fetch the username
-                Thread.sleep(800);
-                
-                // Get username from token (in the real implementation, this would come from the server)
-                String fetchedUsername = "user_" + System.currentTimeMillis();
-                
-                LOG.info("Successfully validated token for: " + fetchedUsername);
-                
-                return fetchedUsername;
-            } catch (Exception e) {
-                LOG.error("Failed to validate token", e);
-                return null;
-            }
-        }).thenAccept(fetchedUsername -> {
-            CompatibilityUtil.executeOnUiThread(() -> {
-                if (fetchedUsername != null) {
-                    this.username = fetchedUsername;
-                    this.token = token;
-                    this.isAuthenticated = true;
-                    
-                    // Save to settings
-                    settings.setAccessToken(token);
-                    settings.setGitHubUsername(fetchedUsername);
-                    
-                    notificationService.showInfo("Login Successful", "Successfully logged in as " + fetchedUsername);
-                    callback.accept(true);
-                } else {
-                    notificationService.showError("Login Failed", "Failed to validate token");
-                    callback.accept(false);
-                }
-            });
-        });
+        return isAuthenticated.get();
     }
 
     /**
-     * Logs out the current user.
-     */
-    public void logout() {
-        LOG.info("Logging out user: " + username);
-        
-        CompletableFuture.runAsync(() -> {
-            try {
-                // In a real implementation, this would call the ModForge API to invalidate the token
-                // For now, just simulate a logout
-                Thread.sleep(500);
-                
-                LOG.info("Successfully logged out user: " + username);
-            } catch (Exception e) {
-                LOG.error("Error during logout", e);
-            }
-        }).thenRun(() -> {
-            CompatibilityUtil.executeOnUiThread(() -> {
-                this.username = null;
-                this.token = null;
-                this.isAuthenticated = false;
-                
-                // Clear settings
-                settings.setAccessToken("");
-                settings.setGitHubUsername("");
-                
-                notificationService.showInfo("Logout Successful", "Successfully logged out");
-            });
-        });
-    }
-
-    /**
-     * Tests the current authentication.
+     * Gets the current username.
      *
-     * @param callback Callback for success.
+     * @return The username.
      */
-    public void testAuthentication(@NotNull Consumer<Boolean> callback) {
-        if (!isAuthenticated) {
-            LOG.info("Not authenticated, cannot test authentication");
-            callback.accept(false);
+    @Nullable
+    public String getUsername() {
+        return settings.getGitHubUsername();
+    }
+
+    /**
+     * Gets the current access token.
+     *
+     * @return The access token.
+     */
+    @Nullable
+    public String getAccessToken() {
+        return settings.getAccessToken();
+    }
+
+    /**
+     * Verifies authentication with the GitHub API.
+     *
+     * @return Whether authentication is valid.
+     */
+    @RequiresBackgroundThread
+    private boolean verifyAuthentication() {
+        String token = settings.getAccessToken();
+        if (token == null || token.isEmpty()) {
+            LOG.warn("No access token available");
+            return false;
+        }
+        
+        String username = settings.getGitHubUsername();
+        if (username == null || username.isEmpty()) {
+            LOG.warn("No username available");
+            return false;
+        }
+        
+        try {
+            URL url = new URL(USER_ENDPOINT);
+            HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+            connection.setRequestMethod("GET");
+            connection.setRequestProperty("Authorization", "token " + token);
+            connection.setConnectTimeout((int) Duration.ofSeconds(10).toMillis());
+            connection.setReadTimeout((int) Duration.ofSeconds(10).toMillis());
+            
+            int responseCode = connection.getResponseCode();
+            
+            if (responseCode == HTTP_OK) {
+                return true;
+            } else if (responseCode == HTTP_UNAUTHORIZED) {
+                LOG.warn("Invalid access token");
+                return false;
+            } else {
+                LOG.warn("Unexpected response code: " + responseCode);
+                return false;
+            }
+        } catch (IOException e) {
+            LOG.error("Error verifying authentication", e);
+            return false;
+        }
+    }
+
+    /**
+     * Generates authentication headers for use with the GitHub API.
+     *
+     * @return The authentication headers or null if not authenticated.
+     */
+    @Nullable
+    public String getAuthenticationHeader() {
+        if (!isAuthenticated()) {
+            return null;
+        }
+        
+        String token = settings.getAccessToken();
+        if (token == null || token.isEmpty()) {
+            return null;
+        }
+        
+        return "token " + token;
+    }
+
+    /**
+     * Gets basic authentication header for use with the GitHub API.
+     *
+     * @return The basic authentication header or null if not authenticated.
+     */
+    @Nullable
+    public String getBasicAuthenticationHeader() {
+        if (!isAuthenticated()) {
+            return null;
+        }
+        
+        String username = settings.getGitHubUsername();
+        String token = settings.getAccessToken();
+        
+        if (username == null || username.isEmpty() || token == null || token.isEmpty()) {
+            return null;
+        }
+        
+        String credentials = username + ":" + token;
+        String encoded = Base64.getEncoder().encodeToString(credentials.getBytes());
+        
+        return "Basic " + encoded;
+    }
+
+    /**
+     * Shows the login dialog and performs login.
+     *
+     * @param project  The project.
+     * @param onSuccess Called when login is successful.
+     */
+    @RequiresEdt
+    public void showLoginDialog(@NotNull Project project, @Nullable Consumer<Boolean> onSuccess) {
+        if (isAuthenticated.get()) {
+            if (onSuccess != null) {
+                onSuccess.accept(true);
+            }
             return;
         }
         
-        LOG.info("Testing authentication for user: " + username);
+        if (isAuthenticating.get()) {
+            notificationService.showWarning(project, "Authentication", "Authentication already in progress");
+            return;
+        }
         
-        CompletableFuture.supplyAsync(() -> {
-            try {
-                // In a real implementation, this would call the ModForge API to test the token
-                // For now, simulate a successful test with a GitHub API call
-                URL url = new URL("https://api.github.com/user");
-                HttpURLConnection connection = (HttpURLConnection) url.openConnection();
-                connection.setRequestMethod("GET");
-                connection.setRequestProperty("Authorization", "token " + token);
-                connection.setConnectTimeout(5000);
-                connection.setReadTimeout(5000);
-                
-                int responseCode = connection.getResponseCode();
-                
-                LOG.info("Authentication test result: " + responseCode);
-                
-                return responseCode == 200;
-            } catch (Exception e) {
-                LOG.error("Failed to test authentication", e);
-                return false;
-            }
-        }).thenAccept(success -> {
-            CompatibilityUtil.executeOnUiThread(() -> {
-                if (success) {
-                    notificationService.showInfo("Authentication Successful", "Successfully authenticated with ModForge");
-                } else {
-                    notificationService.showError("Authentication Failed", "Failed to authenticate with ModForge");
+        // Show login dialog and handle login
+        // This would be implemented with a dialog UI in the real plugin
+        // For this implementation, we'll just assume the user enters credentials
+        
+        String username = settings.getGitHubUsername();
+        String token = settings.getAccessToken();
+        
+        if (username != null && !username.isEmpty() && token != null && !token.isEmpty()) {
+            // If we have credentials, try to authenticate with them
+            ProgressManager.getInstance().run(new Task.Backgroundable(project, "Logging in...", true) {
+                @Override
+                public void run(@NotNull ProgressIndicator indicator) {
+                    indicator.setIndeterminate(true);
                     
-                    // Clear invalid credentials
-                    this.isAuthenticated = false;
+                    try {
+                        boolean result = login(username, token).get(30, TimeUnit.SECONDS);
+                        
+                        if (result) {
+                            notificationService.showInfo(project, "Authentication", "Successfully logged in as " + username);
+                        } else {
+                            notificationService.showError(project, "Authentication", "Failed to log in. Please check your credentials.");
+                        }
+                        
+                        if (onSuccess != null) {
+                            onSuccess.accept(result);
+                        }
+                    } catch (TimeoutException e) {
+                        notificationService.showError(project, "Authentication", "Login timed out. Please try again.");
+                        LOG.error("Login timed out", e);
+                    } catch (Exception e) {
+                        notificationService.showError(project, "Authentication", "An error occurred during login: " + e.getMessage());
+                        LOG.error("Login error", e);
+                    }
                 }
-                callback.accept(success);
             });
-        });
+        } else {
+            // If we don't have credentials, show a message asking user to enter them in settings
+            notificationService.showWarning(project, "Authentication", "Please enter your GitHub credentials in the settings.");
+            settings.openSettings(project);
+        }
+    }
+
+    /**
+     * Tests the authentication with the provided credentials.
+     *
+     * @param username The username.
+     * @param token    The access token.
+     * @return Whether authentication is valid.
+     */
+    public boolean testAuthentication(@NotNull String username, @NotNull String token) {
+        try {
+            URL url = new URL(USER_ENDPOINT);
+            HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+            connection.setRequestMethod("GET");
+            connection.setRequestProperty("Authorization", "token " + token);
+            connection.setConnectTimeout((int) Duration.ofSeconds(10).toMillis());
+            connection.setReadTimeout((int) Duration.ofSeconds(10).toMillis());
+            
+            int responseCode = connection.getResponseCode();
+            
+            return responseCode == HTTP_OK;
+        } catch (IOException e) {
+            LOG.error("Error testing authentication", e);
+            return false;
+        }
     }
 }
