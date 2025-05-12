@@ -23,9 +23,50 @@
     
     <!-- Required plugins -->
     <depends>com.intellij.modules.java</depends>
+    <depends>com.intellij.modules.platform</depends>
     
     <!-- Optional plugins with fallbacks in our code -->
     <depends optional="true" config-file="git-integration.xml">Git4Idea</depends>
     <depends optional="true" config-file="github-integration.xml">org.jetbrains.plugins.github</depends>
     <depends optional="true" config-file="minecraft-dev-integration.xml">com.demonwav.minecraft-dev</depends>
+    
+    <!-- Extensions -->
+    <extensions defaultExtensionNs="com.intellij">
+        <!-- Services -->
+        <applicationService serviceImplementation="com.modforge.intellij.plugin.settings.ModForgeSettings"/>
+        <projectService serviceImplementation="com.modforge.intellij.plugin.services.ModForgeNotificationService"/>
+        <projectService serviceImplementation="com.modforge.intellij.plugin.services.AutonomousCodeGenerationService"/>
+        
+        <!-- Settings UI -->
+        <applicationConfigurable 
+            parentId="tools" 
+            instance="com.modforge.intellij.plugin.ui.ModForgeConfigurable"
+            id="com.modforge.intellij.plugin.ui.ModForgeConfigurable" 
+            displayName="ModForge AI"/>
+            
+        <!-- Notification Group -->
+        <notificationGroup id="ModForgeNotifications" 
+                          displayType="BALLOON" 
+                          toolWindowId="ModForge"
+                          isLogByDefault="true"/>
+    </extensions>
+    
+    <!-- Actions -->
+    <actions>
+        <group id="ModForge.MainMenu" text="ModForge" description="ModForge AI Menu">
+            <add-to-group group-id="MainMenu" anchor="last"/>
+            <action id="ModForge.GenerateCode" 
+                    class="com.modforge.intellij.plugin.actions.GenerateCodeAction" 
+                    text="Generate Mod Code" 
+                    description="Generate Minecraft mod code using AI"/>
+            <action id="ModForge.FixErrors" 
+                    class="com.modforge.intellij.plugin.actions.FixErrorsAction" 
+                    text="Fix Errors" 
+                    description="Fix compilation errors using AI"/>
+            <action id="ModForge.Settings" 
+                    class="com.modforge.intellij.plugin.actions.OpenSettingsAction" 
+                    text="Settings" 
+                    description="Open ModForge AI settings"/>
+        </group>
+    </actions>
 </idea-plugin>

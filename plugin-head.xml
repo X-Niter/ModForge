@@ -23,9 +23,9 @@
     
     <!-- Required plugins -->
     <depends>com.intellij.modules.java</depends>
+    <depends>com.intellij.modules.platform</depends>
     
     <!-- Optional plugins with fallbacks in our code -->
     <depends optional="true" config-file="git-integration.xml">Git4Idea</depends>
     <depends optional="true" config-file="github-integration.xml">org.jetbrains.plugins.github</depends>
     <depends optional="true" config-file="minecraft-dev-integration.xml">com.demonwav.minecraft-dev</depends>
-</idea-plugin>
