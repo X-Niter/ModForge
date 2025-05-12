@@ -105,7 +105,7 @@ public class TogglePatternRecognitionAction extends AnAction {
                     );
                 }
                 
-                if (result == Messages.YES) {
+                if (result == CompatibilityUtil.DIALOG_YES) {
                     service.setEnabled(false);
                     
                     ModForgeSettings settings = ModForgeSettings.getInstance();

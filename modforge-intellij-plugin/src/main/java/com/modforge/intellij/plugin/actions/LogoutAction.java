@@ -75,7 +75,7 @@ public class LogoutAction extends AnAction {
             );
         }
         
-        if (result == Messages.YES) {
+        if (result == CompatibilityUtil.DIALOG_YES) {
             // Stop continuous development if it's running
             stopContinuousDevelopment(project);
             

@@ -584,7 +584,7 @@ public class CreateFromTemplateAction extends AnAction {
                                 null
                         );
                         
-                        if (result != Messages.YES) {
+                        if (result != CompatibilityUtil.DIALOG_YES) {
                             return;
                         }
                     } else {
@@ -597,7 +597,7 @@ public class CreateFromTemplateAction extends AnAction {
                                 "Cancel"
                         );
                         
-                        if (result != Messages.YES) {
+                        if (result != CompatibilityUtil.DIALOG_YES) {
                             return;
                         }
                     }
@@ -612,7 +612,7 @@ public class CreateFromTemplateAction extends AnAction {
                             null
                     );
                     
-                    if (result != Messages.YES) {
+                    if (result != CompatibilityUtil.DIALOG_YES) {
                         return;
                     }
                 }
