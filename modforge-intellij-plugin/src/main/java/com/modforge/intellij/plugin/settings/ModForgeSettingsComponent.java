@@ -61,6 +61,18 @@ public class ModForgeSettingsComponent {
         SpinnerNumberModel spinnerModel = new SpinnerNumberModel(100, 1, 1000, 10);
         maxApiRequestsSpinner = new JSpinner(spinnerModel);
         
+        // Initialize OpenAI fields
+        openAiApiKeyField = new JBPasswordField();
+        openAiModelField = new JBTextField();
+        
+        // Set up spinner for max tokens
+        SpinnerNumberModel maxTokensModel = new SpinnerNumberModel(2048, 100, 8192, 128);
+        maxTokensSpinner = new JSpinner(maxTokensModel);
+        
+        // Set up spinner for temperature
+        SpinnerNumberModel temperatureModel = new SpinnerNumberModel(0.7, 0.0, 1.0, 0.1);
+        temperatureSpinner = new JSpinner(temperatureModel);
+        
         // Set up buttons
         testConnectionButton = new JButton("Test Connection");
         resetButton = new JButton("Reset to Defaults");
@@ -99,6 +111,14 @@ public class ModForgeSettingsComponent {
                 
                 // API settings
                 .addLabeledComponent(new JBLabel("Max API requests per day:"), maxApiRequestsSpinner, 1, false)
+                .addSeparator(10)
+                
+                // OpenAI settings
+                .addComponent(new JBLabel("OpenAI Settings"), 1)
+                .addLabeledComponent(new JBLabel("API Key:"), openAiApiKeyField, 1, false)
+                .addLabeledComponent(new JBLabel("Model:"), openAiModelField, 1, false)
+                .addLabeledComponent(new JBLabel("Max Tokens:"), maxTokensSpinner, 1, false)
+                .addLabeledComponent(new JBLabel("Temperature:"), temperatureSpinner, 1, false)
                 .addSeparator(10)
                 .addComponentFillVertically(new JPanel(), 0)
                 .getPanel();
@@ -398,6 +418,80 @@ public class ModForgeSettingsComponent {
     }
     
     /**
+     * Get the OpenAI API key.
+     *
+     * @return The OpenAI API key
+     */
+    @NotNull
+    public String getOpenAiApiKey() {
+        return new String(openAiApiKeyField.getPassword());
+    }
+    
+    /**
+     * Set the OpenAI API key.
+     *
+     * @param apiKey The OpenAI API key
+     */
+    public void setOpenAiApiKey(@NotNull String apiKey) {
+        openAiApiKeyField.setText(apiKey);
+    }
+    
+    /**
+     * Get the OpenAI model.
+     *
+     * @return The OpenAI model
+     */
+    @NotNull
+    public String getOpenAiModel() {
+        return openAiModelField.getText().trim();
+    }
+    
+    /**
+     * Set the OpenAI model.
+     *
+     * @param model The OpenAI model
+     */
+    public void setOpenAiModel(@NotNull String model) {
+        openAiModelField.setText(model);
+    }
+    
+    /**
+     * Get the maximum number of tokens.
+     *
+     * @return The maximum number of tokens
+     */
+    public int getMaxTokens() {
+        return (Integer) maxTokensSpinner.getValue();
+    }
+    
+    /**
+     * Set the maximum number of tokens.
+     *
+     * @param maxTokens The maximum number of tokens
+     */
+    public void setMaxTokens(int maxTokens) {
+        maxTokensSpinner.setValue(maxTokens);
+    }
+    
+    /**
+     * Get the temperature.
+     *
+     * @return The temperature
+     */
+    public double getTemperature() {
+        return (Double) temperatureSpinner.getValue();
+    }
+    
+    /**
+     * Set the temperature.
+     *
+     * @param temperature The temperature
+     */
+    public void setTemperature(double temperature) {
+        temperatureSpinner.setValue(temperature);
+    }
+    
+    /**
      * Reset settings to defaults.
      */
     private void resetToDefaults() {
@@ -423,6 +517,10 @@ public class ModForgeSettingsComponent {
             setAutoMonitorRepository(settings.isAutoMonitorRepository());
             setAutoRespondToIssues(settings.isAutoRespondToIssues());
             setMaxApiRequestsPerDay(settings.getMaxApiRequestsPerDay());
+            setOpenAiApiKey(settings.getOpenAiApiKey());
+            setOpenAiModel(settings.getOpenAiModel());
+            setMaxTokens(settings.getMaxTokens());
+            setTemperature(settings.getTemperature());
         }
     }
 }

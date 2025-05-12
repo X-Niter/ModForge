@@ -371,7 +371,33 @@ public final class ModForgeSettings implements PersistentStateComponent<ModForge
      * @param project The project.
      */
     public void openSettings(@Nullable Project project) {
-        ShowSettingsUtil.getInstance().showSettingsDialog(project, ModForgeConfigurable.class);
+        ShowSettingsUtil.getInstance().showSettingsDialog(project, ModForgeSettingsConfigurable.class);
+    }
+    
+    /**
+     * Resets all settings to defaults.
+     */
+    public void resetToDefaults() {
+        serverUrl = "https://modforge.ai/api";
+        collaborationServerUrl = "wss://modforge.ai/ws";
+        requestTimeout = 30;
+        enablePatternRecognition = true;
+        enableContinuousDevelopment = false;
+        
+        openAiApiKey = "";
+        openAiModel = "gpt-4o";
+        maxTokens = 2048;
+        temperature = 0.7;
+        
+        githubUsername = "";
+        githubRepository = "";
+        githubToken = "";
+        enableGitHubIntegration = false;
+        autoMonitorRepository = false;
+        autoRespondToIssues = false;
+        
+        useDarkMode = true;
+        maxApiRequestsPerDay = 100;
     }
     
     /**

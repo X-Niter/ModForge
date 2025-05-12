@@ -49,7 +49,11 @@ public class ModForgeSettingsConfigurable implements Configurable {
                 || !mySettingsComponent.getGitHubRepository().equals(settings.getGitHubRepository())
                 || mySettingsComponent.isAutoMonitorRepository() != settings.isAutoMonitorRepository()
                 || mySettingsComponent.isAutoRespondToIssues() != settings.isAutoRespondToIssues()
-                || mySettingsComponent.getMaxApiRequestsPerDay() != settings.getMaxApiRequestsPerDay();
+                || mySettingsComponent.getMaxApiRequestsPerDay() != settings.getMaxApiRequestsPerDay()
+                || !mySettingsComponent.getOpenAiApiKey().equals(settings.getOpenAiApiKey())
+                || !mySettingsComponent.getOpenAiModel().equals(settings.getOpenAiModel())
+                || mySettingsComponent.getMaxTokens() != settings.getMaxTokens()
+                || mySettingsComponent.getTemperature() != settings.getTemperature();
     }
     
     @Override
@@ -72,6 +76,15 @@ public class ModForgeSettingsConfigurable implements Configurable {
             }
         }
         
+        // Validate OpenAI settings
+        if (mySettingsComponent.getOpenAiApiKey().isEmpty()) {
+            throw new ConfigurationException("OpenAI API key cannot be empty");
+        }
+        
+        if (mySettingsComponent.getOpenAiModel().isEmpty()) {
+            throw new ConfigurationException("OpenAI model cannot be empty");
+        }
+        
         // Apply changes
         settings.setServerUrl(mySettingsComponent.getServerUrl());
         settings.setUseDarkMode(mySettingsComponent.isUseDarkMode());
@@ -84,6 +97,10 @@ public class ModForgeSettingsConfigurable implements Configurable {
         settings.setAutoMonitorRepository(mySettingsComponent.isAutoMonitorRepository());
         settings.setAutoRespondToIssues(mySettingsComponent.isAutoRespondToIssues());
         settings.setMaxApiRequestsPerDay(mySettingsComponent.getMaxApiRequestsPerDay());
+        settings.setOpenAiApiKey(mySettingsComponent.getOpenAiApiKey());
+        settings.setOpenAiModel(mySettingsComponent.getOpenAiModel());
+        settings.setMaxTokens(mySettingsComponent.getMaxTokens());
+        settings.setTemperature(mySettingsComponent.getTemperature());
     }
     
     @Override
@@ -100,6 +117,10 @@ public class ModForgeSettingsConfigurable implements Configurable {
         mySettingsComponent.setAutoMonitorRepository(settings.isAutoMonitorRepository());
         mySettingsComponent.setAutoRespondToIssues(settings.isAutoRespondToIssues());
         mySettingsComponent.setMaxApiRequestsPerDay(settings.getMaxApiRequestsPerDay());
+        mySettingsComponent.setOpenAiApiKey(settings.getOpenAiApiKey());
+        mySettingsComponent.setOpenAiModel(settings.getOpenAiModel());
+        mySettingsComponent.setMaxTokens(settings.getMaxTokens());
+        mySettingsComponent.setTemperature(settings.getTemperature());
     }
     
     @Override
