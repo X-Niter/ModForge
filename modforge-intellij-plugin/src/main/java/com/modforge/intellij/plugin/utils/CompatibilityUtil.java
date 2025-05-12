@@ -381,11 +381,11 @@ public final class CompatibilityUtil {
      * Gets the description of a problem using reflection to maintain compatibility with 
      * different IntelliJ IDEA versions, particularly 2025.1.1.1.
      *
-     * @param problem The Problem instance
+     * @param problem The Problem instance or any problem object
      * @return The problem description, or "Unknown error" if not available
      */
     @NotNull
-    public static String getProblemDescription(@NotNull Problem problem) {
+    public static String getProblemDescription(@NotNull Object problem) {
         try {
             // Try the newer method first (IntelliJ IDEA 2025.1.1.1)
             java.lang.reflect.Method getTextMethod = problem.getClass().getMethod("getPresentableText");
