@@ -215,52 +215,116 @@ public final class CollaborationService {
     }
     
     /**
-     * Starts a collaboration session.
-     * @param sessionId The session ID
+     * Starts a collaboration session with the given username.
+     * @param username The username to use in the session
+     * @return A CompletableFuture that completes with the session ID when successful
      */
-    public void startSession(@NotNull String sessionId) {
-        if (connected) {
-            LOG.warn("Already connected to a session");
-            return;
-        }
-        
-        this.sessionId = sessionId;
-        
-        try {
-            connectToServer();
-        } catch (Exception e) {
-            LOG.error("Error connecting to server", e);
+    public CompletableFuture<String> startSession(@NotNull String username) {
+        return CompletableFuture.supplyAsync(() -> {
+            if (connected) {
+                LOG.warn("Already connected to a session");
+                throw new IllegalStateException("Already connected to a session");
+            }
             
-            Notification notification = new Notification(
-                    "ModForge Notifications",
-                    "Collaboration Error",
-                    "Error connecting to collaboration server: " + e.getMessage(),
-                    NotificationType.ERROR
-            );
+            // Store the username
+            this.userId = UUID.randomUUID().toString();
             
-            notification.addAction(new NotificationAction("Try Again") {
-                @Override
-                public void actionPerformed(@NotNull AnActionEvent e, @NotNull Notification notification) {
-                    try {
-                        connectToServer();
-                        notification.expire();
-                    } catch (Exception ex) {
-                        LOG.error("Error connecting to server", ex);
-                        
-                        Notification errorNotification = new Notification(
-                                "ModForge Notifications",
-                                "Collaboration Error",
-                                "Error connecting to collaboration server: " + ex.getMessage(),
-                                NotificationType.ERROR
-                        );
-                        
-                        Notifications.Bus.notify(errorNotification, project);
-                    }
+            // Generate a unique session ID
+            String newSessionId = "sess-" + UUID.randomUUID().toString().substring(0, 8);
+            this.sessionId = newSessionId;
+            
+            try {
+                // Add self as first participant
+                addParticipant(userId, username);
+                
+                // Connect to server
+                connectToServer();
+                
+                if (!connected) {
+                    throw new IllegalStateException("Failed to connect to collaboration server");
                 }
-            });
+                
+                LOG.info("Successfully started session: " + newSessionId);
+                return newSessionId;
+            } catch (Exception e) {
+                LOG.error("Error starting collaboration session", e);
+                
+                Notification notification = new Notification(
+                        "ModForge Notifications",
+                        "Collaboration Error",
+                        "Error starting collaboration session: " + e.getMessage(),
+                        NotificationType.ERROR
+                );
             
-            Notifications.Bus.notify(notification, project);
-        }
+                notification.addAction(new NotificationAction("Try Again") {
+                    @Override
+                    public void actionPerformed(@NotNull AnActionEvent e, @NotNull Notification notification) {
+                        try {
+                            connectToServer();
+                            notification.expire();
+                        } catch (Exception ex) {
+                            LOG.error("Error connecting to server", ex);
+                            
+                            Notification errorNotification = new Notification(
+                                    "ModForge Notifications",
+                                    "Collaboration Error",
+                                    "Error connecting to collaboration server: " + ex.getMessage(),
+                                    NotificationType.ERROR
+                            );
+                            
+                            Notifications.Bus.notify(errorNotification, project);
+                        }
+                    }
+                });
+                
+                Notifications.Bus.notify(notification, project);
+                
+                // Clean up on failure
+                connected = false;
+                sessionId = null;
+                throw new RuntimeException("Failed to start collaboration session", e);
+            }
+        });
+    }
+    
+    /**
+     * Joins an existing collaboration session.
+     * 
+     * @param sessionId The session ID to join
+     * @param username The username to use in the session
+     * @return A CompletableFuture that completes when the session is joined
+     */
+    public CompletableFuture<Void> joinSession(@NotNull String sessionId, @NotNull String username) {
+        return CompletableFuture.runAsync(() -> {
+            if (connected) {
+                LOG.warn("Already connected to a session");
+                throw new IllegalStateException("Already connected to a session");
+            }
+            
+            this.sessionId = sessionId;
+            this.userId = UUID.randomUUID().toString();
+            
+            try {
+                // Add self as participant
+                addParticipant(userId, username);
+                
+                // Connect to server
+                connectToServer();
+                
+                if (!connected) {
+                    throw new IllegalStateException("Failed to connect to collaboration server");
+                }
+                
+                LOG.info("Successfully joined session: " + sessionId);
+            } catch (Exception e) {
+                LOG.error("Error joining collaboration session", e);
+                
+                connected = false;
+                this.sessionId = null;
+                
+                throw new RuntimeException("Failed to join collaboration session", e);
+            }
+        });
     }
     
     /**
