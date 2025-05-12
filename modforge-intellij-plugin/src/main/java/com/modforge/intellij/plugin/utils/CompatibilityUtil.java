@@ -65,9 +65,10 @@ public final class CompatibilityUtil {
      * @param relativePath The relative path from the project root
      * @return The VirtualFile if found, null otherwise
      */
-    public static VirtualFile getModFileByRelativePath(@NotNull Project project, String relativePath) {
+    public static VirtualFile getModFileByRelativePath(@NotNull Project project, @NotNull String relativePath) {
         VirtualFile baseDir = getProjectBaseDir(project);
         if (baseDir == null) {
+            LOG.warn("Project base directory not found");
             return null;
         }
         
@@ -462,20 +463,4 @@ public final class CompatibilityUtil {
         return true;
     }
     
-    /**
-     * Gets a mod file by relative path.
-     *
-     * @param project      The project.
-     * @param relativePath The relative path.
-     * @return The virtual file, or null if not found.
-     */
-    @Nullable
-    public static VirtualFile getModFileByRelativePath(@NotNull Project project, @NotNull String relativePath) {
-        VirtualFile baseDir = getProjectBaseDir(project);
-        if (baseDir == null) {
-            LOG.warn("Project base directory not found");
-            return null;
-        }
-        
-        return baseDir.findFileByRelativePath(relativePath);
-    }}
+}
