@@ -97,7 +97,7 @@ public class FixErrorsAction extends AnAction {
         }
         
         if (editor == null || file == null) {
-            ModForgeNotificationService.getInstance().showErrorNotification(
+            ModForgeNotificationService.getInstance(project).showErrorNotification(
                     project,
                     "No File Selected",
                     "Please open a file to fix errors."
@@ -110,7 +110,7 @@ public class FixErrorsAction extends AnAction {
         
         if (problems.isEmpty()) {
             // Check with user if they want to continue using ModForgeNotificationService
-            ModForgeNotificationService notificationService = ModForgeNotificationService.getInstance();
+            ModForgeNotificationService notificationService = ModForgeNotificationService.getInstance(project);
             int result = notificationService.showYesNoDialog(
                     project,
                     "No compilation errors detected. Do you want to proceed with error fixing anyway?",
@@ -307,7 +307,7 @@ public class FixErrorsAction extends AnAction {
                 project.getService(AutonomousCodeGenerationService.class);
         
         if (codeGenService == null) {
-            ModForgeNotificationService notificationService = ModForgeNotificationService.getInstance();
+            ModForgeNotificationService notificationService = ModForgeNotificationService.getInstance(project);
             notificationService.showErrorDialog(
                     project,
                     "Service Unavailable",
@@ -330,7 +330,7 @@ public class FixErrorsAction extends AnAction {
                                 LOG.error("Error fixing code", e);
                                 
                                 ApplicationManager.getApplication().invokeLater(() -> {
-                                    ModForgeNotificationService notificationService = ModForgeNotificationService.getInstance();
+                                    ModForgeNotificationService notificationService = ModForgeNotificationService.getInstance(project);
                                     notificationService.showErrorDialog(
                                             project,
                                             "Fix Error",
@@ -347,7 +347,7 @@ public class FixErrorsAction extends AnAction {
                     LOG.error("Error fixing code", e);
                     
                     ApplicationManager.getApplication().invokeLater(() -> {
-                        ModForgeNotificationService notificationService = ModForgeNotificationService.getInstance();
+                        ModForgeNotificationService notificationService = ModForgeNotificationService.getInstance(project);
                         notificationService.showErrorDialog(
                                 project,
                                 "Fix Error",
