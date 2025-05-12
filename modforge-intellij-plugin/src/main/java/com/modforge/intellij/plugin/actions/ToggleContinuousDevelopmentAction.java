@@ -15,6 +15,7 @@ import com.modforge.intellij.plugin.services.ModAuthenticationManager;
 import com.modforge.intellij.plugin.services.ContinuousDevelopmentService;
 import com.modforge.intellij.plugin.services.ModForgeNotificationService;
 import com.modforge.intellij.plugin.settings.ModForgeSettings;
+import com.modforge.intellij.plugin.utils.CompatibilityUtil;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -127,7 +128,7 @@ public class ToggleContinuousDevelopmentAction extends AnAction {
                                 "Continuous development has been disabled."
                         );
                     } else {
-                        Messages.showInfoMessage(
+                        CompatibilityUtil.showInfoDialog(
                                 project,
                                 "Continuous development has been disabled.",
                                 "Continuous Development"

@@ -140,8 +140,8 @@ public class CreateFromTemplateAction extends AnAction {
                                             "Project created successfully at " + outputDir.getAbsolutePath()
                                     );
                                 } else {
-                                    // Fallback to standard Messages API since service is not available
-                                    Messages.showInfoMessage(
+                                    // Use compatibility wrapper for standard Messages API
+                                    com.modforge.intellij.plugin.utils.CompatibilityUtil.showInfoDialog(
                                             project,
                                             "Project created successfully at " + outputDir.getAbsolutePath(),
                                             "Project Created"

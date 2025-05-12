@@ -63,7 +63,7 @@ public class TestCompleteAuthFlowAction extends AnAction {
                     results
             );
         } else {
-            Messages.showInfoMessage(project, results, "Complete Authentication Flow Test Results");
+            com.modforge.intellij.plugin.utils.CompatibilityUtil.showInfoDialog(project, results, "Complete Authentication Flow Test Results");
         }
         
         // Log the test completion
