@@ -7,7 +7,7 @@ import com.intellij.openapi.util.Pair;
 import com.intellij.util.concurrency.AppExecutorUtil;
 import com.modforge.intellij.plugin.ai.pattern.PatternData;
 import com.modforge.intellij.plugin.ai.pattern.PatternLearningSystem;
-import com.modforge.intellij.plugin.notifications.ModForgeNotificationService;
+import com.modforge.intellij.plugin.services.ModForgeNotificationService;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -231,7 +231,7 @@ public final class PatternRecognitionService {
                 );
                 
                 // Show a notification
-                ModForgeNotificationService notificationService = project.getService(ModForgeNotificationService.class);
+                ModForgeNotificationService notificationService = ModForgeNotificationService.getInstance();
                 if (notificationService != null) {
                     notificationService.showInfo("Pattern Learning Savings", message);
                 }

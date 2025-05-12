@@ -175,7 +175,7 @@ public class WebSocketMessageHandler {
      */
     private void showNotification(Project project, String title, String content, boolean important) {
         ApplicationManager.getApplication().invokeLater(() -> {
-            ModForgeNotificationService notificationService = project.getService(ModForgeNotificationService.class);
+            ModForgeNotificationService notificationService = ModForgeNotificationService.getInstance();
             
             if (important) {
                 notificationService.showImportantNotification(title, content);

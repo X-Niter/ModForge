@@ -10,7 +10,7 @@ import com.intellij.openapi.startup.StartupActivity;
 import com.intellij.openapi.vfs.VirtualFileEvent;
 import com.intellij.openapi.vfs.VirtualFileListener;
 import com.intellij.openapi.vfs.VirtualFileManager;
-import com.modforge.intellij.plugin.notifications.ModForgeNotificationService;
+import com.modforge.intellij.plugin.services.ModForgeNotificationService;
 import com.modforge.intellij.plugin.run.MinecraftRunConfiguration.RunType;
 import org.jetbrains.annotations.NotNull;
 
@@ -65,7 +65,7 @@ public class MinecraftRunConfigurationService implements StartupActivity.DumbAwa
      * @param project The project to configure
      */
     private void suggestAutoConfiguration(@NotNull Project project) {
-        ModForgeNotificationService notificationService = project.getService(ModForgeNotificationService.class);
+        ModForgeNotificationService notificationService = ModForgeNotificationService.getInstance();
         if (notificationService != null) {
             notificationService.showInfoWithAction(
                     "Minecraft Project Detected",
@@ -141,7 +141,7 @@ public class MinecraftRunConfigurationService implements StartupActivity.DumbAwa
         
         // Notify if configurations were updated
         if (configsChanged) {
-            ModForgeNotificationService notificationService = project.getService(ModForgeNotificationService.class);
+            ModForgeNotificationService notificationService = ModForgeNotificationService.getInstance();
             if (notificationService != null) {
                 notificationService.showInfo(
                         "Run Configurations Updated",
