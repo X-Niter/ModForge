@@ -101,12 +101,12 @@ public final class CompatibilityUtil {
     }
     
     /**
-     * Runs a task on the UI thread. This is a replacement for ApplicationManager.getApplication().invokeLater()
-     * that handles compatibility with newer IntelliJ versions.
+     * Runs a task on the UI thread with non-modal state. This is a replacement for 
+     * ApplicationManager.getApplication().invokeLater() that handles compatibility with newer IntelliJ versions.
      *
      * @param runnable The task to run.
      */
-    public static void runOnUIThread(@NotNull Runnable runnable) {
+    public static void runOnUIThreadNonModal(@NotNull Runnable runnable) {
         ApplicationManager.getApplication().invokeLater(runnable, ModalityState.NON_MODAL);
     }
     
@@ -118,7 +118,7 @@ public final class CompatibilityUtil {
      * @param requestFocus Whether to request focus for the editor.
      */
     public static void openFileInEditor(@NotNull Project project, @NotNull VirtualFile file, boolean requestFocus) {
-        runOnUIThread(() -> FileEditorManager.getInstance(project).openFile(file, requestFocus));
+        runOnUIThreadNonModal(() -> FileEditorManager.getInstance(project).openFile(file, requestFocus));
     }
     
     /**
@@ -130,7 +130,7 @@ public final class CompatibilityUtil {
      * @param title The dialog title.
      */
     public static void showInfoDialog(@NotNull Project project, @NotNull String message, @NotNull String title) {
-        runOnUIThread(() -> Messages.showInfoMessage(project, message, title));
+        runOnUIThreadNonModal(() -> Messages.showInfoMessage(project, message, title));
     }
     
     /**
@@ -374,10 +374,11 @@ public final class CompatibilityUtil {
 
     /**
      * Runs an action on the UI thread.
+     * This version uses a simple name to avoid confusion with runOnUIThread.
      *
      * @param action The action to run.
      */
-    public static void runOnUiThread(@NotNull Runnable action) {
+    public static void executeOnUiThread(@NotNull Runnable action) {
         ApplicationManager.getApplication().invokeLater(action);
     }
 
