@@ -7,6 +7,7 @@ import com.intellij.openapi.actionSystem.AnActionEvent;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.Messages;
+import com.modforge.intellij.plugin.services.ModForgeNotificationService;
 import com.modforge.intellij.plugin.settings.ModForgeSettings;
 import com.modforge.intellij.plugin.utils.AuthTestUtil;
 import org.jetbrains.annotations.NotNull;
@@ -57,7 +58,16 @@ public class TestAuthEndpointsAction extends AnAction {
         }
         
         // Show dialog with all results
-        Messages.showInfoMessage(project, results.toString(), "Authentication Test Results");
+        ModForgeNotificationService notificationService = ModForgeNotificationService.getInstance(project);
+        if (notificationService != null) {
+            notificationService.showInfoMessage(
+                    project,
+                    "Authentication Test Results",
+                    results.toString()
+            );
+        } else {
+            Messages.showInfoMessage(project, results.toString(), "Authentication Test Results");
+        }
         
         LOG.info("Completed testing authentication endpoints");
     }

@@ -12,6 +12,7 @@ import com.intellij.ui.components.JBLabel;
 import com.intellij.ui.components.JBPasswordField;
 import com.intellij.ui.components.JBTextField;
 import com.intellij.util.ui.JBUI;
+import com.modforge.intellij.plugin.services.ModForgeNotificationService;
 import com.modforge.intellij.plugin.settings.ModForgeSettings;
 import com.modforge.intellij.plugin.utils.AuthTestUtil;
 import org.jetbrains.annotations.NotNull;
@@ -54,7 +55,16 @@ public class TestCompleteAuthFlowAction extends AnAction {
         String results = AuthTestUtil.testCompleteAuthFlow(username, password);
         
         // Show results in a dialog
-        Messages.showInfoMessage(project, results, "Complete Authentication Flow Test Results");
+        ModForgeNotificationService notificationService = ModForgeNotificationService.getInstance(project);
+        if (notificationService != null) {
+            notificationService.showInfoMessage(
+                    project,
+                    "Complete Authentication Flow Test Results",
+                    results
+            );
+        } else {
+            Messages.showInfoMessage(project, results, "Complete Authentication Flow Test Results");
+        }
         
         // Log the test completion
         LOG.info("Completed testing complete authentication flow");
