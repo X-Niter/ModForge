@@ -196,7 +196,7 @@ public class FixErrorsAction extends AnAction {
         StringBuilder sb = new StringBuilder();
         for (Problem problem : problems) {
             // Compatible way to get problem description in IntelliJ IDEA 2025.1.1.1
-            sb.append(getProblemDescription(problem)).append("\n");
+            sb.append(getProblemDescriptionSimple(problem)).append("\n");
         }
         
         return sb.toString();
@@ -208,7 +208,7 @@ public class FixErrorsAction extends AnAction {
      * @param problem The problem
      * @return The description
      */
-    private String getProblemDescription(@NotNull Problem problem) {
+    private String getProblemDescriptionSimple(@NotNull Problem problem) {
         try {
             // First try the IntelliJ IDEA 2025.1.1.1 method
             java.lang.reflect.Method getDescMethod = problem.getClass().getMethod("getPresentableText");
