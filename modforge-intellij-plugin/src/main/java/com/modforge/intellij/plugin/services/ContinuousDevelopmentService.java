@@ -243,7 +243,71 @@ public final class ContinuousDevelopmentService {
                 // Format problems
                 StringBuilder errorMessage = new StringBuilder();
                 for (Problem problem : problems) {
-                    errorMessage.append(problem.getDescription()).append("\n");
+                    // Use reflection to get problem description (compatibility with 2025.1.1.1)
+                    try {
+                        // Try multiple potential method names that might exist in different IntelliJ versions
+                        boolean descriptionFound = false;
+                        for (String methodName : new String[]{"getDescriptionText", "getText", "getDescription", "getMessage"}) {
+                            try {
+                                java.lang.reflect.Method method = problem.getClass().getMethod(methodName);
+                                Object result = method.invoke(problem);
+                                if (result instanceof String) {
+                                    String description = (String) result;
+                                    if (description != null && !description.isEmpty()) {
+                                        errorMessage.append(description).append("\n");
+                                        descriptionFound = true;
+                                        break; // Found a valid description, stop trying methods
+                                    }
+                                }
+                            } catch (NoSuchMethodException ignored) {
+                                // Try next method name
+                            }
+                        }
+                        
+                        // If no description method worked, try to build one from line and column info
+                        if (!descriptionFound) {
+                            StringBuilder sb = new StringBuilder();
+                            
+                            // Try to get line info
+                            try {
+                                java.lang.reflect.Method getLineMethod = problem.getClass().getMethod("getLine");
+                                Object lineObj = getLineMethod.invoke(problem);
+                                if (lineObj instanceof Integer) {
+                                    int line = (Integer) lineObj;
+                                    if (line >= 0) {
+                                        sb.append("Line ").append(line);
+                                        
+                                        // Try to get column info
+                                        try {
+                                            java.lang.reflect.Method getColumnMethod = problem.getClass().getMethod("getColumn");
+                                            Object columnObj = getColumnMethod.invoke(problem);
+                                            if (columnObj instanceof Integer) {
+                                                int column = (Integer) columnObj;
+                                                if (column >= 0) {
+                                                    sb.append(", Column ").append(column);
+                                                }
+                                            }
+                                        } catch (Exception e) {
+                                            // Ignore column errors
+                                        }
+                                        
+                                        sb.append(": Error in code");
+                                        errorMessage.append(sb).append("\n");
+                                        descriptionFound = true;
+                                    }
+                                }
+                            } catch (Exception e) {
+                                // Ignore line errors
+                            }
+                            
+                            // If we still have no description, add a generic fallback
+                            if (!descriptionFound) {
+                                errorMessage.append("Unknown error in file\n");
+                            }
+                        }
+                    } catch (Exception e) {
+                        errorMessage.append("Error accessing problem details: ").append(e.getMessage()).append("\n");
+                    }
                 }
                 
                 // Get language from file extension
