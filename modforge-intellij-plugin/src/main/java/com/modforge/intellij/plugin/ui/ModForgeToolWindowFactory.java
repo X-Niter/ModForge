@@ -517,8 +517,8 @@ public class ModForgeToolWindowFactory implements ToolWindowFactory {
         @Override
         protected void doOKAction() {
             if (getUsername().isEmpty()) {
-                Messages.showErrorDialog(
-                        getContentPanel(),
+                com.modforge.intellij.plugin.utils.CompatibilityUtil.showErrorDialog(
+                        null, // No project context here, using null instead
                         "Username cannot be empty",
                         "Validation Error"
                 );

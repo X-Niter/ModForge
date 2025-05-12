@@ -45,13 +45,13 @@ public class ErrorHandler {
         
         if (showStackTrace) {
             String stackTrace = getStackTrace(e);
-            Messages.showErrorDialog(
+            com.modforge.intellij.plugin.utils.CompatibilityUtil.showErrorDialog(
                     project,
                     message + "\n\n" + stackTrace,
                     title
             );
         } else {
-            Messages.showErrorDialog(
+            com.modforge.intellij.plugin.utils.CompatibilityUtil.showErrorDialog(
                     project,
                     message + "\n\n" + e.getMessage(),
                     title
