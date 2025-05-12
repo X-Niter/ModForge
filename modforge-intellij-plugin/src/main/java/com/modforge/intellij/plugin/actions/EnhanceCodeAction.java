@@ -110,11 +110,10 @@ public class EnhanceCodeAction extends AnAction {
                         enhancementTypes[0]
                 );
             } else {
-                enhancementTypeIndex = Messages.showChooseDialog(
+                enhancementTypeIndex = CompatibilityUtil.showChooseDialog(
                         project,
                         "What type of enhancement would you like to perform?",
                         "Select Enhancement Type",
-                        Messages.getQuestionIcon(),
                         enhancementTypes,
                         enhancementTypes[0]
                 );

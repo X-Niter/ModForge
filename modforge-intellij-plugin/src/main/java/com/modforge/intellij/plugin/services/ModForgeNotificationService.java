@@ -246,6 +246,26 @@ public final class ModForgeNotificationService {
     }
     
     /**
+     * Shows a Yes/No dialog with custom button text.
+     * Overload with title and message in reverse order for compatibility.
+     * 
+     * @param project The project
+     * @param title The title
+     * @param message The message
+     * @param yesButtonText Custom text for Yes button
+     * @param noButtonText Custom text for No button
+     * @return The result (YES or NO)
+     */
+    public int showYesNoDialog(
+            @Nullable Project project,
+            @NotNull String title,
+            @NotNull String message,
+            @NotNull String yesButtonText,
+            @NotNull String noButtonText) {
+        return showYesNoDialog(project, message, title, yesButtonText, noButtonText, null);
+    }
+    
+    /**
      * Shows a dialog with Yes/No options.
      * Compatible with IntelliJ IDEA 2025.1.1.1
      *
