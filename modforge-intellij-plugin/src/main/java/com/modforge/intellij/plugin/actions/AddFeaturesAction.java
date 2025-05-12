@@ -99,11 +99,10 @@ public class AddFeaturesAction extends AnAction {
                         "Add the following feature to your mod?\n\n" + featureDescription
                 );
             } else {
-                confirmation = Messages.showYesNoDialog(
+                confirmation = CompatibilityUtil.showYesNoDialog(
                         project,
                         "Add the following feature to your mod?\n\n" + featureDescription,
-                        "Confirm Feature Addition",
-                        Messages.getQuestionIcon()
+                        "Confirm Feature Addition"
                 );
             }
             
