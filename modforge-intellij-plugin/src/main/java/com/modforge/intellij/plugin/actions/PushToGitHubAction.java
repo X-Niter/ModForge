@@ -17,7 +17,7 @@ import com.intellij.ui.components.JBTextField;
 import com.intellij.util.ui.FormBuilder;
 import com.modforge.intellij.plugin.auth.ModAuthenticationManager;
 import com.modforge.intellij.plugin.github.GitHubIntegrationService;
-import com.modforge.intellij.plugin.notifications.ModForgeNotificationService;
+import com.modforge.intellij.plugin.services.ModForgeNotificationService;
 import com.modforge.intellij.plugin.settings.ModForgeSettings;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -48,11 +48,20 @@ public class PushToGitHubAction extends AnAction {
         // Check if user is authenticated
         ModAuthenticationManager authManager = ModAuthenticationManager.getInstance();
         if (!authManager.isAuthenticated()) {
-            Messages.showErrorDialog(
-                    project,
-                    "You need to login to ModForge before pushing to GitHub.",
-                    "Authentication Required"
-            );
+            ModForgeNotificationService notificationService = ModForgeNotificationService.getInstance(project);
+            if (notificationService != null) {
+                notificationService.showErrorDialog(
+                        project,
+                        "Authentication Required",
+                        "You need to login to ModForge before pushing to GitHub."
+                );
+            } else {
+                Messages.showErrorDialog(
+                        project,
+                        "You need to login to ModForge before pushing to GitHub.",
+                        "Authentication Required"
+                );
+            }
             return;
         }
         
