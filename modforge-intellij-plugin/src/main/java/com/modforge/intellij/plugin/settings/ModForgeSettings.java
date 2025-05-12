@@ -66,6 +66,78 @@ public final class ModForgeSettings implements PersistentStateComponent<ModForge
      */
     public ModForgeSettings() {
     }
+    
+    /**
+     * Gets the username.
+     *
+     * @return The username
+     */
+    public String getUsername() {
+        return username;
+    }
+
+    /**
+     * Sets the username.
+     *
+     * @param username The username to set
+     */
+    public void setUsername(String username) {
+        this.username = username;
+    }
+    
+    /**
+     * Gets the password.
+     *
+     * @return The password
+     */
+    public String getPassword() {
+        return password;
+    }
+
+    /**
+     * Sets the password.
+     *
+     * @param password The password to set
+     */
+    public void setPassword(String password) {
+        this.password = password;
+    }
+    
+    /**
+     * Checks if the user is authenticated.
+     *
+     * @return True if authenticated, false otherwise
+     */
+    public boolean isAuthenticated() {
+        return accessToken != null && !accessToken.isEmpty();
+    }
+    
+    /**
+     * Gets the continuous development scan interval in milliseconds.
+     *
+     * @return The scan interval
+     */
+    public long getContinuousDevelopmentScanInterval() {
+        return continuousDevelopmentScanInterval;
+    }
+
+    /**
+     * Sets the continuous development scan interval in milliseconds.
+     *
+     * @param interval The scan interval to set
+     */
+    public void setContinuousDevelopmentScanInterval(long interval) {
+        this.continuousDevelopmentScanInterval = interval;
+    }
+    
+    /**
+     * Sets whether pattern recognition is enabled.
+     *
+     * @param enabled True to enable, false to disable
+     */
+    public void setEnablePatternRecognition(boolean enabled) {
+        this.enablePatternRecognition = enabled;
+    }
 
     /**
      * Gets the instance of the settings.

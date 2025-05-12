@@ -184,9 +184,11 @@ public class StartCollaborationAction extends AnAction {
         private final JBTextField sessionIdField;
         private final JBRadioButton startSessionRadio;
         private final JBRadioButton joinSessionRadio;
+        private final Project project;
         
         protected CollaborationDialog(@Nullable Project project) {
             super(project);
+            this.project = project;
             
             // Get the stored username from settings
             String savedUsername = ModForgeSettings.getInstance().getUsername();
@@ -301,6 +303,15 @@ public class StartCollaborationAction extends AnAction {
          */
         public boolean isStartSession() {
             return startSessionRadio.isSelected();
+        }
+        
+        /**
+         * Gets the project for this dialog.
+         *
+         * @return The project associated with this dialog
+         */
+        public Project getProject() {
+            return project;
         }
     }
 }
