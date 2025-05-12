@@ -172,6 +172,7 @@ public class PushToGitHubAction extends AnAction {
                             } else {
                                 if (notificationService != null) {
                                     notificationService.showErrorNotification(
+                                            project,
                                             "Push Failed",
                                             result.getMessage()
                                     );
