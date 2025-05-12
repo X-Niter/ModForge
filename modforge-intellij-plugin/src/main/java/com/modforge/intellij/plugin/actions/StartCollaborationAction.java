@@ -42,14 +42,27 @@ public class StartCollaborationAction extends AnAction {
         
         // Check if already connected
         if (collaborationService.isConnected()) {
-            int result = Messages.showYesNoDialog(
-                    project,
-                    "You are already in a collaboration session. Do you want to leave it?",
-                    "Already in Session",
-                    "Yes",
-                    "No",
-                    AllIcons.General.QuestionDialog
-            );
+            ModForgeNotificationService notificationService = project.getService(ModForgeNotificationService.class);
+            int result;
+            if (notificationService != null) {
+                result = notificationService.showYesNoDialog(
+                        project,
+                        "Already in Session",
+                        "You are already in a collaboration session. Do you want to leave it?",
+                        "Yes", 
+                        "No"
+                );
+            } else {
+                // Fallback to standard Messages dialog
+                result = Messages.showYesNoDialog(
+                        project,
+                        "You are already in a collaboration session. Do you want to leave it?",
+                        "Already in Session",
+                        "Yes",
+                        "No",
+                        AllIcons.General.QuestionDialog
+                );
+            }
             
             if (result == Messages.YES) {
                 collaborationService.leaveSession().thenAccept(success -> {

@@ -7,6 +7,7 @@ import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.Messages;
 import com.modforge.intellij.plugin.auth.ModAuthenticationManager;
 import com.modforge.intellij.plugin.services.ContinuousDevelopmentService;
+import com.modforge.intellij.plugin.services.ModForgeNotificationService;
 import org.jetbrains.annotations.NotNull;
 
 /**
@@ -30,24 +31,46 @@ public class LogoutAction extends AnAction {
         
         // Make sure the user is authenticated
         if (!authManager.isAuthenticated()) {
-            Messages.showInfoMessage(
-                    project,
-                    "You are not currently logged in.",
-                    "Logout"
-            );
+            ModForgeNotificationService notificationService = project.getService(ModForgeNotificationService.class);
+            if (notificationService != null) {
+                notificationService.showInfoDialog(
+                        project,
+                        "Logout",
+                        "You are not currently logged in."
+                );
+            } else {
+                Messages.showInfoMessage(
+                        project,
+                        "You are not currently logged in.",
+                        "Logout"
+                );
+            }
             return;
         }
         
         // Ask for confirmation
         String username = authManager.getUsername();
-        int result = Messages.showYesNoDialog(
-                project,
-                "Are you sure you want to log out from ModForge? This will stop all services that require authentication.",
-                "Confirm Logout",
-                "Logout",
-                "Cancel",
-                null
-        );
+        int result;
+        
+        ModForgeNotificationService notificationService = project.getService(ModForgeNotificationService.class);
+        if (notificationService != null) {
+            result = notificationService.showYesNoDialog(
+                    project,
+                    "Confirm Logout",
+                    "Are you sure you want to log out from ModForge? This will stop all services that require authentication.",
+                    "Logout",
+                    "Cancel"
+            );
+        } else {
+            result = Messages.showYesNoDialog(
+                    project,
+                    "Are you sure you want to log out from ModForge? This will stop all services that require authentication.",
+                    "Confirm Logout",
+                    "Logout",
+                    "Cancel",
+                    null
+            );
+        }
         
         if (result == Messages.YES) {
             // Stop continuous development if it's running
