@@ -8,7 +8,7 @@ import com.modforge.intellij.plugin.memory.MemoryManager;
 import com.modforge.intellij.plugin.memory.MemoryOptimizer;
 import com.modforge.intellij.plugin.memory.MemoryUtils;
 import com.modforge.intellij.plugin.memory.settings.MemoryManagementSettings;
-import com.modforge.intellij.plugin.notifications.ModForgeNotificationService;
+import com.modforge.intellij.plugin.services.ModForgeNotificationService;
 
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
@@ -39,7 +39,7 @@ public class MemoryAwareContinuousService implements Disposable, MemoryManager.M
      */
     public MemoryAwareContinuousService(Project project) {
         this.project = project;
-        this.notificationService = project.getService(ModForgeNotificationService.class);
+        this.notificationService = ModForgeNotificationService.getInstance();
         
         // Register as a memory pressure listener
         MemoryManager memoryManager = MemoryManager.getInstance();

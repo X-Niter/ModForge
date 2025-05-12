@@ -453,7 +453,7 @@ public class FixErrorsAction extends AnAction {
                                 LOG.error("Error fixing code", e);
                                 
                                 ApplicationManager.getApplication().invokeLater(() -> {
-                                    ModForgeNotificationService notificationService = project.getService(ModForgeNotificationService.class);
+                                    ModForgeNotificationService notificationService = ModForgeNotificationService.getInstance();
                                     notificationService.showErrorDialog(
                                             project,
                                             "Fix Error",
@@ -470,7 +470,7 @@ public class FixErrorsAction extends AnAction {
                     LOG.error("Error fixing code", e);
                     
                     ApplicationManager.getApplication().invokeLater(() -> {
-                        ModForgeNotificationService notificationService = project.getService(ModForgeNotificationService.class);
+                        ModForgeNotificationService notificationService = ModForgeNotificationService.getInstance();
                         notificationService.showErrorDialog(
                                 project,
                                 "Fix Error",
