@@ -79,7 +79,7 @@ public class PushToGitHubAction extends AnAction {
                         "Cancel"
                 );
                 
-                if (result == Messages.YES) {
+                if (result == CompatibilityUtil.DIALOG_YES) {
                     // Open settings dialog
                     ModForgeSettings settings = ModForgeSettings.getInstance();
                     settings.openSettings(project);
@@ -93,7 +93,7 @@ public class PushToGitHubAction extends AnAction {
                         "Cancel"
                 );
                 
-                if (result == Messages.YES) {
+                if (result == CompatibilityUtil.DIALOG_YES) {
                     // Open settings dialog
                     ModForgeSettings settings = ModForgeSettings.getInstance();
                     settings.openSettings(project);
