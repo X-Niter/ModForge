@@ -139,8 +139,9 @@ public class StartCollaborationAction extends AnAction {
                 }
             }).exceptionally(ex -> {
                 ModForgeNotificationService.getInstance().showErrorNotification(
-                        "Failed to join session: " + ex.getMessage(),
-                        "Error"
+                        project,
+                        "Error",
+                        "Failed to join session: " + ex.getMessage()
                 );
                 return null;
             });
