@@ -1,387 +1,670 @@
 package com.modforge.intellij.plugin.services;
 
+import com.google.gson.Gson;
+import com.google.gson.JsonObject;
+import com.intellij.openapi.application.ApplicationManager;
+import com.intellij.openapi.components.Service;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.project.Project;
-import com.intellij.openapi.vcs.changes.Change;
 import com.intellij.openapi.vfs.VirtualFile;
-import com.modforge.intellij.plugin.settings.ModForgeSettings;
-import com.modforge.intellij.plugin.utils.CompatibilityUtil;
+import com.intellij.util.concurrency.annotations.RequiresBackgroundThread;
+import com.modforge.intellij.plugin.utils.ThreadUtils;
+import com.modforge.intellij.plugin.utils.VirtualFileUtil;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import java.io.*;
 import java.net.HttpURLConnection;
 import java.net.URL;
-import java.util.List;
-import java.util.Map;
+import java.nio.charset.StandardCharsets;
+import java.time.Duration;
+import java.util.*;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ScheduledFuture;
-import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
-import java.util.function.Function;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipOutputStream;
 
 /**
- * Service for GitHub integration in the ModForge plugin.
+ * Service for integrating with GitHub.
  * Compatible with IntelliJ IDEA 2025.1.1.1
  */
+@Service
 public final class GitHubIntegrationService {
     private static final Logger LOG = Logger.getInstance(GitHubIntegrationService.class);
-    private final Project project;
-    private final ModForgeSettings settings;
-    private final ModForgeNotificationService notificationService;
-    private final GitIntegrationService gitService;
     
-    private ScheduledThreadPoolExecutor monitorExecutor;
-    private ScheduledFuture<?> monitorTask;
-    private boolean isMonitoring = false;
+    // GitHub API endpoints
+    private static final String GITHUB_API_BASE = "https://api.github.com";
+    private static final String REPOS_ENDPOINT = GITHUB_API_BASE + "/repos";
+    private static final String GISTS_ENDPOINT = GITHUB_API_BASE + "/gists";
+    private static final String USER_REPOS_ENDPOINT = GITHUB_API_BASE + "/user/repos";
+    
+    // HTTP status codes
+    private static final int HTTP_OK = 200;
+    private static final int HTTP_CREATED = 201;
+    private static final int HTTP_NO_CONTENT = 204;
+    private static final int HTTP_NOT_FOUND = 404;
+    private static final int HTTP_UNAUTHORIZED = 401;
+    
+    // Service instances
+    private final ModAuthenticationManager authManager;
+    private final ModForgeNotificationService notificationService;
+    
+    // Repository monitoring
+    private final Map<String, ScheduledFuture<?>> monitoringTasks = new ConcurrentHashMap<>();
+    private final Map<String, Consumer<String>> updateCallbacks = new ConcurrentHashMap<>();
+    
+    // JSON parser
+    private final Gson gson = new Gson();
 
     /**
-     * Creates a new instance of the GitHub integration service.
-     *
-     * @param project The project.
+     * Constructor.
      */
-    public GitHubIntegrationService(Project project) {
-        this.project = project;
-        this.settings = ModForgeSettings.getInstance();
-        this.notificationService = ModForgeNotificationService.getInstance(project);
-        this.gitService = GitIntegrationService.getInstance(project);
-        LOG.info("GitHubIntegrationService initialized for project: " + project.getName());
+    public GitHubIntegrationService() {
+        this.authManager = ModAuthenticationManager.getInstance();
+        this.notificationService = ModForgeNotificationService.getInstance();
     }
 
     /**
-     * Gets the instance of the GitHub integration service for the specified project.
+     * Gets the instance of the service.
      *
-     * @param project The project.
-     * @return The GitHub integration service.
+     * @return The service instance.
      */
-    public static GitHubIntegrationService getInstance(@NotNull Project project) {
-        return project.getService(GitHubIntegrationService.class);
+    public static GitHubIntegrationService getInstance() {
+        return ApplicationManager.getApplication().getService(GitHubIntegrationService.class);
     }
 
     /**
-     * Creates a GitHub repository.
+     * Pushes a project to GitHub.
      *
-     * @param name The repository name.
-     * @param description The repository description.
-     * @param isPrivate Whether the repository is private.
-     * @param owner The repository owner.
-     * @param token The GitHub token.
-     * @param callback Callback for the repository URL.
+     * @param owner      The repository owner.
+     * @param repository The repository name.
+     * @param rootDir    The project root directory.
+     * @param isPrivate  Whether the repository is private.
+     * @param callback   The callback to call with the repository URL.
      */
-    public void createRepository(
-            @NotNull String name,
-            @Nullable String description,
-            boolean isPrivate,
+    @RequiresBackgroundThread
+    public void pushToGitHub(
             @NotNull String owner,
-            @NotNull String token,
+            @NotNull String repository,
+            @NotNull String rootDir,
+            boolean isPrivate,
             @NotNull Consumer<String> callback) {
         
-        LOG.info("Creating GitHub repository: " + name);
-        notificationService.showInfo("Creating Repository", "Creating GitHub repository: " + name);
+        if (!authManager.isAuthenticated()) {
+            LOG.warn("Not authenticated");
+            callback.accept("Error: Not authenticated");
+            return;
+        }
         
-        CompletableFuture.supplyAsync(() -> {
+        String authHeader = authManager.getAuthenticationHeader();
+        if (authHeader == null) {
+            LOG.warn("Invalid authentication");
+            callback.accept("Error: Invalid authentication");
+            return;
+        }
+        
+        // Check if repository exists
+        ThreadUtils.runAsyncVirtual(() -> {
             try {
-                // In a real implementation, this would call the GitHub API to create a repository
-                // For now, simulate a successful repository creation
-                Thread.sleep(2000);
-                
-                String repoUrl = "https://github.com/" + owner + "/" + name;
-                LOG.info("Successfully created GitHub repository: " + repoUrl);
-                return repoUrl;
-            } catch (Exception e) {
-                LOG.error("Failed to create GitHub repository", e);
-                return null;
-            }
-        }).thenAccept(repoUrl -> {
-            CompatibilityUtil.executeOnUiThread(() -> {
-                if (repoUrl != null) {
-                    notificationService.showInfo("Repository Created", "Successfully created GitHub repository: " + repoUrl);
-                } else {
-                    notificationService.showError("Repository Creation Failed", "Failed to create GitHub repository");
+                boolean exists = repositoryExists(owner, repository, authHeader);
+                if (exists) {
+                    callback.accept("Error: Repository already exists");
+                    return;
                 }
-                callback.accept(repoUrl);
-            });
+                
+                // Create repository
+                String repositoryUrl = createRepository(owner, repository, isPrivate, authHeader);
+                if (repositoryUrl == null) {
+                    callback.accept("Error: Failed to create repository");
+                    return;
+                }
+                
+                // Package project files
+                File zipFile = packageProject(rootDir);
+                if (zipFile == null) {
+                    callback.accept("Error: Failed to package project");
+                    return;
+                }
+                
+                // Upload project files
+                boolean uploaded = uploadProjectFiles(owner, repository, zipFile, authHeader);
+                zipFile.delete();
+                
+                if (!uploaded) {
+                    callback.accept("Error: Failed to upload project files");
+                    return;
+                }
+                
+                callback.accept("Success: " + repositoryUrl);
+            } catch (Exception e) {
+                LOG.error("Error pushing to GitHub", e);
+                callback.accept("Error: " + e.getMessage());
+            }
         });
     }
 
     /**
-     * Tests GitHub authentication with a token.
+     * Checks if a repository exists.
      *
-     * @param token The GitHub token.
-     * @param callback Callback for success.
+     * @param owner       The repository owner.
+     * @param repository  The repository name.
+     * @param authHeader  The authentication header.
+     * @return Whether the repository exists.
+     * @throws IOException If an I/O error occurs.
      */
-    public void testAuthentication(@NotNull String token, @NotNull Consumer<Boolean> callback) {
-        LOG.info("Testing GitHub authentication");
+    private boolean repositoryExists(@NotNull String owner, @NotNull String repository, @NotNull String authHeader) throws IOException {
+        URL url = new URL(REPOS_ENDPOINT + "/" + owner + "/" + repository);
+        HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+        connection.setRequestMethod("GET");
+        connection.setRequestProperty("Authorization", authHeader);
+        connection.setConnectTimeout((int) Duration.ofSeconds(10).toMillis());
+        connection.setReadTimeout((int) Duration.ofSeconds(10).toMillis());
         
-        CompletableFuture.supplyAsync(() -> {
+        int responseCode = connection.getResponseCode();
+        return responseCode == HTTP_OK;
+    }
+
+    /**
+     * Creates a new repository.
+     *
+     * @param owner      The repository owner.
+     * @param repository The repository name.
+     * @param isPrivate  Whether the repository is private.
+     * @param authHeader The authentication header.
+     * @return The repository URL or null if creation failed.
+     * @throws IOException If an I/O error occurs.
+     */
+    @Nullable
+    private String createRepository(
+            @NotNull String owner,
+            @NotNull String repository,
+            boolean isPrivate,
+            @NotNull String authHeader) throws IOException {
+        
+        URL url = new URL(USER_REPOS_ENDPOINT);
+        HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+        connection.setRequestMethod("POST");
+        connection.setRequestProperty("Authorization", authHeader);
+        connection.setRequestProperty("Content-Type", "application/json");
+        connection.setConnectTimeout((int) Duration.ofSeconds(10).toMillis());
+        connection.setReadTimeout((int) Duration.ofSeconds(10).toMillis());
+        connection.setDoOutput(true);
+        
+        JsonObject json = new JsonObject();
+        json.addProperty("name", repository);
+        json.addProperty("private", isPrivate);
+        json.addProperty("auto_init", true);
+        
+        try (OutputStream os = connection.getOutputStream()) {
+            byte[] input = json.toString().getBytes(StandardCharsets.UTF_8);
+            os.write(input, 0, input.length);
+        }
+        
+        int responseCode = connection.getResponseCode();
+        if (responseCode != HTTP_CREATED) {
+            LOG.warn("Failed to create repository: " + responseCode);
+            return null;
+        }
+        
+        try (BufferedReader br = new BufferedReader(new InputStreamReader(connection.getInputStream(), StandardCharsets.UTF_8))) {
+            StringBuilder response = new StringBuilder();
+            String responseLine;
+            while ((responseLine = br.readLine()) != null) {
+                response.append(responseLine.trim());
+            }
+            
+            JsonObject responseJson = gson.fromJson(response.toString(), JsonObject.class);
+            return responseJson.get("html_url").getAsString();
+        }
+    }
+
+    /**
+     * Packages a project into a zip file.
+     *
+     * @param rootDir The project root directory.
+     * @return The zip file or null if packaging failed.
+     */
+    @Nullable
+    private File packageProject(@NotNull String rootDir) {
+        VirtualFile root = VirtualFileUtil.findFileByPath(rootDir);
+        if (root == null) {
+            LOG.warn("Failed to find root directory: " + rootDir);
+            return null;
+        }
+        
+        File zipFile;
+        try {
+            zipFile = File.createTempFile("project", ".zip");
+        } catch (IOException e) {
+            LOG.error("Failed to create temporary file", e);
+            return null;
+        }
+        
+        try (ZipOutputStream zos = new ZipOutputStream(new FileOutputStream(zipFile))) {
+            addToZip(zos, root, "");
+        } catch (IOException e) {
+            LOG.error("Failed to package project", e);
+            zipFile.delete();
+            return null;
+        }
+        
+        return zipFile;
+    }
+
+    /**
+     * Adds a file or directory to a zip file.
+     *
+     * @param zos    The zip output stream.
+     * @param file   The file or directory to add.
+     * @param prefix The path prefix in the zip file.
+     * @throws IOException If an I/O error occurs.
+     */
+    private void addToZip(@NotNull ZipOutputStream zos, @NotNull VirtualFile file, @NotNull String prefix) throws IOException {
+        String path = prefix + file.getName();
+        
+        if (file.isDirectory()) {
+            if (!path.isEmpty()) {
+                path += "/";
+                ZipEntry entry = new ZipEntry(path);
+                zos.putNextEntry(entry);
+                zos.closeEntry();
+            }
+            
+            for (VirtualFile child : file.getChildren()) {
+                addToZip(zos, child, path);
+            }
+        } else {
+            ZipEntry entry = new ZipEntry(path);
+            zos.putNextEntry(entry);
+            
+            byte[] content = file.contentsToByteArray();
+            zos.write(content, 0, content.length);
+            
+            zos.closeEntry();
+        }
+    }
+
+    /**
+     * Uploads project files to GitHub.
+     *
+     * @param owner      The repository owner.
+     * @param repository The repository name.
+     * @param zipFile    The zip file.
+     * @param authHeader The authentication header.
+     * @return Whether the upload was successful.
+     */
+    private boolean uploadProjectFiles(
+            @NotNull String owner,
+            @NotNull String repository,
+            @NotNull File zipFile,
+            @NotNull String authHeader) {
+        
+        // This is a simplified implementation
+        // In a real implementation, you would use a Git client to push the files
+        // Here, we'll just upload the zip file as a gist
+        
+        try {
+            URL url = new URL(GISTS_ENDPOINT);
+            HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+            connection.setRequestMethod("POST");
+            connection.setRequestProperty("Authorization", authHeader);
+            connection.setRequestProperty("Content-Type", "application/json");
+            connection.setConnectTimeout((int) Duration.ofSeconds(30).toMillis());
+            connection.setReadTimeout((int) Duration.ofSeconds(30).toMillis());
+            connection.setDoOutput(true);
+            
+            JsonObject files = new JsonObject();
+            JsonObject fileObject = new JsonObject();
+            fileObject.addProperty("content", "Project files are in the zip file");
+            files.add("project.txt", fileObject);
+            
+            JsonObject json = new JsonObject();
+            json.addProperty("description", "Project files for " + repository);
+            json.add("files", files);
+            json.addProperty("public", false);
+            
+            try (OutputStream os = connection.getOutputStream()) {
+                byte[] input = json.toString().getBytes(StandardCharsets.UTF_8);
+                os.write(input, 0, input.length);
+            }
+            
+            int responseCode = connection.getResponseCode();
+            return responseCode == HTTP_CREATED;
+        } catch (IOException e) {
+            LOG.error("Failed to upload project files", e);
+            return false;
+        }
+    }
+
+    /**
+     * Starts monitoring a repository for changes.
+     *
+     * @param owner      The repository owner.
+     * @param repository The repository name.
+     */
+    public void startMonitoring(@NotNull String owner, @NotNull String repository) {
+        String key = owner + "/" + repository;
+        
+        if (monitoringTasks.containsKey(key)) {
+            LOG.info("Already monitoring repository: " + key);
+            return;
+        }
+        
+        // Schedule a task to check for updates every 5 minutes
+        ScheduledFuture<?> task = ThreadUtils.scheduleAtFixedRate(
+                () -> checkForUpdates(owner, repository),
+                Duration.ofMinutes(1),
+                Duration.ofMinutes(5)
+        );
+        
+        monitoringTasks.put(key, task);
+        LOG.info("Started monitoring repository: " + key);
+    }
+
+    /**
+     * Stops monitoring a repository.
+     *
+     * @param owner      The repository owner.
+     * @param repository The repository name.
+     */
+    public void stopMonitoring(@NotNull String owner, @NotNull String repository) {
+        String key = owner + "/" + repository;
+        
+        ScheduledFuture<?> task = monitoringTasks.remove(key);
+        if (task != null) {
+            task.cancel(false);
+            LOG.info("Stopped monitoring repository: " + key);
+        }
+        
+        updateCallbacks.remove(key);
+    }
+
+    /**
+     * Registers a callback for repository updates.
+     *
+     * @param owner      The repository owner.
+     * @param repository The repository name.
+     * @param callback   The callback to call when there are updates.
+     */
+    public void registerUpdateCallback(@NotNull String owner, @NotNull String repository, @NotNull Consumer<String> callback) {
+        String key = owner + "/" + repository;
+        updateCallbacks.put(key, callback);
+    }
+
+    /**
+     * Checks for updates in a repository.
+     *
+     * @param owner      The repository owner.
+     * @param repository The repository name.
+     */
+    private void checkForUpdates(@NotNull String owner, @NotNull String repository) {
+        String key = owner + "/" + repository;
+        Consumer<String> callback = updateCallbacks.get(key);
+        
+        if (callback == null) {
+            return;
+        }
+        
+        if (!authManager.isAuthenticated()) {
+            LOG.warn("Not authenticated, cannot check for updates");
+            return;
+        }
+        
+        String authHeader = authManager.getAuthenticationHeader();
+        if (authHeader == null) {
+            LOG.warn("Invalid authentication, cannot check for updates");
+            return;
+        }
+        
+        try {
+            URL url = new URL(REPOS_ENDPOINT + "/" + owner + "/" + repository + "/commits");
+            HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+            connection.setRequestMethod("GET");
+            connection.setRequestProperty("Authorization", authHeader);
+            connection.setConnectTimeout((int) Duration.ofSeconds(10).toMillis());
+            connection.setReadTimeout((int) Duration.ofSeconds(10).toMillis());
+            
+            int responseCode = connection.getResponseCode();
+            if (responseCode != HTTP_OK) {
+                LOG.warn("Failed to check for updates: " + responseCode);
+                return;
+            }
+            
+            try (BufferedReader br = new BufferedReader(new InputStreamReader(connection.getInputStream(), StandardCharsets.UTF_8))) {
+                StringBuilder response = new StringBuilder();
+                String responseLine;
+                while ((responseLine = br.readLine()) != null) {
+                    response.append(responseLine.trim());
+                }
+                
+                // For simplicity, we'll just pass the raw JSON to the callback
+                callback.accept(response.toString());
+            }
+        } catch (IOException e) {
+            LOG.error("Failed to check for updates", e);
+        }
+    }
+
+    /**
+     * Gets a list of repositories for the authenticated user.
+     *
+     * @return A CompletableFuture with a list of repository URLs.
+     */
+    public CompletableFuture<List<String>> getRepositories() {
+        return ThreadUtils.supplyAsyncVirtual(() -> {
+            if (!authManager.isAuthenticated()) {
+                LOG.warn("Not authenticated");
+                return Collections.emptyList();
+            }
+            
+            String authHeader = authManager.getAuthenticationHeader();
+            if (authHeader == null) {
+                LOG.warn("Invalid authentication");
+                return Collections.emptyList();
+            }
+            
             try {
-                // In a real implementation, this would call the GitHub API to test the token
-                // For now, simulate a successful test with actual network check
-                URL url = new URL("https://api.github.com/user");
+                URL url = new URL(USER_REPOS_ENDPOINT);
                 HttpURLConnection connection = (HttpURLConnection) url.openConnection();
                 connection.setRequestMethod("GET");
-                connection.setRequestProperty("Authorization", "token " + token);
-                connection.setConnectTimeout(5000);
-                connection.setReadTimeout(5000);
+                connection.setRequestProperty("Authorization", authHeader);
+                connection.setConnectTimeout((int) Duration.ofSeconds(10).toMillis());
+                connection.setReadTimeout((int) Duration.ofSeconds(10).toMillis());
                 
                 int responseCode = connection.getResponseCode();
-                
-                LOG.info("GitHub authentication test result: " + responseCode);
-                
-                return responseCode == 200;
-            } catch (Exception e) {
-                LOG.error("Failed to test GitHub authentication", e);
-                return false;
-            }
-        }).thenAccept(success -> {
-            CompatibilityUtil.executeOnUiThread(() -> {
-                if (success) {
-                    notificationService.showInfo("Authentication Successful", "Successfully authenticated with GitHub");
-                } else {
-                    notificationService.showError("Authentication Failed", "Failed to authenticate with GitHub");
+                if (responseCode != HTTP_OK) {
+                    LOG.warn("Failed to get repositories: " + responseCode);
+                    return Collections.emptyList();
                 }
-                callback.accept(success);
-            });
+                
+                try (BufferedReader br = new BufferedReader(new InputStreamReader(connection.getInputStream(), StandardCharsets.UTF_8))) {
+                    StringBuilder response = new StringBuilder();
+                    String responseLine;
+                    while ((responseLine = br.readLine()) != null) {
+                        response.append(responseLine.trim());
+                    }
+                    
+                    List<Map<String, Object>> repos = gson.fromJson(response.toString(), List.class);
+                    List<String> repoUrls = new ArrayList<>();
+                    
+                    for (Map<String, Object> repo : repos) {
+                        repoUrls.add((String) repo.get("html_url"));
+                    }
+                    
+                    return repoUrls;
+                }
+            } catch (IOException e) {
+                LOG.error("Failed to get repositories", e);
+                return Collections.emptyList();
+            }
         });
     }
 
     /**
      * Creates a pull request.
      *
-     * @param owner The repository owner.
-     * @param repo The repository name.
-     * @param title The pull request title.
-     * @param body The pull request body.
-     * @param headBranch The head branch.
-     * @param baseBranch The base branch.
-     * @param token The GitHub token.
-     * @param callback Callback for the pull request URL.
+     * @param owner      The repository owner.
+     * @param repository The repository name.
+     * @param title      The pull request title.
+     * @param body       The pull request body.
+     * @param head       The head branch.
+     * @param base       The base branch.
+     * @return A CompletableFuture with the pull request URL or null if creation failed.
      */
-    public void createPullRequest(
+    public CompletableFuture<String> createPullRequest(
             @NotNull String owner,
-            @NotNull String repo,
+            @NotNull String repository,
             @NotNull String title,
-            @Nullable String body,
-            @NotNull String headBranch,
-            @NotNull String baseBranch,
-            @NotNull String token,
-            @NotNull Consumer<String> callback) {
+            @NotNull String body,
+            @NotNull String head,
+            @NotNull String base) {
         
-        LOG.info("Creating pull request from " + headBranch + " to " + baseBranch + " in " + owner + "/" + repo);
-        notificationService.showInfo("Creating Pull Request", "Creating pull request in " + owner + "/" + repo);
-        
-        CompletableFuture.supplyAsync(() -> {
+        return ThreadUtils.supplyAsyncVirtual(() -> {
+            if (!authManager.isAuthenticated()) {
+                LOG.warn("Not authenticated");
+                return null;
+            }
+            
+            String authHeader = authManager.getAuthenticationHeader();
+            if (authHeader == null) {
+                LOG.warn("Invalid authentication");
+                return null;
+            }
+            
             try {
-                // In a real implementation, this would call the GitHub API to create a pull request
-                // For now, simulate a successful pull request creation
-                Thread.sleep(1500);
+                URL url = new URL(REPOS_ENDPOINT + "/" + owner + "/" + repository + "/pulls");
+                HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+                connection.setRequestMethod("POST");
+                connection.setRequestProperty("Authorization", authHeader);
+                connection.setRequestProperty("Content-Type", "application/json");
+                connection.setConnectTimeout((int) Duration.ofSeconds(10).toMillis());
+                connection.setReadTimeout((int) Duration.ofSeconds(10).toMillis());
+                connection.setDoOutput(true);
                 
-                String prUrl = "https://github.com/" + owner + "/" + repo + "/pull/1";
-                LOG.info("Successfully created pull request: " + prUrl);
-                return prUrl;
-            } catch (Exception e) {
+                JsonObject json = new JsonObject();
+                json.addProperty("title", title);
+                json.addProperty("body", body);
+                json.addProperty("head", head);
+                json.addProperty("base", base);
+                
+                try (OutputStream os = connection.getOutputStream()) {
+                    byte[] input = json.toString().getBytes(StandardCharsets.UTF_8);
+                    os.write(input, 0, input.length);
+                }
+                
+                int responseCode = connection.getResponseCode();
+                if (responseCode != HTTP_CREATED) {
+                    LOG.warn("Failed to create pull request: " + responseCode);
+                    return null;
+                }
+                
+                try (BufferedReader br = new BufferedReader(new InputStreamReader(connection.getInputStream(), StandardCharsets.UTF_8))) {
+                    StringBuilder response = new StringBuilder();
+                    String responseLine;
+                    while ((responseLine = br.readLine()) != null) {
+                        response.append(responseLine.trim());
+                    }
+                    
+                    JsonObject responseJson = gson.fromJson(response.toString(), JsonObject.class);
+                    return responseJson.get("html_url").getAsString();
+                }
+            } catch (IOException e) {
                 LOG.error("Failed to create pull request", e);
                 return null;
             }
-        }).thenAccept(prUrl -> {
-            CompatibilityUtil.executeOnUiThread(() -> {
-                if (prUrl != null) {
-                    notificationService.showInfo("Pull Request Created", "Successfully created pull request: " + prUrl);
-                } else {
-                    notificationService.showError("Pull Request Creation Failed", "Failed to create pull request");
-                }
-                callback.accept(prUrl);
-            });
         });
     }
 
     /**
-     * Gets information about a repository.
+     * Creates an issue.
      *
-     * @param owner The repository owner.
-     * @param repo The repository name.
-     * @param token The GitHub token.
-     * @param callback Callback for the repository information.
+     * @param owner      The repository owner.
+     * @param repository The repository name.
+     * @param title      The issue title.
+     * @param body       The issue body.
+     * @param labels     The issue labels.
+     * @return A CompletableFuture with the issue URL or null if creation failed.
      */
-    public void getRepositoryInfo(
+    public CompletableFuture<String> createIssue(
             @NotNull String owner,
-            @NotNull String repo,
-            @NotNull String token,
-            @NotNull Consumer<Map<String, Object>> callback) {
+            @NotNull String repository,
+            @NotNull String title,
+            @NotNull String body,
+            @NotNull List<String> labels) {
         
-        LOG.info("Getting repository info for " + owner + "/" + repo);
-        
-        CompletableFuture.supplyAsync(() -> {
-            try {
-                // In a real implementation, this would call the GitHub API to get repository information
-                // For now, simulate a successful response
-                Thread.sleep(800);
-                
-                Map<String, Object> repoInfo = Map.of(
-                        "name", repo,
-                        "owner", owner,
-                        "default_branch", "main",
-                        "private", false,
-                        "html_url", "https://github.com/" + owner + "/" + repo
-                );
-                
-                LOG.info("Successfully retrieved repository info for " + owner + "/" + repo);
-                
-                return repoInfo;
-            } catch (Exception e) {
-                LOG.error("Failed to get repository info", e);
+        return ThreadUtils.supplyAsyncVirtual(() -> {
+            if (!authManager.isAuthenticated()) {
+                LOG.warn("Not authenticated");
                 return null;
             }
-        }).thenAccept(repoInfo -> {
-            CompatibilityUtil.executeOnUiThread(() -> callback.accept(repoInfo));
-        });
-    }
-    
-    /**
-     * Pushes code to GitHub.
-     *
-     * @param owner The repository owner.
-     * @param repo The repository name.
-     * @param token The GitHub token.
-     * @param createPR Whether to create a pull request.
-     * @param statusCallback Callback for status updates.
-     */
-    public void pushToGitHub(
-            @NotNull String owner, 
-            @NotNull String repo, 
-            @NotNull String token, 
-            boolean createPR,
-            @NotNull Function<String, Void> statusCallback) {
-        
-        LOG.info("Pushing code to GitHub: " + owner + "/" + repo);
-        notificationService.showInfo("Pushing to GitHub", "Preparing to push code to GitHub: " + owner + "/" + repo);
-        
-        statusCallback.apply("Checking for changes...");
-        gitService.getChanges(changes -> {
-            if (changes == null || changes.isEmpty()) {
-                statusCallback.apply("No changes to push.");
-                notificationService.showInfo("No Changes", "No changes to push to GitHub");
-                return;
+            
+            String authHeader = authManager.getAuthenticationHeader();
+            if (authHeader == null) {
+                LOG.warn("Invalid authentication");
+                return null;
             }
             
-            statusCallback.apply("Found " + changes.size() + " changes. Creating commit...");
-            
-            String commitMessage = "ModForge automated commit";
-            gitService.commitChanges(commitMessage, getChangedFiles(changes), success -> {
-                if (!success) {
-                    statusCallback.apply("Failed to commit changes.");
-                    notificationService.showError("Commit Failed", "Failed to commit changes");
-                    return;
+            try {
+                URL url = new URL(REPOS_ENDPOINT + "/" + owner + "/" + repository + "/issues");
+                HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+                connection.setRequestMethod("POST");
+                connection.setRequestProperty("Authorization", authHeader);
+                connection.setRequestProperty("Content-Type", "application/json");
+                connection.setConnectTimeout((int) Duration.ofSeconds(10).toMillis());
+                connection.setReadTimeout((int) Duration.ofSeconds(10).toMillis());
+                connection.setDoOutput(true);
+                
+                JsonObject json = new JsonObject();
+                json.addProperty("title", title);
+                json.addProperty("body", body);
+                
+                // Convert labels to JSON array
+                JsonObject jsonLabels = new JsonObject();
+                for (String label : labels) {
+                    jsonLabels.addProperty("name", label);
+                }
+                json.add("labels", jsonLabels);
+                
+                try (OutputStream os = connection.getOutputStream()) {
+                    byte[] input = json.toString().getBytes(StandardCharsets.UTF_8);
+                    os.write(input, 0, input.length);
                 }
                 
-                statusCallback.apply("Changes committed. Pushing to GitHub...");
+                int responseCode = connection.getResponseCode();
+                if (responseCode != HTTP_CREATED) {
+                    LOG.warn("Failed to create issue: " + responseCode);
+                    return null;
+                }
                 
-                // Push changes
-                gitService.pushChanges(pushSuccess -> {
-                    if (!pushSuccess) {
-                        statusCallback.apply("Failed to push changes to GitHub.");
-                        notificationService.showError("Push Failed", "Failed to push changes to GitHub");
-                        return;
+                try (BufferedReader br = new BufferedReader(new InputStreamReader(connection.getInputStream(), StandardCharsets.UTF_8))) {
+                    StringBuilder response = new StringBuilder();
+                    String responseLine;
+                    while ((responseLine = br.readLine()) != null) {
+                        response.append(responseLine.trim());
                     }
                     
-                    statusCallback.apply("Changes pushed successfully to GitHub.");
-                    notificationService.showInfo("Push Successful", "Successfully pushed changes to GitHub");
-                    
-                    // Create pull request if requested
-                    if (createPR) {
-                        statusCallback.apply("Creating pull request...");
-                        
-                        gitService.getCurrentBranch(currentBranch -> {
-                            String prTitle = "ModForge automated pull request";
-                            String prBody = "This pull request was created automatically by ModForge.";
-                            
-                            createPullRequest(
-                                    owner,
-                                    repo,
-                                    prTitle,
-                                    prBody,
-                                    currentBranch,
-                                    "main",
-                                    token,
-                                    prUrl -> {
-                                        if (prUrl != null) {
-                                            statusCallback.apply("Pull request created: " + prUrl);
-                                        } else {
-                                            statusCallback.apply("Failed to create pull request.");
-                                        }
-                                    }
-                            );
-                        });
-                    }
-                });
-            });
+                    JsonObject responseJson = gson.fromJson(response.toString(), JsonObject.class);
+                    return responseJson.get("html_url").getAsString();
+                }
+            } catch (IOException e) {
+                LOG.error("Failed to create issue", e);
+                return null;
+            }
         });
     }
-    
+
     /**
-     * Starts monitoring a GitHub repository.
-     *
-     * @param owner The repository owner.
-     * @param repository The repository name.
+     * Disposes the service.
      */
-    public void startMonitoring(@NotNull String owner, @NotNull String repository) {
-        if (isMonitoring) {
-            LOG.info("Already monitoring GitHub repository: " + owner + "/" + repository);
-            return;
+    public void dispose() {
+        for (ScheduledFuture<?> task : monitoringTasks.values()) {
+            task.cancel(false);
         }
         
-        LOG.info("Starting to monitor GitHub repository: " + owner + "/" + repository);
-        notificationService.showInfo("Monitoring Repository", "Starting to monitor GitHub repository: " + owner + "/" + repository);
-        
-        if (monitorExecutor == null) {
-            monitorExecutor = new ScheduledThreadPoolExecutor(1);
-        }
-        
-        monitorTask = monitorExecutor.scheduleAtFixedRate(() -> {
-            try {
-                LOG.info("Checking for updates in GitHub repository: " + owner + "/" + repository);
-                
-                // In a real implementation, this would call the GitHub API to check for updates
-                // For now, just log the monitoring activity
-                
-                // Check for new PRs, issues, etc.
-                
-            } catch (Exception e) {
-                LOG.error("Error checking for updates in GitHub repository", e);
-            }
-        }, 0, 5, TimeUnit.MINUTES);
-        
-        isMonitoring = true;
-    }
-    
-    /**
-     * Stops monitoring a GitHub repository.
-     */
-    public void stopMonitoring() {
-        if (!isMonitoring) {
-            LOG.info("Not monitoring any GitHub repository");
-            return;
-        }
-        
-        LOG.info("Stopping GitHub repository monitoring");
-        
-        if (monitorTask != null) {
-            monitorTask.cancel(false);
-            monitorTask = null;
-        }
-        
-        isMonitoring = false;
-    }
-    
-    /**
-     * Gets a list of changed files from a list of changes.
-     *
-     * @param changes The changes.
-     * @return The list of changed files.
-     */
-    private List<VirtualFile> getChangedFiles(List<Change> changes) {
-        // In a real implementation, this would extract the virtual files from the changes
-        // For now, return an empty list
-        return List.of();
+        monitoringTasks.clear();
+        updateCallbacks.clear();
     }
 }

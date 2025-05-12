@@ -1,72 +1,150 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<idea-plugin require-restart="true">
+<idea-plugin>
     <id>com.modforge.intellij.plugin</id>
-    <name>ModForge AI</name>
-    <vendor email="support@modforge.dev" url="https://www.modforge.dev">ModForge</vendor>
-    <!-- Explicit compatibility with IntelliJ IDEA 2025.1.1.1 (Build #IC-251.25410.129) -->
-    <idea-version since-build="233" until-build="251.25410.129"/>
-    
+    <name>ModForge</name>
+    <vendor email="support@modforge.ai" url="https://modforge.ai">ModForge, Inc.</vendor>
+
     <description><![CDATA[
-    <p>ModForge AI - Smart Minecraft Mod Development</p>
-    <p><b>Optimized for IntelliJ IDEA 2025.1 with Java 21 support</b></p>
-    <p>This plugin provides AI-powered assistance for Minecraft mod development:</p>
-    <ul>
-        <li>Multi-mod loader support (Forge, Fabric, Quilt, Architectury)</li>
-        <li>AI-driven code generation</li>
-        <li>Automatic error detection and fixing</li>
-        <li>Pattern recognition to reduce API costs</li>
-        <li>Continuous development for 24/7 improvement</li>
-        <li>Java 21 virtual thread optimization for improved performance</li>
-        <li>Full compatibility with IntelliJ IDEA 2025.1</li>
-    </ul>
+        <p>ModForge is an advanced autonomous build automation platform for Minecraft mod development.</p>
+        
+        <p>Features:</p>
+        <ul>
+            <li>AI-powered code generation for Minecraft mods</li>
+            <li>Support for multiple mod loaders (Forge, Fabric, Quilt, Architectury)</li>
+            <li>Automated error detection and fixing</li>
+            <li>GitHub integration for collaborative development</li>
+            <li>Continuous development with autonomous improvements</li>
+        </ul>
     ]]></description>
-    
-    <!-- Required plugins -->
-    <depends>com.intellij.modules.java</depends>
+
+    <change-notes><![CDATA[
+        <h3>Version 2025.1.0</h3>
+        <ul>
+            <li>Compatibility with IntelliJ IDEA 2025.1.1.1</li>
+            <li>Java 21 virtual thread support for improved performance</li>
+            <li>Enhanced pattern recognition for optimized AI usage</li>
+            <li>Support for Minecraft 1.21 features</li>
+            <li>Improved GitHub integration</li>
+        </ul>
+    ]]></change-notes>
+
+    <!-- please see https://plugins.jetbrains.com/docs/intellij/plugin-compatibility.html
+         on how to target different products -->
     <depends>com.intellij.modules.platform</depends>
-    
-    <!-- Optional plugins with fallbacks in our code -->
-    <depends optional="true" config-file="git-integration.xml">Git4Idea</depends>
-    <depends optional="true" config-file="github-integration.xml">org.jetbrains.plugins.github</depends>
-    <depends optional="true" config-file="minecraft-dev-integration.xml">com.demonwav.minecraft-dev</depends>
-    
-    <!-- Extensions -->
+    <depends>com.intellij.modules.java</depends>
+
     <extensions defaultExtensionNs="com.intellij">
         <!-- Services -->
         <applicationService serviceImplementation="com.modforge.intellij.plugin.settings.ModForgeSettings"/>
-        <projectService serviceImplementation="com.modforge.intellij.plugin.services.ModForgeNotificationService"/>
+        <applicationService serviceImplementation="com.modforge.intellij.plugin.services.ModAuthenticationManager"/>
+        <applicationService serviceImplementation="com.modforge.intellij.plugin.services.ModForgeNotificationService"/>
+        <applicationService serviceImplementation="com.modforge.intellij.plugin.services.GitHubIntegrationService"/>
+
+        <!-- Project-level services -->
         <projectService serviceImplementation="com.modforge.intellij.plugin.services.AutonomousCodeGenerationService"/>
+        <projectService serviceImplementation="com.modforge.intellij.plugin.services.ContinuousDevelopmentService"/>
+        <projectService serviceImplementation="com.modforge.intellij.plugin.services.CollaborationService"/>
         
-        <!-- Settings UI -->
-        <applicationConfigurable 
-            parentId="tools" 
-            instance="com.modforge.intellij.plugin.ui.ModForgeConfigurable"
-            id="com.modforge.intellij.plugin.ui.ModForgeConfigurable" 
-            displayName="ModForge AI"/>
-            
-        <!-- Notification Group -->
-        <notificationGroup id="ModForgeNotifications" 
-                          displayType="BALLOON" 
-                          toolWindowId="ModForge"
-                          isLogByDefault="true"/>
+        <!-- Settings -->
+        <applicationConfigurable parentId="tools" instance="com.modforge.intellij.plugin.ui.ModForgeConfigurable"
+                                 id="com.modforge.intellij.plugin.ui.ModForgeConfigurable"
+                                 displayName="ModForge Settings"/>
+
+        <!-- Tool Windows -->
+        <toolWindow id="ModForge" anchor="right" icon="AllIcons.General.Modified"
+                    factoryClass="com.modforge.intellij.plugin.ui.toolwindow.ModForgeToolWindowFactory"/>
+
+        <!-- Notification Groups -->
+        <notificationGroup id="ModForge.Info" displayType="BALLOON" toolWindowId="ModForge"/>
+        <notificationGroup id="ModForge.Warning" displayType="BALLOON" toolWindowId="ModForge"/>
+        <notificationGroup id="ModForge.Error" displayType="BALLOON" toolWindowId="ModForge"/>
+        <notificationGroup id="ModForge.Balloon" displayType="BALLOON"/>
     </extensions>
-    
-    <!-- Actions -->
+
     <actions>
-        <group id="ModForge.MainMenu" text="ModForge" description="ModForge AI Menu">
-            <add-to-group group-id="MainMenu" anchor="last"/>
+        <!-- ModForge Menu -->
+        <group id="ModForge.MainMenu" text="ModForge" description="ModForge Menu">
+            <add-to-group group-id="MainMenu" anchor="before" relative-to-action="HelpMenu"/>
             <action id="ModForge.GenerateCode" 
                     class="com.modforge.intellij.plugin.actions.GenerateCodeAction" 
-                    text="Generate Mod Code" 
-                    description="Generate Minecraft mod code using AI"/>
+                    text="Generate Code" 
+                    description="Generate code using AI"/>
             <action id="ModForge.FixErrors" 
                     class="com.modforge.intellij.plugin.actions.FixErrorsAction" 
                     text="Fix Errors" 
                     description="Fix compilation errors using AI"/>
-            <action id="ModForge.Settings" 
-                    class="com.modforge.intellij.plugin.actions.OpenSettingsAction" 
-                    text="Settings" 
-                    description="Open ModForge AI settings"/>
+            <action id="ModForge.EnhanceCode" 
+                    class="com.modforge.intellij.plugin.actions.EnhanceCodeAction" 
+                    text="Enhance Code" 
+                    description="Enhance selected code using AI"/>
+            <action id="ModForge.ExplainCode" 
+                    class="com.modforge.intellij.plugin.actions.ExplainCodeAction" 
+                    text="Explain Code" 
+                    description="Explain selected code using AI"/>
+            <action id="ModForge.GenerateDocumentation" 
+                    class="com.modforge.intellij.plugin.actions.GenerateDocumentationAction" 
+                    text="Generate Documentation" 
+                    description="Generate documentation for selected code using AI"/>
+            <separator/>
+            <action id="ModForge.GenerateMinecraftCode" 
+                    class="com.modforge.intellij.plugin.actions.GenerateMinecraftCodeAction" 
+                    text="Generate Minecraft Mod" 
+                    description="Generate a Minecraft mod using AI"/>
+            <action id="ModForge.AddFeatures" 
+                    class="com.modforge.intellij.plugin.actions.AddFeaturesAction" 
+                    text="Add Features to Mod" 
+                    description="Add features to a Minecraft mod using AI"/>
+            <separator/>
+            <action id="ModForge.PushToGitHub" 
+                    class="com.modforge.intellij.plugin.actions.PushToGitHubAction" 
+                    text="Push to GitHub" 
+                    description="Push project to GitHub"/>
+            <action id="ModForge.StartCollaboration" 
+                    class="com.modforge.intellij.plugin.actions.StartCollaborationAction" 
+                    text="Start Collaboration" 
+                    description="Start collaborative coding session"/>
+            <separator/>
+            <action id="ModForge.Login" 
+                    class="com.modforge.intellij.plugin.actions.LoginAction" 
+                    text="Login" 
+                    description="Login to ModForge"/>
+            <action id="ModForge.Logout" 
+                    class="com.modforge.intellij.plugin.actions.LogoutAction" 
+                    text="Logout" 
+                    description="Logout from ModForge"/>
+            <separator/>
+            <action id="ModForge.TogglePatternRecognition" 
+                    class="com.modforge.intellij.plugin.actions.TogglePatternRecognitionAction" 
+                    text="Toggle Pattern Recognition" 
+                    description="Toggle pattern recognition for AI requests"/>
+            <action id="ModForge.ToggleContinuousDevelopment" 
+                    class="com.modforge.intellij.plugin.actions.ToggleContinuousDevelopmentAction" 
+                    text="Toggle Continuous Development" 
+                    description="Toggle continuous development"/>
+        </group>
+
+        <!-- Editor Popup Menu -->
+        <group id="ModForge.EditorPopupMenu" text="ModForge" description="ModForge Actions">
+            <add-to-group group-id="EditorPopupMenu" anchor="before" relative-to-action="EditorPopupMenu1"/>
+            <action id="ModForge.EditorPopup.GenerateCode" 
+                    class="com.modforge.intellij.plugin.actions.GenerateCodeAction" 
+                    text="Generate Code" 
+                    description="Generate code using AI"/>
+            <action id="ModForge.EditorPopup.EnhanceCode" 
+                    class="com.modforge.intellij.plugin.actions.EnhanceCodeAction" 
+                    text="Enhance Code" 
+                    description="Enhance selected code using AI"/>
+            <action id="ModForge.EditorPopup.ExplainCode" 
+                    class="com.modforge.intellij.plugin.actions.ExplainCodeAction" 
+                    text="Explain Code" 
+                    description="Explain selected code using AI"/>
+            <action id="ModForge.EditorPopup.GenerateDocumentation" 
+                    class="com.modforge.intellij.plugin.actions.GenerateDocumentationAction" 
+                    text="Generate Documentation" 
+                    description="Generate documentation for selected code using AI"/>
         </group>
     </actions>
+    
+    <!-- Compatibility with IntelliJ IDEA 2025.1.1.1 -->
+    <idea-version since-build="241.14494" until-build="250.*"/>
 </idea-plugin>

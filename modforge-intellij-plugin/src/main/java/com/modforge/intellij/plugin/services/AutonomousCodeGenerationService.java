@@ -1,716 +1,512 @@
 package com.modforge.intellij.plugin.services;
 
+import com.google.gson.Gson;
+import com.google.gson.JsonObject;
+import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.components.Service;
 import com.intellij.openapi.diagnostic.Logger;
-import com.intellij.openapi.editor.Document;
-import com.intellij.openapi.editor.Editor;
-import com.intellij.openapi.fileEditor.FileDocumentManager;
-import com.intellij.openapi.fileEditor.FileEditorManager;
-import com.intellij.openapi.progress.ProgressIndicator;
-import com.intellij.openapi.progress.ProgressManager;
-import com.intellij.openapi.progress.Task;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vfs.VirtualFile;
-import com.intellij.psi.PsiFile;
-import com.intellij.psi.PsiManager;
+import com.intellij.util.concurrency.annotations.RequiresBackgroundThread;
 import com.modforge.intellij.plugin.settings.ModForgeSettings;
-import com.modforge.intellij.plugin.utils.CompatibilityUtil;
 import com.modforge.intellij.plugin.utils.ThreadUtils;
 import com.modforge.intellij.plugin.utils.VirtualFileUtil;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-import java.io.IOException;
+import java.io.*;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.function.Consumer;
+import java.util.concurrent.TimeoutException;
 
 /**
- * Service for autonomous code generation in the ModForge plugin.
+ * Service for autonomous code generation using AI.
  * Compatible with IntelliJ IDEA 2025.1.1.1
  */
-@Service(Service.Level.PROJECT)
+@Service
 public final class AutonomousCodeGenerationService {
     private static final Logger LOG = Logger.getInstance(AutonomousCodeGenerationService.class);
     
-    private final Project project;
+    // Server API endpoints
+    private static final String DEFAULT_API_ENDPOINT = "https://modforge.ai/api";
+    private static final String CODE_GENERATION_ENDPOINT = "/generate";
+    private static final String CODE_FIX_ENDPOINT = "/fix";
+    private static final String CODE_ENHANCE_ENDPOINT = "/enhance";
+    private static final String CODE_EXPLAIN_ENDPOINT = "/explain";
+    private static final String CODE_DOCUMENT_ENDPOINT = "/document";
+    private static final String CODE_IMPLEMENT_ENDPOINT = "/implement";
+    private static final String MOD_CODE_ENDPOINT = "/minecraft/generate";
+    private static final String MOD_FIX_ENDPOINT = "/minecraft/fix";
+    private static final String ADD_FEATURES_ENDPOINT = "/minecraft/add-features";
+    
+    // HTTP parameters
+    private static final int HTTP_OK = 200;
+    private static final int HTTP_BAD_REQUEST = 400;
+    private static final int HTTP_UNAUTHORIZED = 401;
+    private static final int HTTP_SERVER_ERROR = 500;
+    
+    // Service instances
     private final ModForgeSettings settings;
     private final ModForgeNotificationService notificationService;
+    private final Project project;
     
-    private final Map<String, AtomicInteger> requestCounts = new HashMap<>();
-    private final AtomicBoolean isGenerating = new AtomicBoolean(false);
+    // JSON parser
+    private final Gson gson = new Gson();
+    
+    // Request timeout
+    private static final Duration DEFAULT_TIMEOUT = Duration.ofSeconds(30);
 
     /**
-     * Creates a new instance of the autonomous code generation service.
+     * Constructor.
      *
      * @param project The project.
      */
     public AutonomousCodeGenerationService(Project project) {
         this.project = project;
         this.settings = ModForgeSettings.getInstance();
-        this.notificationService = ModForgeNotificationService.getInstance(project);
-        LOG.info("AutonomousCodeGenerationService initialized for project: " + project.getName());
+        this.notificationService = ModForgeNotificationService.getInstance();
     }
 
     /**
-     * Gets the instance of the autonomous code generation service for the specified project.
+     * Gets the instance of the service.
      *
      * @param project The project.
-     * @return The autonomous code generation service.
+     * @return The service instance.
      */
     public static AutonomousCodeGenerationService getInstance(@NotNull Project project) {
         return project.getService(AutonomousCodeGenerationService.class);
     }
 
     /**
-     * Generates code based on a prompt.
+     * Generates code from a prompt.
      *
-     * @param prompt The prompt.
-     * @param contextFile The context file.
-     * @param language The programming language.
-     * @return A future with the generated code.
+     * @param prompt   The prompt.
+     * @param file     The file to add context, can be null.
+     * @param language The language to generate.
+     * @return A CompletableFuture with the generated code.
      */
-    @NotNull
-    public CompletableFuture<String> generateCode(
-            @NotNull String prompt,
-            @Nullable String contextFile,
-            @NotNull String language) {
+    public CompletableFuture<String> generateCode(@NotNull String prompt, @Nullable VirtualFile file, @NotNull String language) {
+        Map<String, Object> requestData = new HashMap<>();
+        requestData.put("prompt", prompt);
+        requestData.put("language", language);
         
-        LOG.info("Generating code with prompt: " + prompt);
-        
-        CompletableFuture<String> result = new CompletableFuture<>();
-        
-        if (isGenerating.getAndSet(true)) {
-            LOG.info("Already generating code, queueing request");
-            ThreadUtils.runWithDelay(() -> {
-                generateCode(prompt, contextFile, language).thenAccept(result::complete);
-            }, 1, TimeUnit.SECONDS);
-            return result;
+        if (file != null) {
+            String fileContent = VirtualFileUtil.readFile(file);
+            if (fileContent != null) {
+                requestData.put("context", fileContent);
+            }
         }
         
-        try {
-            ProgressManager.getInstance().run(new Task.Backgroundable(
-                    project,
-                    "Generating Code",
-                    true) {
-                
-                @Override
-                public void run(@NotNull ProgressIndicator indicator) {
-                    try {
-                        indicator.setIndeterminate(false);
-                        indicator.setText("Analyzing prompt...");
-                        indicator.setFraction(0.1);
-                        
-                        // Track request count for this prompt type
-                        String promptType = getPromptType(prompt);
-                        requestCounts.computeIfAbsent(promptType, k -> new AtomicInteger(0))
-                                .incrementAndGet();
-                        
-                        // Use pattern recognition if enabled
-                        boolean usePatterns = settings.isPatternRecognition();
-                        
-                        indicator.setText("Generating code...");
-                        indicator.setFraction(0.3);
-                        
-                        // Mock code generation (in real implementation, call API)
-                        String generatedCode = generateMockCode(prompt, language);
-                        
-                        indicator.setText("Formatting code...");
-                        indicator.setFraction(0.7);
-                        
-                        // Format the code
-                        String formattedCode = formatCode(generatedCode, language);
-                        
-                        indicator.setText("Analyzing generated code...");
-                        indicator.setFraction(0.9);
-                        
-                        // Validate the code
-                        boolean isValid = validateCode(formattedCode, language);
-                        
-                        indicator.setText("Code generation complete");
-                        indicator.setFraction(1.0);
-                        
-                        if (isValid) {
-                            LOG.info("Successfully generated code");
-                            CompatibilityUtil.executeOnUiThread(() -> {
-                                notificationService.showInfo("Code Generation", "Successfully generated code");
-                            });
-                            result.complete(formattedCode);
-                        } else {
-                            LOG.warn("Generated code is invalid");
-                            CompatibilityUtil.executeOnUiThread(() -> {
-                                notificationService.showWarning("Code Generation", "Generated code might have issues");
-                            });
-                            result.complete(formattedCode);
-                        }
-                    } catch (Exception e) {
-                        LOG.error("Failed to generate code", e);
-                        CompatibilityUtil.executeOnUiThread(() -> {
-                            notificationService.showError("Code Generation Failed", e.getMessage());
-                        });
-                        result.completeExceptionally(e);
-                    } finally {
-                        isGenerating.set(false);
-                    }
-                }
-                
-                @Override
-                public void onCancel() {
-                    LOG.info("Code generation cancelled");
-                    isGenerating.set(false);
-                    result.cancel(true);
-                }
-            });
-        } catch (Exception e) {
-            LOG.error("Failed to start code generation task", e);
-            isGenerating.set(false);
-            result.completeExceptionally(e);
-        }
-        
-        return result;
+        return sendRequest(CODE_GENERATION_ENDPOINT, requestData)
+                .thenApply(response -> {
+                    JsonObject jsonResponse = gson.fromJson(response, JsonObject.class);
+                    return jsonResponse.get("code").getAsString();
+                });
     }
 
     /**
      * Fixes code with errors.
      *
-     * @param code The code to fix.
+     * @param code         The code to fix.
      * @param errorMessage The error message.
-     * @param language The programming language.
-     * @return A future with the fixed code.
+     * @param language     The language.
+     * @return A CompletableFuture with the fixed code.
      */
-    @NotNull
-    public CompletableFuture<String> fixCode(
-            @NotNull String code,
-            @NotNull String errorMessage,
-            @NotNull String language) {
+    public CompletableFuture<String> fixCode(@NotNull String code, @NotNull String errorMessage, @NotNull String language) {
+        Map<String, Object> requestData = new HashMap<>();
+        requestData.put("code", code);
+        requestData.put("error", errorMessage);
+        requestData.put("language", language);
         
-        LOG.info("Fixing code with error: " + errorMessage);
-        
-        CompletableFuture<String> result = new CompletableFuture<>();
-        
-        ProgressManager.getInstance().run(new Task.Backgroundable(
-                project,
-                "Fixing Code",
-                true) {
-            
-            @Override
-            public void run(@NotNull ProgressIndicator indicator) {
-                try {
-                    indicator.setIndeterminate(false);
-                    indicator.setText("Analyzing error...");
-                    indicator.setFraction(0.1);
-                    
-                    // Use pattern recognition if enabled
-                    boolean usePatterns = settings.isPatternRecognition();
-                    
-                    indicator.setText("Fixing code...");
-                    indicator.setFraction(0.5);
-                    
-                    // Mock code fixing (in real implementation, call API)
-                    String fixedCode = fixMockCode(code, errorMessage, language);
-                    
-                    indicator.setText("Code fixing complete");
-                    indicator.setFraction(1.0);
-                    
-                    LOG.info("Successfully fixed code");
-                    CompatibilityUtil.executeOnUiThread(() -> {
-                        notificationService.showInfo("Code Fixed", "Successfully fixed code error");
-                    });
-                    result.complete(fixedCode);
-                } catch (Exception e) {
-                    LOG.error("Failed to fix code", e);
-                    CompatibilityUtil.executeOnUiThread(() -> {
-                        notificationService.showError("Code Fix Failed", e.getMessage());
-                    });
-                    result.completeExceptionally(e);
-                }
-            }
-            
-            @Override
-            public void onCancel() {
-                LOG.info("Code fixing cancelled");
-                result.cancel(true);
-            }
-        });
-        
-        return result;
+        return sendRequest(CODE_FIX_ENDPOINT, requestData)
+                .thenApply(response -> {
+                    JsonObject jsonResponse = gson.fromJson(response, JsonObject.class);
+                    return jsonResponse.get("fixedCode").getAsString();
+                });
     }
 
     /**
-     * Enhances code with additional features.
+     * Enhances code.
      *
-     * @param code The code to enhance.
-     * @param instructions The enhancement instructions.
-     * @param language The programming language.
-     * @return A future with the enhanced code.
+     * @param code        The code to enhance.
+     * @param instruction The enhancement instruction.
+     * @param language    The language.
+     * @return A CompletableFuture with the enhanced code.
      */
-    @NotNull
-    public CompletableFuture<String> enhanceCode(
-            @NotNull String code,
-            @NotNull String instructions,
-            @NotNull String language) {
+    public CompletableFuture<String> enhanceCode(@NotNull String code, @NotNull String instruction, @NotNull String language) {
+        Map<String, Object> requestData = new HashMap<>();
+        requestData.put("code", code);
+        requestData.put("instruction", instruction);
+        requestData.put("language", language);
         
-        LOG.info("Enhancing code with instructions: " + instructions);
-        
-        CompletableFuture<String> result = new CompletableFuture<>();
-        
-        ProgressManager.getInstance().run(new Task.Backgroundable(
-                project,
-                "Enhancing Code",
-                true) {
-            
-            @Override
-            public void run(@NotNull ProgressIndicator indicator) {
-                try {
-                    indicator.setIndeterminate(false);
-                    indicator.setText("Analyzing code...");
-                    indicator.setFraction(0.1);
-                    
-                    // Use pattern recognition if enabled
-                    boolean usePatterns = settings.isPatternRecognition();
-                    
-                    indicator.setText("Enhancing code...");
-                    indicator.setFraction(0.5);
-                    
-                    // Mock code enhancement (in real implementation, call API)
-                    String enhancedCode = enhanceMockCode(code, instructions, language);
-                    
-                    indicator.setText("Code enhancement complete");
-                    indicator.setFraction(1.0);
-                    
-                    LOG.info("Successfully enhanced code");
-                    CompatibilityUtil.executeOnUiThread(() -> {
-                        notificationService.showInfo("Code Enhanced", "Successfully enhanced code");
-                    });
-                    result.complete(enhancedCode);
-                } catch (Exception e) {
-                    LOG.error("Failed to enhance code", e);
-                    CompatibilityUtil.executeOnUiThread(() -> {
-                        notificationService.showError("Code Enhancement Failed", e.getMessage());
-                    });
-                    result.completeExceptionally(e);
-                }
-            }
-            
-            @Override
-            public void onCancel() {
-                LOG.info("Code enhancement cancelled");
-                result.cancel(true);
-            }
-        });
-        
-        return result;
+        return sendRequest(CODE_ENHANCE_ENDPOINT, requestData)
+                .thenApply(response -> {
+                    JsonObject jsonResponse = gson.fromJson(response, JsonObject.class);
+                    return jsonResponse.get("enhancedCode").getAsString();
+                });
     }
 
     /**
      * Explains code.
      *
-     * @param code The code to explain.
-     * @param language The programming language.
-     * @return A future with the explanation.
+     * @param code     The code to explain.
+     * @param language The language.
+     * @return A CompletableFuture with the explanation.
      */
-    @NotNull
-    public CompletableFuture<String> explainCode(
-            @NotNull String code,
-            @Nullable String language) {
+    public CompletableFuture<String> explainCode(@NotNull String code, @Nullable String language) {
+        Map<String, Object> requestData = new HashMap<>();
+        requestData.put("code", code);
         
-        LOG.info("Explaining code");
+        if (language != null) {
+            requestData.put("language", language);
+        }
         
-        CompletableFuture<String> result = new CompletableFuture<>();
-        
-        ProgressManager.getInstance().run(new Task.Backgroundable(
-                project,
-                "Explaining Code",
-                true) {
-            
-            @Override
-            public void run(@NotNull ProgressIndicator indicator) {
-                try {
-                    indicator.setIndeterminate(false);
-                    indicator.setText("Analyzing code...");
-                    indicator.setFraction(0.1);
-                    
-                    // Use pattern recognition if enabled
-                    boolean usePatterns = settings.isPatternRecognition();
-                    
-                    indicator.setText("Generating explanation...");
-                    indicator.setFraction(0.5);
-                    
-                    // Mock code explanation (in real implementation, call API)
-                    String explanation = explainMockCode(code, language);
-                    
-                    indicator.setText("Code explanation complete");
-                    indicator.setFraction(1.0);
-                    
-                    LOG.info("Successfully explained code");
-                    result.complete(explanation);
-                } catch (Exception e) {
-                    LOG.error("Failed to explain code", e);
-                    result.completeExceptionally(e);
-                }
-            }
-            
-            @Override
-            public void onCancel() {
-                LOG.info("Code explanation cancelled");
-                result.cancel(true);
-            }
-        });
-        
-        return result;
+        return sendRequest(CODE_EXPLAIN_ENDPOINT, requestData)
+                .thenApply(response -> {
+                    JsonObject jsonResponse = gson.fromJson(response, JsonObject.class);
+                    return jsonResponse.get("explanation").getAsString();
+                });
     }
 
     /**
      * Generates documentation for code.
      *
-     * @param code The code to document.
-     * @param language The programming language.
-     * @return A future with the documented code.
+     * @param code     The code to document.
+     * @param language The language.
+     * @return A CompletableFuture with the documented code.
      */
-    @NotNull
-    public CompletableFuture<String> generateDocumentation(
-            @NotNull String code,
-            @Nullable String language) {
+    public CompletableFuture<String> generateDocumentation(@NotNull String code, @Nullable String language) {
+        Map<String, Object> requestData = new HashMap<>();
+        requestData.put("code", code);
         
-        LOG.info("Generating documentation for code");
+        if (language != null) {
+            requestData.put("language", language);
+        }
         
-        CompletableFuture<String> result = new CompletableFuture<>();
-        
-        ProgressManager.getInstance().run(new Task.Backgroundable(
-                project,
-                "Documenting Code",
-                true) {
-            
-            @Override
-            public void run(@NotNull ProgressIndicator indicator) {
-                try {
-                    indicator.setIndeterminate(false);
-                    indicator.setText("Analyzing code...");
-                    indicator.setFraction(0.1);
-                    
-                    // Use pattern recognition if enabled
-                    boolean usePatterns = settings.isPatternRecognition();
-                    
-                    indicator.setText("Generating documentation...");
-                    indicator.setFraction(0.5);
-                    
-                    // Mock code documentation (in real implementation, call API)
-                    String documentedCode = documentMockCode(code, language);
-                    
-                    indicator.setText("Documentation generation complete");
-                    indicator.setFraction(1.0);
-                    
-                    LOG.info("Successfully documented code");
-                    CompatibilityUtil.executeOnUiThread(() -> {
-                        notificationService.showInfo("Documentation Generated", "Successfully added documentation to code");
-                    });
-                    result.complete(documentedCode);
-                } catch (Exception e) {
-                    LOG.error("Failed to document code", e);
-                    CompatibilityUtil.executeOnUiThread(() -> {
-                        notificationService.showError("Documentation Generation Failed", e.getMessage());
-                    });
-                    result.completeExceptionally(e);
-                }
-            }
-            
-            @Override
-            public void onCancel() {
-                LOG.info("Documentation generation cancelled");
-                result.cancel(true);
-            }
-        });
-        
-        return result;
+        return sendRequest(CODE_DOCUMENT_ENDPOINT, requestData)
+                .thenApply(response -> {
+                    JsonObject jsonResponse = gson.fromJson(response, JsonObject.class);
+                    return jsonResponse.get("documentedCode").getAsString();
+                });
     }
 
     /**
-     * Generates an implementation for an interface or abstract class.
+     * Generates an implementation from a prompt.
      *
-     * @param interfaceCode The interface or abstract class code.
-     * @param className The name of the class to generate.
-     * @param packageName The package name.
+     * @param prompt      The prompt.
+     * @param filePath    The file path to generate.
+     * @param language    The language to generate.
      * @return Whether the implementation was generated successfully.
      */
-    public boolean generateImplementation(
-            @NotNull String interfaceCode,
-            @NotNull String className,
-            @NotNull String packageName) {
-        
-        LOG.info("Generating implementation for: " + className);
+    public boolean generateImplementation(@NotNull String prompt, @NotNull String filePath, @NotNull String language) {
+        Map<String, Object> requestData = new HashMap<>();
+        requestData.put("prompt", prompt);
+        requestData.put("filePath", filePath);
+        requestData.put("language", language);
         
         try {
-            String projectPath = project.getBasePath();
-            if (projectPath == null) {
-                LOG.error("Project base path is null");
-                return false;
+            String response = sendRequest(CODE_IMPLEMENT_ENDPOINT, requestData).get(60, TimeUnit.SECONDS);
+            JsonObject jsonResponse = gson.fromJson(response, JsonObject.class);
+            
+            if (jsonResponse.has("success") && jsonResponse.get("success").getAsBoolean()) {
+                String code = jsonResponse.get("code").getAsString();
+                
+                // Create the file with the generated code
+                int lastSlashIndex = filePath.lastIndexOf('/');
+                String directoryPath = filePath.substring(0, lastSlashIndex);
+                String fileName = filePath.substring(lastSlashIndex + 1);
+                
+                VirtualFile baseDir = project.getBaseDir();
+                if (baseDir == null) {
+                    LOG.error("Project base directory is null");
+                    return false;
+                }
+                
+                VirtualFile directory = VirtualFileUtil.createDirectoryStructure(baseDir, directoryPath);
+                if (directory == null) {
+                    LOG.error("Failed to create directory: " + directoryPath);
+                    return false;
+                }
+                
+                VirtualFile file = VirtualFileUtil.createFile(directory, fileName, code);
+                return file != null;
             }
             
-            // Create the package directory
-            String packagePath = packageName.replace('.', '/');
-            String fullPath = projectPath + "/src/main/java/" + packagePath;
-            
-            PsiDirectory directory = VirtualFileUtil.createDirectoryRecursively(
-                    project,
-                    projectPath,
-                    "src/main/java/" + packagePath);
-            
-            if (directory == null) {
-                LOG.error("Failed to create directory: " + fullPath);
-                return false;
-            }
-            
-            // Generate the implementation code
-            String implementationCode = generateImplementationCode(interfaceCode, className, packageName);
-            
-            // Create the file
-            String fileName = className + ".java";
-            PsiFile file = VirtualFileUtil.createFile(directory, fileName, implementationCode);
-            
-            if (file == null) {
-                LOG.error("Failed to create file: " + fileName);
-                return false;
-            }
-            
-            // Open the file in the editor
-            CompatibilityUtil.executeOnUiThread(() -> {
-                FileEditorManager.getInstance(project).openFile(file.getVirtualFile(), true);
-                notificationService.showInfo("Implementation Generated", "Created " + className + " in " + packageName);
-            });
-            
-            return true;
+            return false;
         } catch (Exception e) {
             LOG.error("Failed to generate implementation", e);
-            CompatibilityUtil.executeOnUiThread(() -> {
-                notificationService.showError("Implementation Generation Failed", e.getMessage());
-            });
             return false;
         }
     }
 
     /**
-     * Adds features to code.
+     * Generates Minecraft mod code.
      *
-     * @param code The code to add features to.
-     * @param featureDescription The feature description.
-     * @param language The programming language.
-     * @return A future with the code with features added.
+     * @param modName      The mod name.
+     * @param modId        The mod ID.
+     * @param description  The mod description.
+     * @param modLoader    The mod loader.
+     * @param mcVersion    The Minecraft version.
+     * @param features     The mod features.
+     * @return A CompletableFuture with the result message.
      */
-    @NotNull
+    public CompletableFuture<String> generateModCode(
+            @NotNull String modName,
+            @NotNull String modId,
+            @NotNull String description,
+            @NotNull String modLoader,
+            @NotNull String mcVersion,
+            @NotNull String features) {
+        
+        Map<String, Object> requestData = new HashMap<>();
+        requestData.put("modName", modName);
+        requestData.put("modId", modId);
+        requestData.put("description", description);
+        requestData.put("modLoader", modLoader);
+        requestData.put("mcVersion", mcVersion);
+        requestData.put("features", features);
+        
+        return sendRequest(MOD_CODE_ENDPOINT, requestData)
+                .thenApply(response -> {
+                    JsonObject jsonResponse = gson.fromJson(response, JsonObject.class);
+                    
+                    if (jsonResponse.has("success") && jsonResponse.get("success").getAsBoolean()) {
+                        return "Successfully generated mod: " + modName;
+                    } else {
+                        String errorMessage = "Unknown error";
+                        if (jsonResponse.has("error")) {
+                            errorMessage = jsonResponse.get("error").getAsString();
+                        }
+                        return "Failed to generate mod: " + errorMessage;
+                    }
+                });
+    }
+
+    /**
+     * Fixes a Minecraft mod with errors.
+     *
+     * @param modId       The mod ID.
+     * @param errorLog    The error log.
+     * @param modLoader   The mod loader.
+     * @param mcVersion   The Minecraft version.
+     * @return A CompletableFuture with the result message.
+     */
+    public CompletableFuture<String> fixModCode(
+            @NotNull String modId,
+            @NotNull String errorLog,
+            @NotNull String modLoader,
+            @NotNull String mcVersion) {
+        
+        Map<String, Object> requestData = new HashMap<>();
+        requestData.put("modId", modId);
+        requestData.put("errorLog", errorLog);
+        requestData.put("modLoader", modLoader);
+        requestData.put("mcVersion", mcVersion);
+        
+        return sendRequest(MOD_FIX_ENDPOINT, requestData)
+                .thenApply(response -> {
+                    JsonObject jsonResponse = gson.fromJson(response, JsonObject.class);
+                    
+                    if (jsonResponse.has("success") && jsonResponse.get("success").getAsBoolean()) {
+                        return "Successfully fixed mod: " + modId;
+                    } else {
+                        String errorMessage = "Unknown error";
+                        if (jsonResponse.has("error")) {
+                            errorMessage = jsonResponse.get("error").getAsString();
+                        }
+                        return "Failed to fix mod: " + errorMessage;
+                    }
+                });
+    }
+
+    /**
+     * Adds features to a Minecraft mod.
+     *
+     * @param modId     The mod ID.
+     * @param features  The features to add.
+     * @param modLoader The mod loader.
+     * @param mcVersion The Minecraft version.
+     * @return A CompletableFuture with the result message.
+     */
     public CompletableFuture<String> addFeatures(
-            @NotNull String code,
-            @NotNull String featureDescription,
-            @NotNull String language) {
+            @NotNull String modId,
+            @NotNull String features,
+            @NotNull String modLoader,
+            @NotNull String mcVersion) {
         
-        LOG.info("Adding features to code: " + featureDescription);
+        Map<String, Object> requestData = new HashMap<>();
+        requestData.put("modId", modId);
+        requestData.put("features", features);
+        requestData.put("modLoader", modLoader);
+        requestData.put("mcVersion", mcVersion);
         
-        CompletableFuture<String> result = new CompletableFuture<>();
+        return sendRequest(ADD_FEATURES_ENDPOINT, requestData)
+                .thenApply(response -> {
+                    JsonObject jsonResponse = gson.fromJson(response, JsonObject.class);
+                    
+                    if (jsonResponse.has("success") && jsonResponse.get("success").getAsBoolean()) {
+                        return "Successfully added features to mod: " + modId;
+                    } else {
+                        String errorMessage = "Unknown error";
+                        if (jsonResponse.has("error")) {
+                            errorMessage = jsonResponse.get("error").getAsString();
+                        }
+                        return "Failed to add features: " + errorMessage;
+                    }
+                });
+    }
+
+    /**
+     * Sends a request to the API.
+     *
+     * @param endpoint   The API endpoint.
+     * @param requestData The request data.
+     * @return A CompletableFuture with the response.
+     */
+    @RequiresBackgroundThread
+    private CompletableFuture<String> sendRequest(@NotNull String endpoint, @NotNull Map<String, Object> requestData) {
+        String apiUrl = settings.getServerUrl() + endpoint;
+        boolean usePatternRecognition = settings.isPatternRecognition();
         
-        ProgressManager.getInstance().run(new Task.Backgroundable(
-                project,
-                "Adding Features",
-                true) {
-            
-            @Override
-            public void run(@NotNull ProgressIndicator indicator) {
-                try {
-                    indicator.setIndeterminate(false);
-                    indicator.setText("Analyzing code...");
-                    indicator.setFraction(0.1);
-                    
-                    // Use pattern recognition if enabled
-                    boolean usePatterns = settings.isPatternRecognition();
-                    
-                    indicator.setText("Adding features...");
-                    indicator.setFraction(0.5);
-                    
-                    // Mock feature addition (in real implementation, call API)
-                    String codeWithFeatures = addMockFeatures(code, featureDescription, language);
-                    
-                    indicator.setText("Feature addition complete");
-                    indicator.setFraction(1.0);
-                    
-                    LOG.info("Successfully added features to code");
-                    CompatibilityUtil.executeOnUiThread(() -> {
-                        notificationService.showInfo("Features Added", "Successfully added features to code");
-                    });
-                    result.complete(codeWithFeatures);
-                } catch (Exception e) {
-                    LOG.error("Failed to add features to code", e);
-                    CompatibilityUtil.executeOnUiThread(() -> {
-                        notificationService.showError("Feature Addition Failed", e.getMessage());
-                    });
-                    result.completeExceptionally(e);
+        requestData.put("usePatternRecognition", usePatternRecognition);
+        
+        String authToken = settings.getAccessToken();
+        if (authToken != null && !authToken.isEmpty()) {
+            requestData.put("token", authToken);
+        }
+        
+        Duration timeout = Duration.ofSeconds(settings.getRequestTimeout());
+        
+        return ThreadUtils.supplyAsyncVirtual(() -> {
+            try {
+                URL url = new URL(apiUrl);
+                HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+                connection.setRequestMethod("POST");
+                connection.setRequestProperty("Content-Type", "application/json");
+                connection.setConnectTimeout((int) timeout.toMillis());
+                connection.setReadTimeout((int) timeout.toMillis());
+                connection.setDoOutput(true);
+                
+                String requestBody = gson.toJson(requestData);
+                
+                try (OutputStream os = connection.getOutputStream()) {
+                    byte[] input = requestBody.getBytes(StandardCharsets.UTF_8);
+                    os.write(input, 0, input.length);
                 }
-            }
-            
-            @Override
-            public void onCancel() {
-                LOG.info("Feature addition cancelled");
-                result.cancel(true);
+                
+                int responseCode = connection.getResponseCode();
+                
+                if (responseCode == HTTP_OK) {
+                    try (BufferedReader br = new BufferedReader(new InputStreamReader(connection.getInputStream(), StandardCharsets.UTF_8))) {
+                        StringBuilder response = new StringBuilder();
+                        String responseLine;
+                        while ((responseLine = br.readLine()) != null) {
+                            response.append(responseLine.trim());
+                        }
+                        return response.toString();
+                    }
+                } else {
+                    String errorMessage;
+                    try (BufferedReader br = new BufferedReader(new InputStreamReader(connection.getErrorStream(), StandardCharsets.UTF_8))) {
+                        StringBuilder response = new StringBuilder();
+                        String responseLine;
+                        while ((responseLine = br.readLine()) != null) {
+                            response.append(responseLine.trim());
+                        }
+                        errorMessage = response.toString();
+                    } catch (Exception e) {
+                        errorMessage = "Unknown error";
+                    }
+                    
+                    throw new IOException("API request failed with status " + responseCode + ": " + errorMessage);
+                }
+            } catch (Exception e) {
+                LOG.error("Failed to send request to API", e);
+                throw new RuntimeException("Failed to send request to API: " + e.getMessage(), e);
             }
         });
+    }
+
+    /**
+     * Tests the API connection.
+     *
+     * @return A CompletableFuture with whether the connection was successful.
+     */
+    public CompletableFuture<Boolean> testConnection() {
+        Map<String, Object> requestData = new HashMap<>();
+        requestData.put("test", true);
         
-        return result;
-    }
-
-    /**
-     * Gets the prompt type from a prompt.
-     *
-     * @param prompt The prompt.
-     * @return The prompt type.
-     */
-    @NotNull
-    private String getPromptType(@NotNull String prompt) {
-        // Simple heuristic to categorize prompts
-        if (prompt.toLowerCase().contains("bug") || prompt.toLowerCase().contains("fix")) {
-            return "bug_fix";
-        } else if (prompt.toLowerCase().contains("feature") || prompt.toLowerCase().contains("add")) {
-            return "feature_request";
-        } else if (prompt.toLowerCase().contains("optimize") || prompt.toLowerCase().contains("performance")) {
-            return "optimization";
-        } else if (prompt.toLowerCase().contains("refactor") || prompt.toLowerCase().contains("clean")) {
-            return "refactoring";
-        } else {
-            return "general";
-        }
-    }
-
-    /**
-     * Formats code.
-     *
-     * @param code The code to format.
-     * @param language The programming language.
-     * @return The formatted code.
-     */
-    @NotNull
-    private String formatCode(@NotNull String code, @NotNull String language) {
-        // In a real implementation, use a language-specific formatter
-        return code;
-    }
-
-    /**
-     * Validates code.
-     *
-     * @param code The code to validate.
-     * @param language The programming language.
-     * @return Whether the code is valid.
-     */
-    private boolean validateCode(@NotNull String code, @NotNull String language) {
-        // In a real implementation, use a language-specific validator
-        return true;
-    }
-
-    /**
-     * Generates mock code for testing.
-     *
-     * @param prompt The prompt.
-     * @param language The programming language.
-     * @return The generated code.
-     */
-    @NotNull
-    private String generateMockCode(@NotNull String prompt, @NotNull String language) {
-        // In a real implementation, call the AI API to generate code
-        if (language.equalsIgnoreCase("java")) {
-            return "/**\n * Generated code based on: " + prompt + "\n */\npublic class GeneratedClass {\n    \n    public static void main(String[] args) {\n        System.out.println(\"Hello, world!\");\n    }\n}";
-        } else if (language.equalsIgnoreCase("python")) {
-            return "# Generated code based on: " + prompt + "\n\ndef main():\n    print(\"Hello, world!\")\n\nif __name__ == \"__main__\":\n    main()";
-        } else {
-            return "// Generated code based on: " + prompt + "\n\nconsole.log(\"Hello, world!\");";
-        }
-    }
-
-    /**
-     * Fixes mock code for testing.
-     *
-     * @param code The code to fix.
-     * @param errorMessage The error message.
-     * @param language The programming language.
-     * @return The fixed code.
-     */
-    @NotNull
-    private String fixMockCode(@NotNull String code, @NotNull String errorMessage, @NotNull String language) {
-        // In a real implementation, call the AI API to fix code
-        return "/**\n * Fixed code\n * Original error: " + errorMessage + "\n */\n" + code.replace("System.out.println", "System.out.print");
-    }
-
-    /**
-     * Enhances mock code for testing.
-     *
-     * @param code The code to enhance.
-     * @param instructions The enhancement instructions.
-     * @param language The programming language.
-     * @return The enhanced code.
-     */
-    @NotNull
-    private String enhanceMockCode(@NotNull String code, @NotNull String instructions, @NotNull String language) {
-        // In a real implementation, call the AI API to enhance code
-        return "/**\n * Enhanced code based on: " + instructions + "\n */\n" + code;
-    }
-
-    /**
-     * Explains mock code for testing.
-     *
-     * @param code The code to explain.
-     * @param language The programming language.
-     * @return The explanation.
-     */
-    @NotNull
-    private String explainMockCode(@NotNull String code, @Nullable String language) {
-        // In a real implementation, call the AI API to explain code
-        return "# Code Explanation\n\nThis code defines a simple program that prints \"Hello, world!\" to the console.\n\n## Details\n\n- It contains a main method which is the entry point of the program\n- It uses standard output to display the message";
-    }
-
-    /**
-     * Documents mock code for testing.
-     *
-     * @param code The code to document.
-     * @param language The programming language.
-     * @return The documented code.
-     */
-    @NotNull
-    private String documentMockCode(@NotNull String code, @Nullable String language) {
-        // In a real implementation, call the AI API to document code
-        if (code.contains("class")) {
-            return code.replace("public class", "/**\n * This class demonstrates a simple Java program.\n */\npublic class");
-        } else {
-            return "/**\n * This is an auto-generated documentation.\n */\n" + code;
-        }
-    }
-
-    /**
-     * Generates mock implementation code for testing.
-     *
-     * @param interfaceCode The interface or abstract class code.
-     * @param className The name of the class to generate.
-     * @param packageName The package name.
-     * @return The implementation code.
-     */
-    @NotNull
-    private String generateImplementationCode(
-            @NotNull String interfaceCode,
-            @NotNull String className,
-            @NotNull String packageName) {
+        CompletableFuture<String> responseFuture = sendRequest("/ping", requestData);
         
-        // In a real implementation, call the AI API to generate implementation
-        return "package " + packageName + ";\n\n/**\n * Implementation of the interface.\n */\npublic class " + className + " implements SomeInterface {\n    \n    @Override\n    public void someMethod() {\n        // Implementation\n    }\n}";
+        return responseFuture
+                .thenApply(response -> {
+                    JsonObject jsonResponse = gson.fromJson(response, JsonObject.class);
+                    return jsonResponse.has("success") && jsonResponse.get("success").getAsBoolean();
+                })
+                .exceptionally(e -> {
+                    LOG.error("API connection test failed", e);
+                    return false;
+                });
     }
 
     /**
-     * Adds mock features to code for testing.
+     * Gets the API endpoint URL.
      *
-     * @param code The code to add features to.
-     * @param featureDescription The feature description.
-     * @param language The programming language.
-     * @return The code with features added.
+     * @return The API endpoint URL.
      */
     @NotNull
-    private String addMockFeatures(@NotNull String code, @NotNull String featureDescription, @NotNull String language) {
-        // In a real implementation, call the AI API to add features
-        return "/**\n * With added features: " + featureDescription + "\n */\n" + code;
+    public String getApiEndpoint() {
+        return settings.getServerUrl();
+    }
+
+    /**
+     * Sets the API endpoint URL.
+     *
+     * @param apiEndpoint The API endpoint URL.
+     */
+    public void setApiEndpoint(@NotNull String apiEndpoint) {
+        settings.setServerUrl(apiEndpoint);
+    }
+
+    /**
+     * Gets the request timeout.
+     *
+     * @return The request timeout.
+     */
+    @NotNull
+    public Duration getRequestTimeout() {
+        return Duration.ofSeconds(settings.getRequestTimeout());
+    }
+
+    /**
+     * Sets the request timeout.
+     *
+     * @param timeout The request timeout.
+     */
+    public void setRequestTimeout(@NotNull Duration timeout) {
+        settings.setRequestTimeout((int) timeout.getSeconds());
+    }
+
+    /**
+     * Checks if the API endpoint is valid.
+     *
+     * @param apiEndpoint The API endpoint URL.
+     * @return Whether the API endpoint is valid.
+     */
+    public static boolean isValidApiEndpoint(@NotNull String apiEndpoint) {
+        return apiEndpoint.startsWith("http://") || apiEndpoint.startsWith("https://");
+    }
+
+    /**
+     * Resets the API endpoint to the default.
+     */
+    public void resetApiEndpoint() {
+        settings.setServerUrl(DEFAULT_API_ENDPOINT);
     }
 }
