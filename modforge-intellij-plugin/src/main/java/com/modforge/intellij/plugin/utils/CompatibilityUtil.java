@@ -5,11 +5,23 @@ import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.application.ReadAction;
 import com.intellij.openapi.application.WriteAction;
 import com.intellij.openapi.diagnostic.Logger;
+import com.intellij.openapi.fileEditor.FileEditor;
+import com.intellij.openapi.fileEditor.FileEditorManager;
 import com.intellij.openapi.project.Project;
+import com.intellij.openapi.project.ProjectUtil;
+import com.intellij.openapi.ui.Messages;
+import com.intellij.openapi.vfs.LocalFileSystem;
+import com.intellij.openapi.vfs.VfsUtil;
 import com.intellij.openapi.vfs.VirtualFile;
+import com.intellij.openapi.wm.ToolWindow;
+import com.intellij.openapi.wm.ToolWindowManager;
+import com.intellij.util.ThrowableRunnable;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import java.io.File;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Supplier;
@@ -30,14 +42,19 @@ public final class CompatibilityUtil {
 
     /**
      * Gets the project base directory.
+     * Replacement for deprecated Project.getBaseDir()
      *
      * @param project The project.
      * @return The project base directory, or null if not found.
      */
     @Nullable
-    public static VirtualFile getProjectBaseDir(@NotNull Project project) {
-        // In new IntelliJ IDEA versions, this is the way to get the project base directory
-        return project.getBaseDir();
+    public static VirtualFile getProjectBaseDir(@Nullable Project project) {
+        if (project == null || project.isDisposed()) {
+            return null;
+        }
+        
+        // Use ProjectUtil.guessProjectDir which is the recommended way in 2025.1
+        return ProjectUtil.guessProjectDir(project);
     }
 
     /**
