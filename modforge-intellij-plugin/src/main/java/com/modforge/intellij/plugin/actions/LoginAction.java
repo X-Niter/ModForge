@@ -103,11 +103,20 @@ public class LoginAction extends AnAction {
                             // Enable features that require authentication
                             enableContinuousDevelopmentIfPossible(project);
                         } else {
-                            Messages.showErrorDialog(
-                                    project,
-                                    "Login failed. Please check your credentials and try again.",
-                                    "Login Failed"
-                            );
+                            ModForgeNotificationService notificationService = ModForgeNotificationService.getInstance(project);
+                            if (notificationService != null) {
+                                notificationService.showErrorDialog(
+                                        project,
+                                        "Login Failed",
+                                        "Login failed. Please check your credentials and try again."
+                                );
+                            } else {
+                                Messages.showErrorDialog(
+                                        project,
+                                        "Login failed. Please check your credentials and try again.",
+                                        "Login Failed"
+                                );
+                            }
                         }
                     });
                 }
@@ -130,11 +139,20 @@ public class LoginAction extends AnAction {
             // We could automatically start continuous development here
             // but for now, we'll just let the user know it's available
             
-            Messages.showInfoMessage(
-                    project,
-                    "Continuous development is enabled in settings. You can start it from the ModForge menu.",
-                    "Continuous Development"
-            );
+            ModForgeNotificationService notificationService = ModForgeNotificationService.getInstance(project);
+            if (notificationService != null) {
+                notificationService.showInfoDialog(
+                        project,
+                        "Continuous Development",
+                        "Continuous development is enabled in settings. You can start it from the ModForge menu."
+                );
+            } else {
+                Messages.showInfoMessage(
+                        project,
+                        "Continuous development is enabled in settings. You can start it from the ModForge menu.",
+                        "Continuous Development"
+                );
+            }
         }
     }
     

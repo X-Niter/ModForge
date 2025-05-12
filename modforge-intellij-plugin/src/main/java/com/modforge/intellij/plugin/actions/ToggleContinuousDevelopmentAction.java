@@ -13,6 +13,7 @@ import com.intellij.util.ui.FormBuilder;
 import com.intellij.util.ui.JBUI;
 import com.modforge.intellij.plugin.auth.ModAuthenticationManager;
 import com.modforge.intellij.plugin.services.ContinuousDevelopmentService;
+import com.modforge.intellij.plugin.services.ModForgeNotificationService;
 import com.modforge.intellij.plugin.settings.ModForgeSettings;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -68,11 +69,20 @@ public class ToggleContinuousDevelopmentAction extends AnAction {
         // Make sure the user is authenticated
         ModAuthenticationManager authManager = ModAuthenticationManager.getInstance();
         if (!authManager.isAuthenticated()) {
-            Messages.showErrorDialog(
-                    project,
-                    "You must be logged in to use continuous development.",
-                    "Authentication Required"
-            );
+            ModForgeNotificationService notificationService = ModForgeNotificationService.getInstance(project);
+            if (notificationService != null) {
+                notificationService.showErrorDialog(
+                        project,
+                        "Authentication Required",
+                        "You must be logged in to use continuous development."
+                );
+            } else {
+                Messages.showErrorDialog(
+                        project,
+                        "You must be logged in to use continuous development.",
+                        "Authentication Required"
+                );
+            }
             return;
         }
         
