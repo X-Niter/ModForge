@@ -20,6 +20,175 @@ public class AuthTestUtil {
     private static final Logger LOG = Logger.getInstance(AuthTestUtil.class);
     
     /**
+     * API Endpoint for testing.
+     */
+    public enum Endpoint {
+        USER("/api/user", "GET"),
+        PROFILE("/api/profile", "GET"),
+        PROJECTS("/api/projects", "GET"),
+        LOGOUT("/api/logout", "POST");
+        
+        private final String path;
+        private final String method;
+        
+        Endpoint(String path, String method) {
+            this.path = path;
+            this.method = method;
+        }
+        
+        public String getPath() {
+            return path;
+        }
+        
+        public String getMethod() {
+            return method;
+        }
+    }
+    
+    /**
+     * Test result for an endpoint.
+     */
+    public static class TestResult {
+        private final boolean success;
+        private final int responseCode;
+        private final String response;
+        
+        public TestResult(boolean success, int responseCode, String response) {
+            this.success = success;
+            this.responseCode = responseCode;
+            this.response = response;
+        }
+        
+        public boolean isSuccess() {
+            return success;
+        }
+        
+        public int getResponseCode() {
+            return responseCode;
+        }
+        
+        public String getResponse() {
+            return response;
+        }
+    }
+    
+    /**
+     * Tests a specific API endpoint.
+     * 
+     * @param endpoint The endpoint to test
+     * @return Test result
+     */
+    public static TestResult testEndpoint(Endpoint endpoint) {
+        try {
+            String serverUrl = ServerUrlUtil.getServerUrl();
+            if (!serverUrl.endsWith("/")) {
+                serverUrl += "/";
+            }
+            
+            String apiUrl = serverUrl + endpoint.getPath().replaceFirst("^/", "");
+            LOG.info("Testing endpoint: " + apiUrl);
+            
+            URL url = new URL(apiUrl);
+            HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+            conn.setRequestMethod(endpoint.getMethod());
+            
+            // Add authentication token if available
+            String accessToken = getStoredAccessToken();
+            if (accessToken != null && !accessToken.isEmpty()) {
+                conn.setRequestProperty("Authorization", "Bearer " + accessToken);
+            }
+            
+            int responseCode = conn.getResponseCode();
+            
+            // Read response
+            StringBuilder response = new StringBuilder();
+            try (BufferedReader in = new BufferedReader(new InputStreamReader(
+                    responseCode >= 400 ? conn.getErrorStream() : conn.getInputStream()))) {
+                String line;
+                while ((line = in.readLine()) != null) {
+                    response.append(line);
+                }
+            }
+            
+            return new TestResult(responseCode >= 200 && responseCode < 300, 
+                responseCode, response.toString());
+                
+        } catch (Exception e) {
+            LOG.error("Error testing endpoint " + endpoint.getPath(), e);
+            return new TestResult(false, 0, e.getMessage());
+        }
+    }
+    
+    /**
+     * Gets the stored access token from settings.
+     * 
+     * @return The access token or null
+     */
+    private static String getStoredAccessToken() {
+        try {
+            return ModForgeSettings.getInstance().getAccessToken();
+        } catch (Exception e) {
+            LOG.error("Failed to get access token", e);
+            return null;
+        }
+    }
+    
+    /**
+     * Tests the complete auth flow.
+     * 
+     * @param username The username
+     * @param password The password
+     * @return Results of the test
+     */
+    public static String testCompleteAuthFlow(String username, String password) {
+        StringBuilder results = new StringBuilder("Authentication Flow Test Results:\n\n");
+        
+        try {
+            String serverUrl = ServerUrlUtil.getServerUrl();
+            if (serverUrl == null || serverUrl.isEmpty()) {
+                return "Error: Server URL is not configured.";
+            }
+            
+            // Test basic connection
+            boolean connected = testConnection(serverUrl);
+            results.append("Connection to ").append(serverUrl).append(": ")
+                   .append(connected ? "Successful" : "Failed").append("\n\n");
+            
+            if (!connected) {
+                return results.toString();
+            }
+            
+            // Try to authenticate
+            String token = getAccessToken(serverUrl, username, password);
+            results.append("Authentication: ").append(token != null ? "Successful" : "Failed").append("\n");
+            
+            if (token == null) {
+                return results.toString();
+            }
+            
+            // Store the token for subsequent tests
+            ModForgeSettings.getInstance().setAccessToken(token);
+            
+            // Test API endpoints
+            results.append("\nEndpoint Tests:\n");
+            for (Endpoint endpoint : Endpoint.values()) {
+                TestResult result = testEndpoint(endpoint);
+                results.append(endpoint.getPath())
+                       .append(" - ")
+                       .append(result.isSuccess() ? "Success" : "Failed")
+                       .append(" (").append(result.getResponseCode()).append(")")
+                       .append("\n");
+            }
+            
+            return results.toString();
+        } catch (Exception e) {
+            LOG.error("Error testing auth flow", e);
+            results.append("\nError: ").append(e.getMessage());
+            return results.toString();
+        }
+    }
+    
+    /**
      * Test basic connection to the ModForge server.
      * @param serverUrl URL of the ModForge server
      * @return Whether the connection was successful

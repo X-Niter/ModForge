@@ -178,9 +178,9 @@ public class WebSocketMessageHandler {
             ModForgeNotificationService notificationService = ModForgeNotificationService.getInstance();
             
             if (important) {
-                notificationService.showImportantNotification(title, content);
+                notificationService.showWarningNotification(project, title, content);
             } else {
-                notificationService.showInfoNotification(title, content);
+                notificationService.showInfoNotification(project, title, content);
             }
         });
     }

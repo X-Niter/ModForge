@@ -113,6 +113,24 @@ public final class ModForgeSettings implements PersistentStateComponent<ModForge
     }
     
     /**
+     * Gets the access token.
+     *
+     * @return The access token
+     */
+    public String getAccessToken() {
+        return accessToken;
+    }
+    
+    /**
+     * Sets the access token.
+     *
+     * @param accessToken The access token to set
+     */
+    public void setAccessToken(String accessToken) {
+        this.accessToken = accessToken;
+    }
+    
+    /**
      * Gets the continuous development scan interval in milliseconds.
      *
      * @return The scan interval
