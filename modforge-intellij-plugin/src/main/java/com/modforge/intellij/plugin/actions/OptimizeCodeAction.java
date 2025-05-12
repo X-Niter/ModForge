@@ -7,12 +7,13 @@ import com.intellij.openapi.progress.ProgressIndicator;
 import com.intellij.openapi.progress.ProgressManager;
 import com.intellij.openapi.progress.Task;
 import com.intellij.openapi.project.Project;
-import com.intellij.openapi.ui.Messages;
 import com.modforge.intellij.plugin.services.AutonomousIdeCoordinatorService;
+import com.modforge.intellij.plugin.services.ModForgeNotificationService;
 import org.jetbrains.annotations.NotNull;
 
 /**
  * Action for optimizing code in the current project.
+ * Compatible with IntelliJ IDEA 2025.1.1.1
  */
 public class OptimizeCodeAction extends AnAction {
     @Override
@@ -45,10 +46,11 @@ public class OptimizeCodeAction extends AnAction {
                     indicator.setText("Applying fixes...");
                     indicator.setFraction(0.6);
                     
-                    // Show result dialog
+                    // Show result dialog using compatible notification service
                     ApplicationManager.getApplication().invokeLater(() -> {
-                        Messages.showInfoDialog(
+                        ModForgeNotificationService.getInstance(project).showInfoNotification(
                                 project,
+                                "Code Optimization Complete",
                                 String.format(
                                         "Optimization completed successfully!\n\n" +
                                         "Found %d issues in %d files (out of %d total files)\n" +
@@ -57,17 +59,16 @@ public class OptimizeCodeAction extends AnAction {
                                         summary.getFilesWithIssues(),
                                         summary.getTotalFiles(),
                                         summary.getIssuesFixed()
-                                ),
-                                "Code Optimization Complete"
+                                )
                         );
                     });
                 } catch (Exception ex) {
-                    // Show error dialog
+                    // Show error dialog using compatible notification service
                     ApplicationManager.getApplication().invokeLater(() -> {
-                        Messages.showErrorDialog(
+                        ModForgeNotificationService.getInstance(project).showErrorNotification(
                                 project,
-                                "Error optimizing code: " + ex.getMessage(),
-                                "Error"
+                                "Error",
+                                "Error optimizing code: " + ex.getMessage()
                         );
                     });
                 }
