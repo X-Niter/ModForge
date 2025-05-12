@@ -292,13 +292,13 @@ public final class CollaborationService {
      * 
      * @param sessionId The session ID to join
      * @param username The username to use in the session
-     * @return A CompletableFuture that completes when the session is joined
+     * @return CompletableFuture with Boolean result indicating success
      */
-    public CompletableFuture<Void> joinSession(@NotNull String sessionId, @NotNull String username) {
-        return CompletableFuture.runAsync(() -> {
+    public CompletableFuture<Boolean> joinSession(@NotNull String sessionId, @NotNull String username) {
+        return CompletableFuture.supplyAsync(() -> {
             if (connected) {
                 LOG.warn("Already connected to a session");
-                throw new IllegalStateException("Already connected to a session");
+                return false;
             }
             
             this.sessionId = sessionId;
