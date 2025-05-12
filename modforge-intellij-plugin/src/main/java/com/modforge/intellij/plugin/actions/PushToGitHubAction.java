@@ -56,10 +56,10 @@ public class PushToGitHubAction extends AnAction {
                         "You need to login to ModForge before pushing to GitHub."
                 );
             } else {
-                Messages.showErrorDialog(
+                CompatibilityUtil.showErrorDialog(
                         project,
-                        "You need to login to ModForge before pushing to GitHub.",
-                        "Authentication Required"
+                        "Authentication Required",
+                        "You need to login to ModForge before pushing to GitHub."
                 );
             }
             return;

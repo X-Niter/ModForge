@@ -69,10 +69,10 @@ public class TogglePatternRecognitionAction extends AnAction {
                         "You must be logged in to use pattern recognition."
                 );
             } else {
-                Messages.showErrorDialog(
+                CompatibilityUtil.showErrorDialog(
                         project,
-                        "You must be logged in to use pattern recognition.",
-                        "Authentication Required"
+                        "Authentication Required",
+                        "You must be logged in to use pattern recognition."
                 );
             }
             return;
@@ -96,13 +96,12 @@ public class TogglePatternRecognitionAction extends AnAction {
                             "Cancel"
                     );
                 } else {
-                    result = Messages.showYesNoDialog(
+                    result = notificationService.showYesNoDialog(
                             project,
-                            "Are you sure you want to disable pattern recognition? This will increase API usage and costs.",
                             "Disable Pattern Recognition",
+                            "Are you sure you want to disable pattern recognition? This will increase API usage and costs.",
                             "Disable",
-                            "Cancel",
-                            null
+                            "Cancel"
                     );
                 }
                 
