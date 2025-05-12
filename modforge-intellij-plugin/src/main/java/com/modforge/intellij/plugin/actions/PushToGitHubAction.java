@@ -138,7 +138,7 @@ public class PushToGitHubAction extends AnAction {
                     
                     indicator.setText(progressText.get());
                     
-                    gitHubService.pushToGitHubV2(
+                    gitHubService.pushToGitHubV3(
                             owner,
                             repository,
                             description,
@@ -154,10 +154,11 @@ public class PushToGitHubAction extends AnAction {
                             
                             if (result.isSuccess()) {
                                 if (notificationService != null) {
-                                    notificationService.showInfoNotification(
-                                            "Push Successful",
-                                            result.getMessage(),
-                                            result.getRepositoryUrl()
+                                    notificationService.showInfoMessage(
+                                            project,
+                                            "Push Successful", 
+                                            result.getMessage() + 
+                                            (result.getRepositoryUrl() != null ? "\nRepository URL: " + result.getRepositoryUrl() : "")
                                     );
                                 } else {
                                     com.modforge.intellij.plugin.utils.CompatibilityUtil.showInfoDialog(
