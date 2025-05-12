@@ -13,6 +13,7 @@ import com.intellij.psi.util.PsiUtilBase;
 import com.modforge.intellij.plugin.services.AutonomousCodeGenerationService;
 import com.modforge.intellij.plugin.services.ModForgeNotificationService;
 import com.modforge.intellij.plugin.ui.dialogs.GenerateImplementationDialog;
+import com.modforge.intellij.plugin.utils.CompatibilityUtil;
 import com.modforge.intellij.plugin.utils.PsiUtils;
 import com.modforge.intellij.plugin.utils.VirtualFileUtil;
 import org.jetbrains.annotations.NotNull;
