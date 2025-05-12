@@ -108,8 +108,7 @@ public class StartCollaborationAction extends AnAction {
             
             future.thenAccept(success -> {
                 if (success) {
-                    Messages.showInfoDialog(
-                            project,
+                    ModForgeNotificationService.getInstance(project).showInfoNotification(
                             "Successfully joined session: " + sessionId,
                             "Session Joined"
                     );
@@ -117,15 +116,13 @@ public class StartCollaborationAction extends AnAction {
                     // Open collaboration tool window
                     showCollaborationToolWindow(project);
                 } else {
-                    Messages.showErrorDialog(
-                            project,
+                    ModForgeNotificationService.getInstance(project).showErrorNotification(
                             "Failed to join session: " + sessionId,
                             "Error"
                     );
                 }
             }).exceptionally(ex -> {
-                Messages.showErrorDialog(
-                        project,
+                ModForgeNotificationService.getInstance(project).showErrorNotification(
                         "Failed to join session: " + ex.getMessage(),
                         "Error"
                 );
@@ -218,10 +215,11 @@ public class StartCollaborationAction extends AnAction {
         @Override
         protected void doOKAction() {
             if (StringUtil.isEmpty(usernameField.getText())) {
-                Messages.showErrorDialog(
+                JOptionPane.showMessageDialog(
                         getContentPanel(),
                         "Username cannot be empty",
-                        "Error"
+                        "Error",
+                        JOptionPane.ERROR_MESSAGE
                 );
                 return;
             }
