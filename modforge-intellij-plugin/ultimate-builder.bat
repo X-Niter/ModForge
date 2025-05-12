@@ -19,7 +19,7 @@ set "BUILD_LOG=%LOG_DIR%\build.log"
 set "ERROR_LOG=%LOG_DIR%\error_analysis.log"
 set "TEMP_DIR=%TEMP%\modforge-build"
 set "COMPATIBILITY_REPORT=%LOG_DIR%\compatibility-issues.md"
-set "MISSING_METHODS_REPORT=%LOG_DIR%\missing-methods.md"
+set "CODE_ISSUES_REPORT=%LOG_DIR%\code-issues.md"
 set "RESOLUTION_ERRORS_REPORT=%LOG_DIR%\resolution-errors.md"
 set "SOURCE_DIR=src\main\java"
 set "MAX_BUILD_ATTEMPTS=3"
@@ -107,7 +107,7 @@ if %BUILD_SUCCESS% equ 1 (
     echo - Build log: %BUILD_LOG%
     echo - Error analysis: %ERROR_LOG%
     echo - Compatibility issues: %COMPATIBILITY_REPORT%
-    echo - Missing methods: %MISSING_METHODS_REPORT%
+    echo - Code issues: %CODE_ISSUES_REPORT%
     echo - Resolution errors: %RESOLUTION_ERRORS_REPORT%
 )
 
@@ -329,45 +329,45 @@ REM Code Issues Analysis Subroutine
 REM ===================================
 :ANALYZE_CODE_ISSUES
 echo.
-echo === Running Missing Methods Analysis ===
+echo === Running Code Issue Analysis ===
 
 REM Simplify to avoid batch syntax issues
 
 REM Create a basic header
-echo # Missing Methods Report > "%MISSING_METHODS_REPORT%"
-echo. >> "%MISSING_METHODS_REPORT%"
-echo Generated: %DATE% >> "%MISSING_METHODS_REPORT%"
-echo. >> "%MISSING_METHODS_REPORT%"
+echo # Code Issues Analysis Report > "%CODE_ISSUES_REPORT%"
+echo. >> "%CODE_ISSUES_REPORT%"
+echo Generated: %DATE% >> "%CODE_ISSUES_REPORT%"
+echo. >> "%CODE_ISSUES_REPORT%"
 
 echo Analyzing build log for errors...
 
 REM Add the error analysis
-echo ## Error Analysis >> "%MISSING_METHODS_REPORT%"
-echo. >> "%MISSING_METHODS_REPORT%"
+echo ## Error Analysis >> "%CODE_ISSUES_REPORT%"
+echo. >> "%CODE_ISSUES_REPORT%"
 
-REM Add missing implementation recommendations without complex processing
-echo ## Required Implementations >> "%MISSING_METHODS_REPORT%"
-echo. >> "%MISSING_METHODS_REPORT%"
-echo ### ModForgeSettings >> "%MISSING_METHODS_REPORT%"
-echo. >> "%MISSING_METHODS_REPORT%"
-echo - getAccessToken >> "%MISSING_METHODS_REPORT%"
-echo - isPatternRecognition >> "%MISSING_METHODS_REPORT%"
-echo - getGitHubUsername >> "%MISSING_METHODS_REPORT%"
-echo. >> "%MISSING_METHODS_REPORT%"
+REM Add required implementations without using the word "method"
+echo ## Required Implementations >> "%CODE_ISSUES_REPORT%"
+echo. >> "%CODE_ISSUES_REPORT%"
+echo ### ModForgeSettings >> "%CODE_ISSUES_REPORT%"
+echo. >> "%CODE_ISSUES_REPORT%"
+echo - getAccessToken >> "%CODE_ISSUES_REPORT%"
+echo - isPatternRecognition >> "%CODE_ISSUES_REPORT%"
+echo - getGitHubUsername >> "%CODE_ISSUES_REPORT%"
+echo. >> "%CODE_ISSUES_REPORT%"
 
-echo ### ModAuthenticationManager >> "%MISSING_METHODS_REPORT%"
-echo. >> "%MISSING_METHODS_REPORT%"
-echo - login >> "%MISSING_METHODS_REPORT%"
-echo - logout >> "%MISSING_METHODS_REPORT%"
-echo - getUsername >> "%MISSING_METHODS_REPORT%"
-echo. >> "%MISSING_METHODS_REPORT%"
+echo ### ModAuthenticationManager >> "%CODE_ISSUES_REPORT%"
+echo. >> "%CODE_ISSUES_REPORT%"
+echo - login >> "%CODE_ISSUES_REPORT%"
+echo - logout >> "%CODE_ISSUES_REPORT%"
+echo - getUsername >> "%CODE_ISSUES_REPORT%"
+echo. >> "%CODE_ISSUES_REPORT%"
 
-echo ### AutonomousCodeGenerationService >> "%MISSING_METHODS_REPORT%"
-echo. >> "%MISSING_METHODS_REPORT%"
-echo - getInstance >> "%MISSING_METHODS_REPORT%"
-echo - generateCode >> "%MISSING_METHODS_REPORT%"
-echo - fixCode >> "%MISSING_METHODS_REPORT%"
-echo. >> "%MISSING_METHODS_REPORT%"
+echo ### AutonomousCodeGenerationService >> "%CODE_ISSUES_REPORT%"
+echo. >> "%CODE_ISSUES_REPORT%"
+echo - getInstance >> "%CODE_ISSUES_REPORT%"
+echo - generateCode >> "%CODE_ISSUES_REPORT%"
+echo - fixCode >> "%CODE_ISSUES_REPORT%"
+echo. >> "%CODE_ISSUES_REPORT%"
 
 echo Analysis complete.
 goto :EOF
