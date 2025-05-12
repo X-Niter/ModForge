@@ -38,6 +38,20 @@ public class ModForgeCompilationListener implements CompilationStatusListener {
             return;
         }
         
+        // Show notification about compilation status
+        if (settings.isEnableNotifications()) {
+            com.modforge.intellij.plugin.services.ModForgeNotificationService notificationService = 
+                    com.modforge.intellij.plugin.services.ModForgeNotificationService.getInstance(project);
+            
+            if (errors > 0) {
+                notificationService.showInfoNotification(
+                        project,
+                        "ModForge Continuous Development",
+                        "Detected " + errors + " compilation errors. ModForge AI will attempt to fix them."
+                );
+            }
+        }
+        
         // If compilation failed and continuous development is running, try to fix errors
         if (errors > 0) {
             LOG.info("Compilation failed with " + errors + " errors, trying to fix");

@@ -5,6 +5,7 @@ import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vfs.*;
 import com.modforge.intellij.plugin.services.ContinuousDevelopmentService;
+import com.modforge.intellij.plugin.services.ModForgeNotificationService;
 import com.modforge.intellij.plugin.settings.ModForgeSettings;
 import org.jetbrains.annotations.NotNull;
 
@@ -73,6 +74,15 @@ public final class ModForgeFileListener implements VirtualFileListener {
         // If service is running, this will eventually trigger a check
         if (service.isRunning()) {
             LOG.info("Continuous development is running, changes will be processed");
+            
+            // Show notification to user if enabled
+            if (settings.isEnableNotifications()) {
+                ModForgeNotificationService.getInstance(project).showInfoNotification(
+                        project,
+                        "ModForge Monitoring",
+                        "Detected changes to " + event.getFile().getName() + ". ModForge AI will analyze for improvements."
+                );
+            }
         }
     }
     
@@ -83,6 +93,19 @@ public final class ModForgeFileListener implements VirtualFileListener {
         }
         
         LOG.info("File created: " + event.getFile().getPath());
+        
+        // Show notification if continuous development is enabled
+        ModForgeSettings settings = ModForgeSettings.getInstance();
+        if (settings.isEnableContinuousDevelopment() && settings.isEnableNotifications()) {
+            ContinuousDevelopmentService service = ContinuousDevelopmentService.getInstance(project);
+            if (service != null && service.isRunning()) {
+                ModForgeNotificationService.getInstance(project).showInfoNotification(
+                        project,
+                        "ModForge Monitoring",
+                        "New file detected: " + event.getFile().getName() + ". ModForge AI will include it in analysis."
+                );
+            }
+        }
     }
     
     @Override
