@@ -188,4 +188,52 @@ public final class CompatibilityUtil {
         
         // Simple version comparison for now
         return currentVersion.compareTo(minVersion) >= 0;
+    }
+    
+    /**
+     * Opens a file in the editor.
+     *
+     * @param project       The project.
+     * @param file          The file to open.
+     * @param requestFocus  Whether to request focus.
+     * @return Whether the file was opened.
+     */
+    public static boolean openFileInEditor(
+            @NotNull Project project,
+            @NotNull VirtualFile file,
+            boolean requestFocus) {
+        
+        if (!file.isValid()) {
+            LOG.warn("Cannot open invalid file: " + file.getPath());
+            return false;
+        }
+        
+        runOnUiThread(() -> {
+            try {
+                com.intellij.openapi.fileEditor.FileEditorManager.getInstance(project)
+                        .openFile(file, requestFocus);
+            } catch (Exception e) {
+                LOG.error("Failed to open file in editor: " + file.getPath(), e);
+            }
+        });
+        
+        return true;
+    }
+    
+    /**
+     * Gets a mod file by relative path.
+     *
+     * @param project      The project.
+     * @param relativePath The relative path.
+     * @return The virtual file, or null if not found.
+     */
+    @Nullable
+    public static VirtualFile getModFileByRelativePath(@NotNull Project project, @NotNull String relativePath) {
+        VirtualFile baseDir = getProjectBaseDir(project);
+        if (baseDir == null) {
+            LOG.warn("Project base directory not found");
+            return null;
+        }
+        
+        return baseDir.findFileByRelativePath(relativePath);
     }}

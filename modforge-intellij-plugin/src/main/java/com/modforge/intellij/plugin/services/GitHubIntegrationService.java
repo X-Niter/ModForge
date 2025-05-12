@@ -350,6 +350,120 @@ public final class GitHubIntegrationService {
     }
     
     /**
+     * Commits and pushes changes to a GitHub repository.
+     *
+     * @param project   The project.
+     * @param repoPath  The repository path.
+     * @param message   The commit message.
+     * @return A CompletableFuture with whether the operation was successful.
+     */
+    public CompletableFuture<Boolean> commitAndPushChanges(
+            @NotNull Project project,
+            @NotNull String repoPath,
+            @NotNull String message) {
+        
+        if (!isAuthenticated()) {
+            LOG.warn("Not authenticated. Cannot commit and push changes.");
+            return CompletableFuture.completedFuture(false);
+        }
+        
+        if (isCommitting.get() || isPushing.get()) {
+            LOG.warn("Already committing or pushing. Please wait for the operation to complete.");
+            return CompletableFuture.completedFuture(false);
+        }
+        
+        isCommitting.set(true);
+        
+        return ThreadUtils.supplyAsyncVirtual(() -> {
+            try {
+                // This is a mock implementation
+                // In real code, use Git integration API to commit and push
+                LOG.info("Committing and pushing changes to: " + repoPath + " with message: " + message);
+                
+                // Simulate some work
+                ThreadUtils.sleep(2000);
+                
+                return true;
+            } catch (Exception e) {
+                LOG.error("Failed to commit and push changes", e);
+                return false;
+            } finally {
+                isCommitting.set(false);
+            }
+        });
+    }
+    
+    /**
+     * Creates an autonomous workflow in a GitHub repository.
+     *
+     * @param repoFullName The full repository name (owner/repo).
+     * @param branch       The branch to run the workflow on.
+     * @return A CompletableFuture with the workflow URL.
+     */
+    public CompletableFuture<String> createAutonomousWorkflow(
+            @NotNull String repoFullName,
+            @NotNull String branch) {
+        
+        if (!isAuthenticated()) {
+            LOG.warn("Not authenticated. Cannot create autonomous workflow.");
+            return CompletableFuture.completedFuture("");
+        }
+        
+        return ThreadUtils.supplyAsyncVirtual(() -> {
+            try {
+                String workflowContent = """
+                    name: ModForge Autonomous Development
+                    
+                    on:
+                      push:
+                        branches: [ %s ]
+                      schedule:
+                        - cron: '0 */4 * * *'  # Run every 4 hours
+                    
+                    jobs:
+                      autonomous-development:
+                        runs-on: ubuntu-latest
+                        steps:
+                          - uses: actions/checkout@v3
+                          - uses: actions/setup-java@v3
+                            with:
+                              distribution: 'temurin'
+                              java-version: '21'
+                          - name: Analyze and Improve Code
+                            run: |
+                              echo "ModForge autonomous development workflow started"
+                              # API calls to ModForge service will be here
+                              # Analyze code, suggest improvements, etc.
+                          - name: Create Pull Request
+                            uses: peter-evans/create-pull-request@v4
+                            with:
+                              token: ${{ secrets.GITHUB_TOKEN }}
+                              commit-message: "Auto-improvement: Code enhancements"
+                              title: "Auto-improvement: Code enhancements"
+                              body: |
+                                This pull request was automatically created by the ModForge autonomous development workflow.
+                                
+                                Changes include:
+                                - Code optimizations
+                                - Bug fixes
+                                - Documentation improvements
+                              branch: autonomous-improvements
+                    """.formatted(branch);
+                
+                return createWorkflowFile(
+                        repoFullName,
+                        "modforge-autonomous.yml",
+                        workflowContent,
+                        "Add ModForge autonomous development workflow"
+                );
+            } catch (Exception e) {
+                LOG.error("Failed to create autonomous workflow", e);
+                return "";
+            }
+        });
+    }
+    
+    /**
      * Helper method for sending requests to the GitHub API.
      *
      * @param urlString The URL.

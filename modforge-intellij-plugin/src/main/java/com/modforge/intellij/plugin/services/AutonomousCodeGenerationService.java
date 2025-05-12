@@ -444,8 +444,8 @@ public final class AutonomousCodeGenerationService {
     /**
      * Mock implementation of adding features.
      *
-     * @param fileContent    The file content.
-     * @param featurePrompt  The feature prompt.
+     * @param fileContent   The file content.
+     * @param featurePrompt The feature prompt.
      * @return Enhanced file content.
      */
     private String mockAddFeature(String fileContent, String featurePrompt) {
