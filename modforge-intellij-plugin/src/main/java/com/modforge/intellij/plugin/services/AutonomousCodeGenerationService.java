@@ -928,4 +928,172 @@ public final class AutonomousCodeGenerationService {
         
         return fileContent;
     }
+    
+    /**
+     * Parses fixed code from JSON response.
+     * 
+     * @param json The JSON response from the API.
+     * @return The fixed code.
+     */
+    private String parseFixedCodeFromJson(String json) {
+        try {
+            // Simple JSON parsing - extract the code field
+            Pattern pattern = Pattern.compile("\"code\"\\s*:\\s*\"(.*?)\"(?:,|\\})", Pattern.DOTALL);
+            Matcher matcher = pattern.matcher(json);
+            if (matcher.find()) {
+                // Unescape the JSON string
+                String fixedCode = matcher.group(1)
+                        .replace("\\n", "\n")
+                        .replace("\\\"", "\"")
+                        .replace("\\\\", "\\")
+                        .replace("\\t", "\t")
+                        .replace("\\/", "/");
+                return fixedCode;
+            }
+        } catch (Exception e) {
+            LOG.error("Error parsing fixed code from JSON", e);
+        }
+        return null;
+    }
+    
+    /**
+     * Parses explanation from JSON response.
+     * 
+     * @param json The JSON response from the API.
+     * @return The explanation text.
+     */
+    private String parseExplanationFromJson(String json) {
+        try {
+            // Simple JSON parsing - extract the explanation field
+            Pattern pattern = Pattern.compile("\"explanation\"\\s*:\\s*\"(.*?)\"(?:,|\\})", Pattern.DOTALL);
+            Matcher matcher = pattern.matcher(json);
+            if (matcher.find()) {
+                // Unescape the JSON string
+                String explanation = matcher.group(1)
+                        .replace("\\n", "\n")
+                        .replace("\\\"", "\"")
+                        .replace("\\\\", "\\")
+                        .replace("\\t", "\t")
+                        .replace("\\/", "/");
+                return explanation;
+            }
+            
+            // Fallback to text field if explanation field is not found
+            pattern = Pattern.compile("\"text\"\\s*:\\s*\"(.*?)\"(?:,|\\})", Pattern.DOTALL);
+            matcher = pattern.matcher(json);
+            if (matcher.find()) {
+                // Unescape the JSON string
+                String text = matcher.group(1)
+                        .replace("\\n", "\n")
+                        .replace("\\\"", "\"")
+                        .replace("\\\\", "\\")
+                        .replace("\\t", "\t")
+                        .replace("\\/", "/");
+                return text;
+            }
+        } catch (Exception e) {
+            LOG.error("Error parsing explanation from JSON", e);
+        }
+        return "Failed to parse explanation from API response.";
+    }
+    
+    /**
+     * Parses documentation from JSON response.
+     * 
+     * @param json The JSON response from the API.
+     * @return The documented code.
+     */
+    private String parseDocumentationFromJson(String json) {
+        try {
+            // Simple JSON parsing - extract the documented_code field
+            Pattern pattern = Pattern.compile("\"documented_code\"\\s*:\\s*\"(.*?)\"(?:,|\\})", Pattern.DOTALL);
+            Matcher matcher = pattern.matcher(json);
+            if (matcher.find()) {
+                // Unescape the JSON string
+                String documentedCode = matcher.group(1)
+                        .replace("\\n", "\n")
+                        .replace("\\\"", "\"")
+                        .replace("\\\\", "\\")
+                        .replace("\\t", "\t")
+                        .replace("\\/", "/");
+                return documentedCode;
+            }
+            
+            // Fallback to code field if documented_code field is not found
+            pattern = Pattern.compile("\"code\"\\s*:\\s*\"(.*?)\"(?:,|\\})", Pattern.DOTALL);
+            matcher = pattern.matcher(json);
+            if (matcher.find()) {
+                // Unescape the JSON string
+                String code = matcher.group(1)
+                        .replace("\\n", "\n")
+                        .replace("\\\"", "\"")
+                        .replace("\\\\", "\\")
+                        .replace("\\t", "\t")
+                        .replace("\\/", "/");
+                return code;
+            }
+        } catch (Exception e) {
+            LOG.error("Error parsing documentation from JSON", e);
+        }
+        return null;
+    }
+    
+    /**
+     * Escapes a string for JSON inclusion.
+     * 
+     * @param str The string to escape.
+     * @return The escaped string.
+     */
+    private String escapeJson(String str) {
+        return "\"" + str
+                .replace("\\", "\\\\")
+                .replace("\"", "\\\"")
+                .replace("\n", "\\n")
+                .replace("\r", "\\r")
+                .replace("\t", "\\t")
+                .replace("\f", "\\f")
+                .replace("\b", "\\b") + "\"";
+    }
+    
+    /**
+     * Makes an API request to the ModForge API.
+     * 
+     * @param url The API URL.
+     * @param apiKey The API key.
+     * @param json The JSON payload.
+     * @return The response JSON.
+     * @throws Exception If an error occurs.
+     */
+    private String makeApiRequest(String url, String apiKey, String json) throws Exception {
+        java.net.HttpURLConnection conn = null;
+        try {
+            java.net.URL apiUrl = new java.net.URL(url);
+            conn = (java.net.HttpURLConnection) apiUrl.openConnection();
+            conn.setRequestMethod("POST");
+            conn.setRequestProperty("Content-Type", "application/json");
+            conn.setRequestProperty("X-API-Key", apiKey);
+            conn.setDoOutput(true);
+            
+            // Write the request body
+            try (java.io.OutputStream os = conn.getOutputStream()) {
+                byte[] input = json.getBytes("utf-8");
+                os.write(input, 0, input.length);
+            }
+            
+            // Read the response
+            try (java.io.BufferedReader br = new java.io.BufferedReader(
+                    new java.io.InputStreamReader(conn.getInputStream(), "utf-8"))) {
+                StringBuilder response = new StringBuilder();
+                String line;
+                while ((line = br.readLine()) != null) {
+                    response.append(line);
+                }
+                return response.toString();
+            }
+        } finally {
+            if (conn != null) {
+                conn.disconnect();
+            }
+        }
+    }
 }

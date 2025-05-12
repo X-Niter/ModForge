@@ -135,6 +135,7 @@ public class CreateFromTemplateAction extends AnAction {
                                 
                                 if (notificationService != null) {
                                     notificationService.showInfoNotification(
+                                            project,
                                             "Project Created",
                                             "Project created successfully at " + outputDir.getAbsolutePath()
                                     );
