@@ -189,13 +189,13 @@ public class FixErrorsAction extends AnAction {
      * @param problems The problems
      * @return A formatted string
      */
-    private String formatProblems(@NotNull Collection<Problem> problems) {
+    private String formatProblems(@NotNull Collection<?> problems) {
         if (problems.isEmpty()) {
             return "No specific errors detected. Please describe the issue you're experiencing.";
         }
         
         StringBuilder sb = new StringBuilder();
-        for (Problem problem : problems) {
+        for (Object problem : problems) {
             // Use CompatibilityUtil for compatible problem description in IntelliJ IDEA 2025.1.1.1
             sb.append(CompatibilityUtil.getProblemDescription(problem)).append("\n");
         }
