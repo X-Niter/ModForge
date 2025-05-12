@@ -213,6 +213,23 @@ public final class CompatibilityUtil {
     public static void executeOnUiThread(@NotNull Runnable task) {
         runOnUiThread(task);
     }
+    
+    /**
+     * Executes a task on the UI thread and returns a value.
+     *
+     * @param <T> The return type.
+     * @param task The supplier to execute.
+     * @return The result of the task.
+     */
+    public static <T> T executeOnUiThreadAndGet(@NotNull java.util.function.Supplier<T> task) {
+        if (ApplicationManager.getApplication().isDispatchThread()) {
+            return task.get();
+        } else {
+            final java.util.concurrent.atomic.AtomicReference<T> result = new java.util.concurrent.atomic.AtomicReference<>();
+            runOnUiThreadAndWait(() -> result.set(task.get()));
+            return result.get();
+        }
+    }
 
     /**
      * Runs a task on the UI thread and waits for it to complete.

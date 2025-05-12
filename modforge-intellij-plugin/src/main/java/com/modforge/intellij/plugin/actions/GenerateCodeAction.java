@@ -57,6 +57,7 @@ public class GenerateCodeAction extends AnAction {
                                 
                                 // Notify success
                                 notificationService.showInfo(
+                                        project,
                                         "Code Generated",
                                         "Successfully generated code from description: " + description
                                 );
@@ -64,6 +65,7 @@ public class GenerateCodeAction extends AnAction {
                         } else {
                             CompatibilityUtil.executeOnUiThread(() -> {
                                 notificationService.showError(
+                                        project,
                                         "Code Generation Failed",
                                         "Failed to generate code from description: " + description
                                 );
