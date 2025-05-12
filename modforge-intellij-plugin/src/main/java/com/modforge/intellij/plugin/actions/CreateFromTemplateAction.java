@@ -57,10 +57,10 @@ public class CreateFromTemplateAction extends AnAction {
                         "Template service is not available."
                 );
             } else {
-                Messages.showErrorDialog(
+                CompatibilityUtil.showErrorDialog(
                         project,
-                        "Template service is not available.",
-                        "Service Unavailable"
+                        "Service Unavailable",
+                        "Template service is not available."
                 );
             }
             return;
@@ -83,10 +83,10 @@ public class CreateFromTemplateAction extends AnAction {
                         "Failed to load templates: " + error.get().getMessage()
                 );
             } else {
-                Messages.showErrorDialog(
+                CompatibilityUtil.showErrorDialog(
                         project,
-                        "Failed to load templates: " + error.get().getMessage(),
-                        "Error Loading Templates"
+                        "Error Loading Templates",
+                        "Failed to load templates: " + error.get().getMessage()
                 );
             }
             return;
@@ -102,10 +102,10 @@ public class CreateFromTemplateAction extends AnAction {
                         "No templates available."
                 );
             } else {
-                Messages.showErrorDialog(
+                CompatibilityUtil.showErrorDialog(
                         project,
-                        "No templates available.",
-                        "No Templates"
+                        "No Templates",
+                        "No templates available."
                 );
             }
             return;
@@ -589,13 +589,12 @@ public class CreateFromTemplateAction extends AnAction {
                         }
                     } else {
                         // Use the compatible version with Project parameter in IntelliJ IDEA 2025.1.1.1
-                        int result = Messages.showYesNoDialog(
+                        int result = notificationService.showYesNoDialog(
                                 project,
-                                "Output directory is not empty. Continue?",
                                 "Output Directory Not Empty",
+                                "Output directory is not empty. Continue?",
                                 "Continue",
-                                "Cancel",
-                                null
+                                "Cancel"
                         );
                         
                         if (result != Messages.YES) {
@@ -604,10 +603,10 @@ public class CreateFromTemplateAction extends AnAction {
                     }
                 } else {
                     // Use the compatible version with Project parameter in IntelliJ IDEA 2025.1.1.1
-                    int result = Messages.showYesNoDialog(
+                    int result = notificationService.showYesNoDialog(
                             project,
-                            "Output directory is not empty. Continue?",
                             "Output Directory Not Empty",
+                            "Output directory is not empty. Continue?",
                             "Continue",
                             "Cancel",
                             null
