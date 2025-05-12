@@ -201,21 +201,42 @@ public class GenerateCodeAction extends AnAction {
         String className = parseClassName(code);
         
         // Save dialog
-        String fileName = Messages.showInputDialog(
-                project,
-                "Enter file name:",
-                "Save Generated Code",
-                null,
-                className + ".java",
-                null
-        );
+        ModForgeNotificationService notificationService = ModForgeNotificationService.getInstance(project);
+        String fileName;
+        
+        if (notificationService != null) {
+            fileName = notificationService.showInputDialog(
+                    project,
+                    "Save Generated Code",
+                    "Enter file name:",
+                    className + ".java"
+            );
+        } else {
+            fileName = Messages.showInputDialog(
+                    project,
+                    "Enter file name:",
+                    "Save Generated Code",
+                    null,
+                    className + ".java",
+                    null
+            );
+        }
         
         if (fileName == null) return;
         
         // Get target directory
         VirtualFile baseDir = CompatibilityUtil.getProjectBaseDir(project);
         if (baseDir == null) {
-            Messages.showErrorDialog(project, "Could not find project base directory.", "Error");
+            ModForgeNotificationService notificationService = ModForgeNotificationService.getInstance(project);
+            if (notificationService != null) {
+                notificationService.showErrorDialog(
+                        project,
+                        "Error",
+                        "Could not find project base directory."
+                );
+            } else {
+                Messages.showErrorDialog(project, "Could not find project base directory.", "Error");
+            }
             return;
         }
         
@@ -258,7 +279,16 @@ public class GenerateCodeAction extends AnAction {
                 );
             }
         } catch (Exception e) {
-            Messages.showErrorDialog(project, "Error saving file: " + e.getMessage(), "Error");
+            ModForgeNotificationService notificationService = ModForgeNotificationService.getInstance(project);
+            if (notificationService != null) {
+                notificationService.showErrorDialog(
+                        project,
+                        "Error",
+                        "Error saving file: " + e.getMessage()
+                );
+            } else {
+                Messages.showErrorDialog(project, "Error saving file: " + e.getMessage(), "Error");
+            }
         }
     }
     

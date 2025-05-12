@@ -17,7 +17,7 @@ import com.intellij.ui.components.JBTextField;
 import com.intellij.util.ui.JBUI;
 import com.intellij.util.ui.UIUtil;
 import com.modforge.intellij.plugin.ai.generation.MinecraftCodeGenerator;
-import com.modforge.intellij.plugin.notifications.ModForgeNotificationService;
+import com.modforge.intellij.plugin.services.ModForgeNotificationService;
 import com.modforge.intellij.plugin.util.ModLoaderDetector.ModLoader;
 import com.modforge.intellij.plugin.utils.CompatibilityUtil;
 import org.jetbrains.annotations.NotNull;
@@ -63,7 +63,16 @@ public class GenerateMinecraftCodeAction extends AnAction {
         // Get the code generator service
         MinecraftCodeGenerator codeGenerator = project.getService(MinecraftCodeGenerator.class);
         if (codeGenerator == null) {
-            Messages.showErrorDialog(project, "Code generator service not available", "Error");
+            ModForgeNotificationService notificationService = ModForgeNotificationService.getInstance(project);
+            if (notificationService != null) {
+                notificationService.showErrorDialog(
+                        project,
+                        "Error",
+                        "Code generator service not available"
+                );
+            } else {
+                Messages.showErrorDialog(project, "Code generator service not available", "Error");
+            }
             return;
         }
         
