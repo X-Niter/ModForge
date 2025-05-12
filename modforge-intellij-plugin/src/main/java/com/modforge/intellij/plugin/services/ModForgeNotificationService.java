@@ -281,7 +281,8 @@ public final class ModForgeNotificationService {
      */
     public void showErrorDialog(@Nullable Project project, @NotNull String title, @NotNull String message) {
         ApplicationManager.getApplication().invokeAndWait(() -> {
-            Messages.showErrorDialog(project, message, title);
+            // Use CompatibilityUtil to ensure compatibility with IntelliJ IDEA 2025.1.1.1
+            com.modforge.intellij.plugin.utils.CompatibilityUtil.showErrorDialog(project, message, title);
         });
     }
     

@@ -34,7 +34,7 @@ public final class DialogUtils {
      */
     public static void showErrorMessage(@Nullable Project project, @NotNull String title, @NotNull String message) {
         SwingUtilities.invokeLater(() ->
-                Messages.showErrorDialog(project, message, title)
+                CompatibilityUtil.showErrorDialog(project, message, title)
         );
     }
     
@@ -47,7 +47,7 @@ public final class DialogUtils {
      */
     public static void showInfoMessage(@Nullable Project project, @NotNull String title, @NotNull String message) {
         SwingUtilities.invokeLater(() ->
-                Messages.showInfoMessage(project, message, title)
+                CompatibilityUtil.showInfoMessage(project, message, title)
         );
     }
     
@@ -60,7 +60,7 @@ public final class DialogUtils {
      */
     public static void showWarningMessage(@Nullable Project project, @NotNull String title, @NotNull String message) {
         SwingUtilities.invokeLater(() ->
-                Messages.showWarningDialog(project, message, title)
+                CompatibilityUtil.showWarningDialog(project, message, title)
         );
     }
     
@@ -80,11 +80,10 @@ public final class DialogUtils {
         CompletableFuture<Boolean> future = new CompletableFuture<>();
         
         SwingUtilities.invokeLater(() -> {
-            int result = Messages.showYesNoDialog(
+            int result = CompatibilityUtil.showYesNoDialog(
                     project,
                     message,
-                    title,
-                    Messages.getQuestionIcon()
+                    title
             );
             
             future.complete(result == Messages.YES);
@@ -138,13 +137,11 @@ public final class DialogUtils {
         CompletableFuture<String> future = new CompletableFuture<>();
         
         SwingUtilities.invokeLater(() -> {
-            String result = Messages.showInputDialog(
+            String result = CompatibilityUtil.showInputDialog(
                     project,
                     message,
                     title,
-                    Messages.getQuestionIcon(),
-                    initialValue,
-                    null
+                    initialValue
             );
             
             future.complete(result);
