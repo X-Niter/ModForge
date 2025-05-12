@@ -463,4 +463,75 @@ public final class CompatibilityUtil {
         return true;
     }
     
+    /**
+     * Shows an information dialog as a compatibility wrapper around Messages.showInfoDialog
+     * which has different parameters across IntelliJ versions.
+     *
+     * @param project The project
+     * @param message The message to display
+     * @param title The dialog title
+     */
+    public static void showInfoDialog(Project project, String message, String title) {
+        ApplicationManager.getApplication().invokeLater(() -> {
+            try {
+                // Try the method with project parameter first (older versions)
+                try {
+                    Messages.class.getMethod("showInfoDialog", Project.class, String.class, String.class)
+                            .invoke(null, project, message, title);
+                    return;
+                } catch (NoSuchMethodException e) {
+                    // Method not found, try alternative
+                    LOG.debug("showInfoDialog with Project parameter not found, trying alternative", e);
+                }
+                
+                // Try the method without project parameter (newer versions)
+                Messages.class.getMethod("showInfoDialog", String.class, String.class)
+                        .invoke(null, message, title);
+            } catch (Exception e) {
+                LOG.error("Failed to show info dialog", e);
+                // Fallback to simple notification if dialogs fail
+                ModForgeNotificationService.getInstance().showInfoNotification(
+                        project,
+                        title,
+                        message
+                );
+            }
+        });
+    }
+    
+    /**
+     * Shows an error dialog as a compatibility wrapper around Messages.showErrorDialog
+     * which has different parameters across IntelliJ versions.
+     *
+     * @param project The project
+     * @param message The message to display
+     * @param title The dialog title
+     */
+    public static void showErrorDialog(Project project, String message, String title) {
+        ApplicationManager.getApplication().invokeLater(() -> {
+            try {
+                // Try the method with project parameter first (older versions)
+                try {
+                    Messages.class.getMethod("showErrorDialog", Project.class, String.class, String.class)
+                            .invoke(null, project, message, title);
+                    return;
+                } catch (NoSuchMethodException e) {
+                    // Method not found, try alternative
+                    LOG.debug("showErrorDialog with Project parameter not found, trying alternative", e);
+                }
+                
+                // Try the method without project parameter (newer versions)
+                Messages.class.getMethod("showErrorDialog", String.class, String.class)
+                        .invoke(null, message, title);
+            } catch (Exception e) {
+                LOG.error("Failed to show error dialog", e);
+                // Fallback to simple notification if dialogs fail
+                ModForgeNotificationService.getInstance().showErrorNotification(
+                        project, 
+                        title,
+                        message
+                );
+            }
+        });
+    }
 }
