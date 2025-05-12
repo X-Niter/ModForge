@@ -10,6 +10,8 @@ import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.openapi.vfs.newvfs.events.VFileCopyEvent;
 import com.intellij.openapi.vfs.newvfs.events.VFileEvent;
 import com.intellij.openapi.vfs.newvfs.events.VFileMoveEvent;
+import com.intellij.problems.Problem;
+import com.intellij.problems.WolfTheProblemSolver;
 import com.modforge.intellij.plugin.services.ModForgeNotificationService;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
