@@ -93,14 +93,26 @@ public class ToggleContinuousDevelopmentAction extends AnAction {
             
             if (currentState) {
                 // Show confirmation dialog before disabling
-                int result = Messages.showYesNoDialog(
-                        project,
-                        "Are you sure you want to disable continuous development? All automatic error fixing will be stopped.",
-                        "Disable Continuous Development",
-                        "Disable",
-                        "Cancel",
-                        null
-                );
+                ModForgeNotificationService notificationService = ModForgeNotificationService.getInstance(project);
+                int result;
+                if (notificationService != null) {
+                    result = notificationService.showYesNoDialog(
+                            project,
+                            "Disable Continuous Development",
+                            "Are you sure you want to disable continuous development? All automatic error fixing will be stopped.",
+                            "Disable",
+                            "Cancel"
+                    );
+                } else {
+                    result = Messages.showYesNoDialog(
+                            project,
+                            "Are you sure you want to disable continuous development? All automatic error fixing will be stopped.",
+                            "Disable Continuous Development",
+                            "Disable",
+                            "Cancel",
+                            null
+                    );
+                }
                 
                 if (result == Messages.YES) {
                     service.setEnabled(false);
@@ -108,11 +120,19 @@ public class ToggleContinuousDevelopmentAction extends AnAction {
                     ModForgeSettings settings = ModForgeSettings.getInstance();
                     settings.setEnableContinuousDevelopment(false);
                     
-                    Messages.showInfoMessage(
-                            project,
-                            "Continuous development has been disabled.",
-                            "Continuous Development"
-                    );
+                    if (notificationService != null) {
+                        notificationService.showInfoDialog(
+                                project,
+                                "Continuous Development",
+                                "Continuous development has been disabled."
+                        );
+                    } else {
+                        Messages.showInfoMessage(
+                                project,
+                                "Continuous development has been disabled.",
+                                "Continuous Development"
+                        );
+                    }
                 }
             } else {
                 // Show settings dialog before enabling
@@ -127,13 +147,24 @@ public class ToggleContinuousDevelopmentAction extends AnAction {
                     settings.setEnableContinuousDevelopment(true);
                     settings.setContinuousDevelopmentScanInterval(interval);
                     
-                    Messages.showInfoMessage(
-                            project,
-                            "Continuous development has been enabled. " +
-                                    "Your project will be automatically scanned for errors every " +
-                                    formatInterval(interval) + ".",
-                            "Continuous Development"
-                    );
+                    ModForgeNotificationService notificationService = ModForgeNotificationService.getInstance(project);
+                    if (notificationService != null) {
+                        notificationService.showInfoDialog(
+                                project,
+                                "Continuous Development",
+                                "Continuous development has been enabled. " +
+                                        "Your project will be automatically scanned for errors every " +
+                                        formatInterval(interval) + "."
+                        );
+                    } else {
+                        Messages.showInfoMessage(
+                                project,
+                                "Continuous development has been enabled. " +
+                                        "Your project will be automatically scanned for errors every " +
+                                        formatInterval(interval) + ".",
+                                "Continuous Development"
+                        );
+                    }
                 }
             }
         }
@@ -183,11 +214,20 @@ public class ToggleContinuousDevelopmentAction extends AnAction {
             });
         }
         
-        Messages.showInfoMessage(
-                project,
-                sb.toString(),
-                "Continuous Development Metrics"
-        );
+        ModForgeNotificationService notificationService = ModForgeNotificationService.getInstance(project);
+        if (notificationService != null) {
+            notificationService.showInfoDialog(
+                    project,
+                    "Continuous Development Metrics",
+                    sb.toString()
+            );
+        } else {
+            Messages.showInfoMessage(
+                    project,
+                    sb.toString(),
+                    "Continuous Development Metrics"
+            );
+        }
     }
     
     /**
