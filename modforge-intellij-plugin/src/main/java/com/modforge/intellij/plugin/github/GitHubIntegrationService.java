@@ -1040,7 +1040,7 @@ public final class GitHubIntegrationService {
      * @param progressConsumer Consumer for progress updates
      * @return CompletableFuture with push result
      */
-    public CompletableFuture<PushResult> pushToGitHub(
+    public CompletableFuture<PushResult> pushToGitHubV2(
             String owner,
             String repository,
             String description,
@@ -1096,7 +1096,7 @@ public final class GitHubIntegrationService {
      * @param repository Repository name
      * @return CompletableFuture with monitoring start result
      */
-    public CompletableFuture<Boolean> startMonitoring(String owner, String repository) {
+    public CompletableFuture<Boolean> startMonitoringAsync(String owner, String repository) {
         if (owner == null || owner.isEmpty() || repository == null || repository.isEmpty()) {
             return CompletableFuture.completedFuture(false);
         }

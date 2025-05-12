@@ -138,7 +138,7 @@ public class PushToGitHubAction extends AnAction {
                     
                     indicator.setText(progressText.get());
                     
-                    gitHubService.pushToGitHub(
+                    gitHubService.pushToGitHubV2(
                             owner,
                             repository,
                             description,
