@@ -66,6 +66,18 @@ public final class ModForgeSettings implements PersistentStateComponent<ModForge
     public static ModForgeSettings getInstance() {
         return ApplicationManager.getApplication().getService(ModForgeSettings.class);
     }
+    
+    /**
+     * Gets the instance of the settings for a specific project.
+     * Note: ModForgeSettings is an application-level service, so this ignores the project parameter.
+     * This method is provided for compatibility with IntelliJ IDEA 2025.1.1.1.
+     *
+     * @param project The project (ignored).
+     * @return The settings instance.
+     */
+    public static ModForgeSettings getInstance(@NotNull Project project) {
+        return getInstance();
+    }
 
     /**
      * Gets the state.
