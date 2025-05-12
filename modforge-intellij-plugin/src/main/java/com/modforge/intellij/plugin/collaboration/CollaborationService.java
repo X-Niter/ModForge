@@ -316,13 +316,14 @@ public final class CollaborationService {
                 }
                 
                 LOG.info("Successfully joined session: " + sessionId);
+                return true;
             } catch (Exception e) {
                 LOG.error("Error joining collaboration session", e);
                 
                 connected = false;
                 this.sessionId = null;
                 
-                throw new RuntimeException("Failed to join collaboration session", e);
+                return false;
             }
         });
     }
@@ -957,11 +958,4 @@ public final class CollaborationService {
         }
     }
     
-    /**
-     * Checks if connected to a collaboration session.
-     * @return Whether connected to a collaboration session
-     */
-    public boolean isConnected() {
-        return connected;
-    }
 }
