@@ -1,28 +1,19 @@
 package com.modforge.intellij.plugin.utils;
 
-import com.intellij.openapi.application.Application;
-import com.intellij.openapi.application.ApplicationInfo;
-import com.intellij.openapi.application.ApplicationManager;
-import com.intellij.openapi.application.ReadAction;
-import com.intellij.openapi.application.WriteAction;
+import com.intellij.openapi.application.*;
 import com.intellij.openapi.diagnostic.Logger;
-import com.intellij.openapi.fileEditor.FileEditor;
 import com.intellij.openapi.fileEditor.FileEditorManager;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.project.ProjectUtil;
 import com.intellij.openapi.ui.Messages;
-import com.intellij.openapi.vfs.LocalFileSystem;
-import com.intellij.openapi.vfs.VfsUtil;
 import com.intellij.openapi.vfs.VirtualFile;
-import com.intellij.openapi.wm.ToolWindow;
-import com.intellij.openapi.wm.ToolWindowManager;
-import com.intellij.util.ThrowableRunnable;
+import com.intellij.openapi.vfs.newvfs.events.VFileCopyEvent;
+import com.intellij.openapi.vfs.newvfs.events.VFileEvent;
+import com.intellij.openapi.vfs.newvfs.events.VFileMoveEvent;
+import com.modforge.intellij.plugin.services.ModForgeNotificationService;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-import java.io.File;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Supplier;
@@ -210,28 +201,23 @@ public final class CompatibilityUtil {
         
         // Create a virtual file listener that invokes the callback on any file change
         com.intellij.openapi.vfs.VirtualFileListener listener = new com.intellij.openapi.vfs.VirtualFileListener() {
-            @Override
-            public void contentsChanged(@NotNull com.intellij.openapi.vfs.events.VFileEvent event) {
+            public void contentsChanged(@NotNull VFileEvent event) {
                 callback.run();
             }
             
-            @Override
-            public void fileCreated(@NotNull com.intellij.openapi.vfs.events.VFileEvent event) {
+            public void fileCreated(@NotNull VFileEvent event) {
                 callback.run();
             }
             
-            @Override
-            public void fileDeleted(@NotNull com.intellij.openapi.vfs.events.VFileEvent event) {
+            public void fileDeleted(@NotNull VFileEvent event) {
                 callback.run();
             }
             
-            @Override
-            public void fileMoved(@NotNull com.intellij.openapi.vfs.events.VFileMoveEvent event) {
+            public void fileMoved(@NotNull VFileMoveEvent event) {
                 callback.run();
             }
             
-            @Override
-            public void fileCopied(@NotNull com.intellij.openapi.vfs.events.VFileCopyEvent event) {
+            public void fileCopied(@NotNull VFileCopyEvent event) {
                 callback.run();
             }
         };
@@ -271,17 +257,7 @@ public final class CompatibilityUtil {
             application.invokeLater(task);
         }
     }
-    
-    /**
-     * Executes a task on the UI thread.
-     * This is an alias for runOnUiThread to maintain backward compatibility.
-     *
-     * @param task The task to run.
-     */
-    public static void executeOnUiThread(@NotNull Runnable task) {
-        runOnUiThread(task);
-    }
-    
+
     /**
      * Executes a task on the UI thread and returns a value.
      *
@@ -431,36 +407,6 @@ public final class CompatibilityUtil {
         }
         
         return numStr.length() > 0 ? Integer.parseInt(numStr.toString()) : 0;
-    }
-    
-    /**
-     * Opens a file in the editor.
-     *
-     * @param project       The project.
-     * @param file          The file to open.
-     * @param requestFocus  Whether to request focus.
-     * @return Whether the file was opened.
-     */
-    public static boolean openFileInEditor(
-            @NotNull Project project,
-            @NotNull VirtualFile file,
-            boolean requestFocus) {
-        
-        if (!file.isValid()) {
-            LOG.warn("Cannot open invalid file: " + file.getPath());
-            return false;
-        }
-        
-        runOnUiThread(() -> {
-            try {
-                com.intellij.openapi.fileEditor.FileEditorManager.getInstance(project)
-                        .openFile(file, requestFocus);
-            } catch (Exception e) {
-                LOG.error("Failed to open file in editor: " + file.getPath(), e);
-            }
-        });
-        
-        return true;
     }
     
     /**

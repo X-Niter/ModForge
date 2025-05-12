@@ -1,5 +1,6 @@
 package com.modforge.intellij.plugin.ai;
 
+import com.google.gson.stream.JsonReader;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.components.Service;
 import com.intellij.openapi.diagnostic.Logger;
