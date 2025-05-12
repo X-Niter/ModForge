@@ -86,7 +86,7 @@ public final class DialogUtils {
                     title
             );
             
-            future.complete(result == Messages.YES);
+            future.complete(result == CompatibilityUtil.DIALOG_YES);
         });
         
         return future;

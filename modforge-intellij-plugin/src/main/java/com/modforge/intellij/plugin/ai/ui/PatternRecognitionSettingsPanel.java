@@ -10,6 +10,7 @@ import com.intellij.ui.components.JBTextField;
 import com.intellij.util.ui.FormBuilder;
 import com.modforge.intellij.plugin.ai.PatternRecognitionService;
 import com.modforge.intellij.plugin.ai.pattern.PatternLearningSystem;
+import com.modforge.intellij.plugin.utils.CompatibilityUtil;
 import org.jetbrains.annotations.Nls;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -153,7 +154,7 @@ public class PatternRecognitionSettingsPanel implements Configurable {
                 "Reset Statistics",
                 Messages.getQuestionIcon());
         
-        if (result == Messages.YES) {
+        if (result == CompatibilityUtil.DIALOG_YES) {
             patternService.resetStatistics();
             updateStatisticsTable();
         }

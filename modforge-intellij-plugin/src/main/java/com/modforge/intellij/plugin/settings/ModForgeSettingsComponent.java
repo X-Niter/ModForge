@@ -7,6 +7,7 @@ import com.intellij.ui.components.JBLabel;
 import com.intellij.ui.components.JBPasswordField;
 import com.intellij.ui.components.JBTextField;
 import com.intellij.util.ui.FormBuilder;
+import com.modforge.intellij.plugin.utils.CompatibilityUtil;
 import com.modforge.intellij.plugin.utils.ConnectionTestUtil;
 import org.jetbrains.annotations.NotNull;
 
@@ -401,7 +402,7 @@ public class ModForgeSettingsComponent {
                 Messages.getQuestionIcon()
         );
         
-        if (result == Messages.YES) {
+        if (result == CompatibilityUtil.DIALOG_YES) {
             ModForgeSettings settings = ModForgeSettings.getInstance();
             settings.resetToDefaults();
             
