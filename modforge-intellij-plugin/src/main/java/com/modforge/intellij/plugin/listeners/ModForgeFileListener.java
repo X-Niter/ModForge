@@ -58,7 +58,7 @@ public final class ModForgeFileListener implements VirtualFileListener {
         
         // Check if continuous development is enabled
         ModForgeSettings settings = ModForgeSettings.getInstance();
-        if (!settings.isContinuousDevelopmentEnabled()) {
+        if (!settings.isEnableContinuousDevelopment()) {
             return;
         }
         

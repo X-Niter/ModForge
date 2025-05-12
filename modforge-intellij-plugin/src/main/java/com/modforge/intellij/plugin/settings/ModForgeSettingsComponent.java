@@ -25,6 +25,7 @@ public class ModForgeSettingsComponent {
     private final JBCheckBox useDarkModeCheckbox;
     private final JBCheckBox enableContinuousDevelopmentCheckbox;
     private final JBCheckBox enablePatternRecognitionCheckbox;
+    private final JBCheckBox enableNotificationsCheckbox;
     private final JBCheckBox enableGitHubIntegrationCheckbox;
     private final JBPasswordField githubTokenField;
     private final JBTextField githubUsernameField;
@@ -50,6 +51,7 @@ public class ModForgeSettingsComponent {
         useDarkModeCheckbox = new JBCheckBox("Use dark mode");
         enableContinuousDevelopmentCheckbox = new JBCheckBox("Enable continuous development");
         enablePatternRecognitionCheckbox = new JBCheckBox("Enable pattern recognition");
+        enableNotificationsCheckbox = new JBCheckBox("Enable notifications");
         enableGitHubIntegrationCheckbox = new JBCheckBox("Enable GitHub integration");
         githubTokenField = new JBPasswordField();
         githubUsernameField = new JBTextField();

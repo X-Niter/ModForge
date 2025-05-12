@@ -45,6 +45,9 @@ public final class ModForgeSettings implements PersistentStateComponent<ModForge
     @Attribute("enableContinuousDevelopment")
     private boolean enableContinuousDevelopment = false;
     
+    @Attribute("enableNotifications")
+    private boolean enableNotifications = true;
+    
     // OpenAI settings
     @Attribute("openAiApiKey")
     private String openAiApiKey = "";
@@ -324,6 +327,24 @@ public final class ModForgeSettings implements PersistentStateComponent<ModForge
     public void setEnableContinuousDevelopment(boolean enableContinuousDevelopment) {
         this.enableContinuousDevelopment = enableContinuousDevelopment;
     }
+    
+    /**
+     * Checks if notifications are enabled.
+     *
+     * @return Whether notifications are enabled.
+     */
+    public boolean isEnableNotifications() {
+        return enableNotifications;
+    }
+
+    /**
+     * Sets whether notifications are enabled.
+     *
+     * @param enableNotifications Whether notifications are enabled.
+     */
+    public void setEnableNotifications(boolean enableNotifications) {
+        this.enableNotifications = enableNotifications;
+    }
 
     /**
      * Gets the GitHub username.
@@ -383,6 +404,7 @@ public final class ModForgeSettings implements PersistentStateComponent<ModForge
         requestTimeout = 30;
         enablePatternRecognition = true;
         enableContinuousDevelopment = false;
+        enableNotifications = true;
         
         openAiApiKey = "";
         openAiModel = "gpt-4o";
