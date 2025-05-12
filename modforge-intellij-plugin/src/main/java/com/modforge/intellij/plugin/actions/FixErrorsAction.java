@@ -108,8 +108,9 @@ public class FixErrorsAction extends AnAction {
         Collection<Problem> problems = getProblemsInFile(project, file);
         
         if (problems.isEmpty()) {
-            // Check with user if they want to continue
-            int result = Messages.showYesNoDialog(
+            // Check with user if they want to continue using ModForgeNotificationService
+            ModForgeNotificationService notificationService = project.getService(ModForgeNotificationService.class);
+            int result = notificationService.showYesNoDialog(
                     project,
                     "No compilation errors detected. Do you want to proceed with error fixing anyway?",
                     "No Errors Detected",
@@ -118,7 +119,7 @@ public class FixErrorsAction extends AnAction {
                     AllIcons.General.QuestionDialog
             );
             
-            if (result != Messages.YES) {
+            if (result != ModForgeNotificationService.YES) {
                 return;
             }
         }
@@ -416,10 +417,11 @@ public class FixErrorsAction extends AnAction {
                 project.getService(AutonomousCodeGenerationService.class);
         
         if (codeGenService == null) {
-            Messages.showErrorDialog(
+            ModForgeNotificationService notificationService = project.getService(ModForgeNotificationService.class);
+            notificationService.showErrorDialog(
                     project,
-                    "Code generation service is not available.",
-                    "Service Unavailable"
+                    "Service Unavailable",
+                    "Code generation service is not available."
             );
             return;
         }
