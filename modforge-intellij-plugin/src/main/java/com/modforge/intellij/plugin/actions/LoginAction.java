@@ -85,11 +85,20 @@ public class LoginAction extends AnAction {
                     // Show result on UI thread
                     ApplicationManager.getApplication().invokeLater(() -> {
                         if (success.get()) {
-                            Messages.showInfoMessage(
-                                    project,
-                                    "Successfully logged in as " + authManager.getUsername(),
-                                    "Login Successful"
-                            );
+                            ModForgeNotificationService notificationService = ModForgeNotificationService.getInstance(project);
+                            if (notificationService != null) {
+                                notificationService.showInfoDialog(
+                                        project,
+                                        "Login Successful",
+                                        "Successfully logged in as " + authManager.getUsername()
+                                );
+                            } else {
+                                Messages.showInfoMessage(
+                                        project,
+                                        "Successfully logged in as " + authManager.getUsername(),
+                                        "Login Successful"
+                                );
+                            }
                             
                             // Enable features that require authentication
                             enableContinuousDevelopmentIfPossible(project);
