@@ -61,6 +61,23 @@ public final class CompatibilityUtil {
     }
     
     /**
+     * Replacement for deprecated Project.getBasePath()
+     * Compatible with IntelliJ IDEA 2025.1.1.1
+     * 
+     * @param project The project
+     * @return The base path string, or null if not available
+     */
+    @Nullable
+    public static String getProjectBasePath(@Nullable Project project) {
+        if (project == null || project.isDisposed()) {
+            return null;
+        }
+        
+        VirtualFile baseDir = getProjectBaseDir(project);
+        return baseDir != null ? baseDir.getPath() : null;
+    }
+    
+    /**
      * Retrieves a mod file using its relative path from the project root.
      * 
      * @param project The project
