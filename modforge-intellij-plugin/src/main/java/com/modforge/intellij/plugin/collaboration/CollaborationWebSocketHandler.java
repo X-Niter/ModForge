@@ -2,7 +2,7 @@ package com.modforge.intellij.plugin.collaboration;
 
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.util.concurrency.AppExecutorUtil;
-import com.modforge.intellij.plugin.collaboration.websocket.WebSocketMessage;
+// Using fully qualified name for websocket.WebSocketMessage to avoid conflicts
 import com.modforge.intellij.plugin.collaboration.websocket.WebSocketMessageListener;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
