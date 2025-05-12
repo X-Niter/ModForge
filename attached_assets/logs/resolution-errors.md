@@ -1,7 +1,7 @@
 # Potential Resolution Error Report 
  
 This report identifies potential "Cannot resolve" errors for IntelliJ IDEA 2025.1.1.1. 
-Generated on Sun 05/11/2025 23:48:13.21. 
+Generated on Sun 05/11/2025 23:56:32.31. 
  
 ## Overview 
  
@@ -204,6 +204,7 @@ src\main\java\com\modforge\intellij\plugin\collaboration\CollaborationService.ja
 src\main\java\com\modforge\intellij\plugin\designers\advancement\AdvancementManager.java:            VirtualFile baseDir = LocalFileSystem.getInstance().findFileByPath(basePath);
 src\main\java\com\modforge\intellij\plugin\designers\recipe\RecipeManager.java:            VirtualFile baseDir = LocalFileSystem.getInstance().findFileByPath(basePath);
 src\main\java\com\modforge\intellij\plugin\designers\structure\StructureManager.java:            VirtualFile baseDir = LocalFileSystem.getInstance().findFileByPath(basePath);
+src\main\java\com\modforge\intellij\plugin\utils\CompatibilityUtil.java:        return LocalFileSystem.getInstance().findFileByPath(path);
 src\main\java\com\modforge\intellij\plugin\utils\VirtualFileUtil.java:        return LocalFileSystem.getInstance().findFileByPath(path);
 --- End Code --- 
  
@@ -237,7 +238,6 @@ G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\mod
 G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\actions\FixErrorsAction.java:204: error: cannot find symbol
 G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\actions\FixErrorsAction.java:223: error: cannot find symbol
 G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\actions\GenerateImplementationAction.java:96: error: cannot find symbol
-G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\ai\generation\MinecraftCodeGenerator.java:462: error: cannot find symbol
 G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\actions\GenerateMinecraftCodeAction.java:83: error: cannot find symbol
 G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\actions\GenerateMinecraftCodeAction.java:95: error: cannot find symbol
 G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\ai\PatternRecognitionService.java:236: error: cannot find symbol
@@ -323,6 +323,8 @@ G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\mod
 G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\crossloader\ArchitecturyService.java:196: error: cannot find symbol
 G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\crossloader\intentions\ConvertToPlatformSpecificIntention.java:55: error: cannot find symbol
 G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\crossloader\ui\CrossLoaderPanel.java:140: error: cannot find symbol
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\debug\MinecraftDebuggerExtension.java:112: error: cannot find symbol
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\debug\MinecraftDebuggerExtension.java:157: error: cannot find symbol
 --- End Code --- 
  
 ## Fix Recommendations 

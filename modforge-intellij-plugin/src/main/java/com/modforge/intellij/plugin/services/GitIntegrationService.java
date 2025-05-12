@@ -1,13 +1,22 @@
 package com.modforge.intellij.plugin.services;
 
+import com.intellij.openapi.components.Service;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.project.Project;
+import com.intellij.openapi.vcs.VcsException;
 import com.intellij.openapi.vcs.changes.Change;
 import com.intellij.openapi.vfs.VirtualFile;
+import com.intellij.util.containers.ContainerUtil;
+import com.modforge.intellij.plugin.settings.ModForgeSettings;
 import com.modforge.intellij.plugin.utils.CompatibilityUtil;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
@@ -16,9 +25,12 @@ import java.util.function.Consumer;
  * Service for Git integration in the ModForge plugin.
  * Compatible with IntelliJ IDEA 2025.1.1.1
  */
+@Service(Service.Level.PROJECT)
 public final class GitIntegrationService {
     private static final Logger LOG = Logger.getInstance(GitIntegrationService.class);
+    
     private final Project project;
+    private final ModForgeSettings settings;
     private final ModForgeNotificationService notificationService;
 
     /**
@@ -28,6 +40,7 @@ public final class GitIntegrationService {
      */
     public GitIntegrationService(Project project) {
         this.project = project;
+        this.settings = ModForgeSettings.getInstance();
         this.notificationService = ModForgeNotificationService.getInstance(project);
         LOG.info("GitIntegrationService initialized for project: " + project.getName());
     }
@@ -43,75 +56,92 @@ public final class GitIntegrationService {
     }
 
     /**
-     * Commits changes to the Git repository.
+     * Gets the Git executable path.
      *
-     * @param message The commit message.
-     * @param filesToCommit The files to commit.
-     * @param callback Callback for success.
+     * @return The Git executable path.
      */
-    public void commitChanges(
-            @NotNull String message,
-            @NotNull List<VirtualFile> filesToCommit,
-            @NotNull Consumer<Boolean> callback) {
+    @NotNull
+    private String getGitExecutable() {
+        String configuredPath = settings.getGitExecutablePath();
+        if (!configuredPath.isEmpty()) {
+            return configuredPath;
+        }
         
-        LOG.info("Committing changes with message: " + message);
-        notificationService.showInfo("Committing Changes", "Preparing to commit changes to Git repository");
-        
-        CompletableFuture.supplyAsync(() -> {
-            try {
-                // In a real implementation, this would use the Git4Idea plugin API
-                // For now, simulate a successful commit
-                Thread.sleep(1000);
-                
-                LOG.info("Successfully committed changes with message: " + message);
-                return true;
-            } catch (Exception e) {
-                LOG.error("Failed to commit changes", e);
-                return false;
-            }
-        }).thenAccept(success -> {
-            CompatibilityUtil.executeOnUiThread(() -> {
-                if (success) {
-                    notificationService.showInfo("Commit Successful", "Changes have been committed to the Git repository");
-                } else {
-                    notificationService.showError("Commit Failed", "Failed to commit changes to the Git repository");
-                }
-                callback.accept(success);
-            });
-        });
+        // Use the default Git executable
+        return "git";
     }
 
     /**
-     * Creates a new branch in the Git repository.
+     * Executes a Git command.
      *
-     * @param branchName The branch name.
-     * @param callback Callback for success.
+     * @param args The command arguments.
+     * @return The command output.
+     * @throws Exception If the command execution fails.
      */
-    public void createBranch(@NotNull String branchName, @NotNull Consumer<Boolean> callback) {
-        LOG.info("Creating branch: " + branchName);
-        notificationService.showInfo("Creating Branch", "Creating new Git branch: " + branchName);
+    @NotNull
+    private String executeGitCommand(@NotNull List<String> args) throws Exception {
+        String projectPath = project.getBasePath();
+        if (projectPath == null) {
+            throw new IllegalStateException("Project base path is null");
+        }
         
+        List<String> command = new ArrayList<>();
+        command.add(getGitExecutable());
+        command.addAll(args);
+        
+        ProcessBuilder processBuilder = new ProcessBuilder(command);
+        processBuilder.directory(new File(projectPath));
+        processBuilder.redirectErrorStream(true);
+        
+        Process process = processBuilder.start();
+        StringBuilder output = new StringBuilder();
+        
+        try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8))) {
+            String line;
+            while ((line = reader.readLine()) != null) {
+                output.append(line).append("\n");
+            }
+        }
+        
+        int exitCode = process.waitFor();
+        if (exitCode != 0) {
+            throw new Exception("Git command failed with exit code " + exitCode + ": " + output);
+        }
+        
+        return output.toString().trim();
+    }
+
+    /**
+     * Gets all changes in the working directory.
+     *
+     * @param callback Callback for the changes.
+     */
+    public void getChanges(@NotNull Consumer<List<Change>> callback) {
         CompletableFuture.supplyAsync(() -> {
             try {
-                // In a real implementation, this would use the Git4Idea plugin API
-                // For now, simulate a successful branch creation
-                Thread.sleep(1000);
+                // In a real implementation, this would use the Git4Idea API to get changes
+                // For now, use the git command line to simulate getting changes
+                String output = executeGitCommand(List.of("status", "--porcelain"));
                 
-                LOG.info("Successfully created branch: " + branchName);
-                return true;
-            } catch (Exception e) {
-                LOG.error("Failed to create branch", e);
-                return false;
-            }
-        }).thenAccept(success -> {
-            CompatibilityUtil.executeOnUiThread(() -> {
-                if (success) {
-                    notificationService.showInfo("Branch Created", "Successfully created branch: " + branchName);
-                } else {
-                    notificationService.showError("Branch Creation Failed", "Failed to create branch: " + branchName);
+                // Parse the output to get the changes
+                List<Change> changes = new ArrayList<>();
+                String[] lines = output.split("\n");
+                for (String line : lines) {
+                    if (line.trim().isEmpty()) continue;
+                    
+                    // Create a mock Change object for each changed file
+                    changes.add(new MockChange(line));
                 }
-                callback.accept(success);
-            });
+                
+                LOG.info("Found " + changes.size() + " changes");
+                
+                return changes;
+            } catch (Exception e) {
+                LOG.error("Failed to get changes", e);
+                return null;
+            }
+        }).thenAccept(changes -> {
+            CompatibilityUtil.executeOnUiThread(() -> callback.accept(changes != null ? changes : List.of()));
         });
     }
 
@@ -121,48 +151,90 @@ public final class GitIntegrationService {
      * @param callback Callback for the branch name.
      */
     public void getCurrentBranch(@NotNull Consumer<String> callback) {
-        LOG.info("Getting current branch");
-        
         CompletableFuture.supplyAsync(() -> {
             try {
-                // In a real implementation, this would use the Git4Idea plugin API
-                // For now, simulate a successful branch retrieval
-                Thread.sleep(500);
-                
-                String branchName = "main";
-                LOG.info("Current branch: " + branchName);
-                return branchName;
+                String branch = executeGitCommand(List.of("rev-parse", "--abbrev-ref", "HEAD"));
+                LOG.info("Current branch: " + branch);
+                return branch;
             } catch (Exception e) {
                 LOG.error("Failed to get current branch", e);
-                return null;
+                return "main"; // Default to main if the command fails
             }
-        }).thenAccept(branchName -> {
-            CompatibilityUtil.executeOnUiThread(() -> callback.accept(branchName));
+        }).thenAccept(branch -> {
+            CompatibilityUtil.executeOnUiThread(() -> callback.accept(branch));
         });
     }
 
     /**
-     * Gets the changes in the repository.
+     * Creates a new branch.
      *
-     * @param callback Callback for the changes.
+     * @param branchName The branch name.
+     * @param callback Callback for success.
      */
-    public void getChanges(@NotNull Consumer<List<Change>> callback) {
-        LOG.info("Getting changes in repository");
+    public void createBranch(@NotNull String branchName, @NotNull Consumer<Boolean> callback) {
+        CompletableFuture.supplyAsync(() -> {
+            try {
+                executeGitCommand(List.of("checkout", "-b", branchName));
+                LOG.info("Created branch: " + branchName);
+                return true;
+            } catch (Exception e) {
+                LOG.error("Failed to create branch: " + branchName, e);
+                return false;
+            }
+        }).thenAccept(success -> {
+            CompatibilityUtil.executeOnUiThread(() -> callback.accept(success));
+        });
+    }
+
+    /**
+     * Switches to a branch.
+     *
+     * @param branchName The branch name.
+     * @param callback Callback for success.
+     */
+    public void switchBranch(@NotNull String branchName, @NotNull Consumer<Boolean> callback) {
+        CompletableFuture.supplyAsync(() -> {
+            try {
+                executeGitCommand(List.of("checkout", branchName));
+                LOG.info("Switched to branch: " + branchName);
+                return true;
+            } catch (Exception e) {
+                LOG.error("Failed to switch to branch: " + branchName, e);
+                return false;
+            }
+        }).thenAccept(success -> {
+            CompatibilityUtil.executeOnUiThread(() -> callback.accept(success));
+        });
+    }
+
+    /**
+     * Commits changes.
+     *
+     * @param message The commit message.
+     * @param files The files to commit.
+     * @param callback Callback for success.
+     */
+    public void commitChanges(
+            @NotNull String message,
+            @NotNull List<VirtualFile> files,
+            @NotNull Consumer<Boolean> callback) {
         
         CompletableFuture.supplyAsync(() -> {
             try {
-                // In a real implementation, this would use the Git4Idea plugin API
-                // For now, return an empty list
-                Thread.sleep(500);
+                // Add all files to staging
+                executeGitCommand(List.of("add", "-A"));
                 
-                LOG.info("Retrieved changes in repository");
-                return (List<Change>) List.of();
+                // Commit the changes
+                executeGitCommand(List.of("commit", "-m", message));
+                
+                LOG.info("Committed changes with message: " + message);
+                return true;
             } catch (Exception e) {
-                LOG.error("Failed to get changes", e);
-                return null;
+                LOG.error("Failed to commit changes", e);
+                return false;
             }
-        }).thenAccept(changes -> {
-            CompatibilityUtil.executeOnUiThread(() -> callback.accept(changes));
+        }).thenAccept(success -> {
+            CompatibilityUtil.executeOnUiThread(() -> callback.accept(success));
         });
     }
 
@@ -172,42 +244,71 @@ public final class GitIntegrationService {
      * @param callback Callback for success.
      */
     public void pushChanges(@NotNull Consumer<Boolean> callback) {
-        LOG.info("Pushing changes to remote repository");
-        notificationService.showInfo("Pushing Changes", "Pushing changes to remote Git repository");
-        
         CompletableFuture.supplyAsync(() -> {
             try {
-                // In a real implementation, this would use the Git4Idea plugin API
-                // For now, simulate a successful push
-                Thread.sleep(1500);
+                getCurrentBranch(branch -> {
+                    CompletableFuture.supplyAsync(() -> {
+                        try {
+                            executeGitCommand(List.of("push", "origin", branch));
+                            LOG.info("Pushed changes to origin/" + branch);
+                            return true;
+                        } catch (Exception e) {
+                            LOG.error("Failed to push changes to origin/" + branch, e);
+                            return false;
+                        }
+                    }).thenAccept(pushSuccess -> {
+                        CompatibilityUtil.executeOnUiThread(() -> callback.accept(pushSuccess));
+                    });
+                });
                 
-                LOG.info("Successfully pushed changes to remote repository");
-                return true;
+                // Return null as the result is handled by the nested CompletableFuture
+                return null;
             } catch (Exception e) {
                 LOG.error("Failed to push changes", e);
                 return false;
             }
         }).thenAccept(success -> {
-            CompatibilityUtil.executeOnUiThread(() -> {
-                if (success) {
-                    notificationService.showInfo("Push Successful", "Changes have been pushed to the remote repository");
-                } else {
-                    notificationService.showError("Push Failed", "Failed to push changes to the remote repository");
-                }
-                callback.accept(success);
-            });
+            if (success != null && !success) {
+                CompatibilityUtil.executeOnUiThread(() -> callback.accept(false));
+            }
         });
     }
 
     /**
-     * Gets the Git repository root.
+     * Pulls changes from the remote repository.
      *
-     * @return The repository root, or null if not found.
+     * @param callback Callback for success.
      */
-    @Nullable
-    public VirtualFile getRepositoryRoot() {
-        // In a real implementation, this would use the Git4Idea plugin API
-        // For now, assume the project base directory is the repository root
-        return CompatibilityUtil.getProjectBaseDir(project);
+    public void pullChanges(@NotNull Consumer<Boolean> callback) {
+        CompletableFuture.supplyAsync(() -> {
+            try {
+                executeGitCommand(List.of("pull"));
+                LOG.info("Pulled changes from remote");
+                return true;
+            } catch (Exception e) {
+                LOG.error("Failed to pull changes", e);
+                return false;
+            }
+        }).thenAccept(success -> {
+            CompatibilityUtil.executeOnUiThread(() -> callback.accept(success));
+        });
+    }
+
+    /**
+     * Mock implementation of the Change class for testing.
+     */
+    private static class MockChange extends Change {
+        private final String description;
+
+        MockChange(String description) {
+            super(null, null);
+            this.description = description;
+        }
+
+        @Nullable
+        @Override
+        public String toString() {
+            return description;
+        }
     }
 }

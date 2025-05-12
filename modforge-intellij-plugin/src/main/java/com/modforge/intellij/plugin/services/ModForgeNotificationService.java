@@ -5,6 +5,8 @@ import com.intellij.notification.NotificationAction;
 import com.intellij.notification.NotificationGroupManager;
 import com.intellij.notification.NotificationType;
 import com.intellij.openapi.actionSystem.AnAction;
+import com.intellij.openapi.components.Service;
+import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.project.Project;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -13,12 +15,26 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Service for showing notifications in the ModForge plugin.
+ * Notification service for ModForge.
  * Compatible with IntelliJ IDEA 2025.1.1.1
  */
+@Service(Service.Level.PROJECT)
 public final class ModForgeNotificationService {
+    private static final Logger LOG = Logger.getInstance(ModForgeNotificationService.class);
+    private static final String NOTIFICATION_GROUP_ID = "ModForge.Notifications";
+    
     private final Project project;
-    private static final String NOTIFICATION_GROUP_ID = "ModForge Notifications";
+    private final List<Notification> activeNotifications = new ArrayList<>();
+
+    /**
+     * Creates a new instance of the notification service.
+     *
+     * @param project The project.
+     */
+    public ModForgeNotificationService(Project project) {
+        this.project = project;
+        LOG.info("ModForgeNotificationService initialized for project: " + project.getName());
+    }
 
     /**
      * Gets the instance of the notification service for the specified project.
@@ -30,169 +46,142 @@ public final class ModForgeNotificationService {
         return project.getService(ModForgeNotificationService.class);
     }
 
-    public ModForgeNotificationService(Project project) {
-        this.project = project;
-    }
-
     /**
      * Shows an information notification.
      *
-     * @param title   The notification title
-     * @param content The notification content
+     * @param title The title.
+     * @param content The content.
+     * @return The notification.
      */
-    public void showInfo(@NotNull String title, @NotNull String content) {
-        showNotification(title, content, NotificationType.INFORMATION, null);
-    }
-    
-    /**
-     * Shows an information notification with automatic expiry.
-     * This version is used by AutonomousCodeGenerationService and other services.
-     *
-     * @param title   The notification title
-     * @param content The notification content
-     */
-    public void showInfoNotification(@NotNull String title, @NotNull String content) {
-        showInfo(title, content);
-    }
-    
-    /**
-     * Shows an important information notification that requires attention.
-     * This notification won't expire automatically and might be highlighted.
-     *
-     * @param title   The notification title
-     * @param content The notification content
-     */
-    public void showImportantNotification(@NotNull String title, @NotNull String content) {
-        // Create a special notification that's marked as important and doesn't expire automatically
-        Notification notification = NotificationGroupManager.getInstance()
-                .getNotificationGroup(NOTIFICATION_GROUP_ID)
-                .createNotification(content, NotificationType.INFORMATION)
-                .setTitle(title)
-                .setImportant(true); // Mark as important so it doesn't expire
-        
-        // Show the notification
-        notification.notify(project);
-    }
-
-    /**
-     * Shows an error notification.
-     *
-     * @param title   The notification title
-     * @param content The notification content
-     */
-    public void showError(@NotNull String title, @NotNull String content) {
-        showNotification(title, content, NotificationType.ERROR, null);
+    @NotNull
+    public Notification showInfo(@NotNull String title, @NotNull String content) {
+        return showNotification(title, content, NotificationType.INFORMATION, null);
     }
 
     /**
      * Shows a warning notification.
      *
-     * @param title   The notification title
-     * @param content The notification content
+     * @param title The title.
+     * @param content The content.
+     * @return The notification.
      */
-    public void showWarning(@NotNull String title, @NotNull String content) {
-        showNotification(title, content, NotificationType.WARNING, null);
+    @NotNull
+    public Notification showWarning(@NotNull String title, @NotNull String content) {
+        return showNotification(title, content, NotificationType.WARNING, null);
+    }
+
+    /**
+     * Shows an error notification.
+     *
+     * @param title The title.
+     * @param content The content.
+     * @return The notification.
+     */
+    @NotNull
+    public Notification showError(@NotNull String title, @NotNull String content) {
+        return showNotification(title, content, NotificationType.ERROR, null);
     }
 
     /**
      * Shows an information notification with actions.
      *
-     * @param title   The notification title
-     * @param content The notification content
-     * @param actions The actions to add to the notification
+     * @param title The title.
+     * @param content The content.
+     * @param actions The actions.
+     * @return The notification.
      */
-    public void showInfoWithActions(@NotNull String title, @NotNull String content, @NotNull List<AnAction> actions) {
-        showNotification(title, content, NotificationType.INFORMATION, actions);
-    }
-
-    /**
-     * Shows an error notification with actions.
-     *
-     * @param title   The notification title
-     * @param content The notification content
-     * @param actions The actions to add to the notification
-     */
-    public void showErrorWithActions(@NotNull String title, @NotNull String content, @NotNull List<AnAction> actions) {
-        showNotification(title, content, NotificationType.ERROR, actions);
+    @NotNull
+    public Notification showInfoWithActions(
+            @NotNull String title,
+            @NotNull String content,
+            @NotNull List<AnAction> actions) {
+        return showNotification(title, content, NotificationType.INFORMATION, actions);
     }
 
     /**
      * Shows a warning notification with actions.
      *
-     * @param title   The notification title
-     * @param content The notification content
-     * @param actions The actions to add to the notification
+     * @param title The title.
+     * @param content The content.
+     * @param actions The actions.
+     * @return The notification.
      */
-    public void showWarningWithActions(@NotNull String title, @NotNull String content, @NotNull List<AnAction> actions) {
-        showNotification(title, content, NotificationType.WARNING, actions);
+    @NotNull
+    public Notification showWarningWithActions(
+            @NotNull String title,
+            @NotNull String content,
+            @NotNull List<AnAction> actions) {
+        return showNotification(title, content, NotificationType.WARNING, actions);
     }
 
     /**
-     * Shows a notification with the specified type and optional actions.
+     * Shows an error notification with actions.
      *
-     * @param title       The notification title
-     * @param content     The notification content
-     * @param type        The notification type
-     * @param actions     The actions to add to the notification, or null for no actions
+     * @param title The title.
+     * @param content The content.
+     * @param actions The actions.
+     * @return The notification.
      */
-    private void showNotification(
+    @NotNull
+    public Notification showErrorWithActions(
+            @NotNull String title,
+            @NotNull String content,
+            @NotNull List<AnAction> actions) {
+        return showNotification(title, content, NotificationType.ERROR, actions);
+    }
+
+    /**
+     * Shows a notification with the specified type and actions.
+     *
+     * @param title The title.
+     * @param content The content.
+     * @param type The type.
+     * @param actions The actions.
+     * @return The notification.
+     */
+    @NotNull
+    public Notification showNotification(
             @NotNull String title,
             @NotNull String content,
             @NotNull NotificationType type,
             @Nullable List<AnAction> actions) {
         
-        // Create notification using the notification group manager
+        LOG.info("Showing notification: " + title + " - " + content);
+        
         Notification notification = NotificationGroupManager.getInstance()
                 .getNotificationGroup(NOTIFICATION_GROUP_ID)
-                .createNotification(content, type)
-                .setTitle(title);
-
-        // Add actions if provided
-        if (actions != null && !actions.isEmpty()) {
+                .createNotification(title, content, type);
+        
+        if (actions != null) {
             for (AnAction action : actions) {
                 if (action instanceof NotificationAction) {
                     notification.addAction((NotificationAction) action);
                 }
             }
         }
-
-        // Show the notification
+        
+        // Add a close action that removes the notification from the active list
+        notification.whenExpired(() -> {
+            LOG.info("Notification expired: " + title);
+            activeNotifications.remove(notification);
+        });
+        
         notification.notify(project);
+        activeNotifications.add(notification);
+        
+        return notification;
     }
 
     /**
-     * Creates an action builder for building notification actions.
-     *
-     * @return A new action builder
+     * Expires all active notifications.
      */
-    public ActionBuilder createActionBuilder() {
-        return new ActionBuilder();
-    }
-
-    /**
-     * Builder class for creating notification actions.
-     */
-    public static class ActionBuilder {
-        private final List<AnAction> actions = new ArrayList<>();
-
-        /**
-         * Adds an action to the builder.
-         *
-         * @param action The action to add
-         * @return This builder
-         */
-        public ActionBuilder addAction(@NotNull AnAction action) {
-            actions.add(action);
-            return this;
+    public void expireAllNotifications() {
+        LOG.info("Expiring all notifications");
+        
+        for (Notification notification : new ArrayList<>(activeNotifications)) {
+            notification.expire();
         }
-
-        /**
-         * Gets the list of actions.
-         *
-         * @return The list of actions
-         */
-        public List<AnAction> getActions() {
-            return actions;
-        }
+        
+        activeNotifications.clear();
     }
 }
