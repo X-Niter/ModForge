@@ -162,9 +162,11 @@ public class LoginAction extends AnAction {
     private static class LoginDialog extends DialogWrapper {
         private final JBTextField usernameField;
         private final JBPasswordField passwordField;
+        private final Project myProject;
         
         public LoginDialog(@Nullable Project project) {
             super(project);
+            this.myProject = project;
             setTitle("Login to ModForge");
             setCancelButtonText("Cancel");
             setOKButtonText("Login");
@@ -210,6 +212,16 @@ public class LoginAction extends AnAction {
          */
         public String getPassword() {
             return new String(passwordField.getPassword());
+        }
+        
+        /**
+         * Gets the project associated with this dialog.
+         *
+         * @return The project or null if none.
+         */
+        @Nullable
+        public Project getProject() {
+            return myProject;
         }
         
         @Override
