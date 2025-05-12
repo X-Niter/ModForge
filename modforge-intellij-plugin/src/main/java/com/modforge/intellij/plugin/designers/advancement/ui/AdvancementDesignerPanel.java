@@ -1,28 +1,50 @@
 package com.modforge.intellij.plugin.designers.advancement.ui;
 
 import com.intellij.openapi.actionSystem.ActionManager;
+import com.modforge.intellij.plugin.utils.CompatibilityUtil;
 import com.intellij.openapi.actionSystem.ActionToolbar;
+import com.modforge.intellij.plugin.utils.CompatibilityUtil;
 import com.intellij.openapi.actionSystem.DefaultActionGroup;
+import com.modforge.intellij.plugin.utils.CompatibilityUtil;
 import com.intellij.openapi.diagnostic.Logger;
+import com.modforge.intellij.plugin.utils.CompatibilityUtil;
 import com.intellij.openapi.project.Project;
+import com.modforge.intellij.plugin.utils.CompatibilityUtil;
 import com.intellij.openapi.ui.ComboBox;
+import com.modforge.intellij.plugin.utils.CompatibilityUtil;
 import com.intellij.openapi.ui.Messages;
+import com.modforge.intellij.plugin.utils.CompatibilityUtil;
 import com.intellij.openapi.ui.SimpleToolWindowPanel;
+import com.modforge.intellij.plugin.utils.CompatibilityUtil;
 import com.intellij.ui.components.JBList;
+import com.modforge.intellij.plugin.utils.CompatibilityUtil;
 import com.intellij.ui.components.JBScrollPane;
+import com.modforge.intellij.plugin.utils.CompatibilityUtil;
 import com.intellij.ui.treeStructure.Tree;
+import com.modforge.intellij.plugin.utils.CompatibilityUtil;
 import com.modforge.intellij.plugin.designers.advancement.AdvancementManager;
+import com.modforge.intellij.plugin.utils.CompatibilityUtil;
 import com.modforge.intellij.plugin.designers.advancement.models.AdvancementCriterion;
+import com.modforge.intellij.plugin.utils.CompatibilityUtil;
 import com.modforge.intellij.plugin.designers.advancement.models.AdvancementModel;
+import com.modforge.intellij.plugin.utils.CompatibilityUtil;
 import com.modforge.intellij.plugin.designers.advancement.models.AdvancementModel.AdvancementFrameType;
+import com.modforge.intellij.plugin.utils.CompatibilityUtil;
 import org.jetbrains.annotations.NotNull;
+import com.modforge.intellij.plugin.utils.CompatibilityUtil;
 
 import javax.swing.*;
+import com.modforge.intellij.plugin.utils.CompatibilityUtil;
 import javax.swing.tree.DefaultMutableTreeNode;
+import com.modforge.intellij.plugin.utils.CompatibilityUtil;
 import javax.swing.tree.DefaultTreeModel;
+import com.modforge.intellij.plugin.utils.CompatibilityUtil;
 import javax.swing.tree.TreeSelectionModel;
+import com.modforge.intellij.plugin.utils.CompatibilityUtil;
 import java.awt.*;
+import com.modforge.intellij.plugin.utils.CompatibilityUtil;
 import java.util.List;
+import com.modforge.intellij.plugin.utils.CompatibilityUtil;
 
 /**
  * UI panel for designing Minecraft advancements
@@ -431,7 +453,7 @@ public class AdvancementDesignerPanel extends SimpleToolWindowPanel {
             Messages.getQuestionIcon()
         );
         
-        if (result == Messages.YES) {
+        if (result == CompatibilityUtil.DIALOG_YES) {
             advancementManager.deleteAdvancement(id);
             refreshAdvancementList();
             clearForm();

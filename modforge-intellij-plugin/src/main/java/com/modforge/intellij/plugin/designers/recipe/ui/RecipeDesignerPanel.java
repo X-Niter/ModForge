@@ -1,26 +1,46 @@
 package com.modforge.intellij.plugin.designers.recipe.ui;
 
 import com.intellij.openapi.actionSystem.ActionManager;
+import com.modforge.intellij.plugin.utils.CompatibilityUtil;
 import com.intellij.openapi.actionSystem.ActionToolbar;
+import com.modforge.intellij.plugin.utils.CompatibilityUtil;
 import com.intellij.openapi.actionSystem.DefaultActionGroup;
+import com.modforge.intellij.plugin.utils.CompatibilityUtil;
 import com.intellij.openapi.diagnostic.Logger;
+import com.modforge.intellij.plugin.utils.CompatibilityUtil;
 import com.intellij.openapi.project.Project;
+import com.modforge.intellij.plugin.utils.CompatibilityUtil;
 import com.intellij.openapi.ui.ComboBox;
+import com.modforge.intellij.plugin.utils.CompatibilityUtil;
 import com.intellij.openapi.ui.Messages;
+import com.modforge.intellij.plugin.utils.CompatibilityUtil;
 import com.intellij.openapi.ui.SimpleToolWindowPanel;
+import com.modforge.intellij.plugin.utils.CompatibilityUtil;
 import com.intellij.ui.components.JBList;
+import com.modforge.intellij.plugin.utils.CompatibilityUtil;
 import com.intellij.ui.components.JBScrollPane;
+import com.modforge.intellij.plugin.utils.CompatibilityUtil;
 import com.intellij.ui.components.JBTabbedPane;
+import com.modforge.intellij.plugin.utils.CompatibilityUtil;
 import com.modforge.intellij.plugin.designers.recipe.RecipeManager;
+import com.modforge.intellij.plugin.utils.CompatibilityUtil;
 import com.modforge.intellij.plugin.designers.recipe.models.RecipeItem;
+import com.modforge.intellij.plugin.utils.CompatibilityUtil;
 import com.modforge.intellij.plugin.designers.recipe.models.RecipeModel;
+import com.modforge.intellij.plugin.utils.CompatibilityUtil;
 import com.modforge.intellij.plugin.designers.recipe.models.RecipeModel.RecipeType;
+import com.modforge.intellij.plugin.utils.CompatibilityUtil;
 import org.jetbrains.annotations.NotNull;
+import com.modforge.intellij.plugin.utils.CompatibilityUtil;
 
 import javax.swing.*;
+import com.modforge.intellij.plugin.utils.CompatibilityUtil;
 import java.awt.*;
+import com.modforge.intellij.plugin.utils.CompatibilityUtil;
 import java.awt.event.ItemEvent;
+import com.modforge.intellij.plugin.utils.CompatibilityUtil;
 import java.util.List;
+import com.modforge.intellij.plugin.utils.CompatibilityUtil;
 
 /**
  * UI panel for designing Minecraft recipes
@@ -511,7 +531,7 @@ public class RecipeDesignerPanel extends SimpleToolWindowPanel {
             Messages.getQuestionIcon()
         );
         
-        if (result == Messages.YES) {
+        if (result == CompatibilityUtil.DIALOG_YES) {
             recipeManager.deleteRecipe(id);
             refreshRecipeList();
             clearForm();

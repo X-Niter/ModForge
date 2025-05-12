@@ -7,6 +7,7 @@ import com.intellij.openapi.actionSystem.AnActionEvent;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.Messages;
 import com.modforge.intellij.plugin.run.MinecraftRunConfiguration.RunType;
+import com.modforge.intellij.plugin.utils.CompatibilityUtil;
 import org.jetbrains.annotations.NotNull;
 
 /**
@@ -28,7 +29,7 @@ public class AutoConfigureMinecraftRunAction extends AnAction {
                 Messages.getQuestionIcon()
         );
         
-        if (result != Messages.YES) return;
+        if (result != CompatibilityUtil.DIALOG_YES) return;
         
         // Get run manager
         RunManager runManager = RunManager.getInstance(project);
@@ -43,7 +44,7 @@ public class AutoConfigureMinecraftRunAction extends AnAction {
         createRunConfiguration(runManager, project, RunType.DATA_GEN, "Run Data Generation");
         
         // Inform user
-        Messages.showInfoMessage(
+        CompatibilityUtil.showInfoDialog(
                 project,
                 "Created 3 Minecraft run configurations. You can now access them from the run configurations dropdown.",
                 "Run Configurations Created"
