@@ -712,7 +712,7 @@ public final class CompatibilityUtil {
      * @param message The message
      * @param title The title
      */
-    public static void showErrorDialog(@Nullable Project project, @NotNull String message, @NotNull String title) {
+    public static void showErrorDialogWithProject(@Nullable Project project, @NotNull String message, @NotNull String title) {
         runOnUiThreadAndWait(() -> {
             try {
                 if (project == null || !project.isDisposed()) {
@@ -733,7 +733,7 @@ public final class CompatibilityUtil {
      * @param message The message
      * @param title The title
      */
-    public static void showInfoDialog(@Nullable Project project, @NotNull String message, @NotNull String title) {
+    public static void showInfoDialogWithProject(@Nullable Project project, @NotNull String message, @NotNull String title) {
         runOnUiThreadAndWait(() -> {
             try {
                 if (project == null || !project.isDisposed()) {
@@ -756,7 +756,7 @@ public final class CompatibilityUtil {
      * @param initialValue The initial value
      * @return The entered text, or null if canceled
      */
-    public static String showInputDialog(@Nullable Project project, @NotNull String message, 
+    public static String showInputDialogWithProject(@Nullable Project project, @NotNull String message, 
                                          @NotNull String title, @Nullable String initialValue) {
         final String[] result = new String[1];
         

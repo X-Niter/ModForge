@@ -248,7 +248,7 @@ public final class ModForgeNotificationService {
     
     /**
      * Shows a Yes/No dialog with custom button text.
-     * Overload with title and message in reverse order for compatibility.
+     * This method handles parameters in the reversed order for compatibility.
      * 
      * @param project The project
      * @param title The title
@@ -257,7 +257,7 @@ public final class ModForgeNotificationService {
      * @param noButtonText Custom text for No button
      * @return The result (YES or NO)
      */
-    public int showYesNoDialog(
+    public int showYesNoDialogReversed(
             @Nullable Project project,
             @NotNull String title,
             @NotNull String message,

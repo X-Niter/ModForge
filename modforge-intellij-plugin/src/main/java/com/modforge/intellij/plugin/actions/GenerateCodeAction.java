@@ -215,13 +215,11 @@ public class GenerateCodeAction extends AnAction {
                     className + ".java"
             );
         } else {
-            fileName = CompatibilityUtil.showInputDialog(
+            fileName = CompatibilityUtil.showInputDialogWithProject(
                     project,
                     "Enter file name:",
                     "Save Generated Code",
-                    null,
-                    className + ".java",
-                    null
+                    className + ".java"
             );
         }
         
