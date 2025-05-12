@@ -1,7 +1,7 @@
 # Potential Resolution Error Report 
  
 This report identifies potential "Cannot resolve" errors for IntelliJ IDEA 2025.1.1.1. 
-Generated on Mon 05/12/2025  5:54:30.17. 
+Generated on Mon 05/12/2025  6:40:09.27. 
  
 ## Overview 
  
@@ -232,13 +232,6 @@ Static analysis found potential resolution issues.
 Resolution errors found during compilation: 
  
 --- Java Code --- 
-G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\services\AutonomousCodeGenerationService.java:89: error: cannot find symbol
-G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\actions\AddFeaturesAction.java:161: error: cannot find symbol
-G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\actions\EnhanceCodeAction.java:104: error: cannot find symbol
-G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\actions\ExplainCodeAction.java:72: error: cannot find symbol
-G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\actions\GenerateCodeAction.java:210: error: cannot find symbol
-G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\actions\GenerateDocumentationAction.java:65: error: cannot find symbol
-G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\actions\GenerateImplementationAction.java:85: error: cannot find symbol
 G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\actions\LoginAction.java:217: error: cannot find symbol
 G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\actions\LogoutAction.java:81: error: cannot find symbol
 G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\actions\PushToGitHubAction.java:141: error: cannot find symbol
@@ -256,9 +249,7 @@ G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\mod
 G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\actions\TestAuthEndpointsAction.java:42: error: cannot find symbol
 G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\actions\TestAuthEndpointsAction.java:42: error: cannot find symbol
 G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\actions\TestAuthEndpointsAction.java:43: error: cannot find symbol
-G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\actions\TestAuthEndpointsAction.java:63: error: cannot find symbol
 G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\actions\TestCompleteAuthFlowAction.java:55: error: cannot find symbol
-G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\actions\TestCompleteAuthFlowAction.java:60: error: cannot find symbol
 G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\actions\TestCompleteAuthFlowAction.java:103: error: cannot find symbol
 G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\actions\TestCompleteAuthFlowAction.java:106: error: cannot find symbol
 G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\actions\TestCompleteAuthFlowAction.java:107: error: cannot find symbol
@@ -310,6 +301,16 @@ G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\mod
 G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\collaboration\CollaborationWebSocketHandler.java:255: error: cannot find symbol
 G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\collaboration\CollaborationWebSocketHandler.java:273: error: cannot find symbol
 G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\collaboration\ui\CollaborationPanel.java:63: error: cannot find symbol
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\collaboration\ui\CollaborationPanel.java:214: error: cannot find symbol
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\collaboration\ui\CollaborationPanel.java:231: error: cannot find symbol
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\collaboration\ui\CollaborationPanel.java:249: error: cannot find symbol
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\collaboration\ui\CollaborationPanel.java:277: error: cannot find symbol
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\collaboration\ui\CollaborationPanel.java:316: error: cannot find symbol
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\collaboration\ui\CollaborationPanel.java:322: error: cannot find symbol
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\collaboration\ui\CollaborationPanel.java:343: error: cannot find symbol
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\collaboration\ui\CollaborationPanel.java:349: error: cannot find symbol
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\collaboration\ui\CollaborationPanel.java:426: error: cannot find symbol
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\collaboration\websocket\WebSocketMessageHandler.java:181: error: cannot find symbol
 --- End Code --- 
  
 ## Fix Recommendations 

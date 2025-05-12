@@ -576,9 +576,10 @@ public class CreateFromTemplateAction extends AnAction {
                     ModForgeNotificationService notificationService = ModForgeNotificationService.getInstance();
                     if (notificationService != null) {
                         int result = notificationService.showYesNoDialog(
-                                "Output directory is not empty. Continue?",
+                                project,
+                                "Output directory is not empty. Continue?", 
                                 "Output Directory Not Empty",
-                                "Continue",
+                                "Continue", 
                                 "Cancel",
                                 null
                         );
