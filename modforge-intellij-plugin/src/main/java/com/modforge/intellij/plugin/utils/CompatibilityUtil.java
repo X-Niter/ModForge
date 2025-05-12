@@ -68,15 +68,13 @@ public final class CompatibilityUtil {
     
     /**
      * Executes the given task on the UI thread.
+     * This method is deprecated - use runOnUiThread instead.
      * 
      * @param runnable The task to execute
      */
+    @Deprecated
     public static void executeOnUiThread(Runnable runnable) {
-        if (ApplicationManager.getApplication().isDispatchThread()) {
-            runnable.run();
-        } else {
-            ApplicationManager.getApplication().invokeLater(runnable);
-        }
+        runOnUiThread(runnable);
     }
     
     /**
@@ -260,11 +258,13 @@ public final class CompatibilityUtil {
 
     /**
      * Executes a task on the UI thread and returns a value.
+     * This method is deprecated - use other alternatives instead.
      *
      * @param <T> The return type.
      * @param task The supplier to execute.
      * @return The result of the task.
      */
+    @Deprecated
     public static <T> T executeOnUiThreadAndGet(@NotNull java.util.function.Supplier<T> task) {
         if (ApplicationManager.getApplication().isDispatchThread()) {
             return task.get();
