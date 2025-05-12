@@ -378,6 +378,75 @@ public final class CompatibilityUtil {
     }
     
     /**
+     * Gets the description of a problem using reflection to maintain compatibility with 
+     * different IntelliJ IDEA versions, particularly 2025.1.1.1.
+     *
+     * @param problem The Problem instance
+     * @return The problem description, or "Unknown error" if not available
+     */
+    @NotNull
+    public static String getProblemDescription(@NotNull Problem problem) {
+        try {
+            // Try the newer method first (IntelliJ IDEA 2025.1.1.1)
+            java.lang.reflect.Method getTextMethod = problem.getClass().getMethod("getPresentableText");
+            String text = (String) getTextMethod.invoke(problem);
+            return text != null ? text : "Unknown error";
+        } catch (Exception e) {
+            try {
+                // Fall back to the older method
+                java.lang.reflect.Method getDescMethod = problem.getClass().getMethod("getDescription");
+                String description = (String) getDescMethod.invoke(problem);
+                return description != null ? description : "Unknown error";
+            } catch (Exception ex) {
+                LOG.warn("Failed to get problem description", ex);
+                return "Unknown error";
+            }
+        }
+    }
+    
+    /**
+     * Compatibility wrapper for WolfTheProblemSolver.getAllProblems().
+     * Use this method instead of directly calling problemSolver.getAllProblems().
+     * 
+     * @param problemSolver The WolfTheProblemSolver instance
+     * @return List of all problems
+     */
+    @NotNull
+    public static List<Problem> getAllProblems(@NotNull WolfTheProblemSolver problemSolver) {
+        List<Problem> problems = new ArrayList<>();
+        
+        try {
+            // Try the newer approach that uses a collection processor
+            java.lang.reflect.Method processMethod = problemSolver.getClass().getMethod("processProblems", 
+                    VirtualFile.class, java.util.function.Consumer.class);
+            
+            // Process problems for all files
+            for (VirtualFile file : getProblemFiles(problemSolver)) {
+                processMethod.invoke(problemSolver, file, (java.util.function.Consumer<Problem>) problems::add);
+            }
+            
+            return problems;
+        } catch (Exception e) {
+            LOG.warn("Failed to process problems using processProblems method", e);
+            
+            try {
+                // Try the older approach with getAllProblems
+                java.lang.reflect.Method getAllMethod = problemSolver.getClass().getMethod("getAllProblems");
+                @SuppressWarnings("unchecked")
+                Collection<Problem> foundProblems = (Collection<Problem>) getAllMethod.invoke(problemSolver);
+                
+                if (foundProblems != null) {
+                    return new ArrayList<>(foundProblems);
+                }
+            } catch (Exception ex) {
+                LOG.error("Failed to get all problems from WolfTheProblemSolver", ex);
+            }
+            
+            return problems; // Return empty list if all approaches failed
+        }
+    }
+    
+    /**
      * Computes a result in a write action.
      *
      * @param computable The computable task.
@@ -466,6 +535,18 @@ public final class CompatibilityUtil {
                 return Collections.emptySet();
             }
         }
+    }
+    
+    /**
+     * Compatibility wrapper for WolfTheProblemSolver.getProblemFiles().
+     * Use this method instead of directly calling problemSolver.getProblemFiles().
+     * 
+     * @param problemSolver The WolfTheProblemSolver instance
+     * @return Collection of problem files
+     */
+    @NotNull
+    public static Collection<VirtualFile> getProblemFiles(@NotNull WolfTheProblemSolver problemSolver) {
+        return getProblemFiles((Object) problemSolver);
     }
     
     /**
