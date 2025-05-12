@@ -35,6 +35,12 @@ public class ModForgeSettingsComponent {
     private final JButton testConnectionButton;
     private final JButton resetButton;
     
+    // OpenAI settings fields
+    private final JBPasswordField openAiApiKeyField;
+    private final JBTextField openAiModelField;
+    private final JSpinner maxTokensSpinner;
+    private final JSpinner temperatureSpinner;
+    
     /**
      * Create a new settings component.
      */

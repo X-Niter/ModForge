@@ -1,12 +1,12 @@
 package com.modforge.intellij.plugin.ai;
 
-import com.google.gson.stream.JsonReader;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.components.Service;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.util.io.HttpRequests;
 import com.intellij.util.io.RequestBuilder;
 import com.modforge.intellij.plugin.settings.ModForgeSettings;
+import com.modforge.intellij.plugin.utils.JsonUtil;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -213,9 +213,11 @@ public final class AIServiceManager {
             // Write request body
             connection.write(JsonUtil.writeToString(requestBody));
             
-            // Read response
-            JsonReader reader = JsonReader.fromInputStream(connection.getInputStream());
-            Map<String, Object> responseMap = reader.readObject();
+            // Read response using JsonUtil instead of JsonReader directly
+            Map<String, Object> responseMap = JsonUtil.readMapFromStream(connection.getInputStream());
+            if (responseMap == null) {
+                throw new IOException("Failed to parse response from OpenAI API");
+            }
             
             // Parse response
             List<Map<String, Object>> choices = (List<Map<String, Object>>) responseMap.get("choices");
