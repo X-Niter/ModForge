@@ -21,6 +21,8 @@ public class WebSocketMessage {
     public static final String TYPE_FILE_CONTENT = "file_content";
     public static final String TYPE_FILE_SYNC = "file_sync";
     public static final String TYPE_ERROR = "error";
+    public static final String TYPE_PARTICIPANT_JOINED = "participant_joined";
+    public static final String TYPE_PARTICIPANT_LEFT = "participant_left";
     
     private final String type;
     private final String userId;
