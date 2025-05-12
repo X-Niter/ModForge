@@ -102,6 +102,22 @@ public final class ModAuthenticationManager {
             }
         });
     }
+    
+    /**
+     * Logs in with username and password synchronously.
+     *
+     * @param username The username.
+     * @param password The password.
+     * @return Whether login was successful.
+     */
+    public boolean loginSync(@NotNull String username, @NotNull String password) {
+        try {
+            return login(username, password).get(30, TimeUnit.SECONDS);
+        } catch (InterruptedException | ExecutionException | TimeoutException e) {
+            LOG.error("Login timed out", e);
+            return false;
+        }
+    }
 
     /**
      * Logs out the current user.

@@ -1,10 +1,12 @@
 package com.modforge.intellij.plugin.services;
 
 import com.intellij.notification.*;
+import com.intellij.openapi.application.Application;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.components.Service;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.project.Project;
+import com.intellij.ui.Messages;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -54,6 +56,17 @@ public final class ModForgeNotificationService {
      */
     public static ModForgeNotificationService getInstance() {
         return ApplicationManager.getApplication().getService(ModForgeNotificationService.class);
+    }
+    
+    /**
+     * Gets the instance of the service for a project.
+     * Note: This is a compatibility method that still uses the application service.
+     *
+     * @param project The project.
+     * @return The service instance.
+     */
+    public static ModForgeNotificationService getInstance(@Nullable Project project) {
+        return getInstance();
     }
 
     /**
@@ -222,6 +235,72 @@ public final class ModForgeNotificationService {
             notification.notify(project);
         } catch (Exception e) {
             LOG.error("Failed to show notification with action", e);
+        }
+    }
+    
+    /**
+     * Shows an info notification.
+     * Compatibility method with simplified signature.
+     * 
+     * @param title    The notification title.
+     * @param content  The notification content.
+     */
+    public void showInfo(@NotNull String title, @NotNull String content) {
+        show(null, INFO_GROUP_ID, INFO_TYPE, title, content);
+    }
+
+    /**
+     * Shows a warning notification.
+     * Compatibility method with simplified signature.
+     * 
+     * @param title    The notification title.
+     * @param content  The notification content.
+     */
+    public void showWarning(@NotNull String title, @NotNull String content) {
+        show(null, WARNING_GROUP_ID, WARNING_TYPE, title, content);
+    }
+
+    /**
+     * Shows an error notification.
+     * Compatibility method with simplified signature.
+     * 
+     * @param title    The notification title.
+     * @param content  The notification content.
+     */
+    public void showError(@NotNull String title, @NotNull String content) {
+        show(null, ERROR_GROUP_ID, ERROR_TYPE, title, content);
+    }
+    
+    /**
+     * Shows an error dialog.
+     *
+     * @param project  The project.
+     * @param message  The message.
+     * @param title    The title.
+     */
+    public static void showErrorDialog(@Nullable Project project, @NotNull String message, @NotNull String title) {
+        executeOnUiThread(() -> {
+            try {
+                Messages.showErrorDialog(project, message, title);
+            } catch (Exception e) {
+                LOG.error("Failed to show error dialog", e);
+            }
+        });
+    }
+    
+    /**
+     * Executes a task on the UI thread.
+     * This is a compatibility method to avoid creating circular dependencies.
+     *
+     * @param task The task to run.
+     */
+    private static void executeOnUiThread(@NotNull Runnable task) {
+        Application application = ApplicationManager.getApplication();
+        
+        if (application.isDispatchThread()) {
+            task.run();
+        } else {
+            application.invokeLater(task);
         }
     }
 }
