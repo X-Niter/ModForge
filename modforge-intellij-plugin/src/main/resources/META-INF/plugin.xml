@@ -39,9 +39,9 @@
         <applicationService serviceImplementation="com.modforge.intellij.plugin.services.ModAuthenticationManager"/>
         <applicationService serviceImplementation="com.modforge.intellij.plugin.services.ModForgeNotificationService"/>
         <applicationService serviceImplementation="com.modforge.intellij.plugin.services.GitHubIntegrationService"/>
+        <applicationService serviceImplementation="com.modforge.intellij.plugin.services.AutonomousCodeGenerationService"/>
 
         <!-- Project-level services -->
-        <projectService serviceImplementation="com.modforge.intellij.plugin.services.AutonomousCodeGenerationService"/>
         <projectService serviceImplementation="com.modforge.intellij.plugin.services.ContinuousDevelopmentService"/>
         <projectService serviceImplementation="com.modforge.intellij.plugin.services.CollaborationService"/>
         

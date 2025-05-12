@@ -1,70 +1,60 @@
 package com.modforge.intellij.plugin.services;
 
-import com.google.gson.Gson;
-import com.google.gson.JsonObject;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.components.Service;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vfs.VirtualFile;
-import com.intellij.util.concurrency.annotations.RequiresBackgroundThread;
+import com.modforge.intellij.plugin.settings.ModForgeSettings;
+import com.modforge.intellij.plugin.utils.CompatibilityUtil;
 import com.modforge.intellij.plugin.utils.ThreadUtils;
-import com.modforge.intellij.plugin.utils.VirtualFileUtil;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-import java.io.*;
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
-import java.time.Duration;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ScheduledFuture;
-import java.util.concurrent.TimeUnit;
-import java.util.function.Consumer;
-import java.util.zip.ZipEntry;
-import java.util.zip.ZipOutputStream;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * Service for integrating with GitHub.
+ * This service provides functionality for interacting with GitHub repositories.
  * Compatible with IntelliJ IDEA 2025.1.1.1
  */
 @Service
 public final class GitHubIntegrationService {
     private static final Logger LOG = Logger.getInstance(GitHubIntegrationService.class);
     
-    // GitHub API endpoints
-    private static final String GITHUB_API_BASE = "https://api.github.com";
-    private static final String REPOS_ENDPOINT = GITHUB_API_BASE + "/repos";
-    private static final String GISTS_ENDPOINT = GITHUB_API_BASE + "/gists";
-    private static final String USER_REPOS_ENDPOINT = GITHUB_API_BASE + "/user/repos";
+    // GitHub API base URL
+    private static final String GITHUB_API_URL = "https://api.github.com";
     
-    // HTTP status codes
-    private static final int HTTP_OK = 200;
-    private static final int HTTP_CREATED = 201;
-    private static final int HTTP_NO_CONTENT = 204;
-    private static final int HTTP_NOT_FOUND = 404;
-    private static final int HTTP_UNAUTHORIZED = 401;
+    // GitHub specific headers
+    private static final String GITHUB_VERSION_HEADER = "2022-11-28";
+    private static final String ACCEPT_HEADER = "application/vnd.github+json";
     
-    // Service instances
-    private final ModAuthenticationManager authManager;
-    private final ModForgeNotificationService notificationService;
+    // Settings
+    private final ModForgeSettings settings;
     
-    // Repository monitoring
-    private final Map<String, ScheduledFuture<?>> monitoringTasks = new ConcurrentHashMap<>();
-    private final Map<String, Consumer<String>> updateCallbacks = new ConcurrentHashMap<>();
+    // State tracking
+    private final AtomicBoolean isCommitting = new AtomicBoolean(false);
+    private final AtomicBoolean isPushing = new AtomicBoolean(false);
+    private final AtomicBoolean isFetching = new AtomicBoolean(false);
     
-    // JSON parser
-    private final Gson gson = new Gson();
-
     /**
      * Constructor.
      */
     public GitHubIntegrationService() {
-        this.authManager = ModAuthenticationManager.getInstance();
-        this.notificationService = ModForgeNotificationService.getInstance();
+        settings = ModForgeSettings.getInstance();
+        LOG.info("GitHubIntegrationService initialized");
     }
 
     /**
@@ -77,594 +67,357 @@ public final class GitHubIntegrationService {
     }
 
     /**
-     * Pushes a project to GitHub.
+     * Gets a list of repositories for the authenticated user.
      *
-     * @param owner      The repository owner.
-     * @param repository The repository name.
-     * @param rootDir    The project root directory.
-     * @param isPrivate  Whether the repository is private.
-     * @param callback   The callback to call with the repository URL.
+     * @return A CompletableFuture with a list of repository names.
      */
-    @RequiresBackgroundThread
-    public void pushToGitHub(
-            @NotNull String owner,
-            @NotNull String repository,
-            @NotNull String rootDir,
-            boolean isPrivate,
-            @NotNull Consumer<String> callback) {
-        
-        if (!authManager.isAuthenticated()) {
-            LOG.warn("Not authenticated");
-            callback.accept("Error: Not authenticated");
-            return;
+    public CompletableFuture<List<String>> getRepositories() {
+        if (!isAuthenticated()) {
+            LOG.warn("Not authenticated. Cannot get repositories.");
+            return CompletableFuture.completedFuture(List.of());
         }
         
-        String authHeader = authManager.getAuthenticationHeader();
-        if (authHeader == null) {
-            LOG.warn("Invalid authentication");
-            callback.accept("Error: Invalid authentication");
-            return;
-        }
-        
-        // Check if repository exists
-        ThreadUtils.runAsyncVirtual(() -> {
+        return ThreadUtils.supplyAsyncVirtual(() -> {
             try {
-                boolean exists = repositoryExists(owner, repository, authHeader);
-                if (exists) {
-                    callback.accept("Error: Repository already exists");
-                    return;
+                String url = GITHUB_API_URL + "/user/repos?per_page=100";
+                String response = sendGitHubRequest(url, "GET", null);
+                
+                // Extract repository names with simple regex for now
+                // In a real implementation, use a proper JSON parser
+                List<String> repos = new ArrayList<>();
+                Pattern pattern = Pattern.compile("\"full_name\"\\s*:\\s*\"([^\"]+)\"");
+                Matcher matcher = pattern.matcher(response);
+                
+                while (matcher.find()) {
+                    repos.add(matcher.group(1));
                 }
                 
-                // Create repository
-                String repositoryUrl = createRepository(owner, repository, isPrivate, authHeader);
-                if (repositoryUrl == null) {
-                    callback.accept("Error: Failed to create repository");
-                    return;
-                }
-                
-                // Package project files
-                File zipFile = packageProject(rootDir);
-                if (zipFile == null) {
-                    callback.accept("Error: Failed to package project");
-                    return;
-                }
-                
-                // Upload project files
-                boolean uploaded = uploadProjectFiles(owner, repository, zipFile, authHeader);
-                zipFile.delete();
-                
-                if (!uploaded) {
-                    callback.accept("Error: Failed to upload project files");
-                    return;
-                }
-                
-                callback.accept("Success: " + repositoryUrl);
+                return repos;
             } catch (Exception e) {
-                LOG.error("Error pushing to GitHub", e);
-                callback.accept("Error: " + e.getMessage());
+                LOG.error("Failed to get repositories", e);
+                return List.of();
             }
         });
     }
-
-    /**
-     * Checks if a repository exists.
-     *
-     * @param owner       The repository owner.
-     * @param repository  The repository name.
-     * @param authHeader  The authentication header.
-     * @return Whether the repository exists.
-     * @throws IOException If an I/O error occurs.
-     */
-    private boolean repositoryExists(@NotNull String owner, @NotNull String repository, @NotNull String authHeader) throws IOException {
-        URL url = new URL(REPOS_ENDPOINT + "/" + owner + "/" + repository);
-        HttpURLConnection connection = (HttpURLConnection) url.openConnection();
-        connection.setRequestMethod("GET");
-        connection.setRequestProperty("Authorization", authHeader);
-        connection.setConnectTimeout((int) Duration.ofSeconds(10).toMillis());
-        connection.setReadTimeout((int) Duration.ofSeconds(10).toMillis());
-        
-        int responseCode = connection.getResponseCode();
-        return responseCode == HTTP_OK;
-    }
-
+    
     /**
      * Creates a new repository.
      *
-     * @param owner      The repository owner.
-     * @param repository The repository name.
-     * @param isPrivate  Whether the repository is private.
-     * @param authHeader The authentication header.
-     * @return The repository URL or null if creation failed.
-     * @throws IOException If an I/O error occurs.
+     * @param name        The repository name.
+     * @param description The repository description.
+     * @param isPrivate   Whether the repository is private.
+     * @return A CompletableFuture with the repository URL.
      */
-    @Nullable
-    private String createRepository(
-            @NotNull String owner,
-            @NotNull String repository,
-            boolean isPrivate,
-            @NotNull String authHeader) throws IOException {
+    public CompletableFuture<String> createRepository(
+            @NotNull String name,
+            @Nullable String description,
+            boolean isPrivate) {
         
-        URL url = new URL(USER_REPOS_ENDPOINT);
-        HttpURLConnection connection = (HttpURLConnection) url.openConnection();
-        connection.setRequestMethod("POST");
-        connection.setRequestProperty("Authorization", authHeader);
-        connection.setRequestProperty("Content-Type", "application/json");
-        connection.setConnectTimeout((int) Duration.ofSeconds(10).toMillis());
-        connection.setReadTimeout((int) Duration.ofSeconds(10).toMillis());
-        connection.setDoOutput(true);
-        
-        JsonObject json = new JsonObject();
-        json.addProperty("name", repository);
-        json.addProperty("private", isPrivate);
-        json.addProperty("auto_init", true);
-        
-        try (OutputStream os = connection.getOutputStream()) {
-            byte[] input = json.toString().getBytes(StandardCharsets.UTF_8);
-            os.write(input, 0, input.length);
+        if (!isAuthenticated()) {
+            LOG.warn("Not authenticated. Cannot create repository.");
+            return CompletableFuture.completedFuture("");
         }
         
-        int responseCode = connection.getResponseCode();
-        if (responseCode != HTTP_CREATED) {
-            LOG.warn("Failed to create repository: " + responseCode);
-            return null;
-        }
-        
-        try (BufferedReader br = new BufferedReader(new InputStreamReader(connection.getInputStream(), StandardCharsets.UTF_8))) {
-            StringBuilder response = new StringBuilder();
-            String responseLine;
-            while ((responseLine = br.readLine()) != null) {
-                response.append(responseLine.trim());
-            }
-            
-            JsonObject responseJson = gson.fromJson(response.toString(), JsonObject.class);
-            return responseJson.get("html_url").getAsString();
-        }
-    }
-
-    /**
-     * Packages a project into a zip file.
-     *
-     * @param rootDir The project root directory.
-     * @return The zip file or null if packaging failed.
-     */
-    @Nullable
-    private File packageProject(@NotNull String rootDir) {
-        VirtualFile root = VirtualFileUtil.findFileByPath(rootDir);
-        if (root == null) {
-            LOG.warn("Failed to find root directory: " + rootDir);
-            return null;
-        }
-        
-        File zipFile;
-        try {
-            zipFile = File.createTempFile("project", ".zip");
-        } catch (IOException e) {
-            LOG.error("Failed to create temporary file", e);
-            return null;
-        }
-        
-        try (ZipOutputStream zos = new ZipOutputStream(new FileOutputStream(zipFile))) {
-            addToZip(zos, root, "");
-        } catch (IOException e) {
-            LOG.error("Failed to package project", e);
-            zipFile.delete();
-            return null;
-        }
-        
-        return zipFile;
-    }
-
-    /**
-     * Adds a file or directory to a zip file.
-     *
-     * @param zos    The zip output stream.
-     * @param file   The file or directory to add.
-     * @param prefix The path prefix in the zip file.
-     * @throws IOException If an I/O error occurs.
-     */
-    private void addToZip(@NotNull ZipOutputStream zos, @NotNull VirtualFile file, @NotNull String prefix) throws IOException {
-        String path = prefix + file.getName();
-        
-        if (file.isDirectory()) {
-            if (!path.isEmpty()) {
-                path += "/";
-                ZipEntry entry = new ZipEntry(path);
-                zos.putNextEntry(entry);
-                zos.closeEntry();
-            }
-            
-            for (VirtualFile child : file.getChildren()) {
-                addToZip(zos, child, path);
-            }
-        } else {
-            ZipEntry entry = new ZipEntry(path);
-            zos.putNextEntry(entry);
-            
-            byte[] content = file.contentsToByteArray();
-            zos.write(content, 0, content.length);
-            
-            zos.closeEntry();
-        }
-    }
-
-    /**
-     * Uploads project files to GitHub.
-     *
-     * @param owner      The repository owner.
-     * @param repository The repository name.
-     * @param zipFile    The zip file.
-     * @param authHeader The authentication header.
-     * @return Whether the upload was successful.
-     */
-    private boolean uploadProjectFiles(
-            @NotNull String owner,
-            @NotNull String repository,
-            @NotNull File zipFile,
-            @NotNull String authHeader) {
-        
-        // This is a simplified implementation
-        // In a real implementation, you would use a Git client to push the files
-        // Here, we'll just upload the zip file as a gist
-        
-        try {
-            URL url = new URL(GISTS_ENDPOINT);
-            HttpURLConnection connection = (HttpURLConnection) url.openConnection();
-            connection.setRequestMethod("POST");
-            connection.setRequestProperty("Authorization", authHeader);
-            connection.setRequestProperty("Content-Type", "application/json");
-            connection.setConnectTimeout((int) Duration.ofSeconds(30).toMillis());
-            connection.setReadTimeout((int) Duration.ofSeconds(30).toMillis());
-            connection.setDoOutput(true);
-            
-            JsonObject files = new JsonObject();
-            JsonObject fileObject = new JsonObject();
-            fileObject.addProperty("content", "Project files are in the zip file");
-            files.add("project.txt", fileObject);
-            
-            JsonObject json = new JsonObject();
-            json.addProperty("description", "Project files for " + repository);
-            json.add("files", files);
-            json.addProperty("public", false);
-            
-            try (OutputStream os = connection.getOutputStream()) {
-                byte[] input = json.toString().getBytes(StandardCharsets.UTF_8);
-                os.write(input, 0, input.length);
-            }
-            
-            int responseCode = connection.getResponseCode();
-            return responseCode == HTTP_CREATED;
-        } catch (IOException e) {
-            LOG.error("Failed to upload project files", e);
-            return false;
-        }
-    }
-
-    /**
-     * Starts monitoring a repository for changes.
-     *
-     * @param owner      The repository owner.
-     * @param repository The repository name.
-     */
-    public void startMonitoring(@NotNull String owner, @NotNull String repository) {
-        String key = owner + "/" + repository;
-        
-        if (monitoringTasks.containsKey(key)) {
-            LOG.info("Already monitoring repository: " + key);
-            return;
-        }
-        
-        // Schedule a task to check for updates every 5 minutes
-        ScheduledFuture<?> task = ThreadUtils.scheduleAtFixedRate(
-                () -> checkForUpdates(owner, repository),
-                Duration.ofMinutes(1),
-                Duration.ofMinutes(5)
-        );
-        
-        monitoringTasks.put(key, task);
-        LOG.info("Started monitoring repository: " + key);
-    }
-
-    /**
-     * Stops monitoring a repository.
-     *
-     * @param owner      The repository owner.
-     * @param repository The repository name.
-     */
-    public void stopMonitoring(@NotNull String owner, @NotNull String repository) {
-        String key = owner + "/" + repository;
-        
-        ScheduledFuture<?> task = monitoringTasks.remove(key);
-        if (task != null) {
-            task.cancel(false);
-            LOG.info("Stopped monitoring repository: " + key);
-        }
-        
-        updateCallbacks.remove(key);
-    }
-
-    /**
-     * Registers a callback for repository updates.
-     *
-     * @param owner      The repository owner.
-     * @param repository The repository name.
-     * @param callback   The callback to call when there are updates.
-     */
-    public void registerUpdateCallback(@NotNull String owner, @NotNull String repository, @NotNull Consumer<String> callback) {
-        String key = owner + "/" + repository;
-        updateCallbacks.put(key, callback);
-    }
-
-    /**
-     * Checks for updates in a repository.
-     *
-     * @param owner      The repository owner.
-     * @param repository The repository name.
-     */
-    private void checkForUpdates(@NotNull String owner, @NotNull String repository) {
-        String key = owner + "/" + repository;
-        Consumer<String> callback = updateCallbacks.get(key);
-        
-        if (callback == null) {
-            return;
-        }
-        
-        if (!authManager.isAuthenticated()) {
-            LOG.warn("Not authenticated, cannot check for updates");
-            return;
-        }
-        
-        String authHeader = authManager.getAuthenticationHeader();
-        if (authHeader == null) {
-            LOG.warn("Invalid authentication, cannot check for updates");
-            return;
-        }
-        
-        try {
-            URL url = new URL(REPOS_ENDPOINT + "/" + owner + "/" + repository + "/commits");
-            HttpURLConnection connection = (HttpURLConnection) url.openConnection();
-            connection.setRequestMethod("GET");
-            connection.setRequestProperty("Authorization", authHeader);
-            connection.setConnectTimeout((int) Duration.ofSeconds(10).toMillis());
-            connection.setReadTimeout((int) Duration.ofSeconds(10).toMillis());
-            
-            int responseCode = connection.getResponseCode();
-            if (responseCode != HTTP_OK) {
-                LOG.warn("Failed to check for updates: " + responseCode);
-                return;
-            }
-            
-            try (BufferedReader br = new BufferedReader(new InputStreamReader(connection.getInputStream(), StandardCharsets.UTF_8))) {
-                StringBuilder response = new StringBuilder();
-                String responseLine;
-                while ((responseLine = br.readLine()) != null) {
-                    response.append(responseLine.trim());
-                }
-                
-                // For simplicity, we'll just pass the raw JSON to the callback
-                callback.accept(response.toString());
-            }
-        } catch (IOException e) {
-            LOG.error("Failed to check for updates", e);
-        }
-    }
-
-    /**
-     * Gets a list of repositories for the authenticated user.
-     *
-     * @return A CompletableFuture with a list of repository URLs.
-     */
-    public CompletableFuture<List<String>> getRepositories() {
         return ThreadUtils.supplyAsyncVirtual(() -> {
-            if (!authManager.isAuthenticated()) {
-                LOG.warn("Not authenticated");
-                return Collections.emptyList();
-            }
-            
-            String authHeader = authManager.getAuthenticationHeader();
-            if (authHeader == null) {
-                LOG.warn("Invalid authentication");
-                return Collections.emptyList();
-            }
-            
             try {
-                URL url = new URL(USER_REPOS_ENDPOINT);
-                HttpURLConnection connection = (HttpURLConnection) url.openConnection();
-                connection.setRequestMethod("GET");
-                connection.setRequestProperty("Authorization", authHeader);
-                connection.setConnectTimeout((int) Duration.ofSeconds(10).toMillis());
-                connection.setReadTimeout((int) Duration.ofSeconds(10).toMillis());
+                String url = GITHUB_API_URL + "/user/repos";
                 
-                int responseCode = connection.getResponseCode();
-                if (responseCode != HTTP_OK) {
-                    LOG.warn("Failed to get repositories: " + responseCode);
-                    return Collections.emptyList();
-                }
+                // Create JSON payload
+                String payload = String.format(
+                        "{\"name\":\"%s\",\"description\":\"%s\",\"private\":%b,\"auto_init\":true}",
+                        name,
+                        description != null ? description : "",
+                        isPrivate
+                );
                 
-                try (BufferedReader br = new BufferedReader(new InputStreamReader(connection.getInputStream(), StandardCharsets.UTF_8))) {
-                    StringBuilder response = new StringBuilder();
-                    String responseLine;
-                    while ((responseLine = br.readLine()) != null) {
-                        response.append(responseLine.trim());
-                    }
-                    
-                    List<Map<String, Object>> repos = gson.fromJson(response.toString(), List.class);
-                    List<String> repoUrls = new ArrayList<>();
-                    
-                    for (Map<String, Object> repo : repos) {
-                        repoUrls.add((String) repo.get("html_url"));
-                    }
-                    
-                    return repoUrls;
+                String response = sendGitHubRequest(url, "POST", payload);
+                
+                // Extract HTML URL with simple regex for now
+                Pattern pattern = Pattern.compile("\"html_url\"\\s*:\\s*\"([^\"]+)\"");
+                Matcher matcher = pattern.matcher(response);
+                
+                if (matcher.find()) {
+                    return matcher.group(1);
+                } else {
+                    LOG.error("Failed to parse repository URL from response");
+                    return "";
                 }
-            } catch (IOException e) {
-                LOG.error("Failed to get repositories", e);
-                return Collections.emptyList();
+            } catch (Exception e) {
+                LOG.error("Failed to create repository", e);
+                return "";
             }
         });
     }
-
+    
     /**
-     * Creates a pull request.
+     * Creates an issue in a repository.
      *
-     * @param owner      The repository owner.
-     * @param repository The repository name.
-     * @param title      The pull request title.
-     * @param body       The pull request body.
-     * @param head       The head branch.
-     * @param base       The base branch.
-     * @return A CompletableFuture with the pull request URL or null if creation failed.
+     * @param repoFullName The full repository name (owner/repo).
+     * @param title        The issue title.
+     * @param body         The issue body.
+     * @return A CompletableFuture with the issue URL.
+     */
+    public CompletableFuture<String> createIssue(
+            @NotNull String repoFullName,
+            @NotNull String title,
+            @NotNull String body) {
+        
+        if (!isAuthenticated()) {
+            LOG.warn("Not authenticated. Cannot create issue.");
+            return CompletableFuture.completedFuture("");
+        }
+        
+        return ThreadUtils.supplyAsyncVirtual(() -> {
+            try {
+                String url = GITHUB_API_URL + "/repos/" + repoFullName + "/issues";
+                
+                // Create JSON payload
+                String payload = String.format(
+                        "{\"title\":\"%s\",\"body\":\"%s\"}",
+                        title,
+                        body.replace("\"", "\\\"").replace("\n", "\\n")
+                );
+                
+                String response = sendGitHubRequest(url, "POST", payload);
+                
+                // Extract HTML URL with simple regex for now
+                Pattern pattern = Pattern.compile("\"html_url\"\\s*:\\s*\"([^\"]+)\"");
+                Matcher matcher = pattern.matcher(response);
+                
+                if (matcher.find()) {
+                    return matcher.group(1);
+                } else {
+                    LOG.error("Failed to parse issue URL from response");
+                    return "";
+                }
+            } catch (Exception e) {
+                LOG.error("Failed to create issue", e);
+                return "";
+            }
+        });
+    }
+    
+    /**
+     * Creates a pull request in a repository.
+     *
+     * @param repoFullName The full repository name (owner/repo).
+     * @param title        The pull request title.
+     * @param body         The pull request body.
+     * @param head         The head branch.
+     * @param base         The base branch.
+     * @return A CompletableFuture with the pull request URL.
      */
     public CompletableFuture<String> createPullRequest(
-            @NotNull String owner,
-            @NotNull String repository,
+            @NotNull String repoFullName,
             @NotNull String title,
             @NotNull String body,
             @NotNull String head,
             @NotNull String base) {
         
-        return ThreadUtils.supplyAsyncVirtual(() -> {
-            if (!authManager.isAuthenticated()) {
-                LOG.warn("Not authenticated");
-                return null;
-            }
-            
-            String authHeader = authManager.getAuthenticationHeader();
-            if (authHeader == null) {
-                LOG.warn("Invalid authentication");
-                return null;
-            }
-            
-            try {
-                URL url = new URL(REPOS_ENDPOINT + "/" + owner + "/" + repository + "/pulls");
-                HttpURLConnection connection = (HttpURLConnection) url.openConnection();
-                connection.setRequestMethod("POST");
-                connection.setRequestProperty("Authorization", authHeader);
-                connection.setRequestProperty("Content-Type", "application/json");
-                connection.setConnectTimeout((int) Duration.ofSeconds(10).toMillis());
-                connection.setReadTimeout((int) Duration.ofSeconds(10).toMillis());
-                connection.setDoOutput(true);
-                
-                JsonObject json = new JsonObject();
-                json.addProperty("title", title);
-                json.addProperty("body", body);
-                json.addProperty("head", head);
-                json.addProperty("base", base);
-                
-                try (OutputStream os = connection.getOutputStream()) {
-                    byte[] input = json.toString().getBytes(StandardCharsets.UTF_8);
-                    os.write(input, 0, input.length);
-                }
-                
-                int responseCode = connection.getResponseCode();
-                if (responseCode != HTTP_CREATED) {
-                    LOG.warn("Failed to create pull request: " + responseCode);
-                    return null;
-                }
-                
-                try (BufferedReader br = new BufferedReader(new InputStreamReader(connection.getInputStream(), StandardCharsets.UTF_8))) {
-                    StringBuilder response = new StringBuilder();
-                    String responseLine;
-                    while ((responseLine = br.readLine()) != null) {
-                        response.append(responseLine.trim());
-                    }
-                    
-                    JsonObject responseJson = gson.fromJson(response.toString(), JsonObject.class);
-                    return responseJson.get("html_url").getAsString();
-                }
-            } catch (IOException e) {
-                LOG.error("Failed to create pull request", e);
-                return null;
-            }
-        });
-    }
-
-    /**
-     * Creates an issue.
-     *
-     * @param owner      The repository owner.
-     * @param repository The repository name.
-     * @param title      The issue title.
-     * @param body       The issue body.
-     * @param labels     The issue labels.
-     * @return A CompletableFuture with the issue URL or null if creation failed.
-     */
-    public CompletableFuture<String> createIssue(
-            @NotNull String owner,
-            @NotNull String repository,
-            @NotNull String title,
-            @NotNull String body,
-            @NotNull List<String> labels) {
-        
-        return ThreadUtils.supplyAsyncVirtual(() -> {
-            if (!authManager.isAuthenticated()) {
-                LOG.warn("Not authenticated");
-                return null;
-            }
-            
-            String authHeader = authManager.getAuthenticationHeader();
-            if (authHeader == null) {
-                LOG.warn("Invalid authentication");
-                return null;
-            }
-            
-            try {
-                URL url = new URL(REPOS_ENDPOINT + "/" + owner + "/" + repository + "/issues");
-                HttpURLConnection connection = (HttpURLConnection) url.openConnection();
-                connection.setRequestMethod("POST");
-                connection.setRequestProperty("Authorization", authHeader);
-                connection.setRequestProperty("Content-Type", "application/json");
-                connection.setConnectTimeout((int) Duration.ofSeconds(10).toMillis());
-                connection.setReadTimeout((int) Duration.ofSeconds(10).toMillis());
-                connection.setDoOutput(true);
-                
-                JsonObject json = new JsonObject();
-                json.addProperty("title", title);
-                json.addProperty("body", body);
-                
-                // Convert labels to JSON array
-                JsonObject jsonLabels = new JsonObject();
-                for (String label : labels) {
-                    jsonLabels.addProperty("name", label);
-                }
-                json.add("labels", jsonLabels);
-                
-                try (OutputStream os = connection.getOutputStream()) {
-                    byte[] input = json.toString().getBytes(StandardCharsets.UTF_8);
-                    os.write(input, 0, input.length);
-                }
-                
-                int responseCode = connection.getResponseCode();
-                if (responseCode != HTTP_CREATED) {
-                    LOG.warn("Failed to create issue: " + responseCode);
-                    return null;
-                }
-                
-                try (BufferedReader br = new BufferedReader(new InputStreamReader(connection.getInputStream(), StandardCharsets.UTF_8))) {
-                    StringBuilder response = new StringBuilder();
-                    String responseLine;
-                    while ((responseLine = br.readLine()) != null) {
-                        response.append(responseLine.trim());
-                    }
-                    
-                    JsonObject responseJson = gson.fromJson(response.toString(), JsonObject.class);
-                    return responseJson.get("html_url").getAsString();
-                }
-            } catch (IOException e) {
-                LOG.error("Failed to create issue", e);
-                return null;
-            }
-        });
-    }
-
-    /**
-     * Disposes the service.
-     */
-    public void dispose() {
-        for (ScheduledFuture<?> task : monitoringTasks.values()) {
-            task.cancel(false);
+        if (!isAuthenticated()) {
+            LOG.warn("Not authenticated. Cannot create pull request.");
+            return CompletableFuture.completedFuture("");
         }
         
-        monitoringTasks.clear();
-        updateCallbacks.clear();
+        return ThreadUtils.supplyAsyncVirtual(() -> {
+            try {
+                String url = GITHUB_API_URL + "/repos/" + repoFullName + "/pulls";
+                
+                // Create JSON payload
+                String payload = String.format(
+                        "{\"title\":\"%s\",\"body\":\"%s\",\"head\":\"%s\",\"base\":\"%s\"}",
+                        title,
+                        body.replace("\"", "\\\"").replace("\n", "\\n"),
+                        head,
+                        base
+                );
+                
+                String response = sendGitHubRequest(url, "POST", payload);
+                
+                // Extract HTML URL with simple regex for now
+                Pattern pattern = Pattern.compile("\"html_url\"\\s*:\\s*\"([^\"]+)\"");
+                Matcher matcher = pattern.matcher(response);
+                
+                if (matcher.find()) {
+                    return matcher.group(1);
+                } else {
+                    LOG.error("Failed to parse pull request URL from response");
+                    return "";
+                }
+            } catch (Exception e) {
+                LOG.error("Failed to create pull request", e);
+                return "";
+            }
+        });
+    }
+    
+    /**
+     * Creates a workflow file in a repository.
+     *
+     * @param repoFullName The full repository name (owner/repo).
+     * @param path         The workflow file path.
+     * @param content      The workflow file content.
+     * @param message      The commit message.
+     * @return A CompletableFuture with the workflow file URL.
+     */
+    public CompletableFuture<String> createWorkflowFile(
+            @NotNull String repoFullName,
+            @NotNull String path,
+            @NotNull String content,
+            @NotNull String message) {
+        
+        if (!isAuthenticated()) {
+            LOG.warn("Not authenticated. Cannot create workflow file.");
+            return CompletableFuture.completedFuture("");
+        }
+        
+        return ThreadUtils.supplyAsyncVirtual(() -> {
+            try {
+                // Ensure the path starts with .github/workflows
+                String normalizedPath = path;
+                if (!normalizedPath.startsWith(".github/workflows/")) {
+                    normalizedPath = ".github/workflows/" + normalizedPath;
+                }
+                
+                // Ensure the path ends with .yml or .yaml
+                if (!normalizedPath.endsWith(".yml") && !normalizedPath.endsWith(".yaml")) {
+                    normalizedPath += ".yml";
+                }
+                
+                String url = GITHUB_API_URL + "/repos/" + repoFullName + "/contents/" + normalizedPath;
+                
+                // Base64 encode the content
+                String encodedContent = java.util.Base64.getEncoder().encodeToString(content.getBytes(StandardCharsets.UTF_8));
+                
+                // Create JSON payload
+                String payload = String.format(
+                        "{\"message\":\"%s\",\"content\":\"%s\"}",
+                        message,
+                        encodedContent
+                );
+                
+                String response = sendGitHubRequest(url, "PUT", payload);
+                
+                // Extract HTML URL with simple regex for now
+                Pattern pattern = Pattern.compile("\"html_url\"\\s*:\\s*\"([^\"]+)\"");
+                Matcher matcher = pattern.matcher(response);
+                
+                if (matcher.find()) {
+                    return matcher.group(1);
+                } else {
+                    LOG.error("Failed to parse workflow file URL from response");
+                    return "";
+                }
+            } catch (Exception e) {
+                LOG.error("Failed to create workflow file", e);
+                return "";
+            }
+        });
+    }
+    
+    /**
+     * Checks if the user is authenticated.
+     *
+     * @return Whether the user is authenticated.
+     */
+    public boolean isAuthenticated() {
+        String username = settings.getGitHubUsername();
+        String token = settings.getAccessToken();
+        
+        return username != null && !username.isEmpty() && token != null && !token.isEmpty();
+    }
+    
+    /**
+     * Validates credentials with GitHub.
+     *
+     * @return Whether the credentials are valid.
+     */
+    public boolean validateCredentials() {
+        if (!isAuthenticated()) {
+            return false;
+        }
+        
+        try {
+            String url = GITHUB_API_URL + "/user";
+            String response = sendGitHubRequest(url, "GET", null);
+            
+            // Check if response contains the username
+            return response.contains("\"login\"") && response.contains(settings.getGitHubUsername());
+        } catch (Exception e) {
+            LOG.error("Failed to validate credentials", e);
+            return false;
+        }
+    }
+    
+    /**
+     * Helper method for sending requests to the GitHub API.
+     *
+     * @param urlString The URL.
+     * @param method    The HTTP method.
+     * @param payload   The payload.
+     * @return The response.
+     * @throws IOException If an I/O error occurs.
+     */
+    private String sendGitHubRequest(
+            @NotNull String urlString,
+            @NotNull String method,
+            @Nullable String payload) throws IOException {
+        
+        URL url = new URL(urlString);
+        HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+        
+        try {
+            connection.setRequestMethod(method);
+            connection.setRequestProperty("Accept", ACCEPT_HEADER);
+            connection.setRequestProperty("X-GitHub-Api-Version", GITHUB_VERSION_HEADER);
+            
+            // Set authentication
+            String auth = settings.getGitHubUsername() + ":" + settings.getAccessToken();
+            String encodedAuth = java.util.Base64.getEncoder().encodeToString(auth.getBytes(StandardCharsets.UTF_8));
+            connection.setRequestProperty("Authorization", "Basic " + encodedAuth);
+            
+            // Set content type if sending payload
+            if (payload != null) {
+                connection.setRequestProperty("Content-Type", "application/json");
+                connection.setDoOutput(true);
+                
+                try (OutputStream os = connection.getOutputStream()) {
+                    byte[] input = payload.getBytes(StandardCharsets.UTF_8);
+                    os.write(input, 0, input.length);
+                }
+            }
+            
+            // Get response
+            int status = connection.getResponseCode();
+            
+            if (status >= 200 && status < 300) {
+                // Success
+                try (BufferedReader br = new BufferedReader(new InputStreamReader(
+                        connection.getInputStream(), StandardCharsets.UTF_8))) {
+                    StringBuilder response = new StringBuilder();
+                    String line;
+                    while ((line = br.readLine()) != null) {
+                        response.append(line);
+                    }
+                    return response.toString();
+                }
+            } else {
+                // Error
+                String errorDetails;
+                try (BufferedReader br = new BufferedReader(new InputStreamReader(
+                        connection.getErrorStream(), StandardCharsets.UTF_8))) {
+                    StringBuilder response = new StringBuilder();
+                    String line;
+                    while ((line = br.readLine()) != null) {
+                        response.append(line);
+                    }
+                    errorDetails = response.toString();
+                }
+                
+                throw new IOException("HTTP error " + status + ": " + errorDetails);
+            }
+        } finally {
+            connection.disconnect();
+        }
     }
 }
