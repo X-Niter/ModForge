@@ -4,6 +4,8 @@ import com.intellij.openapi.components.Service;
 import com.intellij.openapi.components.ServiceManager;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.project.Project;
+import com.modforge.intellij.plugin.services.ModForgeNotificationService;
+import com.modforge.intellij.plugin.settings.ModForgeSettings;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -80,24 +82,79 @@ public final class AIServiceManager {
     /**
      * Records a pattern match success.
      * @param tokensEstimate The estimated number of tokens saved
+     * @param project The current project, may be null for application-level instances
      * @return The pattern match ID
      */
-    public int recordPatternMatchSuccess(int tokensEstimate) {
+    public int recordPatternMatchSuccess(int tokensEstimate, @Nullable Project project) {
         estimatedTokensSaved.addAndGet(tokensEstimate);
         
         // Calculate cost saved in cents
         int costSavedInCents = (int) (tokensEstimate * COST_PER_1K_TOKENS * 100 / 1000);
         estimatedCostSavedInCents.addAndGet(costSavedInCents);
         
+        // Show cost-saving notification if significant enough (more than 1 cent)
+        if (project != null && costSavedInCents > 1) {
+            ModForgeSettings settings = ModForgeSettings.getInstance();
+            if (settings.isEnableNotifications()) {
+                // Only show cost-saving notifications for significant savings
+                double costSaved = costSavedInCents / 100.0;
+                ModForgeNotificationService.getInstance(project).showInfoNotification(
+                        project,
+                        "ModForge Pattern Learning",
+                        String.format("Pattern learning saved ~$%.2f in API costs by reusing similar patterns.", costSaved)
+                );
+            }
+        }
+        
         return patternMatches.incrementAndGet();
     }
     
     /**
+     * Records a pattern match success without a project reference.
+     * @param tokensEstimate The estimated number of tokens saved
+     * @return The pattern match ID
+     */
+    public int recordPatternMatchSuccess(int tokensEstimate) {
+        return recordPatternMatchSuccess(tokensEstimate, null);
+    }
+    
+    /**
      * Records an API fallback.
+     * @param project The current project, may be null for application-level instances
+     * @return The API call ID
+     */
+    public int recordApiFallback(@Nullable Project project) {
+        int callId = apiCalls.incrementAndGet();
+        
+        // Show a notification about API usage with current pattern matching percentage
+        if (project != null) {
+            ModForgeSettings settings = ModForgeSettings.getInstance();
+            if (settings.isEnableNotifications() && settings.isEnableContinuousDevelopment()) {
+                int total = totalRequests.get();
+                int matches = patternMatches.get();
+                int apis = apiCalls.get();
+                
+                // Only show if we have enough data to make meaningful percentage
+                if (total > 10) {
+                    int matchPercentage = matches * 100 / total;
+                    ModForgeNotificationService.getInstance(project).showInfoNotification(
+                            project,
+                            "ModForge API Usage",
+                            String.format("Using OpenAI API for this request. Current pattern match rate: %d%%", matchPercentage)
+                    );
+                }
+            }
+        }
+        
+        return callId;
+    }
+    
+    /**
+     * Records an API fallback without a project reference.
      * @return The API call ID
      */
     public int recordApiFallback() {
-        return apiCalls.incrementAndGet();
+        return recordApiFallback(null);
     }
     
     /**
