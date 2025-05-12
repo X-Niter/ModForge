@@ -7,6 +7,7 @@ import com.modforge.intellij.plugin.collaboration.websocket.WebSocketMessageList
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 
@@ -32,7 +33,7 @@ public class CollaborationWebSocketHandler implements WebSocketMessageListener {
     }
     
     @Override
-    public void onMessageReceived(@NotNull WebSocketMessage message) {
+    public void onMessageReceived(@NotNull com.modforge.intellij.plugin.collaboration.websocket.WebSocketMessage message) {
         executor.submit(() -> {
             try {
                 handleMessage(message);
@@ -61,27 +62,32 @@ public class CollaborationWebSocketHandler implements WebSocketMessageListener {
      * Handles a WebSocket message.
      * @param message The message
      */
-    private void handleMessage(@NotNull WebSocketMessage message) {
-        String type = message.getType();
-        Map<String, Object> data = message.getData();
+    private void handleMessage(@NotNull com.modforge.intellij.plugin.collaboration.websocket.WebSocketMessage message) {
+        com.modforge.intellij.plugin.collaboration.websocket.WebSocketMessageType type = message.getType();
+        // Get data map from message content
+        Map<String, Object> data = new HashMap<>();
+        // Parse JSON content if needed
+        String content = message.getContent();
         
         switch (type) {
-            case WebSocketMessage.TYPE_JOIN:
+            case CONNECT:
                 handleJoinMessage(data);
                 break;
-            case WebSocketMessage.TYPE_LEAVE:
+            case DISCONNECT:
                 handleLeaveMessage(data);
                 break;
-            case WebSocketMessage.TYPE_OPERATION:
+            case CODE_CHANGE:
                 handleOperationMessage(data);
                 break;
-            case WebSocketMessage.TYPE_PARTICIPANT_JOINED:
-                handleParticipantJoinedMessage(data);
+            case SYSTEM:
+                // Check content for participant_joined or participant_left
+                if (content.contains("participant_joined")) {
+                    handleParticipantJoinedMessage(data);
+                } else if (content.contains("participant_left")) {
+                    handleParticipantLeftMessage(data);
+                }
                 break;
-            case WebSocketMessage.TYPE_PARTICIPANT_LEFT:
-                handleParticipantLeftMessage(data);
-                break;
-            case WebSocketMessage.TYPE_ERROR:
+            case ERROR:
                 handleErrorMessage(data);
                 break;
             default:
