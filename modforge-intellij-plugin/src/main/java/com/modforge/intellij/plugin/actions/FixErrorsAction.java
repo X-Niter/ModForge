@@ -17,7 +17,6 @@ import com.intellij.openapi.progress.Task;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.DialogWrapper;
 import com.intellij.openapi.vfs.VirtualFile;
-import com.intellij.problems.Problem;
 import com.intellij.problems.WolfTheProblemSolver;
 import com.intellij.psi.PsiFile;
 import com.intellij.ui.components.JBLabel;
@@ -107,7 +106,7 @@ public class FixErrorsAction extends AnAction {
         }
         
         // Get problems in the file
-        Collection<Problem> problems = getProblemsInFile(project, file);
+        Collection<?> problems = getProblemsInFile(project, file);
         
         if (problems.isEmpty()) {
             // Check with user if they want to continue using ModForgeNotificationService
@@ -152,9 +151,9 @@ public class FixErrorsAction extends AnAction {
      * @param file    The file
      * @return A collection of problems
      */
-    private Collection<Problem> getProblemsInFile(@NotNull Project project, @NotNull VirtualFile file) {
+    private Collection<?> getProblemsInFile(@NotNull Project project, @NotNull VirtualFile file) {
         WolfTheProblemSolver problemSolver = WolfTheProblemSolver.getInstance(project);
-        Collection<Problem> problems = new ArrayList<>();
+        Collection<Object> problems = new ArrayList<>();
         
         if (problemSolver.hasProblemFilesBeneath(psiElement -> {
             if (psiElement instanceof PsiFile) {
@@ -215,7 +214,7 @@ public class FixErrorsAction extends AnAction {
     private void collectProblemsForFile(
             @NotNull WolfTheProblemSolver problemSolver,
             @NotNull VirtualFile file,
-            @NotNull Collection<Problem> problems) {
+            @NotNull Collection<Object> problems) {
         
         // Use a compatibility approach to get problems in 2025.1.1.1
         if (problemSolver.hasProblemFilesBeneath(virtualFile -> virtualFile.equals(file))) {
