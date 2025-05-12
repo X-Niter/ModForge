@@ -49,6 +49,9 @@ public final class ModForgeSettings implements PersistentStateComponent<ModForge
     @Transient
     private String accessToken = "";
     
+    @Transient
+    private String githubToken = "";
+    
     /**
      * Default constructor.
      */
@@ -194,6 +197,25 @@ public final class ModForgeSettings implements PersistentStateComponent<ModForge
      */
     public void setAccessToken(@Nullable String accessToken) {
         this.accessToken = accessToken;
+    }
+    
+    /**
+     * Gets the GitHub token.
+     *
+     * @return The GitHub token.
+     */
+    @Nullable
+    public String getGitHubToken() {
+        return githubToken;
+    }
+
+    /**
+     * Sets the GitHub token.
+     *
+     * @param githubToken The GitHub token.
+     */
+    public void setGitHubToken(@Nullable String githubToken) {
+        this.githubToken = githubToken;
     }
     
     /**

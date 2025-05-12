@@ -121,6 +121,7 @@ public final class ModAuthenticationManager {
 
     /**
      * Logs out the current user.
+     * Compatible with IntelliJ IDEA 2025.1.1.1
      */
     public void logout() {
         if (isAuthenticating.get()) {
@@ -131,8 +132,10 @@ public final class ModAuthenticationManager {
         ThreadUtils.runAsyncVirtual(() -> {
             LOG.info("Logging out user: " + getUsername());
             
-            // Clear credentials
+            // Clear all credentials
             settings.setAccessToken(null);
+            settings.setGitHubUsername("");
+            settings.setGitHubToken("");
             
             isAuthenticated.set(false);
             
