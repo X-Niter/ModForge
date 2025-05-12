@@ -201,20 +201,15 @@ public class FixErrorsAction extends AnAction {
         
         // Use a compatibility approach to get problems in 2025.1.1.1
         if (problemSolver.hasProblemFilesBeneath(file)) {
-            // Manually filter through files with problems
-            problemSolver.getFilesWithProblems().stream()
-                .filter(problemFile -> problemFile.equals(file))
-                .forEach(problemFile -> {
-                    // Process problems directly using our file filter
-                    // This avoids direct API calls to getProblemFiles and getAllProblems
-                    problemSolver.processProblems(problem -> {
-                        VirtualFile pFile = problem.getFile();
-                        if (pFile != null && pFile.equals(file)) {
-                            problems.add(problem);
-                        }
-                        return true;
-                    }, file);
-                });
+            // Use the stable processProblems API to directly process problems without
+            // first retrieving collections that might have API changes in 2025.1.1.1
+            problemSolver.processProblems(problem -> {
+                VirtualFile pFile = problem.getFile();
+                if (pFile != null && pFile.equals(file)) {
+                    problems.add(problem);
+                }
+                return true;
+            }, file);
         }
     }
     
@@ -256,15 +251,28 @@ public class FixErrorsAction extends AnAction {
             }
         }
         
-        // Provide default text if we have nothing else
-        if (sb.length() == 0) {
-            sb.append("Error detected but no description available");
-        }
-        
-        // If problem information is available via toString(), append it
-        String problemString = problem.toString();
-        if (problemString != null && !problemString.isEmpty() && !problemString.equals(problem.getClass().getName())) {
-            sb.append(problemString);
+        // Check for problem description using reflection (safer than direct API call)
+        try {
+            // Try to access getDescription method through reflection
+            // This is safer than direct API calls which might not exist in all versions
+            java.lang.reflect.Method getDescMethod = problem.getClass().getMethod("getDescription");
+            if (getDescMethod != null) {
+                String description = (String) getDescMethod.invoke(problem);
+                if (description != null && !description.isEmpty()) {
+                    sb.append(description);
+                }
+            }
+        } catch (Exception e) {
+            // If reflection fails, fall back to toString
+            String problemString = problem.toString();
+            if (problemString != null && !problemString.isEmpty() && !problemString.equals(problem.getClass().getName())) {
+                sb.append(problemString);
+            } else {
+                // Provide default text if we have nothing else
+                if (sb.length() == 0) {
+                    sb.append("Error detected but no description available");
+                }
+            }
         }
         
         return sb.toString();
