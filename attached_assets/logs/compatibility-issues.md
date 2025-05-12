@@ -1,7 +1,7 @@
 # ModForge IntelliJ IDEA 2025.1.1.1 Compatibility Issues 
  
 This report contains potential compatibility issues found in the codebase. 
-Generated on Sun 05/11/2025 23:06:09.25. 
+Generated on Sun 05/11/2025 23:48:00.28. 
  
 ## Overview 
  
@@ -18,7 +18,7 @@ that might affect plugin functionality for IntelliJ IDEA 2025.1.1.1.
  
 ## Summary 
  
-* Total Java files scanned: 225 
+* Total Java files scanned: 230 
 * Files with potential compatibility issues: 10 
 * Total potential issues found: 18 
  

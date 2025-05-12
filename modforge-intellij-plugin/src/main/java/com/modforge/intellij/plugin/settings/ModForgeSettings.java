@@ -1,9 +1,14 @@
 package com.modforge.intellij.plugin.settings;
 
 import com.intellij.openapi.application.ApplicationManager;
-import com.intellij.openapi.components.*;
+import com.intellij.openapi.components.PersistentStateComponent;
+import com.intellij.openapi.components.Service;
+import com.intellij.openapi.components.State;
+import com.intellij.openapi.components.Storage;
+import com.intellij.openapi.options.ShowSettingsUtil;
 import com.intellij.openapi.project.Project;
 import com.intellij.util.xmlb.XmlSerializerUtil;
+import com.modforge.intellij.plugin.ui.ModForgeConfigurable;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -11,29 +16,26 @@ import org.jetbrains.annotations.Nullable;
  * Persistent settings for the ModForge plugin.
  * Compatible with IntelliJ IDEA 2025.1.1.1
  */
+@Service
 @State(
-        name = "com.modforge.intellij.plugin.settings.ModForgeSettings",
-        storages = {@Storage(StoragePathMacros.NON_ROAMABLE_FILE)}
+        name = "ModForgeSettings",
+        storages = {@Storage("modForgeSettings.xml")}
 )
-public class ModForgeSettings implements PersistentStateComponent<ModForgeSettings> {
-    // User settings
+public final class ModForgeSettings implements PersistentStateComponent<ModForgeSettings> {
     private String username = "";
-    private String serverUrl = "https://api.modforge.dev";
+    private String serverUrl = "https://api.modforge.ai";
+    private String gitHubUsername = "";
+    private String accessToken = "";
     private boolean enableContinuousDevelopment = false;
-    private int memoryThreshold = 75; // Percentage
-    
-    // AI settings
     private boolean usePatternLearning = true;
     private boolean preserveExistingCode = true;
-    
-    // GitHub settings
-    private String githubUsername = "";
-    private String accessToken = "";
+    private boolean patternRecognition = true;
+    private int memoryThreshold = 75;
 
     /**
-     * Gets the singleton instance of the settings.
+     * Gets the instance of the settings.
      *
-     * @return The settings instance.
+     * @return The settings.
      */
     public static ModForgeSettings getInstance() {
         return ApplicationManager.getApplication().getService(ModForgeSettings.class);
@@ -47,6 +49,15 @@ public class ModForgeSettings implements PersistentStateComponent<ModForgeSettin
     @Override
     public void loadState(@NotNull ModForgeSettings state) {
         XmlSerializerUtil.copyBean(state, this);
+    }
+
+    /**
+     * Opens the settings dialog.
+     *
+     * @param project The project.
+     */
+    public void openSettings(@NotNull Project project) {
+        ShowSettingsUtil.getInstance().showSettingsDialog(project, ModForgeConfigurable.class);
     }
 
     /**
@@ -86,9 +97,45 @@ public class ModForgeSettings implements PersistentStateComponent<ModForgeSettin
     }
 
     /**
-     * Checks if continuous development is enabled.
+     * Gets the GitHub username.
      *
-     * @return True if enabled, false otherwise.
+     * @return The GitHub username.
+     */
+    public String getGitHubUsername() {
+        return gitHubUsername;
+    }
+
+    /**
+     * Sets the GitHub username.
+     *
+     * @param gitHubUsername The GitHub username.
+     */
+    public void setGitHubUsername(String gitHubUsername) {
+        this.gitHubUsername = gitHubUsername;
+    }
+
+    /**
+     * Gets the access token.
+     *
+     * @return The access token.
+     */
+    public String getAccessToken() {
+        return accessToken;
+    }
+
+    /**
+     * Sets the access token.
+     *
+     * @param accessToken The access token.
+     */
+    public void setAccessToken(String accessToken) {
+        this.accessToken = accessToken;
+    }
+
+    /**
+     * Gets whether continuous development is enabled.
+     *
+     * @return Whether continuous development is enabled.
      */
     public boolean isEnableContinuousDevelopment() {
         return enableContinuousDevelopment;
@@ -97,34 +144,16 @@ public class ModForgeSettings implements PersistentStateComponent<ModForgeSettin
     /**
      * Sets whether continuous development is enabled.
      *
-     * @param enableContinuousDevelopment True to enable, false to disable.
+     * @param enableContinuousDevelopment Whether continuous development is enabled.
      */
     public void setEnableContinuousDevelopment(boolean enableContinuousDevelopment) {
         this.enableContinuousDevelopment = enableContinuousDevelopment;
     }
 
     /**
-     * Gets the memory threshold.
+     * Gets whether pattern learning is enabled.
      *
-     * @return The memory threshold (percentage).
-     */
-    public int getMemoryThreshold() {
-        return memoryThreshold;
-    }
-
-    /**
-     * Sets the memory threshold.
-     *
-     * @param memoryThreshold The memory threshold (percentage).
-     */
-    public void setMemoryThreshold(int memoryThreshold) {
-        this.memoryThreshold = memoryThreshold;
-    }
-
-    /**
-     * Checks if pattern learning is enabled.
-     *
-     * @return True if enabled, false otherwise.
+     * @return Whether pattern learning is enabled.
      */
     public boolean isUsePatternLearning() {
         return usePatternLearning;
@@ -133,16 +162,16 @@ public class ModForgeSettings implements PersistentStateComponent<ModForgeSettin
     /**
      * Sets whether pattern learning is enabled.
      *
-     * @param usePatternLearning True to enable, false to disable.
+     * @param usePatternLearning Whether pattern learning is enabled.
      */
     public void setUsePatternLearning(boolean usePatternLearning) {
         this.usePatternLearning = usePatternLearning;
     }
 
     /**
-     * Checks if existing code should be preserved.
+     * Gets whether existing code should be preserved.
      *
-     * @return True if enabled, false otherwise.
+     * @return Whether existing code should be preserved.
      */
     public boolean isPreserveExistingCode() {
         return preserveExistingCode;
@@ -151,65 +180,45 @@ public class ModForgeSettings implements PersistentStateComponent<ModForgeSettin
     /**
      * Sets whether existing code should be preserved.
      *
-     * @param preserveExistingCode True to enable, false to disable.
+     * @param preserveExistingCode Whether existing code should be preserved.
      */
     public void setPreserveExistingCode(boolean preserveExistingCode) {
         this.preserveExistingCode = preserveExistingCode;
     }
-    
+
     /**
-     * Gets the GitHub username.
+     * Gets whether pattern recognition is enabled.
      *
-     * @return The GitHub username.
-     */
-    public String getGitHubUsername() {
-        return githubUsername;
-    }
-    
-    /**
-     * Sets the GitHub username.
-     *
-     * @param githubUsername The GitHub username.
-     */
-    public void setGitHubUsername(String githubUsername) {
-        this.githubUsername = githubUsername;
-    }
-    
-    /**
-     * Gets the access token for API access.
-     *
-     * @return The access token.
-     */
-    public String getAccessToken() {
-        return accessToken;
-    }
-    
-    /**
-     * Sets the access token for API access.
-     *
-     * @param accessToken The access token.
-     */
-    public void setAccessToken(String accessToken) {
-        this.accessToken = accessToken;
-    }
-    
-    /**
-     * Checks if pattern recognition should be used for AI operations.
-     * This is an alias for isUsePatternLearning() that matches the method name expected by callers.
-     *
-     * @return True if pattern recognition should be used, false otherwise.
+     * @return Whether pattern recognition is enabled.
      */
     public boolean isPatternRecognition() {
-        return isUsePatternLearning();
+        return patternRecognition;
     }
-    
+
     /**
-     * Opens the settings dialog for the plugin.
+     * Sets whether pattern recognition is enabled.
      *
-     * @param project The current project
+     * @param patternRecognition Whether pattern recognition is enabled.
      */
-    public void openSettings(Project project) {
-        // Implementation could open the settings dialog in the IDE
-        // This is a placeholder that will be enhanced with actual functionality later
+    public void setPatternRecognition(boolean patternRecognition) {
+        this.patternRecognition = patternRecognition;
+    }
+
+    /**
+     * Gets the memory threshold.
+     *
+     * @return The memory threshold.
+     */
+    public int getMemoryThreshold() {
+        return memoryThreshold;
+    }
+
+    /**
+     * Sets the memory threshold.
+     *
+     * @param memoryThreshold The memory threshold.
+     */
+    public void setMemoryThreshold(int memoryThreshold) {
+        this.memoryThreshold = memoryThreshold;
     }
 }
