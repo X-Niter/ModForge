@@ -331,14 +331,7 @@ REM ===================================
 echo.
 echo === Running Missing Methods Analysis ===
 
-REM Call subroutine to handle the missing methods analysis
-call :ANALYZE_MISSING_METHODS
-goto :SKIP_MISSING_METHODS_ANALYSIS
-
-REM ===================================
-REM Missing Methods Analysis Subroutine
-REM ===================================
-:ANALYZE_MISSING_METHODS
+REM Create missing methods report directly here
 
 REM Create output file with header
 (
@@ -372,9 +365,7 @@ echo These methods are referenced in the code but could not be found during comp
 echo.
 ) >> "%MISSING_METHODS_REPORT%"
 
-:SKIP_MISSING_METHODS_ANALYSIS
-
-REM Continue missing methods analysis in the subroutine
+REM Continue with missing methods analysis
 if exist "%TEMP_DIR%\missing_methods.txt" (
     REM Process missing methods - add a summary to the report
     echo Methods found in error log: >> "%MISSING_METHODS_REPORT%"
@@ -434,12 +425,8 @@ if exist "%TEMP_DIR%\missing_methods.txt" (
 echo Missing methods analysis complete.
 goto :EOF
 
-REM ===================================
-REM Process Method Line Subroutine
-REM ===================================
-:PROCESS_METHOD_LINE
-echo - **%~1** >> "%MISSING_METHODS_REPORT%"
-goto :EOF
+REM We've removed the individual method line processing subroutine
+REM since we're now using the type command to directly add error messages
 
 REM ===================================
 REM Add Settings Methods Subroutine
