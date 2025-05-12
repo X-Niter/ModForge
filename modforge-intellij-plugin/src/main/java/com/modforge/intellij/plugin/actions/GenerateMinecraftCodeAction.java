@@ -71,7 +71,7 @@ public class GenerateMinecraftCodeAction extends AnAction {
                         "Code generator service not available"
                 );
             } else {
-                Messages.showErrorDialog(project, "Code generator service not available", "Error");
+                com.modforge.intellij.plugin.utils.CompatibilityUtil.showErrorDialog(project, "Code generator service not available", "Error");
             }
             return;
         }

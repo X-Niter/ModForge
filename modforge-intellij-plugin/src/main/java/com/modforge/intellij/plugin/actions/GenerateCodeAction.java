@@ -237,7 +237,7 @@ public class GenerateCodeAction extends AnAction {
                         "Could not find project base directory."
                 );
             } else {
-                Messages.showErrorDialog(project, "Could not find project base directory.", "Error");
+                com.modforge.intellij.plugin.utils.CompatibilityUtil.showErrorDialog(project, "Could not find project base directory.", "Error");
             }
             return;
         }
@@ -289,7 +289,7 @@ public class GenerateCodeAction extends AnAction {
                         "Error saving file: " + e.getMessage()
                 );
             } else {
-                Messages.showErrorDialog(project, "Error saving file: " + e.getMessage(), "Error");
+                com.modforge.intellij.plugin.utils.CompatibilityUtil.showErrorDialog(project, "Error saving file: " + e.getMessage(), "Error");
             }
         }
     }
