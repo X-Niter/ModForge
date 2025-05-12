@@ -1,436 +1,258 @@
 package com.modforge.intellij.plugin.utils;
 
+import com.intellij.openapi.application.Application;
 import com.intellij.openapi.application.ApplicationManager;
-import com.intellij.openapi.application.ModalityState;
 import com.intellij.openapi.application.ReadAction;
 import com.intellij.openapi.application.WriteAction;
-import com.intellij.openapi.command.CommandProcessor;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.editor.Document;
-import com.intellij.openapi.editor.Editor;
-import com.intellij.openapi.fileEditor.FileEditor;
-import com.intellij.openapi.fileEditor.FileEditorManager;
-import com.intellij.openapi.fileEditor.OpenFileDescriptor;
-import com.intellij.openapi.fileEditor.TextEditor;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.Computable;
 import com.intellij.openapi.util.ThrowableComputable;
-import com.intellij.openapi.vfs.VfsUtil;
-import com.intellij.openapi.vfs.VirtualFile;
-import com.intellij.openapi.wm.IdeFocusManager;
+import com.intellij.psi.PsiDocumentManager;
 import com.intellij.psi.PsiFile;
-import com.intellij.psi.PsiManager;
-import com.intellij.util.concurrency.EdtExecutorService;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-import java.io.File;
-import java.io.IOException;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.concurrent.Callable;
-import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.function.Supplier;
 
 /**
- * Utility class for IntelliJ IDEA API compatibility.
+ * Utility class for compatibility across different IntelliJ IDEA versions.
  * Compatible with IntelliJ IDEA 2025.1.1.1
  */
 public final class CompatibilityUtil {
     private static final Logger LOG = Logger.getInstance(CompatibilityUtil.class);
-
+    
+    // Timeout constants
+    private static final long DEFAULT_TIMEOUT_SECONDS = 10;
+    
+    /**
+     * Private constructor to prevent instantiation.
+     */
     private CompatibilityUtil() {
-        // Private constructor to prevent instantiation
+        throw new UnsupportedOperationException("Utility class cannot be instantiated");
     }
 
     /**
-     * Executes a task in a read action.
+     * Runs a task with read access.
      *
-     * @param <T> The result type.
-     * @param computable The task to execute.
+     * @param task The task to run.
+     * @param <T>  The return type.
      * @return The result of the task.
      */
-    public static <T> T computeInReadAction(@NotNull Computable<T> computable) {
-        return ReadAction.compute(computable);
-    }
-
-    /**
-     * Executes a task in a write action.
-     *
-     * @param <T> The result type.
-     * @param computable The task to execute.
-     * @return The result of the task.
-     * @throws Exception If an error occurs.
-     */
-    public static <T> T computeInWriteAction(@NotNull ThrowableComputable<T, ? extends Exception> computable) throws Exception {
-        return WriteAction.compute(computable);
-    }
-
-    /**
-     * Executes a task in a write action, catching any exceptions.
-     *
-     * @param <T> The result type.
-     * @param computable The task to execute.
-     * @param defaultValue The default value to return if an exception occurs.
-     * @return The result of the task or the default value if an exception occurs.
-     */
-    public static <T> T computeInWriteActionWithDefault(@NotNull Computable<T> computable, T defaultValue) {
-        try {
-            return WriteAction.compute(() -> computable.compute());
-        } catch (Exception e) {
-            LOG.error("Error executing write action", e);
-            return defaultValue;
-        }
-    }
-
-    /**
-     * Runs a task in a read action.
-     *
-     * @param action The task to run.
-     */
-    public static void runInReadAction(@NotNull Runnable action) {
-        ReadAction.run(action);
-    }
-
-    /**
-     * Runs a task in a write action.
-     *
-     * @param action The task to run.
-     */
-    public static void runInWriteAction(@NotNull Runnable action) {
-        try {
-            WriteAction.run(action::run);
-        } catch (Exception e) {
-            LOG.error("Error executing write action", e);
-        }
-    }
-
-    /**
-     * Runs a task in a command action.
-     *
-     * @param project The project.
-     * @param name The command name.
-     * @param action The task to run.
-     */
-    public static void runInCommandAction(@NotNull Project project, @NotNull String name, @NotNull Runnable action) {
-        CommandProcessor.getInstance().executeCommand(project, () -> runInWriteAction(action), name, null);
-    }
-
-    /**
-     * Executes a task on the UI thread.
-     *
-     * @param action The task to run.
-     */
-    public static void executeOnUiThread(@NotNull Runnable action) {
-        if (ApplicationManager.getApplication().isDispatchThread()) {
-            action.run();
-        } else {
-            ApplicationManager.getApplication().invokeLater(action);
-        }
-    }
-
-    /**
-     * Executes a task on the UI thread with a specific modality state.
-     *
-     * @param action The task to run.
-     * @param modalityState The modality state.
-     */
-    public static void executeOnUiThread(@NotNull Runnable action, @NotNull ModalityState modalityState) {
-        if (ApplicationManager.getApplication().isDispatchThread() && ModalityState.current().equals(modalityState)) {
-            action.run();
-        } else {
-            ApplicationManager.getApplication().invokeLater(action, modalityState);
-        }
-    }
-
-    /**
-     * Executes a task on the UI thread with a timeout.
-     *
-     * @param <T> The result type.
-     * @param supplier The task to run.
-     * @param timeout The timeout.
-     * @param unit The time unit of the timeout.
-     * @return A CompletableFuture with the result of the task.
-     */
-    public static <T> CompletableFuture<T> executeOnUiThreadWithTimeout(
-            @NotNull Supplier<T> supplier,
-            long timeout,
-            @NotNull TimeUnit unit) {
+    public static <T> T runWithReadAccess(@NotNull Computable<T> task) {
+        Application application = ApplicationManager.getApplication();
         
-        CompletableFuture<T> future = new CompletableFuture<>();
-        
-        if (ApplicationManager.getApplication().isDispatchThread()) {
+        if (application.isReadAccessAllowed()) {
+            return task.compute();
+        } else {
             try {
-                future.complete(supplier.get());
-            } catch (Exception e) {
-                future.completeExceptionally(e);
+                return ReadAction.nonBlocking(task::compute)
+                        .executionContext(application::isReadAccessAllowed)
+                        .submit()
+                        .get(DEFAULT_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+            } catch (InterruptedException | ExecutionException | TimeoutException e) {
+                LOG.error("Failed to run task with read access", e);
+                throw new RuntimeException("Failed to run task with read access", e);
+            }
+        }
+    }
+
+    /**
+     * Runs a task with write access.
+     *
+     * @param task The task to run.
+     * @param <T>  The return type.
+     * @return The result of the task.
+     */
+    public static <T> T runWithWriteAccess(@NotNull ThrowableComputable<T, Throwable> task) {
+        Application application = ApplicationManager.getApplication();
+        
+        if (application.isWriteAccessAllowed()) {
+            try {
+                return task.compute();
+            } catch (Throwable e) {
+                LOG.error("Failed to run task with write access", e);
+                throw new RuntimeException("Failed to run task with write access", e);
             }
         } else {
-            CompletableFuture.runAsync(() -> {
-                try {
-                    T result = ApplicationManager.getApplication().invokeAndWait(supplier::get);
-                    future.complete(result);
-                } catch (Exception e) {
-                    future.completeExceptionally(e);
-                }
-            }, EdtExecutorService.getInstance());
-        }
-        
-        return future.orTimeout(timeout, unit);
-    }
-
-    /**
-     * Gets the base directory of a project.
-     * Replacement for deprecated Project.getBaseDir()
-     *
-     * @param project The project.
-     * @return The base directory.
-     */
-    @Nullable
-    public static VirtualFile getProjectBaseDir(@NotNull Project project) {
-        String basePath = project.getBasePath();
-        if (basePath == null) {
-            return null;
-        }
-        
-        return VfsUtil.findFile(Paths.get(basePath), true);
-    }
-
-    /**
-     * Refreshes all files in a project.
-     *
-     * @param project The project.
-     */
-    public static void refreshAll(@NotNull Project project) {
-        VirtualFile baseDir = getProjectBaseDir(project);
-        if (baseDir != null) {
-            baseDir.refresh(true, true);
-        }
-    }
-
-    /**
-     * Opens a file in the editor.
-     *
-     * @param project The project.
-     * @param file The file to open.
-     * @param requestFocus Whether to request focus.
-     * @return The opened editor.
-     */
-    @Nullable
-    public static Editor openFileInEditor(
-            @NotNull Project project,
-            @NotNull VirtualFile file,
-            boolean requestFocus) {
-        
-        FileEditor[] fileEditors = FileEditorManager.getInstance(project).openFile(file, requestFocus);
-        
-        for (FileEditor fileEditor : fileEditors) {
-            if (fileEditor instanceof TextEditor) {
-                Editor editor = ((TextEditor) fileEditor).getEditor();
-                if (requestFocus) {
-                    IdeFocusManager.getInstance(project).requestFocus(editor.getContentComponent(), true);
-                }
-                return editor;
+            try {
+                return WriteAction.computeAndWait(task);
+            } catch (Throwable e) {
+                LOG.error("Failed to run task with write access", e);
+                throw new RuntimeException("Failed to run task with write access", e);
             }
         }
-        
-        return null;
     }
 
     /**
-     * Opens a file in the editor at a specific offset.
+     * Runs a task with read access.
      *
-     * @param project The project.
-     * @param file The file to open.
-     * @param offset The offset.
-     * @param requestFocus Whether to request focus.
-     * @return The opened editor.
+     * @param task The task to run.
      */
-    @Nullable
-    public static Editor openFileInEditor(
-            @NotNull Project project,
-            @NotNull VirtualFile file,
-            int offset,
-            boolean requestFocus) {
+    public static void runWithReadAccess(@NotNull Runnable task) {
+        Application application = ApplicationManager.getApplication();
         
-        OpenFileDescriptor descriptor = new OpenFileDescriptor(project, file, offset);
-        Editor editor = FileEditorManager.getInstance(project).openTextEditor(descriptor, requestFocus);
-        
-        if (editor != null && requestFocus) {
-            IdeFocusManager.getInstance(project).requestFocus(editor.getContentComponent(), true);
+        if (application.isReadAccessAllowed()) {
+            task.run();
+        } else {
+            try {
+                ReadAction.nonBlocking(() -> {
+                    task.run();
+                    return null;
+                })
+                        .executionContext(application::isReadAccessAllowed)
+                        .submit()
+                        .get(DEFAULT_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+            } catch (InterruptedException | ExecutionException | TimeoutException e) {
+                LOG.error("Failed to run task with read access", e);
+                throw new RuntimeException("Failed to run task with read access", e);
+            }
         }
-        
-        return editor;
     }
 
     /**
-     * Gets a PsiFile from a VirtualFile.
+     * Runs a task with write access.
+     *
+     * @param task The task to run.
+     */
+    public static void runWithWriteAccess(@NotNull Runnable task) {
+        Application application = ApplicationManager.getApplication();
+        
+        if (application.isWriteAccessAllowed()) {
+            task.run();
+        } else {
+            try {
+                WriteAction.runAndWait(task::run);
+            } catch (Throwable e) {
+                LOG.error("Failed to run task with write access", e);
+                throw new RuntimeException("Failed to run task with write access", e);
+            }
+        }
+    }
+
+    /**
+     * Gets a document for a PSI file.
      *
      * @param project The project.
-     * @param file The virtual file.
-     * @return The PsiFile.
+     * @param file    The PSI file.
+     * @return The document or null if it doesn't exist.
      */
     @Nullable
-    public static PsiFile getPsiFile(@NotNull Project project, @NotNull VirtualFile file) {
-        return computeInReadAction(() -> PsiManager.getInstance(project).findFile(file));
+    public static Document getDocument(@NotNull Project project, @NotNull PsiFile file) {
+        return runWithReadAccess(() -> PsiDocumentManager.getInstance(project).getDocument(file));
     }
 
     /**
-     * Gets the document for a VirtualFile.
+     * Commits a document.
      *
-     * @param file The virtual file.
-     * @return The document.
+     * @param project  The project.
+     * @param document The document.
      */
-    @Nullable
-    public static Document getDocument(@NotNull VirtualFile file) {
-        return computeInReadAction(() -> com.intellij.openapi.fileEditor.FileDocumentManager.getInstance().getDocument(file));
-    }
-
-    /**
-     * Creates a new file.
-     *
-     * @param parent The parent directory.
-     * @param name The file name.
-     * @return The created file.
-     * @throws IOException If an error occurs.
-     */
-    @NotNull
-    public static VirtualFile createNewFile(@NotNull VirtualFile parent, @NotNull String name) throws IOException {
-        return computeInWriteAction(() -> parent.createChildData(null, name));
-    }
-
-    /**
-     * Creates a new directory.
-     *
-     * @param parent The parent directory.
-     * @param name The directory name.
-     * @return The created directory.
-     * @throws IOException If an error occurs.
-     */
-    @NotNull
-    public static VirtualFile createNewDirectory(@NotNull VirtualFile parent, @NotNull String name) throws IOException {
-        return computeInWriteAction(() -> parent.createChildDirectory(null, name));
-    }
-
-    /**
-     * Writes text to a file.
-     *
-     * @param file The file.
-     * @param text The text to write.
-     * @throws IOException If an error occurs.
-     */
-    public static void writeToFile(@NotNull VirtualFile file, @NotNull String text) throws IOException {
-        computeInWriteAction(() -> {
-            file.setBinaryContent(text.getBytes());
+    public static void commitDocument(@NotNull Project project, @NotNull Document document) {
+        runWithWriteAccess(() -> {
+            PsiDocumentManager.getInstance(project).commitDocument(document);
             return null;
         });
     }
 
     /**
-     * Deletes a file.
+     * Runs a task synchronously on the UI thread.
      *
-     * @param file The file to delete.
-     * @throws IOException If an error occurs.
+     * @param task The task to run.
      */
-    public static void deleteFile(@NotNull VirtualFile file) throws IOException {
-        computeInWriteAction(() -> {
-            file.delete(null);
-            return null;
-        });
+    public static void runOnUIThread(@NotNull Runnable task) {
+        Application application = ApplicationManager.getApplication();
+        
+        if (application.isDispatchThread()) {
+            task.run();
+        } else {
+            application.invokeAndWait(task);
+        }
     }
 
     /**
-     * Renames a file.
+     * Runs a task asynchronously on the UI thread.
      *
-     * @param file The file to rename.
-     * @param newName The new name.
-     * @throws IOException If an error occurs.
+     * @param task The task to run.
      */
-    public static void renameFile(@NotNull VirtualFile file, @NotNull String newName) throws IOException {
-        computeInWriteAction(() -> {
-            file.rename(null, newName);
-            return null;
-        });
+    public static void runOnUIThreadAsync(@NotNull Runnable task) {
+        ApplicationManager.getApplication().invokeLater(task);
     }
 
     /**
-     * Moves a file.
+     * Runs a callable with a timeout.
      *
-     * @param file The file to move.
-     * @param newParent The new parent directory.
-     * @throws IOException If an error occurs.
+     * @param callable The callable to run.
+     * @param timeout  The timeout in seconds.
+     * @param <T>      The return type.
+     * @return The result of the callable.
+     * @throws TimeoutException      If the timeout is exceeded.
+     * @throws InterruptedException  If the thread is interrupted.
+     * @throws ExecutionException    If the callable throws an exception.
      */
-    public static void moveFile(@NotNull VirtualFile file, @NotNull VirtualFile newParent) throws IOException {
-        computeInWriteAction(() -> {
-            file.move(null, newParent);
-            return null;
-        });
+    public static <T> T runWithTimeout(@NotNull Callable<T> callable, long timeout)
+            throws TimeoutException, InterruptedException, ExecutionException {
+        
+        return ThreadUtils.supplyAsyncVirtual(() -> {
+            try {
+                return callable.call();
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+        }).get(timeout, TimeUnit.SECONDS);
     }
 
     /**
-     * Converts a file path to a VirtualFile.
+     * Runs a supplier with a timeout.
      *
-     * @param path The file path.
-     * @return The VirtualFile.
+     * @param supplier The supplier to run.
+     * @param timeout  The timeout in seconds.
+     * @param <T>      The return type.
+     * @return The result of the supplier.
+     * @throws TimeoutException      If the timeout is exceeded.
+     * @throws InterruptedException  If the thread is interrupted.
+     * @throws ExecutionException    If the supplier throws an exception.
      */
-    @Nullable
-    public static VirtualFile pathToVirtualFile(@NotNull String path) {
-        return VfsUtil.findFile(Paths.get(path), true);
+    public static <T> T runWithTimeout(@NotNull Supplier<T> supplier, long timeout)
+            throws TimeoutException, InterruptedException, ExecutionException {
+        
+        return ThreadUtils.supplyAsyncVirtual(supplier).get(timeout, TimeUnit.SECONDS);
     }
 
     /**
-     * Converts a VirtualFile to a file path.
+     * Safely runs a runnable, logging any exceptions.
      *
-     * @param file The VirtualFile.
-     * @return The file path.
+     * @param runnable  The runnable to run.
+     * @param errorMsg  The error message to log.
      */
-    @NotNull
-    public static String virtualFileToPath(@NotNull VirtualFile file) {
-        return file.getPath();
+    public static void runSafely(@NotNull Runnable runnable, @NotNull String errorMsg) {
+        try {
+            runnable.run();
+        } catch (Exception e) {
+            LOG.error(errorMsg, e);
+        }
     }
 
     /**
-     * Converts a VirtualFile to a Java File.
+     * Safely runs a supplier, logging any exceptions.
      *
-     * @param file The VirtualFile.
-     * @return The Java File.
+     * @param supplier  The supplier to run.
+     * @param errorMsg  The error message to log.
+     * @param fallback  The fallback value.
+     * @param <T>       The return type.
+     * @return The result of the supplier or the fallback value.
      */
-    @Nullable
-    public static File virtualFileToIoFile(@NotNull VirtualFile file) {
-        return VfsUtil.virtualToIoFile(file);
-    }
-
-    /**
-     * Converts a Java File to a VirtualFile.
-     *
-     * @param file The Java File.
-     * @return The VirtualFile.
-     */
-    @Nullable
-    public static VirtualFile ioFileToVirtualFile(@NotNull File file) {
-        return VfsUtil.findFileByIoFile(file, true);
-    }
-
-    /**
-     * Converts a Java Path to a VirtualFile.
-     *
-     * @param path The Java Path.
-     * @return The VirtualFile.
-     */
-    @Nullable
-    public static VirtualFile pathToVirtualFile(@NotNull Path path) {
-        return VfsUtil.findFile(path, true);
-    }
-
-    /**
-     * Converts a VirtualFile to a Java Path.
-     *
-     * @param file The VirtualFile.
-     * @return The Java Path.
-     */
-    @NotNull
-    public static Path virtualFileToPath(@NotNull VirtualFile file) {
-        return Paths.get(file.getPath());
+    public static <T> T runSafely(@NotNull Supplier<T> supplier, @NotNull String errorMsg, @Nullable T fallback) {
+        try {
+            return supplier.get();
+        } catch (Exception e) {
+            LOG.error(errorMsg, e);
+            return fallback;
+        }
     }
 }
