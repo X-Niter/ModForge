@@ -522,6 +522,40 @@ public final class CompatibilityUtil {
      * @param file The virtual file to clear problems for
      * @return True if clearing was successful, false otherwise
      */
+    public static boolean clearProblems(@NotNull WolfTheProblemSolver problemSolver, @NotNull VirtualFile file) {
+        try {
+            // Try the direct method first (IntelliJ IDEA 2025.1.1.1)
+            try {
+                java.lang.reflect.Method clearProblemsMethod = 
+                    problemSolver.getClass().getMethod("clearProblems", VirtualFile.class);
+                clearProblemsMethod.invoke(problemSolver, file);
+                return true;
+            } catch (Exception e) {
+                LOG.warn("Failed to call clearProblems directly", e);
+                
+                // Try alternative methods
+                try {
+                    // Try clearProblemsForFile
+                    java.lang.reflect.Method method = 
+                        problemSolver.getClass().getMethod("clearProblemsForFile", VirtualFile.class);
+                    method.invoke(problemSolver, file);
+                    return true;
+                } catch (Exception ex) {
+                    LOG.warn("Failed to call clearProblemsForFile", ex);
+                    
+                    // Last resort - try queue update method
+                    java.lang.reflect.Method method = 
+                        problemSolver.getClass().getMethod("queueUpdateForFile", VirtualFile.class);
+                    method.invoke(problemSolver, file);
+                    return true;
+                }
+            }
+        } catch (Exception ex) {
+            LOG.error("Failed to clear problems for file", ex);
+            return false;
+        }
+    }
+    
     /**
      * Reports a problem for a specific file to WolfTheProblemSolver using reflection
      * to maintain compatibility with different IntelliJ IDEA versions, particularly 2025.1.1.1.
@@ -624,40 +658,6 @@ public final class CompatibilityUtil {
         } catch (Exception e) {
             LOG.error("Failed to create problem object", e);
             return null;
-        }
-    }
-    
-    public static boolean clearProblems(@NotNull WolfTheProblemSolver problemSolver, @NotNull VirtualFile file) {
-        try {
-            // Try the direct method first (IntelliJ IDEA 2025.1.1.1)
-            try {
-                java.lang.reflect.Method clearProblemsMethod = 
-                    problemSolver.getClass().getMethod("clearProblems", VirtualFile.class);
-                clearProblemsMethod.invoke(problemSolver, file);
-                return true;
-            } catch (Exception e) {
-                LOG.warn("Failed to call clearProblems directly", e);
-                
-                // Try alternative methods
-                try {
-                    // Try clearProblemsForFile
-                    java.lang.reflect.Method method = 
-                        problemSolver.getClass().getMethod("clearProblemsForFile", VirtualFile.class);
-                    method.invoke(problemSolver, file);
-                    return true;
-                } catch (Exception ex) {
-                    LOG.warn("Failed to call clearProblemsForFile", ex);
-                    
-                    // Last resort - try queue update method
-                    java.lang.reflect.Method method = 
-                        problemSolver.getClass().getMethod("queueUpdateForFile", VirtualFile.class);
-                    method.invoke(problemSolver, file);
-                    return true;
-                }
-            }
-        } catch (Exception ex) {
-            LOG.error("Failed to clear problems for file", ex);
-            return false;
         }
     }
 
