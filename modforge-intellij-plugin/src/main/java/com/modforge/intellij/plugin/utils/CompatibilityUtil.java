@@ -653,6 +653,47 @@ public final class CompatibilityUtil {
     }
     
     /**
+     * Shows a Yes/No dialog with custom button text and icon.
+     * Compatible with IntelliJ IDEA 2025.1.1.1
+     *
+     * @param project The project
+     * @param title The title
+     * @param message The message
+     * @param yesText The text for the Yes button
+     * @param noText The text for the No button
+     * @param icon The icon to display
+     * @return The dialog result (DIALOG_YES or DIALOG_NO)
+     */
+    public static int showYesNoDialog(Project project, String title, String message, 
+                                     String yesText, String noText, @Nullable javax.swing.Icon icon) {
+        final int[] result = new int[1];
+        
+        runOnUiThreadAndWait(() -> {
+            try {
+                result[0] = Messages.showYesNoDialog(
+                    project, 
+                    message, 
+                    title, 
+                    yesText, 
+                    noText, 
+                    icon != null ? icon : Messages.getQuestionIcon()
+                );
+            } catch (Exception ex) {
+                LOG.error("Failed to show custom Yes/No dialog with project parameter", ex);
+                try {
+                    // Fall back to standard Yes/No dialog
+                    result[0] = Messages.showYesNoDialog(project, message, title, Messages.getQuestionIcon());
+                } catch (Exception e) {
+                    LOG.error("Failed to show Yes/No dialog", e);
+                    result[0] = DIALOG_NO;
+                }
+            }
+        });
+        
+        return result[0];
+    }
+    
+    /**
      * Shows an input dialog to prompt the user for text.
      * Compatibility wrapper for different IntelliJ IDEA versions.
      *
