@@ -169,6 +169,19 @@ public class FixErrorsAction extends AnAction {
     }
     
     /**
+     * This method was removed as it's incompatible with IntelliJ IDEA 2025.1.1.1
+     * Replaced with collectProblemsForFile which uses reflection to handle API changes
+     * 
+     * Original code was:
+     * 
+     * problemSolver.getProblemFiles().forEach(problemFile -> {
+     *     problemSolver.getAllProblems().stream()
+     *         .filter(problem -> problemFile.equals(file))
+     *         .forEach(problems::add);
+     * });
+     */
+    
+    /**
      * Format problems as a single string.
      *
      * @param problems The problems
