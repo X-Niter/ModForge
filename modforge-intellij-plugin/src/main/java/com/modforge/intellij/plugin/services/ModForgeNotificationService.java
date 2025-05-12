@@ -147,6 +147,28 @@ public final class ModForgeNotificationService {
     }
     
     /**
+     * Shows an important notification.
+     *
+     * @param project The project.
+     * @param title   The title.
+     * @param content The content.
+     */
+    public void showImportantNotification(@Nullable Project project, @NotNull String title, @NotNull String content) {
+        showStickyNotification(project, title, content, NotificationType.WARNING);
+    }
+    
+    /**
+     * Shows an important notification.
+     * Simplified method without project parameter for backwards compatibility.
+     *
+     * @param title   The title.
+     * @param content The content.
+     */
+    public void showImportantNotification(@NotNull String title, @NotNull String content) {
+        showImportantNotification(null, title, content);
+    }
+    
+    /**
      * Shows a notification with an action.
      *
      * @param project      The project.

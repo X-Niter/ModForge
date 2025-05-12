@@ -149,6 +149,24 @@ public final class ModForgeSettings implements PersistentStateComponent<ModForge
     }
     
     /**
+     * Gets the server URL.
+     *
+     * @return The server URL
+     */
+    public String getServerUrl() {
+        return serverUrl;
+    }
+    
+    /**
+     * Sets the server URL.
+     *
+     * @param serverUrl The server URL to set
+     */
+    public void setServerUrl(String serverUrl) {
+        this.serverUrl = serverUrl;
+    }
+    
+    /**
      * Sets whether pattern recognition is enabled.
      *
      * @param enabled True to enable, false to disable
