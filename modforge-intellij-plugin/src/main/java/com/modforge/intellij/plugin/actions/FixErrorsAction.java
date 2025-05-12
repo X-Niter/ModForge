@@ -225,7 +225,7 @@ public class FixErrorsAction extends AnAction {
                 java.lang.reflect.Method processProbsMethod = problemSolver.getClass().getMethod("processProblems", 
                     java.util.function.Predicate.class);
                 
-                processProbsMethod.invoke(problemSolver, (java.util.function.Predicate<Problem>) problem -> {
+                processProbsMethod.invoke(problemSolver, (java.util.function.Predicate<Object>) problem -> {
                     // Get file using reflection
                     try {
                         VirtualFile pFile = null;
@@ -256,7 +256,7 @@ public class FixErrorsAction extends AnAction {
                     java.lang.reflect.Method processProbsMethod = problemSolver.getClass().getMethod("processProblems", 
                         java.util.function.Predicate.class, VirtualFile.class);
                     
-                    processProbsMethod.invoke(problemSolver, (java.util.function.Predicate<Problem>) problem -> {
+                    processProbsMethod.invoke(problemSolver, (java.util.function.Predicate<Object>) problem -> {
                         try {
                             VirtualFile pFile = null;
                             try {
