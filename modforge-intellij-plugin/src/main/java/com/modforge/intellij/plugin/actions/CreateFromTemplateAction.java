@@ -159,10 +159,12 @@ public class CreateFromTemplateAction extends AnAction {
         private final JComboBox<String> categoryComboBox;
         private final JComboBox<ModTemplateType> typeComboBox;
         private final List<ModTemplate> allTemplates;
+        private final Project project; // Store project reference for consistency
         
         public TemplateSelectionDialog(@Nullable Project project, @NotNull List<ModTemplate> templates) {
             super(project);
             
+            this.project = project; // Save project for use in methods
             this.allTemplates = templates;
             
             setTitle("Select Template");
@@ -324,10 +326,12 @@ public class CreateFromTemplateAction extends AnAction {
         private final ModTemplate template;
         private final Map<String, JTextField> variableFields = new HashMap<>();
         private final JBTextField outputDirField;
+        private final Project project; // Store project reference as class field
         
         public TemplateConfigurationDialog(@Nullable Project project, @NotNull ModTemplate template) {
             super(project);
             
+            this.project = project; // Save project for use in methods
             this.template = template;
             
             setTitle("Configure Template");
