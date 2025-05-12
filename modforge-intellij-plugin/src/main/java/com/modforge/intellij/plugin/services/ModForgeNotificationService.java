@@ -1,54 +1,24 @@
 package com.modforge.intellij.plugin.services;
 
 import com.intellij.notification.*;
-import com.intellij.openapi.application.Application;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.components.Service;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.project.Project;
-import com.intellij.ui.Messages;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * Service for managing notifications.
+ * Service for ModForge notifications.
  * Compatible with IntelliJ IDEA 2025.1.1.1
  */
 @Service
 public final class ModForgeNotificationService {
     private static final Logger LOG = Logger.getInstance(ModForgeNotificationService.class);
     
-    // Notification groups
-    private static final String INFO_GROUP_ID = "ModForge.Info";
-    private static final String WARNING_GROUP_ID = "ModForge.Warning";
-    private static final String ERROR_GROUP_ID = "ModForge.Error";
-    private static final String BALLOON_GROUP_ID = "ModForge.Balloon";
+    private static final NotificationGroup NOTIFICATION_GROUP = 
+            NotificationGroupManager.getInstance().getNotificationGroup("ModForge Notifications");
     
-    // Notification types
-    private static final NotificationType INFO_TYPE = NotificationType.INFORMATION;
-    private static final NotificationType WARNING_TYPE = NotificationType.WARNING;
-    private static final NotificationType ERROR_TYPE = NotificationType.ERROR;
-    
-    /**
-     * Constructor.
-     */
-    public ModForgeNotificationService() {
-        // Register notification groups
-        NotificationGroupManager manager = NotificationGroupManager.getInstance();
-        
-        // Check if groups are already registered
-        boolean infoGroupExists = findNotificationGroup(INFO_GROUP_ID) != null;
-        boolean warningGroupExists = findNotificationGroup(WARNING_GROUP_ID) != null;
-        boolean errorGroupExists = findNotificationGroup(ERROR_GROUP_ID) != null;
-        boolean balloonGroupExists = findNotificationGroup(BALLOON_GROUP_ID) != null;
-        
-        // Log notification group status
-        LOG.info("Notification groups status: Info=" + infoGroupExists +
-                ", Warning=" + warningGroupExists +
-                ", Error=" + errorGroupExists +
-                ", Balloon=" + balloonGroupExists);
-    }
-
     /**
      * Gets the instance of the service.
      *
@@ -59,281 +29,110 @@ public final class ModForgeNotificationService {
     }
     
     /**
-     * Gets the instance of the service for a project.
-     * Note: This is a compatibility method that still uses the application service.
+     * Shows an information notification.
      *
      * @param project The project.
-     * @return The service instance.
+     * @param title   The title.
+     * @param content The content.
      */
-    public static ModForgeNotificationService getInstance(@Nullable Project project) {
-        return getInstance();
+    public void showInfoNotification(@Nullable Project project, @NotNull String title, @NotNull String content) {
+        showNotification(project, title, content, NotificationType.INFORMATION);
     }
-
-    /**
-     * Shows an info notification.
-     *
-     * @param project The project.
-     * @param title   The notification title.
-     * @param content The notification content.
-     */
-    public void showInfo(@Nullable Project project, @NotNull String title, @NotNull String content) {
-        show(project, INFO_GROUP_ID, INFO_TYPE, title, content);
-    }
-
+    
     /**
      * Shows a warning notification.
      *
      * @param project The project.
-     * @param title   The notification title.
-     * @param content The notification content.
+     * @param title   The title.
+     * @param content The content.
      */
-    public void showWarning(@Nullable Project project, @NotNull String title, @NotNull String content) {
-        show(project, WARNING_GROUP_ID, WARNING_TYPE, title, content);
+    public void showWarningNotification(@Nullable Project project, @NotNull String title, @NotNull String content) {
+        showNotification(project, title, content, NotificationType.WARNING);
     }
-
+    
     /**
      * Shows an error notification.
      *
      * @param project The project.
-     * @param title   The notification title.
-     * @param content The notification content.
+     * @param title   The title.
+     * @param content The content.
      */
-    public void showError(@Nullable Project project, @NotNull String title, @NotNull String content) {
-        show(project, ERROR_GROUP_ID, ERROR_TYPE, title, content);
+    public void showErrorNotification(@Nullable Project project, @NotNull String title, @NotNull String content) {
+        showNotification(project, title, content, NotificationType.ERROR);
     }
     
     /**
-     * Shows an info notification with simpler signature.
-     * For compatibility with older code.
-     *
-     * @param title   The notification title.
-     * @param content The notification content.
-     */
-    public void showInfo(@NotNull String title, @NotNull String content) {
-        showInfo(null, title, content);
-    }
-
-    /**
-     * Shows a warning notification with simpler signature.
-     * For compatibility with older code.
-     *
-     * @param title   The notification title.
-     * @param content The notification content.
-     */
-    public void showWarning(@NotNull String title, @NotNull String content) {
-        showWarning(null, title, content);
-    }
-
-    /**
-     * Shows an error notification with simpler signature.
-     * For compatibility with older code.
-     *
-     * @param title   The notification title.
-     * @param content The notification content.
-     */
-    public void showError(@NotNull String title, @NotNull String content) {
-        showError(null, title, content);
-    }
-
-    /**
-     * Shows a balloon notification.
+     * Shows a sticky notification that requires user action to dismiss.
      *
      * @param project The project.
+     * @param title   The title.
+     * @param content The content.
      * @param type    The notification type.
-     * @param title   The notification title.
-     * @param content The notification content.
-     */
-    public void showBalloon(@Nullable Project project, @NotNull NotificationType type, @NotNull String title, @NotNull String content) {
-        show(project, BALLOON_GROUP_ID, type, title, content);
-    }
-
-    /**
-     * Shows a notification.
-     *
-     * @param project  The project.
-     * @param groupId  The notification group ID.
-     * @param type     The notification type.
-     * @param title    The notification title.
-     * @param content  The notification content.
-     */
-    private void show(@Nullable Project project, @NotNull String groupId, @NotNull NotificationType type, @NotNull String title, @NotNull String content) {
-        NotificationGroup group = findNotificationGroup(groupId);
-        
-        if (group == null) {
-            LOG.error("Notification group not found: " + groupId + ". Using a fallback group.");
-            
-            // Create a fallback notification group
-            group = NotificationGroupManager.getInstance().getNotificationGroup(BALLOON_GROUP_ID);
-            
-            if (group == null) {
-                // Last resort fallback
-                LOG.error("Fallback notification group not found. Cannot show notification.");
-                return;
-            }
-        }
-        
-        try {
-            Notification notification = group.createNotification(title, content, type);
-            notification.notify(project);
-        } catch (Exception e) {
-            LOG.error("Failed to show notification", e);
-        }
-    }
-
-    /**
-     * Finds a notification group by ID.
-     *
-     * @param groupId The notification group ID.
-     * @return The notification group or null if not found.
-     */
-    @Nullable
-    private NotificationGroup findNotificationGroup(@NotNull String groupId) {
-        try {
-            return NotificationGroupManager.getInstance().getNotificationGroup(groupId);
-        } catch (Exception e) {
-            LOG.error("Failed to find notification group: " + groupId, e);
-            return null;
-        }
-    }
-
-    /**
-     * Shows a sticky notification that requires user acknowledgment.
-     *
-     * @param project  The project.
-     * @param type     The notification type.
-     * @param title    The notification title.
-     * @param content  The notification content.
-     * @param listener The notification listener.
      */
     public void showStickyNotification(
             @Nullable Project project,
-            @NotNull NotificationType type,
             @NotNull String title,
             @NotNull String content,
-            @Nullable NotificationListener listener) {
+            @NotNull NotificationType type) {
         
-        NotificationGroup group = findNotificationGroup(BALLOON_GROUP_ID);
-        
-        if (group == null) {
-            LOG.error("Notification group not found: " + BALLOON_GROUP_ID);
-            return;
-        }
-        
-        try {
-            Notification notification = group.createNotification(title, content, type);
-            
-            if (listener != null) {
-                notification.setListener(listener);
-            }
-            
-            // Make the notification sticky
-            notification.setImportant(true);
-            
-            notification.notify(project);
-        } catch (Exception e) {
-            LOG.error("Failed to show sticky notification", e);
-        }
+        Notification notification = NOTIFICATION_GROUP.createNotification(title, content, type);
+        notification.setImportant(true);
+        notification.notify(project);
     }
-
+    
     /**
      * Shows a notification with an action.
      *
-     * @param project        The project.
-     * @param type           The notification type.
-     * @param title          The notification title.
-     * @param content        The notification content.
-     * @param actionText     The action text.
-     * @param actionCallback The action callback.
+     * @param project      The project.
+     * @param title        The title.
+     * @param content      The content.
+     * @param type         The notification type.
+     * @param actionText   The action text.
+     * @param actionRunner The action runner.
      */
     public void showNotificationWithAction(
             @Nullable Project project,
-            @NotNull NotificationType type,
             @NotNull String title,
             @NotNull String content,
+            @NotNull NotificationType type,
             @NotNull String actionText,
-            @NotNull Runnable actionCallback) {
+            @NotNull Runnable actionRunner) {
         
-        NotificationGroup group = findNotificationGroup(BALLOON_GROUP_ID);
+        Notification notification = NOTIFICATION_GROUP.createNotification(title, content, type);
         
-        if (group == null) {
-            LOG.error("Notification group not found: " + BALLOON_GROUP_ID);
-            return;
-        }
-        
-        try {
-            Notification notification = group.createNotification(title, content, type);
-            
-            notification.addAction(NotificationAction.createSimple(actionText, actionCallback));
-            
-            notification.notify(project);
-        } catch (Exception e) {
-            LOG.error("Failed to show notification with action", e);
-        }
-    }
-    
-    /**
-     * Shows an info notification.
-     * Compatibility method with simplified signature.
-     * 
-     * @param title    The notification title.
-     * @param content  The notification content.
-     */
-    public void showInfo(@NotNull String title, @NotNull String content) {
-        show(null, INFO_GROUP_ID, INFO_TYPE, title, content);
-    }
-
-    /**
-     * Shows a warning notification.
-     * Compatibility method with simplified signature.
-     * 
-     * @param title    The notification title.
-     * @param content  The notification content.
-     */
-    public void showWarning(@NotNull String title, @NotNull String content) {
-        show(null, WARNING_GROUP_ID, WARNING_TYPE, title, content);
-    }
-
-    /**
-     * Shows an error notification.
-     * Compatibility method with simplified signature.
-     * 
-     * @param title    The notification title.
-     * @param content  The notification content.
-     */
-    public void showError(@NotNull String title, @NotNull String content) {
-        show(null, ERROR_GROUP_ID, ERROR_TYPE, title, content);
-    }
-    
-    /**
-     * Shows an error dialog.
-     *
-     * @param project  The project.
-     * @param message  The message.
-     * @param title    The title.
-     */
-    public static void showErrorDialog(@Nullable Project project, @NotNull String message, @NotNull String title) {
-        executeOnUiThread(() -> {
+        notification.addAction(NotificationAction.createSimple(actionText, () -> {
             try {
-                Messages.showErrorDialog(project, message, title);
+                actionRunner.run();
+                notification.expire();
             } catch (Exception e) {
-                LOG.error("Failed to show error dialog", e);
+                LOG.error("Error executing notification action", e);
+                showErrorNotification(
+                        project,
+                        "Action Error",
+                        "Failed to execute action: " + e.getMessage()
+                );
             }
-        });
+        }));
+        
+        notification.notify(project);
     }
     
     /**
-     * Executes a task on the UI thread.
-     * This is a compatibility method to avoid creating circular dependencies.
+     * Shows a notification.
      *
-     * @param task The task to run.
+     * @param project The project.
+     * @param title   The title.
+     * @param content The content.
+     * @param type    The notification type.
      */
-    private static void executeOnUiThread(@NotNull Runnable task) {
-        Application application = ApplicationManager.getApplication();
+    private void showNotification(
+            @Nullable Project project,
+            @NotNull String title,
+            @NotNull String content,
+            @NotNull NotificationType type) {
         
-        if (application.isDispatchThread()) {
-            task.run();
-        } else {
-            application.invokeLater(task);
-        }
+        NOTIFICATION_GROUP
+                .createNotification(title, content, type)
+                .notify(project);
     }
 }

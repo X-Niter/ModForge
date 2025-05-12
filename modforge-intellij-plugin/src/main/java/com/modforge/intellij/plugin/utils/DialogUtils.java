@@ -1,238 +1,171 @@
 package com.modforge.intellij.plugin.utils;
 
-import com.intellij.openapi.application.ApplicationManager;
-import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.project.Project;
+import com.intellij.openapi.ui.DialogWrapper;
 import com.intellij.openapi.ui.Messages;
+import com.intellij.openapi.wm.StatusBar;
+import com.intellij.openapi.wm.WindowManager;
+import com.modforge.intellij.plugin.ui.dialogs.GenerateImplementationDialog;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-import java.util.concurrent.Callable;
+import javax.swing.*;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.atomic.AtomicReference;
 
 /**
- * Utility class for working with dialogs.
+ * Utility class for dialogs.
  * Compatible with IntelliJ IDEA 2025.1.1.1
  */
 public final class DialogUtils {
-    private static final Logger LOG = Logger.getInstance(DialogUtils.class);
     
     /**
-     * Private constructor to prevent instantiation.
+     * Private constructor.
      */
     private DialogUtils() {
         // Utility class
     }
-
+    
     /**
-     * Shows an information dialog.
+     * Shows an error message.
      *
      * @param project The project.
-     * @param message The message.
      * @param title   The title.
+     * @param message The message.
      */
-    public static void showInfoDialog(@Nullable Project project, @NotNull String message, @NotNull String title) {
-        executeOnUiThread(() -> {
-            try {
-                Messages.showInfoMessage(project, message, title);
-            } catch (Exception e) {
-                LOG.error("Failed to show info dialog", e);
-            }
-        });
+    public static void showErrorMessage(@Nullable Project project, @NotNull String title, @NotNull String message) {
+        SwingUtilities.invokeLater(() ->
+                Messages.showErrorDialog(project, message, title)
+        );
     }
-
+    
     /**
-     * Shows an error dialog.
+     * Shows an information message.
      *
      * @param project The project.
-     * @param message The message.
      * @param title   The title.
+     * @param message The message.
      */
-    public static void showErrorDialog(@Nullable Project project, @NotNull String message, @NotNull String title) {
-        executeOnUiThread(() -> {
-            try {
-                Messages.showErrorDialog(project, message, title);
-            } catch (Exception e) {
-                LOG.error("Failed to show error dialog", e);
-            }
-        });
+    public static void showInfoMessage(@Nullable Project project, @NotNull String title, @NotNull String message) {
+        SwingUtilities.invokeLater(() ->
+                Messages.showInfoMessage(project, message, title)
+        );
     }
-
+    
     /**
-     * Shows a warning dialog.
+     * Shows a warning message.
      *
      * @param project The project.
-     * @param message The message.
      * @param title   The title.
+     * @param message The message.
      */
-    public static void showWarningDialog(@Nullable Project project, @NotNull String message, @NotNull String title) {
-        executeOnUiThread(() -> {
-            try {
-                Messages.showWarningDialog(project, message, title);
-            } catch (Exception e) {
-                LOG.error("Failed to show warning dialog", e);
-            }
-        });
+    public static void showWarningMessage(@Nullable Project project, @NotNull String title, @NotNull String message) {
+        SwingUtilities.invokeLater(() ->
+                Messages.showWarningDialog(project, message, title)
+        );
     }
-
+    
     /**
-     * Shows a yes/no dialog.
+     * Shows a confirmation dialog.
      *
      * @param project The project.
-     * @param message The message.
      * @param title   The title.
-     * @return Whether the user clicked yes.
-     */
-    public static boolean showYesNoDialog(@Nullable Project project, @NotNull String message, @NotNull String title) {
-        AtomicReference<Boolean> result = new AtomicReference<>(false);
-        
-        executeOnUiThreadAndWait(() -> {
-            try {
-                int answer = Messages.showYesNoDialog(project, message, title, Messages.getQuestionIcon());
-                result.set(answer == Messages.YES);
-            } catch (Exception e) {
-                LOG.error("Failed to show yes/no dialog", e);
-            }
-        });
-        
-        return result.get();
-    }
-
-    /**
-     * Shows an input dialog.
-     *
-     * @param project The project.
      * @param message The message.
-     * @param title   The title.
-     * @param initial The initial value.
-     * @return The user input.
+     * @return The future with the result.
      */
-    @Nullable
-    public static String showInputDialog(
+    public static CompletableFuture<Boolean> showConfirmationDialog(
             @Nullable Project project,
-            @NotNull String message,
             @NotNull String title,
-            @Nullable String initial) {
+            @NotNull String message) {
         
-        AtomicReference<String> result = new AtomicReference<>();
+        CompletableFuture<Boolean> future = new CompletableFuture<>();
         
-        executeOnUiThreadAndWait(() -> {
-            try {
-                String input = Messages.showInputDialog(project, message, title, Messages.getQuestionIcon(), initial, null);
-                result.set(input);
-            } catch (Exception e) {
-                LOG.error("Failed to show input dialog", e);
-            }
+        SwingUtilities.invokeLater(() -> {
+            int result = Messages.showYesNoDialog(
+                    project,
+                    message,
+                    title,
+                    Messages.getQuestionIcon()
+            );
+            
+            future.complete(result == Messages.YES);
         });
         
-        return result.get();
+        return future;
     }
-
+    
     /**
-     * Shows a password dialog.
+     * Shows a status bar notification.
      *
      * @param project The project.
      * @param message The message.
-     * @param title   The title.
-     * @return The password.
      */
-    @Nullable
-    public static String showPasswordDialog(
-            @Nullable Project project,
-            @NotNull String message,
-            @NotNull String title) {
-        
-        AtomicReference<String> result = new AtomicReference<>();
-        
-        executeOnUiThreadAndWait(() -> {
-            try {
-                String password = Messages.showPasswordDialog(project, message, title, Messages.getQuestionIcon(), null);
-                result.set(password);
-            } catch (Exception e) {
-                LOG.error("Failed to show password dialog", e);
+    public static void showStatusBarNotification(@NotNull Project project, @NotNull String message) {
+        SwingUtilities.invokeLater(() -> {
+            StatusBar statusBar = WindowManager.getInstance().getStatusBar(project);
+            if (statusBar != null) {
+                statusBar.setInfo(message);
             }
         });
-        
-        return result.get();
     }
-
+    
     /**
-     * Shows a dialog with multiple options.
+     * Shows the generate implementation dialog.
      *
      * @param project The project.
-     * @param message The message.
-     * @param title   The title.
-     * @param options The options.
-     * @return The selected option index, or -1 if canceled.
+     * @return The dialog.
      */
-    public static int showDialog(
+    public static GenerateImplementationDialog showGenerateImplementationDialog(@NotNull Project project) {
+        GenerateImplementationDialog dialog = new GenerateImplementationDialog(project);
+        dialog.show();
+        return dialog;
+    }
+    
+    /**
+     * Shows an input dialog with a text field.
+     *
+     * @param project     The project.
+     * @param title       The title.
+     * @param message     The message.
+     * @param initialValue The initial value.
+     * @return The future with the result.
+     */
+    public static CompletableFuture<String> showInputDialog(
             @Nullable Project project,
-            @NotNull String message,
             @NotNull String title,
-            @NotNull String[] options) {
+            @NotNull String message,
+            @Nullable String initialValue) {
         
-        AtomicReference<Integer> result = new AtomicReference<>(-1);
+        CompletableFuture<String> future = new CompletableFuture<>();
         
-        executeOnUiThreadAndWait(() -> {
-            try {
-                int choice = Messages.showDialog(project, message, title, options, 0, Messages.getQuestionIcon());
-                result.set(choice);
-            } catch (Exception e) {
-                LOG.error("Failed to show dialog", e);
-            }
+        SwingUtilities.invokeLater(() -> {
+            String result = Messages.showInputDialog(
+                    project,
+                    message,
+                    title,
+                    Messages.getQuestionIcon(),
+                    initialValue,
+                    null
+            );
+            
+            future.complete(result);
         });
         
-        return result.get();
+        return future;
     }
-
+    
     /**
-     * Executes a task on the UI thread.
+     * Shows a custom dialog.
      *
-     * @param task The task to run.
+     * @param dialog The dialog.
+     * @param <T>    The dialog type.
+     * @return The future with the dialog.
      */
-    public static void executeOnUiThread(@NotNull Runnable task) {
-        if (ApplicationManager.getApplication().isDispatchThread()) {
-            task.run();
-        } else {
-            ApplicationManager.getApplication().invokeLater(task);
-        }
-    }
-
-    /**
-     * Executes a task on the UI thread and waits for it to complete.
-     *
-     * @param task The task to run.
-     */
-    public static void executeOnUiThreadAndWait(@NotNull Runnable task) {
-        if (ApplicationManager.getApplication().isDispatchThread()) {
-            task.run();
-        } else {
-            try {
-                ApplicationManager.getApplication().invokeAndWait(task);
-            } catch (Exception e) {
-                LOG.error("Failed to execute task on UI thread", e);
-            }
-        }
-    }
-
-    /**
-     * Executes a task on the UI thread and returns a CompletableFuture.
-     *
-     * @param task The task to run.
-     * @param <T>  The return type.
-     * @return A CompletableFuture that completes with the task's result.
-     */
-    @NotNull
-    public static <T> CompletableFuture<T> executeOnUiThreadAsync(@NotNull Callable<T> task) {
+    public static <T extends DialogWrapper> CompletableFuture<T> showDialog(@NotNull T dialog) {
         CompletableFuture<T> future = new CompletableFuture<>();
         
-        executeOnUiThread(() -> {
-            try {
-                future.complete(task.call());
-            } catch (Exception e) {
-                future.completeExceptionally(e);
-            }
+        SwingUtilities.invokeLater(() -> {
+            dialog.show();
+            future.complete(dialog);
         });
         
         return future;

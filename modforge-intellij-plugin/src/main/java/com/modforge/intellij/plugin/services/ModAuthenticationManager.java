@@ -113,20 +113,10 @@ public final class ModAuthenticationManager {
     public boolean loginSync(@NotNull String username, @NotNull String password) {
         try {
             return login(username, password).get(30, TimeUnit.SECONDS);
-        } catch (InterruptedException | ExecutionException | TimeoutException e) {
+        } catch (InterruptedException | java.util.concurrent.ExecutionException | TimeoutException e) {
             LOG.error("Login timed out", e);
             return false;
         }
-    }
-    
-    /**
-     * Gets the username of the authenticated user.
-     *
-     * @return The username.
-     */
-    @NotNull
-    public String getUsername() {
-        return settings.getGitHubUsername();
     }
 
     /**
@@ -185,7 +175,7 @@ public final class ModAuthenticationManager {
     /**
      * Gets the current username.
      *
-     * @return The username.
+     * @return The username or null if not set.
      */
     @Nullable
     public String getUsername() {
@@ -305,7 +295,7 @@ public final class ModAuthenticationManager {
         }
         
         if (isAuthenticating.get()) {
-            notificationService.showWarning(project, "Authentication", "Authentication already in progress");
+            notificationService.showWarningNotification(project, "Authentication", "Authentication already in progress");
             return;
         }
         
@@ -327,27 +317,27 @@ public final class ModAuthenticationManager {
                         boolean result = login(username, token).get(30, TimeUnit.SECONDS);
                         
                         if (result) {
-                            notificationService.showInfo(project, "Authentication", "Successfully logged in as " + username);
+                            notificationService.showInfoNotification(project, "Authentication", "Successfully logged in as " + username);
                         } else {
-                            notificationService.showError(project, "Authentication", "Failed to log in. Please check your credentials.");
+                            notificationService.showErrorNotification(project, "Authentication", "Failed to log in. Please check your credentials.");
                         }
                         
                         if (onSuccess != null) {
                             onSuccess.accept(result);
                         }
                     } catch (TimeoutException e) {
-                        notificationService.showError(project, "Authentication", "Login timed out. Please try again.");
+                        notificationService.showErrorNotification(project, "Authentication", "Login timed out. Please try again.");
                         LOG.error("Login timed out", e);
                     } catch (Exception e) {
-                        notificationService.showError(project, "Authentication", "An error occurred during login: " + e.getMessage());
+                        notificationService.showErrorNotification(project, "Authentication", "An error occurred during login: " + e.getMessage());
                         LOG.error("Login error", e);
                     }
                 }
             });
         } else {
             // If we don't have credentials, show a message asking user to enter them in settings
-            notificationService.showWarning(project, "Authentication", "Please enter your GitHub credentials in the settings.");
-            settings.openSettings(project);
+            notificationService.showWarningNotification(project, "Authentication", "Please enter your GitHub credentials in the settings.");
+            // Note: settings.openSettings(project) would be implemented in ModForgeSettings
         }
     }
 
