@@ -704,5 +704,76 @@ public final class CompatibilityUtil {
             }
         }
     }
-
+    
+    /**
+     * Shows an error dialog with a message.
+     * 
+     * @param project The project (can be null)
+     * @param message The message
+     * @param title The title
+     */
+    public static void showErrorDialog(@Nullable Project project, @NotNull String message, @NotNull String title) {
+        runOnUiThreadAndWait(() -> {
+            try {
+                if (project == null || !project.isDisposed()) {
+                    Messages.showErrorDialog(project, message, title);
+                }
+            } catch (Exception ex) {
+                LOG.error("Failed to show error dialog", ex);
+                // Fallback to notification
+                ModForgeNotificationService.getInstance().showError(title, message);
+            }
+        });
+    }
+    
+    /**
+     * Shows an info dialog with a message.
+     * 
+     * @param project The project (can be null)
+     * @param message The message
+     * @param title The title
+     */
+    public static void showInfoDialog(@Nullable Project project, @NotNull String message, @NotNull String title) {
+        runOnUiThreadAndWait(() -> {
+            try {
+                if (project == null || !project.isDisposed()) {
+                    Messages.showInfoMessage(project, message, title);
+                }
+            } catch (Exception ex) {
+                LOG.error("Failed to show info dialog", ex);
+                // Fallback to notification
+                ModForgeNotificationService.getInstance().showInfo(title, message);
+            }
+        });
+    }
+    
+    /**
+     * Shows an input dialog to get text from the user.
+     * 
+     * @param project The project (can be null)
+     * @param message The message
+     * @param title The title
+     * @param initialValue The initial value
+     * @return The entered text, or null if canceled
+     */
+    public static String showInputDialog(@Nullable Project project, @NotNull String message, 
+                                         @NotNull String title, @Nullable String initialValue) {
+        final String[] result = new String[1];
+        
+        runOnUiThreadAndWait(() -> {
+            try {
+                if (project == null || !project.isDisposed()) {
+                    result[0] = Messages.showInputDialog(project, message, title, null, initialValue, null);
+                } else {
+                    result[0] = Messages.showInputDialog(message, title, null, initialValue, null);
+                }
+            } catch (Exception ex) {
+                LOG.error("Failed to show input dialog", ex);
+                // Cannot fall back for input dialog
+                ModForgeNotificationService.getInstance().showError(title, 
+                        "Could not show input dialog: " + message);
+            }
+        });
+        return result[0];
+    }
 }
