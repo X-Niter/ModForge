@@ -18,6 +18,7 @@ import com.intellij.util.ui.FormBuilder;
 import com.modforge.intellij.plugin.services.ModAuthenticationManager;
 import com.modforge.intellij.plugin.github.GitHubIntegrationService;
 import com.modforge.intellij.plugin.services.ModForgeNotificationService;
+import com.modforge.intellij.plugin.utils.CompatibilityUtil;
 import com.modforge.intellij.plugin.settings.ModForgeSettings;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -84,13 +85,12 @@ public class PushToGitHubAction extends AnAction {
                     settings.openSettings(project);
                 }
             } else {
-                int result = Messages.showYesNoDialog(
+                int result = notificationService.showYesNoDialog(
                         project,
-                        "No GitHub token found. Do you want to configure it in the settings?",
                         "GitHub Token Required",
+                        "No GitHub token found. Do you want to configure it in the settings?",
                         "Open Settings",
-                        "Cancel",
-                        Messages.getQuestionIcon()
+                        "Cancel"
                 );
                 
                 if (result == Messages.YES) {
@@ -121,10 +121,10 @@ public class PushToGitHubAction extends AnAction {
                             "GitHub integration service is not available."
                     );
                 } else {
-                    Messages.showErrorDialog(
+                    CompatibilityUtil.showErrorDialog(
                             project,
-                            "GitHub integration service is not available.",
-                            "Service Unavailable"
+                            "Service Unavailable",
+                            "GitHub integration service is not available."
                     );
                 }
                 return;
@@ -176,10 +176,10 @@ public class PushToGitHubAction extends AnAction {
                                             result.getMessage()
                                     );
                                 } else {
-                                    Messages.showErrorDialog(
+                                    CompatibilityUtil.showErrorDialog(
                                             project,
-                                            result.getMessage(),
-                                            "Push Failed"
+                                            "Push Failed",
+                                            result.getMessage()
                                     );
                                 }
                             }
