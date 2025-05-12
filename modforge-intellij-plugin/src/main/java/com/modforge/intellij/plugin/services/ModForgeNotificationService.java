@@ -435,11 +435,11 @@ public final class ModForgeNotificationService {
         
         ApplicationManager.getApplication().invokeAndWait(() -> {
             try {
-                result[0] = Messages.showInputDialog(project, message, title, null, initialValue, null);
+                result[0] = CompatibilityUtil.showInputDialog(project, message, title, initialValue);
             } catch (Exception e) {
                 LOG.warn("Failed to show input dialog with project parameter", e);
                 try {
-                    result[0] = Messages.showInputDialog(message, title, null, initialValue, null);
+                    result[0] = CompatibilityUtil.showInputDialog(null, message, title, initialValue);
                 } catch (Exception ex) {
                     LOG.error("Failed to show input dialog", ex);
                     result[0] = null;
