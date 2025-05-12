@@ -250,15 +250,22 @@ public final class ModForgeNotificationService {
         AtomicInteger result = new AtomicInteger(NO);
         
         ApplicationManager.getApplication().invokeAndWait(() -> {
-            int dialogResult = Messages.showYesNoDialog(
-                    project,
-                    message,
-                    title,
-                    yesText,
-                    noText,
-                    icon != null ? icon : UIUtil.getQuestionIcon()
-            );
-            result.set(dialogResult);
+            try {
+                int dialogResult = Messages.showYesNoDialog(
+                        project,
+                        message,
+                        title,
+                        yesText,
+                        noText,
+                        icon != null ? icon : UIUtil.getQuestionIcon()
+                );
+                result.set(dialogResult);
+            } catch (Exception e) {
+                LOG.warn("Failed to show custom Yes/No dialog with IntelliJ API, falling back to standard Yes/No", e);
+                // Fall back to standard Yes/No dialog
+                int dialogResult = com.modforge.intellij.plugin.utils.CompatibilityUtil.showYesNoDialog(project, message, title);
+                result.set(dialogResult);
+            }
         });
         
         return result.get();
@@ -324,7 +331,8 @@ public final class ModForgeNotificationService {
      */
     public void showWarningDialog(@Nullable Project project, @NotNull String title, @NotNull String message) {
         ApplicationManager.getApplication().invokeAndWait(() -> {
-            Messages.showWarningDialog(project, message, title);
+            // Use CompatibilityUtil to ensure compatibility with IntelliJ IDEA 2025.1.1.1
+            com.modforge.intellij.plugin.utils.CompatibilityUtil.showWarningDialog(project, message, title);
         });
     }
     

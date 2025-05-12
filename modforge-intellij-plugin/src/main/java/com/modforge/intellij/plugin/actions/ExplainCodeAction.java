@@ -45,7 +45,8 @@ public class ExplainCodeAction extends AnAction {
                         "Please select some code to explain."
                 );
             } else {
-                Messages.showWarningDialog(
+                // Use compatibility method to ensure compatibility with IntelliJ IDEA 2025.1.1.1
+                com.modforge.intellij.plugin.utils.CompatibilityUtil.showWarningDialog(
                         project,
                         "Please select some code to explain.",
                         "Explain Code"

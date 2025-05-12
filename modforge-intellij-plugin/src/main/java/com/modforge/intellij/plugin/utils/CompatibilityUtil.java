@@ -591,6 +591,62 @@ public final class CompatibilityUtil {
     }
     
     /**
+     * Shows a warning dialog.
+     * Compatibility wrapper for different IntelliJ IDEA versions.
+     *
+     * @param project The project
+     * @param message The message to show
+     * @param title The dialog title
+     */
+    public static void showWarningDialog(Project project, String message, String title) {
+        ApplicationManager.getApplication().invokeLater(() -> {
+            try {
+                // Try the method with project parameter first (newer versions in 2025.1.1.1)
+                Messages.showWarningDialog(project, message, title);
+            } catch (Exception e) {
+                try {
+                    // Fall back to version without project parameter
+                    Messages.showWarningDialog(message, title);
+                } catch (Exception ex) {
+                    LOG.error("Failed to show warning dialog", ex);
+                    // Last resort - use notification service
+                    ModForgeNotificationService.getInstance().showWarning(title, message);
+                }
+            }
+        });
+    }
+    
+    /**
+     * Shows a yes/no dialog.
+     * Compatibility wrapper for different IntelliJ IDEA versions.
+     *
+     * @param project The project
+     * @param message The message to show
+     * @param title The dialog title
+     * @return The result of the dialog (Messages.YES or Messages.NO)
+     */
+    public static int showYesNoDialog(Project project, String message, String title) {
+        final int[] result = new int[1];
+        runOnUiThreadAndWait(() -> {
+            try {
+                // Try the method with project parameter first (newer versions in 2025.1.1.1)
+                result[0] = Messages.showYesNoDialog(project, message, title, Messages.getQuestionIcon());
+            } catch (Exception e) {
+                try {
+                    // Fall back to version without project parameter
+                    result[0] = Messages.showYesNoDialog(message, title, Messages.getQuestionIcon());
+                } catch (Exception ex) {
+                    LOG.error("Failed to show yes/no dialog", ex);
+                    // Last resort - default to NO and show error
+                    ModForgeNotificationService.getInstance().showWarning(title, message + " (Dialog failed, defaulting to NO)");
+                    result[0] = Messages.NO;
+                }
+            }
+        });
+        return result[0];
+    }
+    
+    /**
      * Shows an input dialog to prompt the user for text.
      * Compatibility wrapper for different IntelliJ IDEA versions.
      *
