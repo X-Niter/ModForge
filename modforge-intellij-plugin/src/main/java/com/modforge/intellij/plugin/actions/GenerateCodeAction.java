@@ -66,8 +66,8 @@ public class GenerateCodeAction extends AnAction {
                                 );
                             });
                         } else {
-                            CompatibilityUtil.executeOnUiThread(() -> {
-                                notificationService.showError(
+                            CompatibilityUtil.runOnUiThread(() -> {
+                                notificationService.showErrorNotification(
                                         "Code Generation Failed",
                                         "Failed to generate code from description: " + description
                                 );
