@@ -6,7 +6,9 @@ import com.intellij.openapi.fileEditor.FileEditorManager;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.project.ProjectUtil;
 import com.intellij.openapi.ui.Messages;
+import com.intellij.openapi.vfs.LocalFileSystem;
 import com.intellij.openapi.vfs.VirtualFile;
+import com.intellij.openapi.vfs.VirtualFileManager;
 import com.intellij.openapi.vfs.newvfs.events.VFileCopyEvent;
 import com.intellij.openapi.vfs.newvfs.events.VFileEvent;
 import com.intellij.openapi.vfs.newvfs.events.VFileMoveEvent;
@@ -546,6 +548,35 @@ public final class CompatibilityUtil {
             } catch (Exception ex) {
                 LOG.warn("Failed to get problem description", ex);
                 return "Unknown error";
+            }
+        }
+    }
+    
+    /**
+     * Compatibility wrapper for findFileByPath, which is deprecated in IDEA 2025.1.1.1
+     * Use this method instead of directly calling LocalFileSystem.getInstance().findFileByPath().
+     * 
+     * @param path The file path to find
+     * @return The virtual file, or null if not found
+     */
+    @Nullable
+    public static VirtualFile findFileByPath(@NotNull String path) {
+        if (path.isEmpty()) {
+            return null;
+        }
+        
+        try {
+            // In newer versions, VirtualFileManager is preferred over LocalFileSystem
+            String url = VirtualFileManager.constructUrl(LocalFileSystem.PROTOCOL, path);
+            return VirtualFileManager.getInstance().findFileByUrl(url);
+        } catch (Exception e) {
+            // Fall back to old method in case of issues with the new approach
+            LOG.warn("Failed to find file using VirtualFileManager, falling back to LocalFileSystem", e);
+            try {
+                return LocalFileSystem.getInstance().findFileByPath(path);
+            } catch (Exception ex) {
+                LOG.error("Failed to find file by path: " + path, ex);
+                return null;
             }
         }
     }

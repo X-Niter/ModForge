@@ -794,7 +794,7 @@ public final class CollaborationService {
      */
     @Nullable
     private VirtualFile findFileByPath(@NotNull String path) {
-        return com.intellij.openapi.vfs.LocalFileSystem.getInstance().findFileByPath(path);
+        return com.modforge.intellij.plugin.utils.CompatibilityUtil.findFileByPath(path);
     }
     
     /**
