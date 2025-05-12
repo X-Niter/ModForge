@@ -50,7 +50,7 @@ public final class MinecraftDevIntegrationService {
      */
     public MinecraftDevIntegrationService(Project project) {
         this.project = project;
-        this.notificationService = ModForgeNotificationService.getInstance(project);
+        this.notificationService = ModForgeNotificationService.getInstance();
         LOG.info("MinecraftDevIntegrationService initialized for project: " + project.getName());
     }
 

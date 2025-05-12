@@ -32,7 +32,7 @@ public class GenerateCodeAction extends AnAction {
         Project project = e.getProject();
         if (project == null) return;
         
-        ModForgeNotificationService notificationService = ModForgeNotificationService.getInstance(project);
+        ModForgeNotificationService notificationService = ModForgeNotificationService.getInstance();
         AutonomousCodeGenerationService codeGenerationService = AutonomousCodeGenerationService.getInstance(project);
         
         // Determine package and module type

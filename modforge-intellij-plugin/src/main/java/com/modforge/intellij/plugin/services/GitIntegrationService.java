@@ -41,7 +41,7 @@ public final class GitIntegrationService {
     public GitIntegrationService(Project project) {
         this.project = project;
         this.settings = ModForgeSettings.getInstance();
-        this.notificationService = ModForgeNotificationService.getInstance(project);
+        this.notificationService = ModForgeNotificationService.getInstance();
         LOG.info("GitIntegrationService initialized for project: " + project.getName());
     }
 
