@@ -3,6 +3,8 @@ package com.modforge.intellij.plugin.utils;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.application.ReadAction;
 import com.intellij.openapi.application.WriteAction;
+import com.intellij.openapi.application.ModalityState;
+import com.intellij.openapi.ui.Messages;
 import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.fileEditor.FileDocumentManager;
@@ -18,6 +20,8 @@ import com.intellij.psi.PsiFile;
 import com.intellij.psi.PsiManager;
 import com.intellij.psi.xml.XmlFile;
 import com.intellij.psi.xml.XmlTag;
+import com.intellij.problems.Problem;
+import com.intellij.problems.WolfTheProblemSolver;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -92,6 +96,136 @@ public final class CompatibilityUtil {
         
         // Commit all documents
         PsiDocumentManager.getInstance(project).commitAllDocuments();
+    }
+    
+    /**
+     * Runs a task on the UI thread. This is a replacement for ApplicationManager.getApplication().invokeLater()
+     * that handles compatibility with newer IntelliJ versions.
+     *
+     * @param runnable The task to run.
+     */
+    public static void runOnUIThread(@NotNull Runnable runnable) {
+        ApplicationManager.getApplication().invokeLater(runnable, ModalityState.NON_MODAL);
+    }
+    
+    /**
+     * Open a file in the editor.
+     *
+     * @param project The project.
+     * @param file The file to open.
+     * @param requestFocus Whether to request focus for the editor.
+     */
+    public static void openFileInEditor(@NotNull Project project, @NotNull VirtualFile file, boolean requestFocus) {
+        runOnUIThread(() -> FileEditorManager.getInstance(project).openFile(file, requestFocus));
+    }
+    
+    /**
+     * Show an info dialog with the specified message.
+     * Replacement for Messages.showInfoDialog(Project, String, String) which was removed in newer versions.
+     *
+     * @param project The project.
+     * @param message The message to show.
+     * @param title The dialog title.
+     */
+    public static void showInfoDialog(@NotNull Project project, @NotNull String message, @NotNull String title) {
+        runOnUIThread(() -> Messages.showInfoMessage(project, message, title));
+    }
+    
+    /**
+     * Runs a task in a read action, safely handling exceptions.
+     *
+     * @param computable The task to run.
+     * @param <T> The return type.
+     * @return The result of the task, or null if an exception occurred.
+     */
+    @Nullable
+    public static <T> T runReadAction(@NotNull Computable<T> computable) {
+        try {
+            return ReadAction.compute(computable);
+        } catch (Exception e) {
+            LOG.error("Error running read action", e);
+            return null;
+        }
+    }
+    
+    /**
+     * Runs a task in a write action, safely handling exceptions.
+     *
+     * @param runnable The task to run.
+     * @return True if the task was executed successfully, false otherwise.
+     */
+    public static boolean runWriteAction(@NotNull Runnable runnable) {
+        try {
+            WriteAction.runAndWait(runnable);
+            return true;
+        } catch (Exception e) {
+            LOG.error("Error running write action", e);
+            return false;
+        }
+    }
+    
+    /**
+     * Gets all problems for a specific file, compatible with IntelliJ IDEA 2025.1.1.1.
+     *
+     * @param project The project.
+     * @param file The virtual file to check for problems.
+     * @return A collection of problems associated with the file.
+     */
+    @NotNull
+    public static Collection<Problem> getProblemsForFile(@NotNull Project project, @NotNull VirtualFile file) {
+        WolfTheProblemSolver problemSolver = WolfTheProblemSolver.getInstance(project);
+        Collection<Problem> problems = new ArrayList<>();
+        
+        try {
+            // Use 2025.1.1.1 API
+            problemSolver.getProblemFiles().forEach(problemFile -> {
+                if (problemFile.equals(file)) {
+                    problemSolver.getAllProblems().stream()
+                        .filter(problem -> {
+                            VirtualFile problemFile1 = problem.getVirtualFile();
+                            return problemFile1 != null && problemFile1.equals(file);
+                        })
+                        .forEach(problems::add);
+                }
+            });
+        } catch (Exception e) {
+            LOG.warn("Error getting problems using new API", e);
+            // Fallback for older versions - will never be called in practice for 2025.1.1.1
+            try {
+                // This code will not be executed in 2025.1.1.1 but is kept for backward compatibility
+                problemSolver.getAllProblems().stream()
+                    .filter(problem -> {
+                        VirtualFile problemFile = problem.getVirtualFile();
+                        return problemFile != null && problemFile.equals(file);
+                    })
+                    .forEach(problems::add);
+            } catch (Exception ex) {
+                LOG.error("Error getting problems using fallback approach", ex);
+            }
+        }
+        
+        return problems;
+    }
+    
+    /**
+     * Gets the description of a problem in a way that's compatible with IntelliJ IDEA 2025.1.1.1.
+     *
+     * @param problem The problem.
+     * @return The problem description.
+     */
+    @NotNull
+    public static String getProblemDescription(@NotNull Problem problem) {
+        try {
+            // First try the getDescription() method
+            return problem.getDescription();
+        } catch (NoSuchMethodError e) {
+            // Fall back to toString() which should contain the important info
+            String description = problem.toString();
+            if (description == null || description.isEmpty()) {
+                return "Unknown error";
+            }
+            return description;
+        }
     }
 
     /**
