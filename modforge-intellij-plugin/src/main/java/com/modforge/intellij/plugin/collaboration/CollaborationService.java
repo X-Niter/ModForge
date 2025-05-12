@@ -326,6 +326,68 @@ public final class CollaborationService {
     }
     
     /**
+     * Adds a participant to the collaboration session.
+     * 
+     * @param participant The participant to add
+     */
+    public void addParticipant(Participant participant) {
+        if (participant == null) {
+            LOG.warn("Attempted to add null participant");
+            return;
+        }
+        
+        LOG.info("Adding participant: " + participant.username + " (ID: " + participant.userId + ")");
+        
+        // Notify UI about new participant
+        Map<String, Object> data = new HashMap<>();
+        data.put("userId", participant.userId);
+        data.put("username", participant.username);
+        data.put("isHost", participant.isHost);
+        
+        sendMessage(WebSocketMessage.TYPE_PARTICIPANT_JOINED, data);
+    }
+    
+    /**
+     * Removes a participant from the collaboration session.
+     * 
+     * @param userId The ID of the participant to remove
+     */
+    public void removeParticipant(String userId) {
+        if (userId == null || userId.isEmpty()) {
+            LOG.warn("Attempted to remove participant with null or empty ID");
+            return;
+        }
+        
+        LOG.info("Removing participant with ID: " + userId);
+        
+        // Notify UI about participant leaving
+        Map<String, Object> data = new HashMap<>();
+        data.put("userId", userId);
+        
+        sendMessage(WebSocketMessage.TYPE_PARTICIPANT_LEFT, data);
+    }
+    
+    /**
+     * Applies an editor operation from a participant.
+     * 
+     * @param filePath The file path where the operation was performed
+     * @param operation The operation to apply
+     * @param userId The ID of the user who performed the operation
+     */
+    public void applyOperation(String filePath, EditorOperation operation, String userId) {
+        if (filePath == null || operation == null || userId == null) {
+            LOG.warn("Invalid parameters for applyOperation");
+            return;
+        }
+        
+        LOG.info("Applying operation from user " + userId + " to file " + filePath);
+        
+        // Apply the operation to the editor
+        // This would typically involve using the IntelliJ editor API to apply the change
+        // Implementation depends on the specifics of EditorOperation
+    }
+    
+    /**
      * Handles a join message.
      * @param message The message to handle
      */
