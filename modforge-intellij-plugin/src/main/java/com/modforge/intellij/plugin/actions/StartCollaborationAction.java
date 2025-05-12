@@ -45,7 +45,7 @@ public class StartCollaborationAction extends AnAction {
             ModForgeNotificationService notificationService = ModForgeNotificationService.getInstance();
             int result;
             if (notificationService != null) {
-                result = notificationService.showYesNoDialog(
+                result = notificationService.showYesNoDialogReversed(
                         project,
                         "Already in Session",
                         "You are already in a collaboration session. Do you want to leave it?",

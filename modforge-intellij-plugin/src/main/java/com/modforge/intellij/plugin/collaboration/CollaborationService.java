@@ -167,6 +167,54 @@ public final class CollaborationService {
     }
     
     /**
+     * Checks if connected to a collaboration session.
+     * @return True if connected, false otherwise
+     */
+    public boolean isConnected() {
+        return connected;
+    }
+    
+    /**
+     * Leaves the current collaboration session.
+     * @return A CompletableFuture that completes with true if successful, false otherwise
+     */
+    public CompletableFuture<Boolean> leaveSession() {
+        return CompletableFuture.supplyAsync(() -> {
+            if (!connected) {
+                LOG.warn("Not connected to a session");
+                return false;
+            }
+            
+            LOG.info("Leaving session: " + sessionId);
+            try {
+                if (webSocketClient != null) {
+                    webSocketClient.close();
+                    webSocketClient = null;
+                }
+                
+                if (pingTask != null) {
+                    pingTask.cancel(true);
+                    pingTask = null;
+                }
+                
+                // Clear participants and editors
+                participants.clear();
+                editors.clear();
+                collaboratedFiles.clear();
+                
+                connected = false;
+                sessionId = null;
+                
+                LOG.info("Successfully left the session");
+                return true;
+            } catch (Exception e) {
+                LOG.error("Error leaving session", e);
+                return false;
+            }
+        });
+    }
+    
+    /**
      * Starts a collaboration session.
      * @param sessionId The session ID
      */
