@@ -487,7 +487,182 @@ public final class CompatibilityUtil {
     }
     
     /**
-     * Gets problems from a WolfTheProblemSolver instance using reflection to maintain
+     * Checks if a file has problems using WolfTheProblemSolver instance via reflection
+     * to maintain compatibility with different IntelliJ IDEA versions, particularly 2025.1.1.1.
+     * 
+     * @param problemSolver The WolfTheProblemSolver instance
+     * @param file The virtual file to check
+     * @return True if the file has problems, false otherwise
+     */
+    public static boolean hasProblems(@NotNull WolfTheProblemSolver problemSolver, @NotNull VirtualFile file) {
+        try {
+            // Try the direct method first (IntelliJ IDEA 2025.1.1.1)
+            try {
+                java.lang.reflect.Method hasProblemsMethod = 
+                    problemSolver.getClass().getMethod("hasProblems", VirtualFile.class);
+                return (boolean) hasProblemsMethod.invoke(problemSolver, file);
+            } catch (Exception e) {
+                LOG.warn("Failed to call hasProblems directly", e);
+                
+                // Fall back to getting all problems and checking if there are any for this file
+                Collection<Problem> problems = getProblemsForFile(problemSolver, file);
+                return !problems.isEmpty();
+            }
+        } catch (Exception ex) {
+            LOG.error("Failed to check if file has problems", ex);
+            return false;
+        }
+    }
+    
+    /**
+     * Clears problems for a specific file in WolfTheProblemSolver using reflection
+     * to maintain compatibility with different IntelliJ IDEA versions, particularly 2025.1.1.1.
+     * 
+     * @param problemSolver The WolfTheProblemSolver instance
+     * @param file The virtual file to clear problems for
+     * @return True if clearing was successful, false otherwise
+     */
+    /**
+     * Reports a problem for a specific file to WolfTheProblemSolver using reflection
+     * to maintain compatibility with different IntelliJ IDEA versions, particularly 2025.1.1.1.
+     * 
+     * @param problemSolver The WolfTheProblemSolver instance
+     * @param file The virtual file to report problems for
+     * @param description The problem description
+     * @return True if reporting was successful, false otherwise
+     */
+    public static boolean reportProblem(@NotNull WolfTheProblemSolver problemSolver, 
+                                      @NotNull VirtualFile file,
+                                      @NotNull String description) {
+        try {
+            // Try the direct method first (IntelliJ IDEA 2025.1.1.1)
+            try {
+                java.lang.reflect.Method reportProblemMethod = 
+                    problemSolver.getClass().getMethod("reportProblems", VirtualFile.class, Collection.class);
+                
+                // Create a problem description using older ProblemImpl class via reflection
+                Object problem = createProblemObject(file, description);
+                
+                if (problem != null) {
+                    reportProblemMethod.invoke(problemSolver, file, Collections.singletonList(problem));
+                    return true;
+                } else {
+                    return false;
+                }
+            } catch (Exception e) {
+                LOG.warn("Failed to call reportProblems directly", e);
+                
+                // Try alternative method
+                try {
+                    java.lang.reflect.Method method = 
+                        problemSolver.getClass().getMethod("weHaveGotProblems", VirtualFile.class, String.class);
+                    method.invoke(problemSolver, file, description);
+                    return true;
+                } catch (Exception ex) {
+                    LOG.warn("Failed to call weHaveGotProblems", ex);
+                    return false;
+                }
+            }
+        } catch (Exception ex) {
+            LOG.error("Failed to report problem for file", ex);
+            return false;
+        }
+    }
+    
+    /**
+     * Creates a problem object for use with WolfTheProblemSolver via reflection.
+     * This is an internal helper method.
+     *
+     * @param file The file with the problem
+     * @param description The problem description
+     * @return A problem object or null if creation failed
+     */
+    @Nullable
+    private static Object createProblemObject(@NotNull VirtualFile file, @NotNull String description) {
+        try {
+            // Try to find the ProblemImpl class and create an instance
+            Class<?> problemImplClass = null;
+            
+            try {
+                // Try modern package
+                problemImplClass = Class.forName("com.intellij.problems.ProblemImpl");
+            } catch (ClassNotFoundException e1) {
+                try {
+                    // Try older package
+                    problemImplClass = Class.forName("com.intellij.codeInsight.daemon.impl.WolfTheProblemSolver$Problem");
+                } catch (ClassNotFoundException e2) {
+                    try {
+                        // Last resort - try innermost class
+                        problemImplClass = Class.forName("com.intellij.codeInsight.daemon.impl.WolfTheProblemSolver$ProblemImpl");
+                    } catch (ClassNotFoundException e3) {
+                        LOG.error("Could not find any Problem implementation class", e3);
+                        return null;
+                    }
+                }
+            }
+            
+            // Find a constructor that takes VirtualFile and String
+            Constructor<?> constructor = null;
+            for (Constructor<?> c : problemImplClass.getDeclaredConstructors()) {
+                if (c.getParameterCount() == 2 &&
+                    c.getParameterTypes()[0].isAssignableFrom(VirtualFile.class) &&
+                    c.getParameterTypes()[1] == String.class) {
+                    constructor = c;
+                    break;
+                }
+            }
+            
+            if (constructor == null) {
+                LOG.error("Could not find appropriate constructor for Problem implementation");
+                return null;
+            }
+            
+            // Create the problem instance
+            constructor.setAccessible(true);
+            return constructor.newInstance(file, description);
+            
+        } catch (Exception e) {
+            LOG.error("Failed to create problem object", e);
+            return null;
+        }
+    }
+    
+    public static boolean clearProblems(@NotNull WolfTheProblemSolver problemSolver, @NotNull VirtualFile file) {
+        try {
+            // Try the direct method first (IntelliJ IDEA 2025.1.1.1)
+            try {
+                java.lang.reflect.Method clearProblemsMethod = 
+                    problemSolver.getClass().getMethod("clearProblems", VirtualFile.class);
+                clearProblemsMethod.invoke(problemSolver, file);
+                return true;
+            } catch (Exception e) {
+                LOG.warn("Failed to call clearProblems directly", e);
+                
+                // Try alternative methods
+                try {
+                    // Try clearProblemsForFile
+                    java.lang.reflect.Method method = 
+                        problemSolver.getClass().getMethod("clearProblemsForFile", VirtualFile.class);
+                    method.invoke(problemSolver, file);
+                    return true;
+                } catch (Exception ex) {
+                    LOG.warn("Failed to call clearProblemsForFile", ex);
+                    
+                    // Last resort - try queue update method
+                    java.lang.reflect.Method method = 
+                        problemSolver.getClass().getMethod("queueUpdateForFile", VirtualFile.class);
+                    method.invoke(problemSolver, file);
+                    return true;
+                }
+            }
+        } catch (Exception ex) {
+            LOG.error("Failed to clear problems for file", ex);
+            return false;
+        }
+    }
+
+    /**
+     * Gets all problems from a WolfTheProblemSolver instance using reflection to maintain
      * compatibility with different IntelliJ IDEA versions, particularly 2025.1.1.1.
      * 
      * @param problemSolver The problem solver instance
