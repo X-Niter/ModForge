@@ -65,13 +65,10 @@ public class LogoutAction extends AnAction {
                     null
             );
         } else {
-            result = Messages.showYesNoDialog(
+            result = CompatibilityUtil.showYesNoDialog(
                     project,
                     "Are you sure you want to log out from ModForge? This will stop all services that require authentication.",
-                    "Confirm Logout",
-                    "Logout",
-                    "Cancel",
-                    null
+                    "Confirm Logout"
             );
         }
         

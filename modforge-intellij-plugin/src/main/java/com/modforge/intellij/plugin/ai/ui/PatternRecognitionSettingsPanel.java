@@ -149,10 +149,10 @@ public class PatternRecognitionSettingsPanel implements Configurable {
      * Reset pattern recognition statistics
      */
     private void resetStatistics() {
-        int result = Messages.showYesNoDialog(
+        int result = CompatibilityUtil.showYesNoDialog(
+                project,
                 "Are you sure you want to reset all pattern recognition statistics?",
-                "Reset Statistics",
-                Messages.getQuestionIcon());
+                "Reset Statistics");
         
         if (result == CompatibilityUtil.DIALOG_YES) {
             patternService.resetStatistics();
