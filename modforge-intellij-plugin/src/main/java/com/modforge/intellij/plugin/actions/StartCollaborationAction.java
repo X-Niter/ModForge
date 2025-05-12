@@ -228,23 +228,42 @@ public class StartCollaborationAction extends AnAction {
         
         @Override
         protected void doOKAction() {
+            Project project = getProject();
+            ModForgeNotificationService notificationService = ModForgeNotificationService.getInstance(project);
+            
             if (StringUtil.isEmpty(usernameField.getText())) {
-                JOptionPane.showMessageDialog(
-                        getContentPanel(),
-                        "Username cannot be empty",
-                        "Error",
-                        JOptionPane.ERROR_MESSAGE
-                );
+                if (notificationService != null) {
+                    notificationService.showErrorDialog(
+                            null,
+                            "Validation Error",
+                            "Username cannot be empty"
+                    );
+                } else {
+                    JOptionPane.showMessageDialog(
+                            getContentPanel(),
+                            "Username cannot be empty",
+                            "Error",
+                            JOptionPane.ERROR_MESSAGE
+                    );
+                }
                 return;
             }
             
             if (joinSessionRadio.isSelected() && StringUtil.isEmpty(sessionIdField.getText())) {
-                JOptionPane.showMessageDialog(
-                        getContentPanel(),
-                        "Session ID cannot be empty",
-                        "Error",
-                        JOptionPane.ERROR_MESSAGE
-                );
+                if (notificationService != null) {
+                    notificationService.showErrorDialog(
+                            null,
+                            "Validation Error",
+                            "Session ID cannot be empty"
+                    );
+                } else {
+                    JOptionPane.showMessageDialog(
+                            getContentPanel(),
+                            "Session ID cannot be empty",
+                            "Error",
+                            JOptionPane.ERROR_MESSAGE
+                    );
+                }
                 return;
             }
             

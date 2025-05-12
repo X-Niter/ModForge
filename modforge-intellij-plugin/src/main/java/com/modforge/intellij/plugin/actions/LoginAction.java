@@ -214,21 +214,40 @@ public class LoginAction extends AnAction {
         
         @Override
         protected void doOKAction() {
+            Project project = getProject();
+            ModForgeNotificationService notificationService = ModForgeNotificationService.getInstance(project);
+            
             if (getUsername().isEmpty()) {
-                Messages.showErrorDialog(
-                        getContentPanel(),
-                        "Username cannot be empty",
-                        "Validation Error"
-                );
+                if (notificationService != null) {
+                    notificationService.showErrorDialog(
+                            null,  // Use null for JComponent parent
+                            "Validation Error",
+                            "Username cannot be empty"
+                    );
+                } else {
+                    Messages.showErrorDialog(
+                            getContentPanel(),
+                            "Username cannot be empty",
+                            "Validation Error"
+                    );
+                }
                 return;
             }
             
             if (getPassword().isEmpty()) {
-                Messages.showErrorDialog(
-                        getContentPanel(),
-                        "Password cannot be empty",
-                        "Validation Error"
-                );
+                if (notificationService != null) {
+                    notificationService.showErrorDialog(
+                            null,  // Use null for JComponent parent
+                            "Validation Error",
+                            "Password cannot be empty"
+                    );
+                } else {
+                    Messages.showErrorDialog(
+                            getContentPanel(),
+                            "Password cannot be empty",
+                            "Validation Error"
+                    );
+                }
                 return;
             }
             
