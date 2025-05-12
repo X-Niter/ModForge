@@ -26,6 +26,8 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.io.File;
+import java.util.ArrayList;
+import java.util.Collection;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
@@ -337,7 +339,7 @@ public final class CompatibilityUtil {
      * @param <T> The return type.
      * @return The result of the action.
      */
-    public static <T> T runReadAction(@NotNull Computable<T> action) {
+    public static <T> T computeInReadAction(@NotNull Computable<T> action) {
         return ReadAction.compute(action);
     }
 
@@ -348,7 +350,7 @@ public final class CompatibilityUtil {
      * @param <T> The return type.
      * @return The result of the action.
      */
-    public static <T> T runWriteAction(@NotNull Computable<T> action) {
+    public static <T> T computeInWriteAction(@NotNull Computable<T> action) {
         return WriteAction.compute(action);
     }
 
