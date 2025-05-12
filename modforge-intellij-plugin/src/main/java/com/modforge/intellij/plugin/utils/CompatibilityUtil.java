@@ -655,6 +655,10 @@ public final class CompatibilityUtil {
     /**
      * Shows a Yes/No dialog with custom button text and icon.
      * Compatible with IntelliJ IDEA 2025.1.1.1
+     * 
+     * Note: The parameter order differs from Messages.showYesNoDialog
+     * In this method: (project, title, message, yesText, noText, icon)
+     * In Messages: (project, message, title, yesText, noText, icon)
      *
      * @param project The project
      * @param title The title
@@ -670,9 +674,10 @@ public final class CompatibilityUtil {
         
         runOnUiThreadAndWait(() -> {
             try {
+                // Swap title and message to match Messages.showYesNoDialog parameter order
                 result[0] = Messages.showYesNoDialog(
                     project, 
-                    message, 
+                    message,  // IntelliJ API expects message first, then title
                     title, 
                     yesText, 
                     noText, 
