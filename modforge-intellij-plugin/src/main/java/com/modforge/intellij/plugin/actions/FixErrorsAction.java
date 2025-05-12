@@ -75,8 +75,8 @@ public class FixErrorsAction extends AnAction {
         // Make sure the user is authenticated
         ModAuthenticationManager authManager = ModAuthenticationManager.getInstance();
         if (!authManager.isAuthenticated()) {
-            ModForgeNotificationService.getInstance().showErrorNotification(
-                    e.getProject(),
+            ModForgeNotificationService.getInstance(project).showErrorNotification(
+                    project,
                     "Authentication Required",
                     "You must be logged in to fix errors."
             );

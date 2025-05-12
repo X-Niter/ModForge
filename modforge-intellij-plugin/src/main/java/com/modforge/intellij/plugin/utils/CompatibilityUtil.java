@@ -138,7 +138,7 @@ public final class CompatibilityUtil {
             return;
         }
         
-        executeOnUiThread(() -> {
+        runOnUiThread(() -> {
             FileEditorManager.getInstance(project).openFile(file, requestFocus);
         });
     }
