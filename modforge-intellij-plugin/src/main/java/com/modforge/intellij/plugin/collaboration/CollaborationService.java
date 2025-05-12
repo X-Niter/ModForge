@@ -52,16 +52,6 @@ public final class CollaborationService {
     }
     
     /**
-     * Gets an instance of the CollaborationService for the specified project.
-     *
-     * @param project The project
-     * @return The CollaborationService instance
-     */
-    public static CollaborationService getInstance(@NotNull Project project) {
-        return project.getService(CollaborationService.class);
-    }
-    
-    /**
      * Gets an instance of the CollaborationService.
      * Note: This method is provided for backward compatibility.
      * The actual implementation needs a project parameter, so this will return null
