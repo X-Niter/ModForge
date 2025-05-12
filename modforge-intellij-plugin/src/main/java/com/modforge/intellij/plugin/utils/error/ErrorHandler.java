@@ -77,7 +77,7 @@ public class ErrorHandler {
     ) {
         LOG.error(message, e);
         
-        ModForgeNotificationService notificationService = project.getService(ModForgeNotificationService.class);
+        ModForgeNotificationService notificationService = ModForgeNotificationService.getInstance();
         if (notificationService == null) {
             return "";
         }

@@ -50,7 +50,7 @@ public class CreateFromTemplateAction extends AnAction {
         // Get the template service
         ModTemplateService templateService = project.getService(ModTemplateService.class);
         if (templateService == null) {
-            ModForgeNotificationService notificationService = project.getService(ModForgeNotificationService.class);
+            ModForgeNotificationService notificationService = ModForgeNotificationService.getInstance();
             if (notificationService != null) {
                 notificationService.showErrorDialog(
                         project,
@@ -77,7 +77,7 @@ public class CreateFromTemplateAction extends AnAction {
                 .join();
         
         if (error.get() != null) {
-            ModForgeNotificationService notificationService = project.getService(ModForgeNotificationService.class);
+            ModForgeNotificationService notificationService = ModForgeNotificationService.getInstance();
             if (notificationService != null) {
                 notificationService.showErrorDialog(
                         project,
@@ -97,7 +97,7 @@ public class CreateFromTemplateAction extends AnAction {
         // Get templates
         List<ModTemplate> templates = templateService.getTemplates();
         if (templates.isEmpty()) {
-            ModForgeNotificationService notificationService = project.getService(ModForgeNotificationService.class);
+            ModForgeNotificationService notificationService = ModForgeNotificationService.getInstance();
             if (notificationService != null) {
                 notificationService.showErrorDialog(
                         project,
@@ -134,7 +134,7 @@ public class CreateFromTemplateAction extends AnAction {
                             ApplicationManager.getApplication().invokeLater(() -> {
                                 // Get notification service
                                 ModForgeNotificationService notificationService =
-                                        project.getService(ModForgeNotificationService.class);
+                                        ModForgeNotificationService.getInstance();
                                 
                                 if (notificationService != null) {
                                     notificationService.showInfoNotification(
@@ -155,7 +155,7 @@ public class CreateFromTemplateAction extends AnAction {
                             ApplicationManager.getApplication().invokeLater(() -> {
                                 // Get notification service
                                 ModForgeNotificationService notificationService =
-                                        project.getService(ModForgeNotificationService.class);
+                                        ModForgeNotificationService.getInstance();
                                 
                                 if (notificationService != null) {
                                     notificationService.showErrorNotification(
@@ -337,7 +337,7 @@ public class CreateFromTemplateAction extends AnAction {
         protected void doOKAction() {
             if (templateList.getSelectedValue() == null) {
                 if (project != null) {
-                    ModForgeNotificationService notificationService = project.getService(ModForgeNotificationService.class);
+                    ModForgeNotificationService notificationService = ModForgeNotificationService.getInstance();
                     if (notificationService != null) {
                         notificationService.showErrorDialog(
                                 project,
@@ -522,7 +522,7 @@ public class CreateFromTemplateAction extends AnAction {
             // Check if output directory is specified
             if (outputDirField.getText().isEmpty()) {
                 if (project != null) {
-                    ModForgeNotificationService notificationService = project.getService(ModForgeNotificationService.class);
+                    ModForgeNotificationService notificationService = ModForgeNotificationService.getInstance();
                     if (notificationService != null) {
                         notificationService.showErrorDialog(
                                 project,
@@ -550,7 +550,7 @@ public class CreateFromTemplateAction extends AnAction {
             File outputDir = getOutputDirectory();
             if (outputDir.exists() && outputDir.isFile()) {
                 if (project != null) {
-                    ModForgeNotificationService notificationService = project.getService(ModForgeNotificationService.class);
+                    ModForgeNotificationService notificationService = ModForgeNotificationService.getInstance();
                     if (notificationService != null) {
                         notificationService.showErrorDialog(
                                 project,
@@ -577,7 +577,7 @@ public class CreateFromTemplateAction extends AnAction {
             // Check if output directory is empty
             if (outputDir.exists() && outputDir.listFiles() != null && outputDir.listFiles().length > 0) {
                 if (project != null) {
-                    ModForgeNotificationService notificationService = project.getService(ModForgeNotificationService.class);
+                    ModForgeNotificationService notificationService = ModForgeNotificationService.getInstance();
                     if (notificationService != null) {
                         int result = notificationService.showYesNoDialog(
                                 project,
