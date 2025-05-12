@@ -1040,7 +1040,7 @@ public final class GitHubIntegrationService {
      * @param progressConsumer Consumer for progress updates
      * @return CompletableFuture with push result
      */
-    public CompletableFuture<PushResult> pushToGitHubV2(
+    public CompletableFuture<PushResult> pushToGitHubV3(
             String owner,
             String repository,
             String description,
