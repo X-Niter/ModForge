@@ -320,6 +320,17 @@ public final class CompatibilityUtil {
      */
     @Deprecated
     public static <T> T executeOnUiThreadAndGet(@NotNull java.util.function.Supplier<T> task) {
+        return runOnUiThreadAndGet(task);
+    }
+    
+    /**
+     * Executes a task on the UI thread and returns its result.
+     * 
+     * @param task The task to execute
+     * @return The result of the task
+     * @param <T> The type of the result
+     */
+    public static <T> T runOnUiThreadAndGet(@NotNull java.util.function.Supplier<T> task) {
         if (ApplicationManager.getApplication().isDispatchThread()) {
             return task.get();
         } else {
