@@ -223,11 +223,20 @@ public class AddFeaturesAction extends AnAction {
             LOG.error("Error in add features action", ex);
             
             // Show error
-            Messages.showErrorDialog(
-                    project,
-                    "An error occurred: " + ex.getMessage(),
-                    "Error"
-            );
+            ModForgeNotificationService notificationService = ModForgeNotificationService.getInstance(project);
+            if (notificationService != null) {
+                notificationService.showErrorDialog(
+                        project,
+                        "Error",
+                        "An error occurred: " + ex.getMessage()
+                );
+            } else {
+                Messages.showErrorDialog(
+                        project,
+                        "An error occurred: " + ex.getMessage(),
+                        "Error"
+                );
+            }
         }
     }
     
