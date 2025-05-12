@@ -2,6 +2,7 @@ package com.modforge.intellij.plugin.settings;
 
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.components.*;
+import com.intellij.openapi.project.Project;
 import com.intellij.util.xmlb.XmlSerializerUtil;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -24,6 +25,10 @@ public class ModForgeSettings implements PersistentStateComponent<ModForgeSettin
     // AI settings
     private boolean usePatternLearning = true;
     private boolean preserveExistingCode = true;
+    
+    // GitHub settings
+    private String githubUsername = "";
+    private String accessToken = "";
 
     /**
      * Gets the singleton instance of the settings.
@@ -150,5 +155,61 @@ public class ModForgeSettings implements PersistentStateComponent<ModForgeSettin
      */
     public void setPreserveExistingCode(boolean preserveExistingCode) {
         this.preserveExistingCode = preserveExistingCode;
+    }
+    
+    /**
+     * Gets the GitHub username.
+     *
+     * @return The GitHub username.
+     */
+    public String getGitHubUsername() {
+        return githubUsername;
+    }
+    
+    /**
+     * Sets the GitHub username.
+     *
+     * @param githubUsername The GitHub username.
+     */
+    public void setGitHubUsername(String githubUsername) {
+        this.githubUsername = githubUsername;
+    }
+    
+    /**
+     * Gets the access token for API access.
+     *
+     * @return The access token.
+     */
+    public String getAccessToken() {
+        return accessToken;
+    }
+    
+    /**
+     * Sets the access token for API access.
+     *
+     * @param accessToken The access token.
+     */
+    public void setAccessToken(String accessToken) {
+        this.accessToken = accessToken;
+    }
+    
+    /**
+     * Checks if pattern recognition should be used for AI operations.
+     * This is an alias for isUsePatternLearning() that matches the method name expected by callers.
+     *
+     * @return True if pattern recognition should be used, false otherwise.
+     */
+    public boolean isPatternRecognition() {
+        return isUsePatternLearning();
+    }
+    
+    /**
+     * Opens the settings dialog for the plugin.
+     *
+     * @param project The current project
+     */
+    public void openSettings(Project project) {
+        // Implementation could open the settings dialog in the IDE
+        // This is a placeholder that will be enhanced with actual functionality later
     }
 }

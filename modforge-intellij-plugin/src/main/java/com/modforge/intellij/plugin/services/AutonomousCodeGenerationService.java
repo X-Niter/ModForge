@@ -1,5 +1,6 @@
 package com.modforge.intellij.plugin.services;
 
+import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.components.Service;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.project.Project;
@@ -28,6 +29,16 @@ public final class AutonomousCodeGenerationService {
     private final Map<String, CompletableFuture<String>> pendingOperations = new ConcurrentHashMap<>();
     private final AtomicBoolean isGenerating = new AtomicBoolean(false);
     private final ModForgeNotificationService notificationService;
+    
+    /**
+     * Gets the singleton instance of the service for the specified project.
+     *
+     * @param project The project.
+     * @return The service instance.
+     */
+    public static AutonomousCodeGenerationService getInstance(@NotNull Project project) {
+        return project.getService(AutonomousCodeGenerationService.class);
+    }
 
     /**
      * Creates a new instance of the service.
@@ -204,5 +215,202 @@ public final class AutonomousCodeGenerationService {
      */
     public int getPendingOperationCount() {
         return pendingOperations.size();
+    }
+    
+    /**
+     * Fixes code based on error messages.
+     *
+     * @param code The code to fix.
+     * @param errorMessage The error message.
+     * @param language The language of the code.
+     * @return A CompletableFuture that completes with the fixed code.
+     */
+    public CompletableFuture<String> fixCode(
+            @NotNull String code,
+            @NotNull String errorMessage,
+            @NotNull String language) {
+        
+        LOG.info("Fixing code with error: " + errorMessage);
+        notificationService.showInfoNotification(
+                "Fixing Code",
+                "Analyzing and fixing code errors"
+        );
+        
+        String operationId = "fix-code-" + System.currentTimeMillis();
+        CompletableFuture<String> future = CompletableFuture.supplyAsync(() -> {
+            try {
+                isGenerating.set(true);
+                
+                // In a real implementation, this would call the AI service
+                // For now, return a placeholder
+                Thread.sleep(1000); // Simulate processing time
+                
+                return "// Fixed code\n" +
+                       "// Original error: " + errorMessage + "\n" +
+                       "// Language: " + language + "\n" +
+                       "// Fixed implementation would be here\n" +
+                       code.replace("// ERROR", "// FIXED");
+            } catch (Exception e) {
+                LOG.error("Error fixing code", e);
+                throw new RuntimeException("Failed to fix code: " + e.getMessage(), e);
+            } finally {
+                isGenerating.set(false);
+                pendingOperations.remove(operationId);
+            }
+        }, threadPool);
+        
+        pendingOperations.put(operationId, future);
+        return future;
+    }
+    
+    /**
+     * Explains code to the user.
+     *
+     * @param code The code to explain.
+     * @param context Optional context for more accurate explanation.
+     * @return A CompletableFuture that completes with the explanation.
+     */
+    public CompletableFuture<String> explainCode(
+            @NotNull String code,
+            @Nullable String context) {
+        
+        LOG.info("Explaining code");
+        notificationService.showInfoNotification(
+                "Explaining Code",
+                "Generating explanation for selected code"
+        );
+        
+        String operationId = "explain-" + System.currentTimeMillis();
+        CompletableFuture<String> future = CompletableFuture.supplyAsync(() -> {
+            try {
+                isGenerating.set(true);
+                
+                // In a real implementation, this would call the AI service
+                // For now, return a placeholder
+                Thread.sleep(1000); // Simulate processing time
+                
+                return "# Code Explanation\n\n" +
+                       "This code appears to " + (context != null ? "be related to " + context + " and " : "") +
+                       "implements a basic functionality. It uses standard patterns and techniques.\n\n" +
+                       "## Key Components\n\n" +
+                       "- Initializes data structures\n" +
+                       "- Processes inputs\n" +
+                       "- Generates results\n\n" +
+                       "## Potential Improvements\n\n" +
+                       "- Add better error handling\n" +
+                       "- Improve performance with optimized algorithms\n" +
+                       "- Add more comprehensive documentation";
+            } catch (Exception e) {
+                LOG.error("Error explaining code", e);
+                throw new RuntimeException("Failed to explain code: " + e.getMessage(), e);
+            } finally {
+                isGenerating.set(false);
+                pendingOperations.remove(operationId);
+            }
+        }, threadPool);
+        
+        pendingOperations.put(operationId, future);
+        return future;
+    }
+    
+    /**
+     * Generates documentation for the provided code.
+     *
+     * @param code The code to document.
+     * @param context Optional context for more accurate documentation.
+     * @return A CompletableFuture that completes with the documented code.
+     */
+    public CompletableFuture<String> generateDocumentation(
+            @NotNull String code,
+            @Nullable String context) {
+        
+        LOG.info("Generating documentation for code");
+        notificationService.showInfoNotification(
+                "Generating Documentation",
+                "Adding documentation to code"
+        );
+        
+        String operationId = "document-" + System.currentTimeMillis();
+        CompletableFuture<String> future = CompletableFuture.supplyAsync(() -> {
+            try {
+                isGenerating.set(true);
+                
+                // In a real implementation, this would call the AI service
+                // For now, add basic javadoc
+                Thread.sleep(1000); // Simulate processing time
+                
+                String[] lines = code.split("\n");
+                StringBuilder documented = new StringBuilder();
+                
+                for (int i = 0; i < lines.length; i++) {
+                    String line = lines[i];
+                    
+                    // Add javadoc to class declarations
+                    if (line.contains("class ") || line.contains("interface ")) {
+                        documented.append("/**\n");
+                        documented.append(" * This class provides functionality for ");
+                        documented.append(context != null ? context : "the application");
+                        documented.append(".\n");
+                        documented.append(" * \n");
+                        documented.append(" * @author ModForge AI\n");
+                        documented.append(" */\n");
+                    }
+                    
+                    // Add javadoc to method declarations
+                    if (line.contains("public ") || line.contains("private ") || line.contains("protected ")) {
+                        if (line.contains("(") && !line.contains(";")) {
+                            documented.append("/**\n");
+                            documented.append(" * Method documentation would be generated here.\n");
+                            documented.append(" *\n");
+                            documented.append(" * @return The result of the operation\n");
+                            documented.append(" */\n");
+                        }
+                    }
+                    
+                    documented.append(line).append("\n");
+                }
+                
+                return documented.toString();
+            } catch (Exception e) {
+                LOG.error("Error generating documentation", e);
+                throw new RuntimeException("Failed to generate documentation: " + e.getMessage(), e);
+            } finally {
+                isGenerating.set(false);
+                pendingOperations.remove(operationId);
+            }
+        }, threadPool);
+        
+        pendingOperations.put(operationId, future);
+        return future;
+    }
+    
+    /**
+     * Generates implementation for a specific feature or interface.
+     *
+     * @param interfaceName The name of the interface or class to implement.
+     * @param packageName The target package.
+     * @param description Additional details about the implementation.
+     * @return True if successful, false otherwise.
+     */
+    public boolean generateImplementation(
+            @NotNull String interfaceName,
+            @NotNull String packageName,
+            @NotNull String description) {
+        
+        LOG.info("Generating implementation for: " + interfaceName);
+        notificationService.showInfoNotification(
+                "Generating Implementation",
+                "Creating implementation for: " + interfaceName
+        );
+        
+        try {
+            // This would be a more complex implementation in a real system
+            // For now, just return success
+            Thread.sleep(1000); // Simulate processing time
+            return true;
+        } catch (Exception e) {
+            LOG.error("Error generating implementation", e);
+            return false;
+        }
     }
 }

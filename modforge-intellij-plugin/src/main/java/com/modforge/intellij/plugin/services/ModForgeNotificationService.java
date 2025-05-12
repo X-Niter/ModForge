@@ -33,6 +33,17 @@ public final class ModForgeNotificationService {
     public void showInfo(@NotNull String title, @NotNull String content) {
         showNotification(title, content, NotificationType.INFORMATION, null);
     }
+    
+    /**
+     * Shows an information notification with automatic expiry.
+     * This version is used by AutonomousCodeGenerationService and other services.
+     *
+     * @param title   The notification title
+     * @param content The notification content
+     */
+    public void showInfoNotification(@NotNull String title, @NotNull String content) {
+        showInfo(title, content);
+    }
 
     /**
      * Shows an error notification.
