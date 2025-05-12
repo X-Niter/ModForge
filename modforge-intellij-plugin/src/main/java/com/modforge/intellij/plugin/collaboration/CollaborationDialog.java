@@ -168,6 +168,17 @@ public class CollaborationDialog extends DialogWrapper {
     }
     
     /**
+     * Gets the session ID entered by the user.
+     * This is the same as the session name but used when joining an existing session.
+     *
+     * @return The session ID
+     */
+    @NotNull
+    public String getSessionId() {
+        return sessionNameField.getText().trim();
+    }
+    
+    /**
      * Gets the session description entered by the user.
      *
      * @return The session description
