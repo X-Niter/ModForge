@@ -440,10 +440,11 @@ public class FixErrorsAction extends AnAction {
                                 LOG.error("Error fixing code", e);
                                 
                                 ApplicationManager.getApplication().invokeLater(() -> {
-                                    Messages.showErrorDialog(
+                                    ModForgeNotificationService notificationService = project.getService(ModForgeNotificationService.class);
+                                    notificationService.showErrorDialog(
                                             project,
-                                            "Error fixing code: " + e.getMessage(),
-                                            "Fix Error"
+                                            "Fix Error",
+                                            "Error fixing code: " + e.getMessage()
                                     );
                                 });
                                 
@@ -456,10 +457,11 @@ public class FixErrorsAction extends AnAction {
                     LOG.error("Error fixing code", e);
                     
                     ApplicationManager.getApplication().invokeLater(() -> {
-                        Messages.showErrorDialog(
+                        ModForgeNotificationService notificationService = project.getService(ModForgeNotificationService.class);
+                        notificationService.showErrorDialog(
                                 project,
-                                "Error fixing code: " + e.getMessage(),
-                                "Fix Error"
+                                "Fix Error",
+                                "Error fixing code: " + e.getMessage()
                         );
                     });
                 }
@@ -636,19 +638,19 @@ public class FixErrorsAction extends AnAction {
         @Override
         protected void doOKAction() {
             if (getCode().isEmpty()) {
-                Messages.showErrorDialog(
-                        getContentPanel(),
-                        "Code cannot be empty",
-                        "Validation Error"
+                ModForgeNotificationService notificationService = ModForgeNotificationService.getInstance();
+                notificationService.showErrorDialog(
+                        "Validation Error",
+                        "Code cannot be empty"
                 );
                 return;
             }
             
             if (getErrorMessages().isEmpty()) {
-                Messages.showErrorDialog(
-                        getContentPanel(),
-                        "Error messages cannot be empty",
-                        "Validation Error"
+                ModForgeNotificationService notificationService = ModForgeNotificationService.getInstance();
+                notificationService.showErrorDialog(
+                        "Validation Error",
+                        "Error messages cannot be empty"
                 );
                 return;
             }

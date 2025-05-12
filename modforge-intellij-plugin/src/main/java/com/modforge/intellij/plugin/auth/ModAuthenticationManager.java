@@ -351,34 +351,74 @@ public final class ModAuthenticationManager implements PersistentStateComponent<
     
     /**
      * Login with username and password
+     * Compatible with IntelliJ IDEA 2025.1.1.1
      * 
      * @param username The username
      * @param password The password
      * @return A CompletableFuture that completes with true if login is successful, false otherwise
      */
     public CompletableFuture<Boolean> login(String username, String password) {
-        // For now, store the username and simulate a GitHub token
+        if (username == null || username.isEmpty() || password == null || password.isEmpty()) {
+            return CompletableFuture.completedFuture(false);
+        }
+        
+        // Store the username 
         setGitHubUsername(username);
         
-        // Simulate generating a token from credentials
-        String simulatedToken = "github_pat_" + System.currentTimeMillis();
-        setGitHubToken(simulatedToken, true);
-        
-        // Return async validation result
         CompletableFuture<Boolean> result = new CompletableFuture<>();
-        validateGitHubTokenAsync(isValid -> {
-            result.complete(isValid);
-        });
+        
+        // Use virtual threads for improved concurrency in Java 21
+        CompletableFuture.runAsync(() -> {
+            try {
+                LOG.info("Attempting login for user: " + username);
+                
+                // In a real implementation, this would authenticate against GitHub API
+                // and retrieve a real access token
+                String generatedToken = "github_pat_" + System.currentTimeMillis();
+                
+                // Store the token securely
+                ApplicationManager.getApplication().invokeLater(() -> {
+                    setGitHubToken(generatedToken, true);
+                    
+                    // Validate the token asynchronously
+                    validateGitHubTokenAsync(isValid -> {
+                        LOG.info("Login validation result: " + (isValid ? "success" : "failure"));
+                        result.complete(isValid);
+                    });
+                });
+            } catch (Exception e) {
+                LOG.error("Login failed", e);
+                ApplicationManager.getApplication().invokeLater(() -> {
+                    result.complete(false);
+                });
+            }
+        }, Executors.newVirtualThreadPerTaskExecutor());
         
         return result;
     }
     
     /**
      * Get the current username
+     * Compatible with IntelliJ IDEA 2025.1.1.1
      * 
-     * @return The username
+     * @return The username, or empty string if not authenticated
      */
     public String getUsername() {
-        return getGitHubUsername();
+        String username = getGitHubUsername();
+        if (username == null || username.isEmpty()) {
+            LOG.debug("No username found, user is likely not authenticated");
+            return "";
+        }
+        return username;
+    }
+    
+    /**
+     * Check if user has a valid username
+     * 
+     * @return true if user has a valid username, false otherwise
+     */
+    public boolean hasValidUsername() {
+        String username = getGitHubUsername();
+        return username != null && !username.isEmpty();
     }
 }
