@@ -79,12 +79,21 @@ public class LogoutAction extends AnAction {
             // Logout
             authManager.logout();
             
-            Messages.showInfoMessage(
-                    project,
-                    "You have been logged out from ModForge." +
-                            (username.isEmpty() ? "" : " (Goodbye, " + username + "!)"),
-                    "Logout Successful"
-            );
+            if (notificationService != null) {
+                notificationService.showInfoDialog(
+                        project,
+                        "Logout Successful",
+                        "You have been logged out from ModForge." +
+                                (username.isEmpty() ? "" : " (Goodbye, " + username + "!)")
+                );
+            } else {
+                Messages.showInfoMessage(
+                        project,
+                        "You have been logged out from ModForge." +
+                                (username.isEmpty() ? "" : " (Goodbye, " + username + "!)"),
+                        "Logout Successful"
+                );
+            }
         }
     }
     
@@ -102,11 +111,20 @@ public class LogoutAction extends AnAction {
         if (continuousService != null && continuousService.isRunning()) {
             continuousService.stop();
             
-            Messages.showInfoMessage(
-                    project,
-                    "Continuous development has been stopped due to logout.",
-                    "Continuous Development"
-            );
+            ModForgeNotificationService notificationService = project.getService(ModForgeNotificationService.class);
+            if (notificationService != null) {
+                notificationService.showInfoDialog(
+                        project,
+                        "Continuous Development",
+                        "Continuous development has been stopped due to logout."
+                );
+            } else {
+                Messages.showInfoMessage(
+                        project,
+                        "Continuous development has been stopped due to logout.",
+                        "Continuous Development"
+                );
+            }
         }
     }
 }

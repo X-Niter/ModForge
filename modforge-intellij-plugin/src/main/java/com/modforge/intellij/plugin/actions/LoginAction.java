@@ -15,6 +15,7 @@ import com.intellij.ui.components.JBPasswordField;
 import com.intellij.ui.components.JBTextField;
 import com.intellij.util.ui.FormBuilder;
 import com.modforge.intellij.plugin.auth.ModAuthenticationManager;
+import com.modforge.intellij.plugin.services.ModForgeNotificationService;
 import com.modforge.intellij.plugin.settings.ModForgeSettings;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -45,11 +46,20 @@ public class LoginAction extends AnAction {
         ModForgeSettings settings = ModForgeSettings.getInstance();
         String serverUrl = settings.getServerUrl();
         if (serverUrl.isEmpty()) {
-            Messages.showErrorDialog(
-                    project,
-                    "Please set the ModForge server URL in the settings.",
-                    "Login Error"
-            );
+            ModForgeNotificationService notificationService = ModForgeNotificationService.getInstance(project);
+            if (notificationService != null) {
+                notificationService.showErrorDialog(
+                        project,
+                        "Login Error",
+                        "Please set the ModForge server URL in the settings."
+                );
+            } else {
+                Messages.showErrorDialog(
+                        project,
+                        "Please set the ModForge server URL in the settings.",
+                        "Login Error"
+                );
+            }
             return;
         }
         
