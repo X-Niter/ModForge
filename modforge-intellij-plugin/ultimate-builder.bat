@@ -331,194 +331,70 @@ REM ===================================
 echo.
 echo === Running Missing Methods Analysis ===
 
-REM Create missing methods report directly here
+REM Create a basic report without complex syntax
+echo # Missing Methods and Symbol Resolution Report > "%MISSING_METHODS_REPORT%"
+echo. >> "%MISSING_METHODS_REPORT%"
+echo This report identifies methods that are called but might not be implemented, >> "%MISSING_METHODS_REPORT%" 
+echo causing "cannot find symbol" errors during compilation. >> "%MISSING_METHODS_REPORT%"
+echo. >> "%MISSING_METHODS_REPORT%"
+echo Generated on %DATE% %TIME%. >> "%MISSING_METHODS_REPORT%"
 
-REM Create output file with header
-(
-echo # Missing Methods and Symbol Resolution Report
-echo.
-echo This report identifies methods that are called but might not be implemented,
-echo causing "cannot find symbol" errors during compilation.
-echo.
-echo Generated on %DATE% %TIME%.
-echo.
-echo ## Overview
-echo.
-echo This analysis looks for:
-echo.
-echo 1. Methods called on service classes that might not exist
-echo 2. Method signature mismatches between calls and definitions
-echo 3. Missing getInstance() methods on service classes
-echo 4. Missing methods in common utility classes
-echo.
-) > "%MISSING_METHODS_REPORT%"
+REM Search for errors in build log
+echo Extracting method errors from build log...
+findstr /i /c:"symbol:   method" "%BUILD_LOG%" > "%TEMP_DIR%\method_errors.txt" 2>nul
+findstr /i /c:"location: variable" "%BUILD_LOG%" > "%TEMP_DIR%\location_errors.txt" 2>nul
 
-REM Extract method calls from build errors
-findstr /i /c:"symbol:   method" "%BUILD_LOG%" > "%TEMP_DIR%\missing_methods.txt"
-findstr /i /c:"location: variable" "%BUILD_LOG%" > "%TEMP_DIR%\locations.txt"
+REM Add method errors to report
+echo. >> "%MISSING_METHODS_REPORT%"
+echo ## Missing Method Errors >> "%MISSING_METHODS_REPORT%"
+echo. >> "%MISSING_METHODS_REPORT%"
 
-REM Create a consolidated report of missing methods
-(
-echo ## Missing Methods from Build Errors
-echo.
-echo These methods are referenced in the code but could not be found during compilation:
-echo.
-) >> "%MISSING_METHODS_REPORT%"
-
-REM Continue with missing methods analysis
-if exist "%TEMP_DIR%\missing_methods.txt" (
-    REM Process missing methods - add a summary to the report
-    echo Methods found in error log: >> "%MISSING_METHODS_REPORT%"
+REM Check if we found any method errors
+if exist "%TEMP_DIR%\method_errors.txt" (
+    echo Methods mentioned in build errors: >> "%MISSING_METHODS_REPORT%"
     echo. >> "%MISSING_METHODS_REPORT%"
-    type "%TEMP_DIR%\missing_methods.txt" >> "%MISSING_METHODS_REPORT%"
+    type "%TEMP_DIR%\method_errors.txt" >> "%MISSING_METHODS_REPORT%"
     echo. >> "%MISSING_METHODS_REPORT%"
     
-    REM Add section headers for service classes
-    (
-    echo.
-    echo ## Service Classes with Missing Methods
-    echo.
-    ) >> "%MISSING_METHODS_REPORT%"
-    
-    REM Check ModForgeSettings issues
-    echo ### ModForgeSettings Implementation Issues >> "%MISSING_METHODS_REPORT%"
+    REM Add class-specific recommendations
+    echo ## Common Missing Methods >> "%MISSING_METHODS_REPORT%"
     echo. >> "%MISSING_METHODS_REPORT%"
     
-    findstr /i /c:"settings" "%TEMP_DIR%\locations.txt" > "%TEMP_DIR%\settings_locations.txt"
-    if exist "%TEMP_DIR%\settings_locations.txt" (
-        call :ADD_SETTINGS_METHODS
-    )
-    
-    echo ### ModAuthenticationManager Implementation Issues >> "%MISSING_METHODS_REPORT%"
+    REM ModForgeSettings recommendations
+    echo ### ModForgeSettings >> "%MISSING_METHODS_REPORT%"
+    echo. >> "%MISSING_METHODS_REPORT%"
+    echo Make sure ModForgeSettings class has these methods: >> "%MISSING_METHODS_REPORT%"
+    echo - getAccessToken() >> "%MISSING_METHODS_REPORT%"
+    echo - isPatternRecognition() >> "%MISSING_METHODS_REPORT%"
+    echo - getGitHubUsername() >> "%MISSING_METHODS_REPORT%"
     echo. >> "%MISSING_METHODS_REPORT%"
     
-    findstr /i /c:"authManager" "%TEMP_DIR%\locations.txt" > "%TEMP_DIR%\auth_locations.txt"
-    if exist "%TEMP_DIR%\auth_locations.txt" (
-        call :ADD_AUTH_METHODS
-    )
-    
-    echo ### AutonomousCodeGenerationService Implementation Issues >> "%MISSING_METHODS_REPORT%"
+    REM ModAuthenticationManager recommendations
+    echo ### ModAuthenticationManager >> "%MISSING_METHODS_REPORT%"
+    echo. >> "%MISSING_METHODS_REPORT%"
+    echo Make sure ModAuthenticationManager class has these methods: >> "%MISSING_METHODS_REPORT%"
+    echo - login(username, password) >> "%MISSING_METHODS_REPORT%"
+    echo - logout() >> "%MISSING_METHODS_REPORT%"
+    echo - getUsername() >> "%MISSING_METHODS_REPORT%"
     echo. >> "%MISSING_METHODS_REPORT%"
     
-    findstr /i /c:"codeGenService" /c:"AutonomousCodeGenerationService" "%TEMP_DIR%\locations.txt" > "%TEMP_DIR%\codegen_locations.txt"
-    if exist "%TEMP_DIR%\codegen_locations.txt" (
-        call :ADD_CODEGEN_METHODS
-    )
-    
-    echo ## Type Compatibility Issues >> "%MISSING_METHODS_REPORT%"
+    REM AutonomousCodeGeneration recommendations
+    echo ### AutonomousCodeGenerationService >> "%MISSING_METHODS_REPORT%"
     echo. >> "%MISSING_METHODS_REPORT%"
-    findstr /i /c:"incompatible types:" "%BUILD_LOG%" > "%TEMP_DIR%\type_issues.txt"
-    if exist "%TEMP_DIR%\type_issues.txt" (
-        call :ADD_TYPE_ISSUES
-    )
-    
-    echo ## Method Override Issues >> "%MISSING_METHODS_REPORT%"
+    echo Make sure AutonomousCodeGenerationService has these methods: >> "%MISSING_METHODS_REPORT%"
+    echo - getInstance(project) >> "%MISSING_METHODS_REPORT%"
+    echo - generateCode(prompt, contextFile, language) >> "%MISSING_METHODS_REPORT%"
+    echo - fixCode(code, errorMessage, language) >> "%MISSING_METHODS_REPORT%"
     echo. >> "%MISSING_METHODS_REPORT%"
-    findstr /i /c:"cannot override" "%BUILD_LOG%" > "%TEMP_DIR%\override_issues.txt"
-    if exist "%TEMP_DIR%\override_issues.txt" (
-        call :ADD_OVERRIDE_ISSUES
-    )
 ) else (
-    echo No specific missing methods detected from build errors. >> "%MISSING_METHODS_REPORT%"
+    echo No method errors found in build log. >> "%MISSING_METHODS_REPORT%"
 )
 
 echo Missing methods analysis complete.
 goto :EOF
 
-REM We've removed the individual method line processing subroutine
-REM since we're now using the type command to directly add error messages
-
-REM ===================================
-REM Add Settings Methods Subroutine
-REM ===================================
-:ADD_SETTINGS_METHODS
-(
-echo Methods possibly missing from ModForgeSettings:
-echo.
-echo --- Java Method Signatures ---
-echo // Required methods:
-echo // - getAccessToken()
-echo // - isPatternRecognition()
-echo // - getGitHubUsername()
-echo // - openSettings(Project project)
-echo // - other settings methods...
-echo --- End Method Signatures ---
-echo.
-) >> "%MISSING_METHODS_REPORT%"
-goto :EOF
-
-REM ===================================
-REM Add Auth Methods Subroutine
-REM ===================================
-:ADD_AUTH_METHODS
-(
-echo Methods possibly missing from ModAuthenticationManager:
-echo.
-echo --- Java Method Signatures ---
-echo // Required methods:
-echo // - login(String username, String password)
-echo // - logout()
-echo // - getUsername()
-echo // - Other auth methods...
-echo --- End Method Signatures ---
-echo.
-) >> "%MISSING_METHODS_REPORT%"
-goto :EOF
-
-REM ===================================
-REM Add CodeGen Methods Subroutine
-REM ===================================
-:ADD_CODEGEN_METHODS
-(
-echo Methods possibly missing from AutonomousCodeGenerationService:
-echo.
-echo --- Java Method Signatures ---
-echo // Required static method:
-echo // - getInstance(Project project)
-echo.
-echo // Required instance methods:
-echo // - generateCode(String prompt, VirtualFile contextFile, String language)
-echo // - fixCode(String code, String errorMessage, String language)
-echo // - generateDocumentation(String code, Object options)
-echo // - explainCode(String code, Object options)
-echo // - generateImplementation(String interfaceName, String packageName, String className)
-echo // - Other code generation methods...
-echo --- End Method Signatures ---
-echo.
-) >> "%MISSING_METHODS_REPORT%"
-goto :EOF
-
-REM ===================================
-REM Add Type Issues Subroutine
-REM ===================================
-:ADD_TYPE_ISSUES
-(
-echo Type compatibility issues found:
-echo.
-echo --- Java Errors ---
-type "%TEMP_DIR%\type_issues.txt"
-echo --- End Errors ---
-echo.
-echo Ensure parameter types match exactly between method calls and definitions.
-echo.
-) >> "%MISSING_METHODS_REPORT%"
-goto :EOF
-
-REM ===================================
-REM Add Override Issues Subroutine
-REM ===================================
-:ADD_OVERRIDE_ISSUES
-(
-echo Method override issues found:
-echo.
-echo --- Java Errors ---
-type "%TEMP_DIR%\override_issues.txt"
-echo --- End Errors ---
-echo.
-echo Ensure overridden methods have exactly the same return type as the parent class method.
-echo.
-) >> "%MISSING_METHODS_REPORT%"
-goto :EOF
+REM We've completely refactored this section to avoid syntax issues
+REM All previous subroutines have been consolidated into simpler direct calls
 
 REM ===================================
 REM Resolution Errors Scan Subroutine
