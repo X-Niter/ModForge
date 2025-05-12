@@ -22,6 +22,7 @@ import java.net.URISyntaxException;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
@@ -38,6 +39,17 @@ public final class CollaborationService {
     private String sessionId;
     private WebSocketClient webSocketClient;
     private boolean connected = false;
+    
+    /**
+     * Gets the instance of the collaboration service for the given project.
+     *
+     * @param project The project
+     * @return The collaboration service instance
+     */
+    @NotNull
+    public static CollaborationService getInstance(@NotNull Project project) {
+        return project.getService(CollaborationService.class);
+    }
     
     /**
      * Gets an instance of the CollaborationService for the specified project.
