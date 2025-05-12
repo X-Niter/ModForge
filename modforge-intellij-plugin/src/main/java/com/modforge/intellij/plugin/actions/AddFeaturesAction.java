@@ -106,7 +106,7 @@ public class AddFeaturesAction extends AnAction {
                 );
             }
             
-            if (confirmation != Messages.YES) {
+            if (confirmation != 0) { // 0 = YES in compatibility layer
                 // User cancelled
                 return;
             }
