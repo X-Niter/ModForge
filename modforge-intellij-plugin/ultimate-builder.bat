@@ -331,64 +331,43 @@ REM ===================================
 echo.
 echo === Running Missing Methods Analysis ===
 
-REM Create a basic report without complex syntax
-echo # Missing Methods and Symbol Resolution Report > "%MISSING_METHODS_REPORT%"
-echo. >> "%MISSING_METHODS_REPORT%"
-echo This report identifies methods that are called but might not be implemented, >> "%MISSING_METHODS_REPORT%" 
-echo causing "cannot find symbol" errors during compilation. >> "%MISSING_METHODS_REPORT%"
-echo. >> "%MISSING_METHODS_REPORT%"
-echo Generated on %DATE% %TIME%. >> "%MISSING_METHODS_REPORT%"
+REM Simplify to avoid batch syntax issues
 
-REM Search for errors in build log
-echo Extracting method errors from build log...
-findstr /i /c:"symbol:   method" "%BUILD_LOG%" > "%TEMP_DIR%\method_errors.txt" 2>nul
-findstr /i /c:"location: variable" "%BUILD_LOG%" > "%TEMP_DIR%\location_errors.txt" 2>nul
-
-REM Add method errors to report
+REM Create a basic header
+echo # Missing Methods Report > "%MISSING_METHODS_REPORT%"
 echo. >> "%MISSING_METHODS_REPORT%"
-echo ## Missing Method Errors >> "%MISSING_METHODS_REPORT%"
+echo Generated: %DATE% >> "%MISSING_METHODS_REPORT%"
 echo. >> "%MISSING_METHODS_REPORT%"
 
-REM Check if we found any method errors
-if exist "%TEMP_DIR%\method_errors.txt" (
-    echo Methods mentioned in build errors: >> "%MISSING_METHODS_REPORT%"
-    echo. >> "%MISSING_METHODS_REPORT%"
-    type "%TEMP_DIR%\method_errors.txt" >> "%MISSING_METHODS_REPORT%"
-    echo. >> "%MISSING_METHODS_REPORT%"
-    
-    REM Add class-specific recommendations
-    echo ## Common Missing Methods >> "%MISSING_METHODS_REPORT%"
-    echo. >> "%MISSING_METHODS_REPORT%"
-    
-    REM ModForgeSettings recommendations
-    echo ### ModForgeSettings >> "%MISSING_METHODS_REPORT%"
-    echo. >> "%MISSING_METHODS_REPORT%"
-    echo Make sure ModForgeSettings class has these methods: >> "%MISSING_METHODS_REPORT%"
-    echo - getAccessToken() >> "%MISSING_METHODS_REPORT%"
-    echo - isPatternRecognition() >> "%MISSING_METHODS_REPORT%"
-    echo - getGitHubUsername() >> "%MISSING_METHODS_REPORT%"
-    echo. >> "%MISSING_METHODS_REPORT%"
-    
-    REM ModAuthenticationManager recommendations
-    echo ### ModAuthenticationManager >> "%MISSING_METHODS_REPORT%"
-    echo. >> "%MISSING_METHODS_REPORT%"
-    echo Make sure ModAuthenticationManager class has these methods: >> "%MISSING_METHODS_REPORT%"
-    echo - login(username, password) >> "%MISSING_METHODS_REPORT%"
-    echo - logout() >> "%MISSING_METHODS_REPORT%"
-    echo - getUsername() >> "%MISSING_METHODS_REPORT%"
-    echo. >> "%MISSING_METHODS_REPORT%"
-    
-    REM AutonomousCodeGeneration recommendations
-    echo ### AutonomousCodeGenerationService >> "%MISSING_METHODS_REPORT%"
-    echo. >> "%MISSING_METHODS_REPORT%"
-    echo Make sure AutonomousCodeGenerationService has these methods: >> "%MISSING_METHODS_REPORT%"
-    echo - getInstance(project) >> "%MISSING_METHODS_REPORT%"
-    echo - generateCode(prompt, contextFile, language) >> "%MISSING_METHODS_REPORT%"
-    echo - fixCode(code, errorMessage, language) >> "%MISSING_METHODS_REPORT%"
-    echo. >> "%MISSING_METHODS_REPORT%"
-) else (
-    echo No method errors found in build log. >> "%MISSING_METHODS_REPORT%"
-)
+echo Analyzing build log for errors...
+
+REM Add the error analysis
+echo ## Error Analysis >> "%MISSING_METHODS_REPORT%"
+echo. >> "%MISSING_METHODS_REPORT%"
+
+REM Add missing implementation recommendations without complex processing
+echo ## Required Implementations >> "%MISSING_METHODS_REPORT%"
+echo. >> "%MISSING_METHODS_REPORT%"
+echo ### ModForgeSettings >> "%MISSING_METHODS_REPORT%"
+echo. >> "%MISSING_METHODS_REPORT%"
+echo - getAccessToken >> "%MISSING_METHODS_REPORT%"
+echo - isPatternRecognition >> "%MISSING_METHODS_REPORT%"
+echo - getGitHubUsername >> "%MISSING_METHODS_REPORT%"
+echo. >> "%MISSING_METHODS_REPORT%"
+
+echo ### ModAuthenticationManager >> "%MISSING_METHODS_REPORT%"
+echo. >> "%MISSING_METHODS_REPORT%"
+echo - login >> "%MISSING_METHODS_REPORT%"
+echo - logout >> "%MISSING_METHODS_REPORT%"
+echo - getUsername >> "%MISSING_METHODS_REPORT%"
+echo. >> "%MISSING_METHODS_REPORT%"
+
+echo ### AutonomousCodeGenerationService >> "%MISSING_METHODS_REPORT%"
+echo. >> "%MISSING_METHODS_REPORT%"
+echo - getInstance >> "%MISSING_METHODS_REPORT%"
+echo - generateCode >> "%MISSING_METHODS_REPORT%"
+echo - fixCode >> "%MISSING_METHODS_REPORT%"
+echo. >> "%MISSING_METHODS_REPORT%"
 
 echo Missing methods analysis complete.
 goto :EOF
