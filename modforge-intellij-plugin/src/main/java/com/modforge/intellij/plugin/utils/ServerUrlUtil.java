@@ -53,4 +53,26 @@ public class ServerUrlUtil {
         
         return url;
     }
+    
+    /**
+     * Gets the configured collaboration server URL from settings.
+     * 
+     * @return The collaboration server URL, or null if not configured
+     */
+    public static String getCollaborationServerUrl() {
+        try {
+            ModForgeSettings settings = ModForgeSettings.getInstance();
+            String serverUrl = settings.getCollaborationServerUrl();
+            
+            if (serverUrl == null || serverUrl.isEmpty()) {
+                LOG.warn("Collaboration server URL is not configured");
+                return null;
+            }
+            
+            return serverUrl;
+        } catch (Exception e) {
+            LOG.error("Failed to get collaboration server URL", e);
+            return null;
+        }
+    }
 }
