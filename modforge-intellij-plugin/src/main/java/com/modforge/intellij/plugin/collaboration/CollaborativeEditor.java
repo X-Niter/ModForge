@@ -156,7 +156,7 @@ public class CollaborativeEditor {
         ApplicationManager.getApplication().invokeLater(() -> {
             CommandProcessor.getInstance().executeCommand(
                     project,
-                    () -> ApplicationManager.getApplication().runWriteAction(runnable),
+                    () -> CompatibilityUtil.runWriteAction(runnable),
                     "Collaborative Edit",
                     null
             );

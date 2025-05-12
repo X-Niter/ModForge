@@ -15,6 +15,7 @@ import com.modforge.intellij.plugin.ai.AIServiceManager;
 import com.modforge.intellij.plugin.services.CodeAnalysisService.AnalysisResult;
 import com.modforge.intellij.plugin.services.CodeAnalysisService.ClassInfo;
 import com.modforge.intellij.plugin.services.CodeAnalysisService.MethodInfo;
+import com.modforge.intellij.plugin.utils.CompatibilityUtil;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -184,7 +185,7 @@ public final class AutomatedRefactoringService {
                 continue;
             }
             
-            boolean isReferenced = ApplicationManager.getApplication().runReadAction(
+            boolean isReferenced = CompatibilityUtil.runReadAction(
                     (Computable<Boolean>) () -> {
                         PsiElement target = reference.resolve();
                         return target != null && styleManager.isReferenceUsed(reference, javaFile);
@@ -704,7 +705,7 @@ public final class AutomatedRefactoringService {
         
         ApplicationManager.getApplication().invokeLater(() -> {
             CommandProcessor.getInstance().executeCommand(project, () -> {
-                ApplicationManager.getApplication().runWriteAction(runnable);
+                CompatibilityUtil.runWriteAction(runnable);
             }, "Remove Unused Import", null);
         });
         
