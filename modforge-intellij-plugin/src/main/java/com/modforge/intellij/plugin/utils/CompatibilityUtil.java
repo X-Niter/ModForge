@@ -26,6 +26,12 @@ import java.util.function.Supplier;
 public final class CompatibilityUtil {
     private static final Logger LOG = Logger.getInstance(CompatibilityUtil.class);
     
+    // Dialog constants compatible with 2025.1.1.1
+    public static final int DIALOG_YES = 0;
+    public static final int DIALOG_NO = 1;
+    public static final int DIALOG_CANCEL = 2;
+    public static final int DIALOG_OK = 0;
+    
     /**
      * Private constructor to prevent instantiation.
      */
