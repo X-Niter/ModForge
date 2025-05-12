@@ -45,7 +45,9 @@ public class StartCollaborationAction extends AnAction {
                     project,
                     "You are already in a collaboration session. Do you want to leave it?",
                     "Already in Session",
-                    Messages.getQuestionIcon()
+                    "Yes",
+                    "No",
+                    AllIcons.General.QuestionDialog
             );
             
             if (result == Messages.YES) {
@@ -53,8 +55,7 @@ public class StartCollaborationAction extends AnAction {
                     if (success) {
                         startOrJoinSession(project, collaborationService);
                     } else {
-                        Messages.showErrorDialog(
-                                project,
+                        ModForgeNotificationService.getInstance(project).showErrorNotification(
                                 "Failed to leave the current session",
                                 "Error"
                         );
@@ -85,8 +86,7 @@ public class StartCollaborationAction extends AnAction {
             collaborationService.startSession(username)
                 .thenAccept(sessionId -> {
                     // Show success message with session ID
-                    Messages.showInfoDialog(
-                        project,
+                    ModForgeNotificationService.getInstance(project).showInfoNotification(
                         "Session started with ID: " + sessionId + "\n\n" +
                         "Share this ID with your team members so they can join.",
                         "Session Started"
@@ -95,8 +95,7 @@ public class StartCollaborationAction extends AnAction {
                 // Open collaboration tool window
                 showCollaborationToolWindow(project);
             }).exceptionally(ex -> {
-                Messages.showErrorDialog(
-                        project,
+                ModForgeNotificationService.getInstance(project).showErrorNotification(
                         "Failed to start session: " + ex.getMessage(),
                         "Error"
                 );
