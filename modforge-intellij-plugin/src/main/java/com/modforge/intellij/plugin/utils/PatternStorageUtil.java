@@ -7,6 +7,7 @@ import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.project.Project;
 import com.modforge.intellij.plugin.models.ModLoaderType;
 import com.modforge.intellij.plugin.models.Pattern;
+import com.modforge.intellij.plugin.utils.CompatibilityUtil;
 import org.jetbrains.annotations.NotNull;
 
 import java.io.*;
@@ -39,7 +40,14 @@ public class PatternStorageUtil {
      */
     public PatternStorageUtil(@NotNull Project project) {
         this.project = project;
-        this.storageDir = new File(project.getBasePath(), ".modforge");
+        String basePath = CompatibilityUtil.getProjectBasePath(project);
+        if (basePath == null) {
+            LOG.error("Could not determine project base path for pattern storage");
+            // Fallback to temporary directory
+            this.storageDir = new File(System.getProperty("java.io.tmpdir"), "modforge_patterns_" + project.getName());
+        } else {
+            this.storageDir = new File(basePath, ".modforge");
+        }
         this.patternsFile = new File(storageDir, "patterns.json");
         this.gson = new GsonBuilder().setPrettyPrinting().create();
     }
