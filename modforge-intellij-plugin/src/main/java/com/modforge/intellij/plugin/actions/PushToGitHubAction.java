@@ -70,7 +70,7 @@ public class PushToGitHubAction extends AnAction {
         if (token == null || token.isEmpty()) {
             ModForgeNotificationService notificationService = ModForgeNotificationService.getInstance();
             if (notificationService != null) {
-                boolean result = notificationService.showYesNoDialog(
+                int result = notificationService.showYesNoDialog(
                         project,
                         "GitHub Token Required",
                         "No GitHub token found. Do you want to configure it in the settings?",

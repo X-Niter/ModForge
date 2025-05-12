@@ -68,6 +68,7 @@ public class GenerateCodeAction extends AnAction {
                         } else {
                             CompatibilityUtil.runOnUiThread(() -> {
                                 notificationService.showErrorNotification(
+                                        project,
                                         "Code Generation Failed",
                                         "Failed to generate code from description: " + description
                                 );
@@ -229,7 +230,6 @@ public class GenerateCodeAction extends AnAction {
         // Get target directory
         VirtualFile baseDir = CompatibilityUtil.getProjectBaseDir(project);
         if (baseDir == null) {
-            ModForgeNotificationService notificationService = ModForgeNotificationService.getInstance();
             if (notificationService != null) {
                 notificationService.showErrorDialog(
                         project,
@@ -281,7 +281,6 @@ public class GenerateCodeAction extends AnAction {
                 );
             }
         } catch (Exception e) {
-            ModForgeNotificationService notificationService = ModForgeNotificationService.getInstance();
             if (notificationService != null) {
                 notificationService.showErrorDialog(
                         project,
