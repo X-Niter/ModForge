@@ -123,16 +123,18 @@ public class StartCollaborationAction extends AnAction {
             future.thenAccept(success -> {
                 if (success) {
                     ModForgeNotificationService.getInstance().showInfoNotification(
-                            "Successfully joined session: " + sessionId,
-                            "Session Joined"
+                            project,
+                            "Session Joined",
+                            "Successfully joined session: " + sessionId
                     );
                     
                     // Open collaboration tool window
                     showCollaborationToolWindow(project);
                 } else {
                     ModForgeNotificationService.getInstance().showErrorNotification(
-                            "Failed to join session: " + sessionId,
-                            "Error"
+                            project,
+                            "Error",
+                            "Failed to join session: " + sessionId
                     );
                 }
             }).exceptionally(ex -> {
