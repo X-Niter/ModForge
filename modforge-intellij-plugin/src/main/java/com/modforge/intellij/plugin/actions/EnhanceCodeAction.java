@@ -67,11 +67,20 @@ public class EnhanceCodeAction extends AnAction {
             // Check authentication
             ModAuthenticationManager authManager = ModAuthenticationManager.getInstance();
             if (!authManager.isAuthenticated()) {
-                Messages.showErrorDialog(
-                        project,
-                        "You must be logged in to ModForge to enhance code.",
-                        "Authentication Required"
-                );
+                ModForgeNotificationService notificationService = ModForgeNotificationService.getInstance(project);
+                if (notificationService != null) {
+                    notificationService.showErrorDialog(
+                            project,
+                            "Authentication Required",
+                            "You must be logged in to ModForge to enhance code."
+                    );
+                } else {
+                    Messages.showErrorDialog(
+                            project,
+                            "You must be logged in to ModForge to enhance code.",
+                            "Authentication Required"
+                    );
+                }
                 return;
             }
             
@@ -89,14 +98,26 @@ public class EnhanceCodeAction extends AnAction {
                     "Fix Potential Bugs"
             };
             
-            int enhancementTypeIndex = Messages.showChooseDialog(
-                    project,
-                    "What type of enhancement would you like to perform?",
-                    "Select Enhancement Type",
-                    Messages.getQuestionIcon(),
-                    enhancementTypes,
-                    enhancementTypes[0]
-            );
+            ModForgeNotificationService notificationService = ModForgeNotificationService.getInstance(project);
+            int enhancementTypeIndex;
+            if (notificationService != null) {
+                enhancementTypeIndex = notificationService.showChooseDialog(
+                        project,
+                        "Select Enhancement Type",
+                        "What type of enhancement would you like to perform?",
+                        enhancementTypes,
+                        enhancementTypes[0]
+                );
+            } else {
+                enhancementTypeIndex = Messages.showChooseDialog(
+                        project,
+                        "What type of enhancement would you like to perform?",
+                        "Select Enhancement Type",
+                        Messages.getQuestionIcon(),
+                        enhancementTypes,
+                        enhancementTypes[0]
+                );
+            }
             
             if (enhancementTypeIndex < 0) {
                 // User cancelled
@@ -167,11 +188,20 @@ public class EnhanceCodeAction extends AnAction {
                                 }
                             } catch (Exception ex) {
                                 LOG.error("Error applying code enhancements", ex);
-                                Messages.showErrorDialog(
-                                        project,
-                                        "Error applying code enhancements: " + ex.getMessage(),
-                                        "Error"
-                                );
+                                ModForgeNotificationService localNotificationService = ModForgeNotificationService.getInstance(project);
+                                if (localNotificationService != null) {
+                                    localNotificationService.showErrorDialog(
+                                            project,
+                                            "Error",
+                                            "Error applying code enhancements: " + ex.getMessage()
+                                    );
+                                } else {
+                                    Messages.showErrorDialog(
+                                            project,
+                                            "Error applying code enhancements: " + ex.getMessage(),
+                                            "Error"
+                                    );
+                                }
                             }
                         });
                     } catch (Exception ex) {
