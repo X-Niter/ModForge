@@ -33,6 +33,9 @@ public final class ModForgeSettings implements PersistentStateComponent<ModForge
     @Attribute("serverUrl")
     private String serverUrl = "https://modforge.ai/api";
     
+    @Attribute("collaborationServerUrl")
+    private String collaborationServerUrl = "wss://modforge.ai/ws";
+    
     @Attribute("requestTimeout")
     private int requestTimeout = 30;
     
@@ -164,6 +167,24 @@ public final class ModForgeSettings implements PersistentStateComponent<ModForge
      */
     public void setServerUrl(String serverUrl) {
         this.serverUrl = serverUrl;
+    }
+    
+    /**
+     * Gets the collaboration server URL.
+     *
+     * @return The collaboration server URL
+     */
+    public String getCollaborationServerUrl() {
+        return collaborationServerUrl;
+    }
+    
+    /**
+     * Sets the collaboration server URL.
+     *
+     * @param collaborationServerUrl The collaboration server URL to set
+     */
+    public void setCollaborationServerUrl(String collaborationServerUrl) {
+        this.collaborationServerUrl = collaborationServerUrl;
     }
     
     /**
