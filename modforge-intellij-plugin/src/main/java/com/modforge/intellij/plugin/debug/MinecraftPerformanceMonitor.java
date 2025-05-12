@@ -14,7 +14,7 @@ import com.intellij.xdebugger.breakpoints.XBreakpointListener;
 import com.intellij.xdebugger.breakpoints.XLineBreakpoint;
 import com.intellij.xdebugger.frame.XStackFrame;
 import com.intellij.xdebugger.frame.XSuspendContext;
-import com.modforge.intellij.plugin.notifications.ModForgeNotificationService;
+import com.modforge.intellij.plugin.services.ModForgeNotificationService;
 import com.modforge.intellij.plugin.run.MinecraftRunConfiguration;
 import org.jetbrains.annotations.NotNull;
 
@@ -200,7 +200,7 @@ public class MinecraftPerformanceMonitor {
             
             // Notify the user of the performance hotspot
             ModForgeNotificationService notificationService = 
-                    project.getService(ModForgeNotificationService.class);
+                    ModForgeNotificationService.getInstance();
             
             if (notificationService != null) {
                 notificationService.showNotification(
