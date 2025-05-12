@@ -132,8 +132,9 @@ public class CollaborationWebSocketHandler implements WebSocketMessageListener {
         
         LOG.info("User left session: " + userId);
         
-        // Remove participant
+        // Remove participant and notify
         collaborationService.removeParticipant(userId);
+        collaborationService.notifyParticipantLeft(userId);
     }
     
     /**
@@ -275,8 +276,9 @@ public class CollaborationWebSocketHandler implements WebSocketMessageListener {
         
         LOG.info("Participant left: " + userId);
         
-        // Remove participant
+        // Remove participant and notify
         collaborationService.removeParticipant(userId);
+        collaborationService.notifyParticipantLeft(userId);
     }
     
     /**

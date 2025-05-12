@@ -1,0 +1,485 @@
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\collaboration\CollaborationDialog.java:31: error: cannot find symbol
+    private JBRadioButton startSessionRadio;
+            ^
+  symbol:   class JBRadioButton
+  location: class CollaborationDialog
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\collaboration\CollaborationDialog.java:32: error: cannot find symbol
+    private JBRadioButton joinSessionRadio;
+            ^
+  symbol:   class JBRadioButton
+  location: class CollaborationDialog
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\collaboration\CollaborationService.java:185: error: cannot find symbol
+    public CompletableFuture<Boolean> leaveSession() {
+           ^
+  symbol:   class CompletableFuture
+  location: class CollaborationService
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\collaboration\CollaborationService.java:226: error: cannot find symbol
+    public CompletableFuture<String> startSession(@NotNull String username) {
+           ^
+  symbol:   class CompletableFuture
+  location: class CollaborationService
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\collaboration\CollaborationService.java:301: error: cannot find symbol
+    public CompletableFuture<Boolean> joinSession(@NotNull String sessionId, @NotNull String username) {
+           ^
+  symbol:   class CompletableFuture
+  location: class CollaborationService
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\collaboration\CollaborationService.java:536: error: method removeParticipant(String) is already defined in class CollaborationService
+    public void removeParticipant(String userId) {
+                ^
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\github\GitHubIntegrationService.java:1043: error: method pushToGitHubV2(String,String,String,boolean,Consumer<String>) is already defined in class GitHubIntegrationService
+    public CompletableFuture<PushResult> pushToGitHubV2(
+                                         ^
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\settings\ModForgeSettings.java:248: error: method getServerUrl() is already defined in class ModForgeSettings
+    public String getServerUrl() {
+                  ^
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\settings\ModForgeSettings.java:257: error: method setServerUrl(String) is already defined in class ModForgeSettings
+    public void setServerUrl(@NotNull String serverUrl) {
+                ^
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\actions\PushToGitHubAction.java:158: error: incompatible types: String cannot be converted to @org.jetbrains.annotations.Nullable Project
+                                            "Push Successful",
+                                            ^
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\actions\StartCollaborationAction.java:41: error: cannot find symbol
+        CollaborationService collaborationService = CollaborationService.getInstance(project);
+                                                                        ^
+  symbol:   method getInstance(Project)
+  location: class CollaborationService
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\actions\TestAuthEndpointsAction.java:69: error: cannot find symbol
+            CompatibilityUtil.showInfoDialog(project, results.toString(), "Authentication Test Results");
+            ^
+  symbol:   variable CompatibilityUtil
+  location: class TestAuthEndpointsAction
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\services\ContinuousDevelopmentService.java:66: error: cannot find symbol
+        project.getMessageBus().connect().subscribe(Project.TOPIC, new Project.ProjectListener() {
+                                                           ^
+  symbol:   variable TOPIC
+  location: interface Project
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\services\ContinuousDevelopmentService.java:66: error: cannot find symbol
+        project.getMessageBus().connect().subscribe(Project.TOPIC, new Project.ProjectListener() {
+                                                                              ^
+  symbol:   class ProjectListener
+  location: interface Project
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\services\ContinuousDevelopmentService.java:67: error: method does not override or implement a method from a supertype
+            @Override
+            ^
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\services\ContinuousDevelopmentService.java:174: error: cannot find symbol
+            problemSolver.visitProblemFiles(problemFiles::add);
+                         ^
+  symbol:   method visitProblemFiles(problemFiles::add)
+  location: variable problemSolver of type WolfTheProblemSolver
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\services\ContinuousDevelopmentService.java:229: error: cannot find symbol
+                problemSolver.processProblems(problems, file);
+                             ^
+  symbol:   method processProblems(Collection<Problem>,VirtualFile)
+  location: variable problemSolver of type WolfTheProblemSolver
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\actions\TogglePatternRecognitionAction.java:164: error: cannot find symbol
+        Map<String, Object> metrics = service.getMetrics();
+                                             ^
+  symbol:   method getMetrics()
+  location: variable service of type PatternRecognitionService
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\actions\VerifyAuthenticationAction.java:32: error: verifyAuthentication() has private access in ModAuthenticationManager
+        boolean isValid = authManager.verifyAuthentication();
+                                     ^
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\ai\AIServiceManager.java:171: error: cannot find symbol
+        String apiKey = settings.getOpenAiApiKey();
+                                ^
+  symbol:   method getOpenAiApiKey()
+  location: variable settings of type ModForgeSettings
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\ai\AIServiceManager.java:172: error: cannot find symbol
+        String model = settings.getOpenAiModel();
+                               ^
+  symbol:   method getOpenAiModel()
+  location: variable settings of type ModForgeSettings
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\ai\AIServiceManager.java:173: error: cannot find symbol
+        int maxTokens = settings.getMaxTokens();
+                                ^
+  symbol:   method getMaxTokens()
+  location: variable settings of type ModForgeSettings
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\ai\AIServiceManager.java:174: error: cannot find symbol
+        double temperature = settings.getTemperature();
+                                     ^
+  symbol:   method getTemperature()
+  location: variable settings of type ModForgeSettings
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\ai\AIServiceManager.java:214: error: cannot find symbol
+            connection.write(JsonUtil.writeToString(requestBody));
+                             ^
+  symbol:   variable JsonUtil
+  location: class AIServiceManager
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\ai\AIServiceManager.java:217: error: cannot find symbol
+            JsonReader reader = JsonReader.fromInputStream(connection.getInputStream());
+                                          ^
+  symbol:   method fromInputStream(InputStream)
+  location: class JsonReader
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\ai\AIServiceManager.java:218: error: cannot find symbol
+            Map<String, Object> responseMap = reader.readObject();
+                                                    ^
+  symbol:   method readObject()
+  location: variable reader of type JsonReader
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\ai\generation\MinecraftCodeGenerator.java:215: error: incompatible types: @org.jetbrains.annotations.NotNull String cannot be converted to ModLoader
+        ModLoader detected = ModLoaderDetector.detectModLoader(project);
+                                                              ^
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\ai\generation\MinecraftCodeGenerator.java:455: error: cannot find symbol
+                    CompatibilityUtil.runOnUIThread(() -> {
+                                     ^
+  symbol:   method runOnUIThread(()->{ Comp[...]e); })
+  location: class CompatibilityUtil
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\auth\AuthenticationManager.java:123: error: cannot find symbol
+                        settings.setAuthenticated(true);
+                                ^
+  symbol:   method setAuthenticated(boolean)
+  location: variable settings of type ModForgeSettings
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\auth\AuthenticationManager.java:135: error: cannot find symbol
+                                settings.setUserId(userId);
+                                        ^
+  symbol:   method setUserId(String)
+  location: variable settings of type ModForgeSettings
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\auth\AuthenticationManager.java:148: error: cannot find symbol
+                settings.setAuthenticated(false);
+                        ^
+  symbol:   method setAuthenticated(boolean)
+  location: variable settings of type ModForgeSettings
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\auth\AuthenticationManager.java:154: error: cannot find symbol
+            settings.setAuthenticated(false);
+                    ^
+  symbol:   method setAuthenticated(boolean)
+  location: variable settings of type ModForgeSettings
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\auth\AuthenticationManager.java:176: error: cannot find symbol
+        boolean isValid = TokenAuthConnectionUtil.testTokenAuthentication();
+                                                 ^
+  symbol:   method testTokenAuthentication()
+  location: class TokenAuthConnectionUtil
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\auth\AuthenticationManager.java:180: error: cannot find symbol
+            settings.setAuthenticated(false);
+                    ^
+  symbol:   method setAuthenticated(boolean)
+  location: variable settings of type ModForgeSettings
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\auth\AuthenticationManager.java:182: error: cannot find symbol
+            settings.setUserId("");
+                    ^
+  symbol:   method setUserId(String)
+  location: variable settings of type ModForgeSettings
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\auth\AuthenticationManager.java:200: error: cannot find symbol
+            settings.setAuthenticated(false);
+                    ^
+  symbol:   method setAuthenticated(boolean)
+  location: variable settings of type ModForgeSettings
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\auth\AuthenticationManager.java:202: error: cannot find symbol
+            settings.setUserId("");
+                    ^
+  symbol:   method setUserId(String)
+  location: variable settings of type ModForgeSettings
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\auth\AuthenticationManager.java:207: error: cannot find symbol
+        String response = TokenAuthConnectionUtil.makeAuthenticatedPostRequest(LOGOUT_ENDPOINT, null);
+                                                 ^
+  symbol:   method makeAuthenticatedPostRequest(String,<null>)
+  location: class TokenAuthConnectionUtil
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\auth\AuthenticationManager.java:211: error: cannot find symbol
+        settings.setAuthenticated(false);
+                ^
+  symbol:   method setAuthenticated(boolean)
+  location: variable settings of type ModForgeSettings
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\auth\AuthenticationManager.java:213: error: cannot find symbol
+        settings.setUserId("");
+                ^
+  symbol:   method setUserId(String)
+  location: variable settings of type ModForgeSettings
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\collaboration\CollaborationDialog.java:108: error: cannot find symbol
+        startSessionRadio = new JBRadioButton("Start new session");
+                                ^
+  symbol:   class JBRadioButton
+  location: class CollaborationDialog
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\collaboration\CollaborationDialog.java:109: error: cannot find symbol
+        joinSessionRadio = new JBRadioButton("Join existing session");
+                               ^
+  symbol:   class JBRadioButton
+  location: class CollaborationDialog
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\collaboration\CollaborationService.java:186: error: cannot find symbol
+        return CompletableFuture.supplyAsync(() -> {
+               ^
+  symbol:   variable CompletableFuture
+  location: class CollaborationService
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\collaboration\CollaborationService.java:227: error: cannot find symbol
+        return CompletableFuture.supplyAsync(() -> {
+               ^
+  symbol:   variable CompletableFuture
+  location: class CollaborationService
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\collaboration\CollaborationService.java:302: error: cannot find symbol
+        return CompletableFuture.supplyAsync(() -> {
+               ^
+  symbol:   variable CompletableFuture
+  location: class CollaborationService
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\collaboration\CollaborationService.java:663: error: cannot find symbol
+        EditorOperation operation = EditorOperation.fromMap(operationMap);
+                                                   ^
+  symbol:   method fromMap(Map<String,Object>)
+  location: class EditorOperation
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\collaboration\CollaborativeEditor.java:103: error: cannot find symbol
+        if (lastTimestamp != null && lastTimestamp >= operation.getTimestamp()) {
+                                                               ^
+  symbol:   method getTimestamp()
+  location: variable operation of type @org.jetbrains.annotations.NotNull EditorOperation
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\collaboration\CollaborativeEditor.java:109: error: cannot find symbol
+        lastOperationTimestamps.put(userId, operation.getTimestamp());
+                                                     ^
+  symbol:   method getTimestamp()
+  location: variable operation of type @org.jetbrains.annotations.NotNull EditorOperation
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\collaboration\CollaborativeEditor.java:130: error: cannot find symbol
+                switch (operation.getType()) {
+                                 ^
+  symbol:   method getType()
+  location: variable operation of type @org.jetbrains.annotations.NotNull EditorOperation
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\collaboration\CollaborativeEditor.java:131: error: cannot find symbol
+                    case EditorOperation.TYPE_INSERT:
+                                        ^
+  symbol:   variable TYPE_INSERT
+  location: class EditorOperation
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\collaboration\CollaborativeEditor.java:132: error: cannot find symbol
+                        document.insertString(operation.getOffset(), operation.getText());
+                                                       ^
+  symbol:   method getOffset()
+  location: variable operation of type @org.jetbrains.annotations.NotNull EditorOperation
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\collaboration\CollaborativeEditor.java:132: error: cannot find symbol
+                        document.insertString(operation.getOffset(), operation.getText());
+                                                                              ^
+  symbol:   method getText()
+  location: variable operation of type @org.jetbrains.annotations.NotNull EditorOperation
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\collaboration\CollaborativeEditor.java:135: error: cannot find symbol
+                    case EditorOperation.TYPE_DELETE:
+                                        ^
+  symbol:   variable TYPE_DELETE
+  location: class EditorOperation
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\collaboration\CollaborativeEditor.java:136: error: cannot find symbol
+                        document.deleteString(operation.getOffset(), operation.getOffset() + operation.getLength());
+                                                                              ^
+  symbol:   method getOffset()
+  location: variable operation of type @org.jetbrains.annotations.NotNull EditorOperation
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\collaboration\CollaborativeEditor.java:136: error: cannot find symbol
+                        document.deleteString(operation.getOffset(), operation.getOffset() + operation.getLength());
+                                                                                                      ^
+  symbol:   method getLength()
+  location: variable operation of type @org.jetbrains.annotations.NotNull EditorOperation
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\collaboration\CollaborativeEditor.java:136: error: cannot find symbol
+                        document.deleteString(operation.getOffset(), operation.getOffset() + operation.getLength());
+                                                       ^
+  symbol:   method getOffset()
+  location: variable operation of type @org.jetbrains.annotations.NotNull EditorOperation
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\collaboration\CollaborativeEditor.java:139: error: cannot find symbol
+                    case EditorOperation.TYPE_REPLACE:
+                                        ^
+  symbol:   variable TYPE_REPLACE
+  location: class EditorOperation
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\collaboration\CollaborativeEditor.java:142: error: cannot find symbol
+                                operation.getOffset() + operation.getLength(),
+                                         ^
+  symbol:   method getOffset()
+  location: variable operation of type @org.jetbrains.annotations.NotNull EditorOperation
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\collaboration\CollaborativeEditor.java:142: error: cannot find symbol
+                                operation.getOffset() + operation.getLength(),
+                                                                 ^
+  symbol:   method getLength()
+  location: variable operation of type @org.jetbrains.annotations.NotNull EditorOperation
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\collaboration\CollaborativeEditor.java:141: error: cannot find symbol
+                                operation.getOffset(),
+                                         ^
+  symbol:   method getOffset()
+  location: variable operation of type @org.jetbrains.annotations.NotNull EditorOperation
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\collaboration\CollaborativeEditor.java:143: error: cannot find symbol
+                                operation.getText()
+                                         ^
+  symbol:   method getText()
+  location: variable operation of type @org.jetbrains.annotations.NotNull EditorOperation
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\collaboration\CollaborativeEditor.java:148: error: cannot find symbol
+                        LOG.warn("Unknown operation type: " + operation.getType());
+                                                                       ^
+  symbol:   method getType()
+  location: variable operation of type @org.jetbrains.annotations.NotNull EditorOperation
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\collaboration\CollaborativeEditor.java:186: error: incompatible types: FileEditor[] cannot be converted to Editor[]
+        Editor[] editors = fileEditorManager.getEditors(file);
+                                                       ^
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\collaboration\CollaborativeEditor.java:212: error: cannot find symbol
+            String eventType = event.getType().toString();
+                                    ^
+  symbol:   method getType()
+  location: variable event of type @org.jetbrains.annotations.NotNull DocumentEvent
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\collaboration\CollaborativeEditor.java:247: error: cannot find symbol
+            data.put("operation", operation.toMap());
+                                           ^
+  symbol:   method toMap()
+  location: variable operation of type EditorOperation
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\collaboration\WebSocketMessage.java:196: error: cannot find symbol
+        data.put("operation", operation.toMap());
+                                       ^
+  symbol:   method toMap()
+  location: variable operation of type @org.jetbrains.annotations.NotNull EditorOperation
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\collaboration\CollaborationWebSocketHandler.java:117: error: method addParticipant in class CollaborationService cannot be applied to given types;
+        collaborationService.addParticipant(participant);
+                            ^
+  required: @org.jetbrains.annotations.NotNull String,@org.jetbrains.annotations.NotNull String
+  found:    Participant
+  reason: actual and formal argument lists differ in length
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\collaboration\CollaborationWebSocketHandler.java:168: error: cannot find symbol
+            case EditorOperation.TYPE_INSERT:
+                                ^
+  symbol:   variable TYPE_INSERT
+  location: class EditorOperation
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\collaboration\CollaborationWebSocketHandler.java:171: error: cannot find symbol
+            case EditorOperation.TYPE_DELETE:
+                                ^
+  symbol:   variable TYPE_DELETE
+  location: class EditorOperation
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\collaboration\CollaborationWebSocketHandler.java:174: error: cannot find symbol
+            case EditorOperation.TYPE_REPLACE:
+                                ^
+  symbol:   variable TYPE_REPLACE
+  location: class EditorOperation
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\collaboration\CollaborationWebSocketHandler.java:261: error: method addParticipant in class CollaborationService cannot be applied to given types;
+        collaborationService.addParticipant(participant);
+                            ^
+  required: @org.jetbrains.annotations.NotNull String,@org.jetbrains.annotations.NotNull String
+  found:    Participant
+  reason: actual and formal argument lists differ in length
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\collaboration\ui\CollaborationPanel.java:63: error: cannot find symbol
+        collaborationService.addListener(this);
+                            ^
+  symbol:   method addListener(CollaborationPanel)
+  location: variable collaborationService of type CollaborationService
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\collaboration\ui\CollaborationPanel.java:212: error: updateUI() in CollaborationPanel cannot override updateUI() in JPanel
+    private void updateUI() {
+                 ^
+  attempting to assign weaker access privileges; was public
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\collaboration\ui\CollaborationPanel.java:214: error: cannot find symbol
+        boolean isHost = collaborationService.isHost();
+                                             ^
+  symbol:   method isHost()
+  location: variable collaborationService of type CollaborationService
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\collaboration\ui\CollaborationPanel.java:231: error: cannot find symbol
+                    collaborationService.getUsername(),
+                                        ^
+  symbol:   method getUsername()
+  location: variable collaborationService of type CollaborationService
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\collaboration\ui\CollaborationPanel.java:249: error: incompatible types: bad type in conditional expression
+                ? collaborationService.getParticipants()
+                                                      ^
+    Map<String,ParticipantInfo> cannot be converted to List<Participant>
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\collaboration\ui\CollaborationPanel.java:277: error: cannot find symbol
+                Messages.showInfoDialog(
+                        ^
+  symbol:   method showInfoDialog(String,String)
+  location: class Messages
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\collaboration\ui\CollaborationPanel.java:322: error: cannot find symbol
+                    Messages.showInfoDialog("Successfully joined session.", "Success");
+                            ^
+  symbol:   method showInfoDialog(String,String)
+  location: class Messages
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\collaboration\ui\CollaborationPanel.java:349: error: cannot find symbol
+                    Messages.showInfoDialog("Successfully left session.", "Success");
+                            ^
+  symbol:   method showInfoDialog(String,String)
+  location: class Messages
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\collaboration\ui\CollaborationPanel.java:426: error: cannot find symbol
+        collaborationService.removeListener(this);
+                            ^
+  symbol:   method removeListener(CollaborationPanel)
+  location: variable collaborationService of type CollaborationService
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\crossloader\actions\CreateCrossLoaderModAction.java:68: error: cannot find symbol
+            ModForgeProjectService projectService = ModForgeProjectService.getInstance(project);
+                                                                          ^
+  symbol:   method getInstance(@org.jetbrains.annotations.NotNull Project)
+  location: class ModForgeProjectService
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\crossloader\ArchitecturyService.java:169: error: cannot find symbol
+            for (VirtualFile lib : rootManager.getFiles(OrderRootType.CLASSES)) {
+                                              ^
+  symbol:   method getFiles(OrderRootType)
+  location: variable rootManager of type ModuleRootManager
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\crossloader\ArchitecturyService.java:197: error: cannot find symbol
+        for (VirtualFile lib : rootManager.getFiles(OrderRootType.CLASSES)) {
+                                          ^
+  symbol:   method getFiles(OrderRootType)
+  location: variable rootManager of type ModuleRootManager
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\crossloader\ui\CrossLoaderProjectSetupDialog.java:811: error: cannot find symbol
+                    myProject,
+                    ^
+  symbol:   variable myProject
+  location: class CrossLoaderProjectSetupDialog
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\crossloader\ui\CrossLoaderProjectSetupDialog.java:830: error: cannot find symbol
+                myProject,
+                ^
+  symbol:   variable myProject
+  location: class CrossLoaderProjectSetupDialog
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\crossloader\intentions\ConvertToPlatformSpecificIntention.java:55: error: cannot find symbol
+        if (!architecturyService.isArchitecturyAvailable()) {
+                                ^
+  symbol:   method isArchitecturyAvailable()
+  location: variable architecturyService of type ArchitecturyService
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\crossloader\ui\CrossLoaderPanel.java:137: error: cannot find symbol
+        if (architecturyService.isArchitecturyAvailable()) {
+                               ^
+  symbol:   method isArchitecturyAvailable()
+  location: variable architecturyService of type ArchitecturyService
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\debug\MinecraftDebuggerExtension.java:100: error: cannot find symbol
+                    debugProcessImpl.getNodeManager().setRenderer(entry.getKey(), entry.getValue());
+                                    ^
+  symbol:   method getNodeManager()
+  location: variable debugProcessImpl of type DebugProcessImpl
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\debug\MinecraftDebuggerExtension.java:145: error: cannot find symbol
+                boolean breakpointExists = breakpointManager.getAllBreakpoints().stream()
+                                                                                ^
+  symbol:   method stream()
+  location: class XBreakpointBase<?,?,?>[]
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\debug\MinecraftDebuggerExtension.java:190: error: method does not override or implement a method from a supertype
+        @Override
+        ^
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\debug\MinecraftDebuggerExtension.java:192: error: incompatible types: ValueDescriptor cannot be converted to Value
+            super.buildChildren(descriptor, builder, evaluationContext);
+                                ^
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\debug\MinecraftDebugService.java:58: error: cannot find symbol
+            debuggerManagerImpl.registerDebugProcessListener((processHandler, debugProcess) -> {
+                               ^
+  symbol:   method registerDebugProcessListener((processHa[...]; } })
+  location: variable debuggerManagerImpl of type XDebuggerManagerImpl
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\debug\MinecraftPerformanceMonitor.java:98: error: cannot find symbol
+        session.addBreakpointListener(new XBreakpointListener<>() {
+               ^
+  symbol:   method addBreakpointListener(XBreakpointListener<XBreakpoint<?>>)
+  location: variable session of type XDebugSession
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\debug\MinecraftPerformanceMonitor.java:99: error: method does not override or implement a method from a supertype
+            @Override
+            ^
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\debug\MinecraftPerformanceMonitor.java:206: error: method showNotification in class ModForgeNotificationService cannot be applied to given types;
+                notificationService.showNotification(
+                                   ^
+  required: @org.jetbrains.annotations.Nullable Project,@org.jetbrains.annotations.NotNull String,@org.jetbrains.annotations.NotNull String,@org.jetbrains.annotations.NotNull NotificationType
+  found:    String,String,NotificationType
+  reason: actual and formal argument lists differ in length
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\designers\advancement\ui\AdvancementDesignerPanel.java:580: error: cannot find symbol
+        List<AdvancementModel> possibleParents = new ArrayList<>();
+                                                     ^
+  symbol:   class ArrayList
+  location: class AdvancementDesignerPanel
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\designers\recipe\ui\RecipeDesignerPanel.java:619: error: package Map does not exist
+        for (Map.Entry<Character, RecipeItem> entry : recipe.getKey().entrySet()) {
+                ^
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\github\GitHubIntegrationService.java:235: error: incompatible types: no instance(s) of type variable(s) T exist so that T[] conforms to String
+                issueBuilder.label(labels.toArray(new String[0]));
+                            ^
+  where T is a type-variable:
+    T extends Object declared in method <T>toArray(T[])
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\github\GitHubIntegrationService.java:720: error: cannot find symbol
+            } catch (RateLimitExceededException e) {
+                     ^
+  symbol:   class RateLimitExceededException
+  location: class GitHubIntegrationService
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\github\GitHubIntegrationService.java:958: error: cannot find symbol
+                    connectToRepository();
+                    ^
+  symbol: method connectToRepository()
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\listeners\ModForgeProjectListener.java:35: warning: [removal] projectOpened(Project) in ProjectManagerListener has been deprecated and marked for removal
+    public void projectOpened(@NotNull Project project) {
+                ^
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\listeners\ModForgeProjectManagerListener.java:24: warning: [removal] projectOpened(Project) in ProjectManagerListener has been deprecated and marked for removal
+    public void projectOpened(@NotNull Project project) {
+                ^
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\ModForgePlugin.java:154: warning: [removal] projectOpened(Project) in ProjectManagerListener has been deprecated and marked for removal
+    public void projectOpened(@NotNull Project project) {
+                ^
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\ModForgePluginActivator.java:46: warning: [removal] projectOpened(Project) in ProjectManagerListener has been deprecated and marked for removal
+                public void projectOpened(@NotNull Project project) {

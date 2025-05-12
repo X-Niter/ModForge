@@ -529,17 +529,18 @@ public final class CollaborationService {
     }
     
     /**
-     * Removes a participant from the collaboration session.
+     * Notifies that a participant has left the collaboration session.
+     * This method is for UI notifications only and doesn't update the internal participant list.
      * 
-     * @param userId The ID of the participant to remove
+     * @param userId The ID of the participant who left
      */
-    public void removeParticipant(String userId) {
+    public void notifyParticipantLeft(String userId) {
         if (userId == null || userId.isEmpty()) {
-            LOG.warn("Attempted to remove participant with null or empty ID");
+            LOG.warn("Attempted to notify about leaving participant with null or empty ID");
             return;
         }
         
-        LOG.info("Removing participant with ID: " + userId);
+        LOG.info("Notifying about participant leaving with ID: " + userId);
         
         // Notify UI about participant leaving
         Map<String, Object> data = new HashMap<>();
