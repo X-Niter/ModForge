@@ -118,7 +118,7 @@ public class TogglePatternRecognitionAction extends AnAction {
                                 "Pattern recognition has been disabled."
                         );
                     } else {
-                        Messages.showInfoMessage(
+                        CompatibilityUtil.showInfoDialog(
                                 project,
                                 "Pattern recognition has been disabled.",
                                 "Pattern Recognition"
@@ -140,7 +140,7 @@ public class TogglePatternRecognitionAction extends AnAction {
                             "Pattern recognition has been enabled."
                     );
                 } else {
-                    Messages.showInfoMessage(
+                    CompatibilityUtil.showInfoDialog(
                             project,
                             "Pattern recognition has been enabled.",
                             "Pattern Recognition"

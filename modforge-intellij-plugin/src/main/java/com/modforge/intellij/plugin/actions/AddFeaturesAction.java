@@ -165,7 +165,7 @@ public class AddFeaturesAction extends AnAction {
                                                     "\n\nYou can track the progress in the ModForge panel."
                                             );
                                         } else {
-                                            com.intellij.openapi.ui.Messages.showInfoMessage(
+                                            com.modforge.intellij.plugin.utils.CompatibilityUtil.showInfoDialog(
                                                     project,
                                                     message + "\n\nRequest ID: " + requestId + 
                                                     "\n\nYou can track the progress in the ModForge panel.",
