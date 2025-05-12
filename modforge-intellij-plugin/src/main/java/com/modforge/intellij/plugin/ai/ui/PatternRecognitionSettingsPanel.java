@@ -165,7 +165,8 @@ public class PatternRecognitionSettingsPanel implements Configurable {
      */
     private void viewPatterns() {
         // This would require implementing a patterns browser dialog
-        Messages.showInfoMessage(
+        CompatibilityUtil.showInfoDialog(
+                project,
                 "Pattern browser not implemented yet. " +
                 "Please check the logs for pattern information.",
                 "View Patterns");
@@ -276,7 +277,8 @@ public class PatternRecognitionSettingsPanel implements Configurable {
             
             LOG.info("Applied pattern recognition settings changes");
         } catch (NumberFormatException e) {
-            Messages.showErrorDialog(
+            CompatibilityUtil.showErrorDialog(
+                    project,
                     "Invalid input: " + e.getMessage(),
                     "Settings Error");
         }

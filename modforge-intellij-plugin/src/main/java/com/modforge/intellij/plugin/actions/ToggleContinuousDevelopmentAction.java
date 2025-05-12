@@ -13,9 +13,9 @@ import com.intellij.util.ui.FormBuilder;
 import com.intellij.util.ui.JBUI;
 import com.modforge.intellij.plugin.services.ModAuthenticationManager;
 import com.modforge.intellij.plugin.services.ContinuousDevelopmentService;
+import com.modforge.intellij.plugin.utils.CompatibilityUtil;
 import com.modforge.intellij.plugin.services.ModForgeNotificationService;
 import com.modforge.intellij.plugin.settings.ModForgeSettings;
-import com.modforge.intellij.plugin.utils.CompatibilityUtil;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -78,7 +78,7 @@ public class ToggleContinuousDevelopmentAction extends AnAction {
                         "You must be logged in to use continuous development."
                 );
             } else {
-                Messages.showErrorDialog(
+                CompatibilityUtil.showErrorDialog(
                         project,
                         "You must be logged in to use continuous development.",
                         "Authentication Required"
