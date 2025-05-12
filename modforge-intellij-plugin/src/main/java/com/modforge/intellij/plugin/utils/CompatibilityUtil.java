@@ -330,8 +330,16 @@ public final class CompatibilityUtil {
      * @param <T>        The return type.
      * @return The result of the computation.
      */
-    @Nullable
-    public static <T> T computeInWriteAction(@NotNull Callable<T> computable) {
+    /**
+     * Computes a result in a write action using a Callable.
+     * This is different from the Supplier version and is used when 
+     * the computation might throw checked exceptions.
+     * 
+     * @param <T> The return type
+     * @param computable The callable to execute
+     * @return The result of the computation, or null if an error occurred
+     */
+    public static <T> T computeInWriteActionCallable(@NotNull Callable<T> computable) {
         try {
             return WriteAction.compute(computable::call);
         } catch (Exception e) {
