@@ -39,7 +39,7 @@ public final class VirtualFileUtil {
      */
     @Nullable
     public static VirtualFile getVirtualFile(@NotNull String path) {
-        return LocalFileSystem.getInstance().findFileByPath(path);
+        return CompatibilityUtil.findFileByPath(path);
     }
 
     /**
