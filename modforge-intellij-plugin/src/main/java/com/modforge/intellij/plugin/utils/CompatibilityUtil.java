@@ -416,6 +416,32 @@ public final class CompatibilityUtil {
     }
     
     /**
+     * Get the virtual file associated with a problem in a compatible way.
+     * This handles the API differences between IntelliJ IDEA versions where the method
+     * to get the file might be getVirtualFile() or getFile().
+     * 
+     * @param problem The problem object
+     * @return The associated virtual file, or null if not found
+     */
+    @Nullable
+    public static VirtualFile getProblemVirtualFile(@NotNull Object problem) {
+        try {
+            // Try getVirtualFile first (newer versions)
+            java.lang.reflect.Method getFileMethod = problem.getClass().getMethod("getVirtualFile");
+            return (VirtualFile) getFileMethod.invoke(problem);
+        } catch (Exception e) {
+            try {
+                // Fall back to getFile (older versions)
+                java.lang.reflect.Method getFileMethod = problem.getClass().getMethod("getFile");
+                return (VirtualFile) getFileMethod.invoke(problem);
+            } catch (Exception ex) {
+                LOG.debug("Failed to get problem virtual file", ex);
+                return null;
+            }
+        }
+    }
+    
+    /**
      * Compatibility wrapper for WolfTheProblemSolver.getAllProblems().
      * Use this method instead of directly calling problemSolver.getAllProblems().
      * 

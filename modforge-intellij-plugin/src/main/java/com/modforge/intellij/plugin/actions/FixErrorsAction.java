@@ -220,21 +220,9 @@ public class FixErrorsAction extends AnAction {
                     java.util.function.Predicate.class);
                 
                 processProbsMethod.invoke(problemSolver, (java.util.function.Predicate<Object>) problem -> {
-                    // Get file using reflection
                     try {
-                        VirtualFile pFile = null;
-                        try {
-                            java.lang.reflect.Method getFileMethod = problem.getClass().getMethod("getVirtualFile");
-                            pFile = (VirtualFile) getFileMethod.invoke(problem);
-                        } catch (Exception e) {
-                            try {
-                                java.lang.reflect.Method getFileMethod = problem.getClass().getMethod("getFile");
-                                pFile = (VirtualFile) getFileMethod.invoke(problem);
-                            } catch (Exception ex) {
-                                // Couldn't get file, skip this problem
-                                return true;
-                            }
-                        }
+                        // Use compatibility method to get the virtual file
+                        VirtualFile pFile = CompatibilityUtil.getProblemVirtualFile(problem);
                         
                         if (pFile != null && pFile.equals(file)) {
                             problems.add(problem);
@@ -252,19 +240,8 @@ public class FixErrorsAction extends AnAction {
                     
                     processProbsMethod.invoke(problemSolver, (java.util.function.Predicate<Object>) problem -> {
                         try {
-                            VirtualFile pFile = null;
-                            try {
-                                java.lang.reflect.Method getFileMethod = problem.getClass().getMethod("getVirtualFile");
-                                pFile = (VirtualFile) getFileMethod.invoke(problem);
-                            } catch (Exception ex1) {
-                                try {
-                                    java.lang.reflect.Method getFileMethod = problem.getClass().getMethod("getFile");
-                                    pFile = (VirtualFile) getFileMethod.invoke(problem);
-                                } catch (Exception ex2) {
-                                    // Couldn't get file, skip this problem
-                                    return true;
-                                }
-                            }
+                            // Use compatibility method to get the virtual file
+                            VirtualFile pFile = CompatibilityUtil.getProblemVirtualFile(problem);
                             
                             if (pFile != null && pFile.equals(file)) {
                                 problems.add(problem);
