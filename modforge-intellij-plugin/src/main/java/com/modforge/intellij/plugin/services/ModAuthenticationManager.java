@@ -1,7 +1,7 @@
 package com.modforge.intellij.plugin.services;
 
 import com.intellij.openapi.application.ApplicationManager;
-import com.intellij.openapi.components.ServiceManager;
+import com.intellij.openapi.components.Service;
 import com.intellij.openapi.diagnostic.Logger;
 
 import java.util.concurrent.CompletableFuture;
@@ -11,7 +11,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * Manager for authentication with ModForge services.
  * Compatible with IntelliJ IDEA 2025.1.1.1
  */
-public class ModAuthenticationManager {
+@Service(Service.Level.APP)
+public final class ModAuthenticationManager {
     private static final Logger LOG = Logger.getInstance(ModAuthenticationManager.class);
 
     private String username;

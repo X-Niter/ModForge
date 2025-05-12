@@ -459,32 +459,32 @@ for /f "tokens=*" %%p in (%TEMP_DIR%\relocation_patterns.txt) do (
     )
 )
 
-REM Check for deprecated method calls
-echo ## Potentially Problematic Method Calls >> "%RESOLUTION_ERRORS_REPORT%"
+REM Check for deprecated API calls
+echo ## Potentially Problematic API Calls >> "%RESOLUTION_ERRORS_REPORT%"
 echo. >> "%RESOLUTION_ERRORS_REPORT%"
-echo Method calls causing resolution issues: >> "%RESOLUTION_ERRORS_REPORT%"
+echo API calls causing resolution issues: >> "%RESOLUTION_ERRORS_REPORT%"
 echo. >> "%RESOLUTION_ERRORS_REPORT%"
 
-set "METHODS_FOUND=0"
+set "API_CALLS_FOUND=0"
 for %%m in (getBaseDir findFileByPath getInstanceEx getFileSystem resolveFile) do (
-    findstr /s /i /c:".%%m(" "%SOURCE_DIR%\*.java" > "%TEMP_DIR%\problem_methods_%%m.txt" 2>nul
-    if exist "%TEMP_DIR%\problem_methods_%%m.txt" (
-        set "METHODS_FOUND=1"
+    findstr /s /i /c:".%%m(" "%SOURCE_DIR%\*.java" > "%TEMP_DIR%\problem_api_%%m.txt" 2>nul
+    if exist "%TEMP_DIR%\problem_api_%%m.txt" (
+        set "API_CALLS_FOUND=1"
         echo ### Calls to %%m >> "%RESOLUTION_ERRORS_REPORT%"
         echo. >> "%RESOLUTION_ERRORS_REPORT%"
         echo --- Java Code --- >> "%RESOLUTION_ERRORS_REPORT%"
-        type "%TEMP_DIR%\problem_methods_%%m.txt" >> "%RESOLUTION_ERRORS_REPORT%"
+        type "%TEMP_DIR%\problem_api_%%m.txt" >> "%RESOLUTION_ERRORS_REPORT%"
         echo --- End Code --- >> "%RESOLUTION_ERRORS_REPORT%"
         echo. >> "%RESOLUTION_ERRORS_REPORT%"
         
-        REM Add method-specific suggestions
-        call :ADD_METHOD_SUGGESTION "%%m" "%RESOLUTION_ERRORS_REPORT%"
+        REM Add API-specific suggestions
+        call :ADD_API_SUGGESTION "%%m" "%RESOLUTION_ERRORS_REPORT%"
         
         echo. >> "%RESOLUTION_ERRORS_REPORT%"
     )
 )
 
-if "%FOUND_ISSUES%%METHODS_FOUND%"=="00" (
+if "%FOUND_ISSUES%%API_CALLS_FOUND%"=="00" (
     echo No specific resolution issues detected from static analysis. >> "%RESOLUTION_ERRORS_REPORT%"
     echo. >> "%RESOLUTION_ERRORS_REPORT%"
     echo However, build errors indicate there are resolution issues. Check the build log for details. >> "%RESOLUTION_ERRORS_REPORT%"
