@@ -10,6 +10,7 @@ import com.intellij.openapi.util.text.StringUtil;
 import com.intellij.openapi.wm.ToolWindow;
 import com.intellij.openapi.wm.ToolWindowManager;
 import com.modforge.intellij.plugin.services.ModForgeNotificationService;
+import javax.swing.JOptionPane;
 import com.intellij.ui.components.JBLabel;
 import com.intellij.ui.components.JBPanel;
 import com.intellij.ui.components.JBRadioButton;
@@ -225,10 +226,11 @@ public class StartCollaborationAction extends AnAction {
             }
             
             if (joinSessionRadio.isSelected() && StringUtil.isEmpty(sessionIdField.getText())) {
-                Messages.showErrorDialog(
+                JOptionPane.showMessageDialog(
                         getContentPanel(),
                         "Session ID cannot be empty",
-                        "Error"
+                        "Error",
+                        JOptionPane.ERROR_MESSAGE
                 );
                 return;
             }
