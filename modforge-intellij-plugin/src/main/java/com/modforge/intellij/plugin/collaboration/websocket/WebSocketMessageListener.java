@@ -11,7 +11,7 @@ public interface WebSocketMessageListener {
      * Called when a WebSocket message is received.
      * @param message The message
      */
-    void onMessageReceived(@NotNull WebSocketMessage message);
+    void onMessageReceived(@NotNull com.modforge.intellij.plugin.collaboration.websocket.WebSocketMessage message);
     
     /**
      * Called when a WebSocket connection is established.

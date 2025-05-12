@@ -111,7 +111,7 @@ public class ModForgeWebSocketClient {
      *
      * @param message The message to send.
      */
-    public void sendMessage(WebSocketMessage message) {
+    public void sendMessage(com.modforge.intellij.plugin.collaboration.websocket.WebSocketMessage message) {
         if (!isConnected()) {
             LOG.warn("Cannot send message, not connected");
             return;
@@ -146,7 +146,7 @@ public class ModForgeWebSocketClient {
                 messageBuffer.setLength(0);
                 
                 try {
-                    WebSocketMessage parsedMessage = WebSocketMessage.fromJson(message);
+                    com.modforge.intellij.plugin.collaboration.websocket.WebSocketMessage parsedMessage = com.modforge.intellij.plugin.collaboration.websocket.WebSocketMessage.fromJson(message);
                     messageHandler.handleMessage(parsedMessage, project);
                 } catch (Exception e) {
                     LOG.error("Error handling message", e);
