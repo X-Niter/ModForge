@@ -97,10 +97,8 @@ public class GenerateMinecraftCodeAction extends AnAction {
                     String errorMessage = "Code generation failed: " + ex.getMessage();
                     LOG.error(errorMessage, ex);
                     
-                    ModForgeNotificationService notificationService = project.getService(ModForgeNotificationService.class);
-                    if (notificationService != null) {
-                        notificationService.showErrorNotification(project, "Code Generation Error", errorMessage);
-                    }
+                    ModForgeNotificationService notificationService = ModForgeNotificationService.getInstance();
+                    notificationService.showErrorNotification(project, "Code Generation Error", errorMessage);
                 });
                 
                 return null;
