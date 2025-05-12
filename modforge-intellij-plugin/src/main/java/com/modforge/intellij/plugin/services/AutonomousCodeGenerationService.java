@@ -80,13 +80,13 @@ public final class AutonomousCodeGenerationService {
      * Generates code from a description.
      *
      * @param description   The code description.
-     * @param targetPackage The target package.
+     * @param targetPackage The target package as a VirtualFile.
      * @param moduleType    The module type.
      * @return A CompletableFuture that completes with the generated code.
      */
     public CompletableFuture<String> generateCode(
             @NotNull String description,
-            @NotNull String targetPackage,
+            @Nullable VirtualFile targetPackage,
             @NotNull String moduleType) {
         
         if (isGeneratingCode.getAndSet(true)) {

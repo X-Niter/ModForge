@@ -48,10 +48,14 @@ public class GenerateCodeAction extends AnAction {
             moduleType = dialog.getModuleType();
             
             // Generate code
-            codeGenerationService.generateCode(description, targetPackage, moduleType)
+            // Convert String to VirtualFile if needed
+            VirtualFile packageVirtualFile = CompatibilityUtil.getModFileByRelativePath(project, 
+                    "src/main/java/" + targetPackage.replace('.', '/'));
+            
+            codeGenerationService.generateCode(description, packageVirtualFile, moduleType)
                     .thenAccept(generatedCode -> {
                         if (generatedCode != null && !generatedCode.isEmpty()) {
-                            CompatibilityUtil.executeOnUiThread(() -> {
+                            CompatibilityUtil.runOnUiThread(() -> {
                                 // Show the generated code in a dialog
                                 showGeneratedCodeDialog(project, generatedCode, description);
                                 
