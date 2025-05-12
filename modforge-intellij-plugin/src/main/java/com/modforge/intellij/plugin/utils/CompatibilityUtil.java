@@ -57,6 +57,73 @@ public final class CompatibilityUtil {
         // Use ProjectUtil.guessProjectDir which is the recommended way in 2025.1
         return ProjectUtil.guessProjectDir(project);
     }
+    
+    /**
+     * Retrieves a mod file using its relative path from the project root.
+     * 
+     * @param project The project
+     * @param relativePath The relative path from the project root
+     * @return The VirtualFile if found, null otherwise
+     */
+    public static VirtualFile getModFileByRelativePath(@NotNull Project project, String relativePath) {
+        VirtualFile baseDir = getProjectBaseDir(project);
+        if (baseDir == null) {
+            return null;
+        }
+        
+        return baseDir.findFileByRelativePath(relativePath);
+    }
+    
+    /**
+     * Executes the given task on the UI thread.
+     * 
+     * @param runnable The task to execute
+     */
+    public static void executeOnUiThread(Runnable runnable) {
+        if (ApplicationManager.getApplication().isDispatchThread()) {
+            runnable.run();
+        } else {
+            ApplicationManager.getApplication().invokeLater(runnable);
+        }
+    }
+    
+    /**
+     * Computes a result in a write action.
+     * 
+     * @param supplier The supplier that computes the result
+     * @param <T> The type of the result
+     * @return The computed result
+     */
+    public static <T> T computeInWriteAction(Supplier<T> supplier) {
+        if (ApplicationManager.getApplication().isWriteAccessAllowed()) {
+            return supplier.get();
+        } else {
+            try {
+                return WriteAction.compute(supplier::get);
+            } catch (Exception e) {
+                LOG.error("Error executing write action", e);
+                return null;
+            }
+        }
+    }
+    
+    /**
+     * Opens a file in the editor.
+     * 
+     * @param project The project
+     * @param file The file to open
+     * @param requestFocus Whether to request focus
+     */
+    public static void openFileInEditor(@NotNull Project project, VirtualFile file, boolean requestFocus) {
+        if (file == null) {
+            LOG.warn("Cannot open null file in editor");
+            return;
+        }
+        
+        executeOnUiThread(() -> {
+            FileEditorManager.getInstance(project).openFile(file, requestFocus);
+        });
+    }
 
     /**
      * Runs a task under a read action.
