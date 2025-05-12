@@ -156,7 +156,7 @@ public final class ModForgeFileListener implements VirtualFileListener {
         }
         
         // Check if file is in project
-        String projectBasePath = project.getBasePath();
+        String projectBasePath = CompatibilityUtil.getProjectBasePath(project);
         if (projectBasePath != null && !file.getPath().startsWith(projectBasePath)) {
             return false;
         }

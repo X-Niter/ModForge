@@ -3,6 +3,7 @@ package com.modforge.intellij.plugin.services;
 import com.intellij.openapi.components.Service;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.project.Project;
+import com.modforge.intellij.plugin.utils.CompatibilityUtil;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -93,7 +94,14 @@ public final class EmbeddingService {
      */
     @NotNull
     private File getEmbeddingsDirectory() {
-        Path projectPath = Paths.get(project.getBasePath());
+        String basePath = CompatibilityUtil.getProjectBasePath(project);
+        if (basePath == null) {
+            LOG.error("Could not determine project base path");
+            // Fallback to temporary directory
+            return new File(System.getProperty("java.io.tmpdir"), "modforge_embeddings_" + project.getName());
+        }
+        
+        Path projectPath = Paths.get(basePath);
         Path embeddingsPath = projectPath.resolve(".idea").resolve(EMBEDDINGS_DIR);
         return embeddingsPath.toFile();
     }
