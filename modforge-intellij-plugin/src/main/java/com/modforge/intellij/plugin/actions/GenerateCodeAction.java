@@ -1,648 +1,321 @@
 package com.modforge.intellij.plugin.actions;
 
-import com.intellij.openapi.actionSystem.*;
+import com.intellij.openapi.actionSystem.AnAction;
+import com.intellij.openapi.actionSystem.AnActionEvent;
+import com.intellij.openapi.actionSystem.CommonDataKeys;
 import com.intellij.openapi.application.ApplicationManager;
-import com.intellij.openapi.command.WriteCommandAction;
-import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.fileEditor.FileDocumentManager;
-import com.intellij.openapi.fileEditor.FileEditorManager;
-import com.intellij.openapi.progress.ProgressIndicator;
-import com.intellij.openapi.progress.ProgressManager;
-import com.intellij.openapi.progress.Task;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.DialogWrapper;
 import com.intellij.openapi.ui.Messages;
-import com.intellij.openapi.util.TextRange;
 import com.intellij.openapi.vfs.VirtualFile;
-import com.intellij.ui.components.JBLabel;
-import com.intellij.ui.components.JBScrollPane;
-import com.intellij.ui.components.JBTextArea;
-import com.intellij.util.ui.FormBuilder;
+import com.intellij.psi.PsiFile;
+import com.intellij.psi.PsiJavaFile;
 import com.intellij.util.ui.JBUI;
-import com.modforge.intellij.plugin.auth.ModAuthenticationManager;
 import com.modforge.intellij.plugin.services.AutonomousCodeGenerationService;
+import com.modforge.intellij.plugin.services.ModForgeNotificationService;
+import com.modforge.intellij.plugin.ui.CodeGenerationDialog;
+import com.modforge.intellij.plugin.utils.CompatibilityUtil;
 import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
 
 import javax.swing.*;
 import java.awt.*;
-import java.util.concurrent.atomic.AtomicReference;
 
 /**
- * Action for generating code with AI.
+ * Action for generating code using the ModForge AI.
+ * Compatible with IntelliJ IDEA 2025.1.1.1
  */
 public class GenerateCodeAction extends AnAction {
-    private static final Logger LOG = Logger.getInstance(GenerateCodeAction.class);
-    
-    @Override
-    public void update(@NotNull AnActionEvent e) {
-        Project project = e.getProject();
-        Presentation presentation = e.getPresentation();
-        
-        // Disable action if there's no project
-        if (project == null) {
-            presentation.setEnabled(false);
-            return;
-        }
-        
-        // Make sure the user is authenticated
-        ModAuthenticationManager authManager = ModAuthenticationManager.getInstance();
-        if (!authManager.isAuthenticated()) {
-            presentation.setEnabled(false);
-            return;
-        }
-        
-        // Enable action if we have a project and the user is authenticated
-        presentation.setEnabled(true);
-    }
-    
     @Override
     public void actionPerformed(@NotNull AnActionEvent e) {
         Project project = e.getProject();
-        if (project == null) {
-            return;
-        }
+        if (project == null) return;
         
-        // Make sure the user is authenticated
-        ModAuthenticationManager authManager = ModAuthenticationManager.getInstance();
-        if (!authManager.isAuthenticated()) {
-            Messages.showErrorDialog(
-                    project,
-                    "You must be logged in to generate code.",
-                    "Authentication Required"
-            );
-            return;
-        }
+        ModForgeNotificationService notificationService = ModForgeNotificationService.getInstance(project);
+        AutonomousCodeGenerationService codeGenerationService = AutonomousCodeGenerationService.getInstance(project);
         
-        // Get current editor
-        Editor editor = e.getData(CommonDataKeys.EDITOR);
-        VirtualFile file = e.getData(CommonDataKeys.VIRTUAL_FILE);
+        // Determine package and module type
+        String targetPackage = getTargetPackage(e);
+        String moduleType = determineModuleType(project);
         
-        if (editor == null) {
-            // If no editor is open, use the current file from the project
-            FileEditorManager fileEditorManager = FileEditorManager.getInstance(project);
-            editor = fileEditorManager.getSelectedTextEditor();
-            if (editor != null) {
-                file = FileDocumentManager.getInstance().getFile(editor.getDocument());
-            }
-        }
-        
-        // Show dialog to get prompt
-        GenerateCodeDialog dialog = new GenerateCodeDialog(project, file);
+        // Create and show dialog
+        CodeGenerationDialog dialog = new CodeGenerationDialog(project, targetPackage, moduleType);
         if (dialog.showAndGet()) {
-            String prompt = dialog.getPrompt();
-            String language = dialog.getLanguage();
-            boolean createNewFile = dialog.isCreateNewFile();
-            String fileName = dialog.getFileName();
+            // Get user input
+            String description = dialog.getDescription();
+            targetPackage = dialog.getTargetPackage();
+            moduleType = dialog.getModuleType();
             
             // Generate code
-            generateCode(project, editor, file, prompt, language, createNewFile, fileName);
+            codeGenerationService.generateCode(description, targetPackage, moduleType)
+                    .thenAccept(generatedCode -> {
+                        if (generatedCode != null && !generatedCode.isEmpty()) {
+                            CompatibilityUtil.executeOnUiThread(() -> {
+                                // Show the generated code in a dialog
+                                showGeneratedCodeDialog(project, generatedCode, description);
+                                
+                                // Notify success
+                                notificationService.showInfo(
+                                        "Code Generated",
+                                        "Successfully generated code from description: " + description
+                                );
+                            });
+                        } else {
+                            CompatibilityUtil.executeOnUiThread(() -> {
+                                notificationService.showError(
+                                        "Code Generation Failed",
+                                        "Failed to generate code from description: " + description
+                                );
+                            });
+                        }
+                    });
         }
+    }
+
+    @Override
+    public void update(@NotNull AnActionEvent e) {
+        // Only enable in projects
+        Project project = e.getProject();
+        e.getPresentation().setEnabled(project != null);
     }
     
     /**
-     * Generate code with the given prompt.
+     * Determines the target package based on the current file.
      *
-     * @param project       The project
-     * @param editor        The editor (can be null if creating a new file)
-     * @param file          The file (can be null if creating a new file)
-     * @param prompt        The prompt for code generation
-     * @param language      The programming language
-     * @param createNewFile Whether to create a new file
-     * @param fileName      The name of the new file (can be null if not creating a new file)
+     * @param e The action event.
+     * @return The target package name.
      */
-    private void generateCode(
-            @NotNull Project project,
-            @Nullable Editor editor,
-            @Nullable VirtualFile file,
-            @NotNull String prompt,
-            @NotNull String language,
-            boolean createNewFile,
-            @Nullable String fileName
-    ) {
-        // Get code generation service
-        AutonomousCodeGenerationService codeGenService =
-                project.getService(AutonomousCodeGenerationService.class);
+    private String getTargetPackage(@NotNull AnActionEvent e) {
+        Project project = e.getProject();
+        if (project == null) return "com.example.mod";
         
-        if (codeGenService == null) {
-            Messages.showErrorDialog(
-                    project,
-                    "Code generation service is not available.",
-                    "Service Unavailable"
-            );
+        PsiFile psiFile = e.getData(CommonDataKeys.PSI_FILE);
+        if (psiFile instanceof PsiJavaFile) {
+            return ((PsiJavaFile) psiFile).getPackageName();
+        }
+        
+        // Default package
+        return "com.example.mod";
+    }
+    
+    /**
+     * Determines the module type (Forge, Fabric, etc.) for the project.
+     *
+     * @param project The project.
+     * @return The module type.
+     */
+    private String determineModuleType(@NotNull Project project) {
+        // Check for Forge markers
+        VirtualFile forgeToml = CompatibilityUtil.getModFileByRelativePath(project, "src/main/resources/META-INF/mods.toml");
+        if (forgeToml != null && forgeToml.exists()) {
+            return "forge";
+        }
+        
+        // Check for Fabric markers
+        VirtualFile fabricModJson = CompatibilityUtil.getModFileByRelativePath(project, "src/main/resources/fabric.mod.json");
+        if (fabricModJson != null && fabricModJson.exists()) {
+            return "fabric";
+        }
+        
+        // Check for Quilt markers
+        VirtualFile quiltModJson = CompatibilityUtil.getModFileByRelativePath(project, "src/main/resources/quilt.mod.json");
+        if (quiltModJson != null && quiltModJson.exists()) {
+            return "quilt";
+        }
+        
+        // Default to Forge
+        return "forge";
+    }
+    
+    /**
+     * Shows a dialog with the generated code.
+     *
+     * @param project The project.
+     * @param generatedCode The generated code.
+     * @param description The description used to generate the code.
+     */
+    private void showGeneratedCodeDialog(@NotNull Project project, @NotNull String generatedCode, @NotNull String description) {
+        DialogWrapper dialog = new DialogWrapper(project, false) {
+            private JTextArea codeArea;
+            
+            {
+                init();
+                setTitle("Generated Code for: " + description);
+            }
+            
+            @Override
+            protected JComponent createCenterPanel() {
+                JPanel panel = new JPanel(new BorderLayout());
+                panel.setBorder(JBUI.Borders.empty(10));
+                
+                codeArea = new JTextArea(generatedCode);
+                codeArea.setEditable(true);
+                codeArea.setFont(new Font(Font.MONOSPACED, Font.PLAIN, 12));
+                
+                JScrollPane scrollPane = new JScrollPane(codeArea);
+                scrollPane.setPreferredSize(new Dimension(800, 600));
+                
+                panel.add(scrollPane, BorderLayout.CENTER);
+                
+                return panel;
+            }
+            
+            @Override
+            protected JComponent createSouthPanel() {
+                JPanel panel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+                
+                JButton saveButton = new JButton("Save to File...");
+                saveButton.addActionListener(e -> {
+                    saveGeneratedCode(project, codeArea.getText());
+                    close(0);
+                });
+                
+                JButton copyButton = new JButton("Copy to Clipboard");
+                copyButton.addActionListener(e -> {
+                    codeArea.selectAll();
+                    codeArea.copy();
+                });
+                
+                panel.add(copyButton);
+                panel.add(saveButton);
+                panel.add(super.createSouthPanel());
+                
+                return panel;
+            }
+        };
+        
+        dialog.show();
+    }
+    
+    /**
+     * Saves the generated code to a file.
+     *
+     * @param project The project.
+     * @param code The generated code.
+     */
+    private void saveGeneratedCode(@NotNull Project project, @NotNull String code) {
+        // Parse the generated code to determine class name and package
+        String className = parseClassName(code);
+        
+        // Save dialog
+        String fileName = Messages.showInputDialog(
+                project,
+                "Enter file name:",
+                "Save Generated Code",
+                null,
+                className + ".java",
+                null
+        );
+        
+        if (fileName == null) return;
+        
+        // Get target directory
+        VirtualFile baseDir = CompatibilityUtil.getProjectBaseDir(project);
+        if (baseDir == null) {
+            Messages.showErrorDialog(project, "Could not find project base directory.", "Error");
             return;
         }
         
-        // Show progress while generating
-        AtomicReference<String> generatedCode = new AtomicReference<>();
-        ProgressManager.getInstance().run(new Task.Backgroundable(project, "Generating Code") {
-            @Override
-            public void run(@NotNull ProgressIndicator indicator) {
-                indicator.setIndeterminate(true);
-                
-                try {
-                    // Generate code
-                    String code = codeGenService.generateCode(prompt, file, language)
-                            .exceptionally(e -> {
-                                LOG.error("Error generating code", e);
-                                
-                                ApplicationManager.getApplication().invokeLater(() -> {
-                                    Messages.showErrorDialog(
-                                            project,
-                                            "Error generating code: " + e.getMessage(),
-                                            "Generation Error"
-                                    );
-                                });
-                                
-                                return null;
-                            })
-                            .join();
-                    
-                    generatedCode.set(code);
-                } catch (Exception e) {
-                    LOG.error("Error generating code", e);
-                    
-                    ApplicationManager.getApplication().invokeLater(() -> {
-                        Messages.showErrorDialog(
-                                project,
-                                "Error generating code: " + e.getMessage(),
-                                "Generation Error"
-                        );
-                    });
-                }
-            }
-            
-            @Override
-            public void onSuccess() {
-                String code = generatedCode.get();
-                if (code == null || code.isEmpty()) {
-                    return;
-                }
-                
-                if (createNewFile) {
-                    // Create new file
-                    createNewFileWithCode(project, fileName, code, language);
-                } else if (editor != null) {
-                    // Insert into current editor
-                    insertCodeIntoEditor(project, editor, code);
-                }
-            }
-        });
-    }
-    
-    /**
-     * Insert code into the current editor.
-     *
-     * @param project The project
-     * @param editor  The editor
-     * @param code    The code to insert
-     */
-    private void insertCodeIntoEditor(@NotNull Project project, @NotNull Editor editor, @NotNull String code) {
-        Document document = editor.getDocument();
-        
-        // Get the current selection
-        int start = editor.getSelectionModel().getSelectionStart();
-        int end = editor.getSelectionModel().getSelectionEnd();
-        
-        // If no selection, insert at caret
-        if (start == end) {
-            int caretOffset = editor.getCaretModel().getOffset();
-            WriteCommandAction.runWriteCommandAction(project, () -> {
-                document.insertString(caretOffset, code);
-            });
-        } else {
-            // Replace selection
-            WriteCommandAction.runWriteCommandAction(project, () -> {
-                document.replaceString(start, end, code);
-            });
-        }
-    }
-    
-    /**
-     * Create a new file with the generated code.
-     *
-     * @param project  The project
-     * @param fileName The name of the new file
-     * @param code     The code to insert
-     * @param language The programming language
-     */
-    private void createNewFileWithCode(
-            @NotNull Project project,
-            @Nullable String fileName,
-            @NotNull String code,
-            @NotNull String language
-    ) {
         try {
-            // Check if file name is empty
-            if (fileName == null || fileName.trim().isEmpty()) {
-                // Generate a reasonable file name based on language
-                fileName = generateFileNameForLanguage(language);
-            } else if (!fileName.contains(".")) {
-                // Add extension if missing
-                fileName = addExtensionForLanguage(fileName, language);
-            }
-            
-            // Get source roots
-            com.intellij.openapi.roots.ProjectRootManager rootManager = com.intellij.openapi.roots.ProjectRootManager.getInstance(project);
-            VirtualFile[] sourceRoots = rootManager.getContentSourceRoots();
-            
-            if (sourceRoots.length == 0) {
-                LOG.warn("No source roots found in project");
-                // Show dialog to display code if we can't create the file
-                CodeDisplayDialog dialog = new CodeDisplayDialog(project, code, language);
-                dialog.show();
-                return;
-            }
-            
-            // Select root directory - prefer src/main/java for Java or src for other languages
-            VirtualFile targetDir = null;
-            
-            // First try to find appropriate directory based on language
-            for (VirtualFile root : sourceRoots) {
-                if ("Java".equals(language) && root.getPath().contains("/src/main/java")) {
-                    targetDir = root;
-                    break;
-                } else if (root.getPath().contains("/src")) {
-                    targetDir = root;
-                    break;
+            // Find or create the target directory
+            String packagePath = "src/main/java/" + parsePackagePath(code);
+            VirtualFile targetDir = CompatibilityUtil.computeInWriteAction(() -> {
+                VirtualFile dir = baseDir;
+                for (String pathComponent : packagePath.split("/")) {
+                    if (pathComponent.isEmpty()) continue;
+                    
+                    VirtualFile child = dir.findChild(pathComponent);
+                    if (child == null) {
+                        child = dir.createChildDirectory(this, pathComponent);
+                    }
+                    dir = child;
                 }
-            }
-            
-            // If no suitable directory found, use the first source root
-            if (targetDir == null) {
-                targetDir = sourceRoots[0];
-            }
-            
-            // Create the file in the target directory
-            final VirtualFile finalTargetDir = targetDir;
-            final String finalFileName = fileName;
-            
-            // Execute write action to create the file
-            WriteCommandAction.runWriteCommandAction(project, () -> {
-                try {
-                    // Create file
-                    VirtualFile newFile = finalTargetDir.createChildData(this, finalFileName);
-                    
-                    // Write code to file
-                    com.intellij.openapi.vfs.VfsUtil.saveText(newFile, code);
-                    
-                    // Open the file in editor
-                    com.intellij.openapi.fileEditor.OpenFileDescriptor descriptor = 
-                            new com.intellij.openapi.fileEditor.OpenFileDescriptor(project, newFile);
-                    com.intellij.openapi.fileEditor.FileEditorManager.getInstance(project).openEditor(descriptor, true);
-                    
-                    // Show notification
-                    com.intellij.notification.Notification notification = new com.intellij.notification.Notification(
-                            "ModForge",
-                            "File Created",
-                            "Created new file: " + finalFileName,
-                            com.intellij.notification.NotificationType.INFORMATION
-                    );
-                    notification.notify(project);
-                } catch (Exception e) {
-                    LOG.error("Error creating file: " + finalFileName, e);
-                    
-                    // Show error message
-                    ApplicationManager.getApplication().invokeLater(() -> {
-                        Messages.showErrorDialog(
-                                project,
-                                "Error creating file: " + e.getMessage(),
-                                "File Creation Error"
-                        );
-                        
-                        // Show code in dialog as fallback
-                        CodeDisplayDialog dialog = new CodeDisplayDialog(project, code, language);
-                        dialog.show();
-                    });
-                }
+                return dir;
             });
             
-        } catch (Exception e) {
-            LOG.error("Error in file creation", e);
+            // Create the file
+            VirtualFile file = CompatibilityUtil.computeInWriteAction(() -> 
+                targetDir.createChildData(this, fileName)
+            );
             
-            // Show error and fall back to dialog
-            ApplicationManager.getApplication().invokeLater(() -> {
-                Messages.showErrorDialog(
-                        project,
-                        "Error creating file: " + e.getMessage(),
-                        "File Creation Error"
-                );
+            // Write content
+            Document document = FileDocumentManager.getInstance().getDocument(file);
+            if (document != null) {
+                ApplicationManager.getApplication().runWriteAction(() -> {
+                    document.setText(code);
+                    FileDocumentManager.getInstance().saveDocument(document);
+                });
                 
-                // Show code in dialog as fallback
-                CodeDisplayDialog dialog = new CodeDisplayDialog(project, code, language);
-                dialog.show();
-            });
+                // Open the file
+                CompatibilityUtil.openFileInEditor(project, file, true);
+                
+                ModForgeNotificationService.getInstance(project).showInfo(
+                        "Code Saved",
+                        "Generated code saved to " + fileName
+                );
+            }
+        } catch (Exception e) {
+            Messages.showErrorDialog(project, "Error saving file: " + e.getMessage(), "Error");
         }
     }
     
     /**
-     * Generate a file name based on language.
+     * Parses the class name from the generated code.
      *
-     * @param language The programming language
-     * @return A suitable file name with extension
+     * @param code The generated code.
+     * @return The parsed class name, or a default.
      */
-    private String generateFileNameForLanguage(String language) {
-        String baseName = "GeneratedCode";
-        return addExtensionForLanguage(baseName, language);
-    }
-    
-    /**
-     * Add appropriate file extension for the given language.
-     *
-     * @param fileName The file name without extension
-     * @param language The programming language
-     * @return The file name with extension
-     */
-    private String addExtensionForLanguage(String fileName, String language) {
-        if (language == null) {
-            return fileName + ".txt";
-        }
-        
-        switch (language) {
-            case "Java":
-                return fileName + ".java";
-            case "Kotlin":
-                return fileName + ".kt";
-            case "JavaScript":
-                return fileName + ".js";
-            case "TypeScript":
-                return fileName + ".ts";
-            case "Python":
-                return fileName + ".py";
-            case "C":
-                return fileName + ".c";
-            case "C++":
-                return fileName + ".cpp";
-            case "C#":
-                return fileName + ".cs";
-            case "Go":
-                return fileName + ".go";
-            case "Rust":
-                return fileName + ".rs";
-            case "Ruby":
-                return fileName + ".rb";
-            case "PHP":
-                return fileName + ".php";
-            case "Swift":
-                return fileName + ".swift";
-            case "HTML":
-                return fileName + ".html";
-            case "CSS":
-                return fileName + ".css";
-            case "JSON":
-                return fileName + ".json";
-            case "XML":
-                return fileName + ".xml";
-            default:
-                return fileName + ".txt";
-        }
-    }
-    
-    /**
-     * Dialog for generating code.
-     */
-    private static class GenerateCodeDialog extends DialogWrapper {
-        private final JBTextArea promptField;
-        private final JComboBox<String> languageComboBox;
-        private final JCheckBox createNewFileCheckBox;
-        private final JTextField fileNameField;
-        
-        public GenerateCodeDialog(@Nullable Project project, @Nullable VirtualFile contextFile) {
-            super(project);
-            
-            setTitle("Generate Code with ModForge AI");
-            setCancelButtonText("Cancel");
-            setOKButtonText("Generate");
-            
-            // Prompt field
-            promptField = new JBTextArea(10, 50);
-            promptField.setLineWrap(true);
-            promptField.setWrapStyleWord(true);
-            
-            // Language combo box
-            languageComboBox = new JComboBox<>(new String[]{
-                    "Java", "Kotlin", "JavaScript", "TypeScript", "Python", "C", "C++", "C#",
-                    "Go", "Rust", "Ruby", "PHP", "Swift", "HTML", "CSS", "JSON", "XML"
-            });
-            
-            // Set default language based on file extension
-            if (contextFile != null) {
-                String extension = contextFile.getExtension();
-                if (extension != null) {
-                    switch (extension.toLowerCase()) {
-                        case "java":
-                            languageComboBox.setSelectedItem("Java");
-                            break;
-                        case "kt":
-                            languageComboBox.setSelectedItem("Kotlin");
-                            break;
-                        case "js":
-                            languageComboBox.setSelectedItem("JavaScript");
-                            break;
-                        case "ts":
-                            languageComboBox.setSelectedItem("TypeScript");
-                            break;
-                        case "py":
-                            languageComboBox.setSelectedItem("Python");
-                            break;
-                        case "c":
-                            languageComboBox.setSelectedItem("C");
-                            break;
-                        case "cpp":
-                        case "cc":
-                        case "cxx":
-                            languageComboBox.setSelectedItem("C++");
-                            break;
-                        case "cs":
-                            languageComboBox.setSelectedItem("C#");
-                            break;
-                        case "go":
-                            languageComboBox.setSelectedItem("Go");
-                            break;
-                        case "rs":
-                            languageComboBox.setSelectedItem("Rust");
-                            break;
-                        case "rb":
-                            languageComboBox.setSelectedItem("Ruby");
-                            break;
-                        case "php":
-                            languageComboBox.setSelectedItem("PHP");
-                            break;
-                        case "swift":
-                            languageComboBox.setSelectedItem("Swift");
-                            break;
-                        case "html":
-                            languageComboBox.setSelectedItem("HTML");
-                            break;
-                        case "css":
-                            languageComboBox.setSelectedItem("CSS");
-                            break;
-                        case "json":
-                            languageComboBox.setSelectedItem("JSON");
-                            break;
-                        case "xml":
-                            languageComboBox.setSelectedItem("XML");
-                            break;
+    private String parseClassName(@NotNull String code) {
+        // Simple parsing for class/interface/enum name
+        String[] lines = code.split("\n");
+        for (String line : lines) {
+            line = line.trim();
+            if (line.contains("class ") || line.contains("interface ") || line.contains("enum ")) {
+                String[] parts = line.split("\\s+");
+                for (int i = 0; i < parts.length - 1; i++) {
+                    if (parts[i].equals("class") || parts[i].equals("interface") || parts[i].equals("enum")) {
+                        String name = parts[i + 1];
+                        // Remove any generics or implements/extends
+                        int genericStart = name.indexOf('<');
+                        int implementsStart = name.indexOf("implements");
+                        int extendsStart = name.indexOf("extends");
+                        
+                        if (genericStart > 0) {
+                            name = name.substring(0, genericStart);
+                        } else if (implementsStart > 0) {
+                            name = name.substring(0, implementsStart);
+                        } else if (extendsStart > 0) {
+                            name = name.substring(0, extendsStart);
+                        }
+                        
+                        return name.trim();
                     }
                 }
             }
-            
-            // Create new file checkbox
-            createNewFileCheckBox = new JCheckBox("Create new file");
-            createNewFileCheckBox.setSelected(false);
-            
-            // File name field
-            fileNameField = new JTextField();
-            fileNameField.setEnabled(false);
-            
-            // Enable/disable file name field based on checkbox
-            createNewFileCheckBox.addActionListener(e -> {
-                fileNameField.setEnabled(createNewFileCheckBox.isSelected());
-            });
-            
-            init();
         }
         
-        @Override
-        protected @Nullable JComponent createCenterPanel() {
-            // Create a panel with labels and fields
-            FormBuilder formBuilder = FormBuilder.createFormBuilder()
-                    .addLabeledComponent(new JBLabel("Write a description of the code you want to generate:"), new JBScrollPane(promptField), 1, true)
-                    .addLabeledComponent(new JBLabel("Programming language:"), languageComboBox, 1, false)
-                    .addComponent(createNewFileCheckBox, 1)
-                    .addLabeledComponent(new JBLabel("File name:"), fileNameField, 1, false)
-                    .addComponentFillVertically(new JPanel(), 0);
-            
-            // Add a usage hint
-            JBLabel hintLabel = new JBLabel("Hint: Be as specific as possible. Include details about functionality, parameters, etc.");
-            hintLabel.setForeground(JBUI.CurrentTheme.ContextHelp.FOREGROUND);
-            hintLabel.setFont(JBUI.Fonts.smallFont());
-            formBuilder.addComponent(hintLabel);
-            
-            JPanel panel = formBuilder.getPanel();
-            panel.setPreferredSize(new Dimension(600, panel.getPreferredSize().height));
-            
-            return panel;
-        }
-        
-        @Override
-        public @Nullable JComponent getPreferredFocusedComponent() {
-            return promptField;
-        }
-        
-        /**
-         * Get the entered prompt.
-         *
-         * @return The prompt
-         */
-        public String getPrompt() {
-            return promptField.getText().trim();
-        }
-        
-        /**
-         * Get the selected language.
-         *
-         * @return The language
-         */
-        public String getLanguage() {
-            return (String) languageComboBox.getSelectedItem();
-        }
-        
-        /**
-         * Check if a new file should be created.
-         *
-         * @return True if a new file should be created, false otherwise
-         */
-        public boolean isCreateNewFile() {
-            return createNewFileCheckBox.isSelected();
-        }
-        
-        /**
-         * Get the entered file name.
-         *
-         * @return The file name
-         */
-        public String getFileName() {
-            return fileNameField.getText().trim();
-        }
-        
-        @Override
-        protected void doOKAction() {
-            if (getPrompt().isEmpty()) {
-                Messages.showErrorDialog(
-                        getContentPanel(),
-                        "Prompt cannot be empty",
-                        "Validation Error"
-                );
-                return;
-            }
-            
-            if (isCreateNewFile() && getFileName().isEmpty()) {
-                Messages.showErrorDialog(
-                        getContentPanel(),
-                        "File name cannot be empty",
-                        "Validation Error"
-                );
-                return;
-            }
-            
-            super.doOKAction();
-        }
+        return "GeneratedClass";
     }
     
     /**
-     * Dialog for displaying generated code.
+     * Parses the package path from the generated code.
+     *
+     * @param code The generated code.
+     * @return The parsed package path.
      */
-    private static class CodeDisplayDialog extends DialogWrapper {
-        private final String code;
-        private final String language;
-        
-        public CodeDisplayDialog(@Nullable Project project, @NotNull String code, @NotNull String language) {
-            super(project);
-            
-            this.code = code;
-            this.language = language;
-            
-            setTitle("Generated Code - " + language);
-            setOKButtonText("Close");
-            setCancelButtonText("Copy to Clipboard");
-            
-            init();
+    private String parsePackagePath(@NotNull String code) {
+        // Extract package declaration
+        String[] lines = code.split("\n");
+        for (String line : lines) {
+            line = line.trim();
+            if (line.startsWith("package ")) {
+                String packageName = line.substring("package ".length(), line.indexOf(';'));
+                return packageName.replace('.', '/');
+            }
         }
         
-        @Override
-        protected @Nullable JComponent createCenterPanel() {
-            JBTextArea codeField = new JBTextArea(code);
-            codeField.setEditable(false);
-            codeField.setFont(new Font(Font.MONOSPACED, Font.PLAIN, 12));
-            
-            JBScrollPane scrollPane = new JBScrollPane(codeField);
-            scrollPane.setPreferredSize(new Dimension(800, 600));
-            
-            return scrollPane;
-        }
-        
-        @Override
-        protected void doOKAction() {
-            super.doOKAction();
-        }
-        
-        @Override
-        public void doCancelAction() {
-            // Copy to clipboard
-            java.awt.datatransfer.StringSelection selection = new java.awt.datatransfer.StringSelection(code);
-            java.awt.Toolkit.getDefaultToolkit().getSystemClipboard().setContents(selection, null);
-            
-            // Show notification
-            Messages.showInfoMessage(
-                    getContentPanel(),
-                    "Code copied to clipboard",
-                    "Copy Successful"
-            );
-            
-            // Don't close the dialog
-        }
+        return "com/example/mod";
     }
 }

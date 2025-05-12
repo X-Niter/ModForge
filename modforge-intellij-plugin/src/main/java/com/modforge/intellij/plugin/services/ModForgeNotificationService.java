@@ -20,6 +20,16 @@ public final class ModForgeNotificationService {
     private final Project project;
     private static final String NOTIFICATION_GROUP_ID = "ModForge Notifications";
 
+    /**
+     * Gets the instance of the notification service for the specified project.
+     *
+     * @param project The project.
+     * @return The notification service.
+     */
+    public static ModForgeNotificationService getInstance(@NotNull Project project) {
+        return project.getService(ModForgeNotificationService.class);
+    }
+
     public ModForgeNotificationService(Project project) {
         this.project = project;
     }
