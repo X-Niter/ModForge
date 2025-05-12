@@ -13,6 +13,7 @@ import com.intellij.psi.PsiFile;
 import com.intellij.psi.PsiManager;
 import com.intellij.util.concurrency.AppExecutorUtil;
 import com.modforge.intellij.plugin.services.ModAuthenticationManager;
+import com.modforge.intellij.plugin.services.ModForgeNotificationService;
 import com.modforge.intellij.plugin.settings.ModForgeSettings;
 import com.modforge.intellij.plugin.utils.CompatibilityUtil;
 import org.jetbrains.annotations.NotNull;
@@ -95,6 +96,14 @@ public final class ContinuousDevelopmentService {
         ModAuthenticationManager authManager = ModAuthenticationManager.getInstance();
         if (!authManager.isAuthenticated()) {
             LOG.warn("Cannot start continuous development: not authenticated");
+            
+            // Show notification to user
+            ModForgeNotificationService.getInstance(project).showWarningNotification(
+                    project,
+                    "ModForge Continuous Development",
+                    "Cannot start continuous development: You need to be authenticated."
+            );
+            
             return;
         }
         
@@ -107,6 +116,13 @@ public final class ContinuousDevelopmentService {
         );
         
         running.set(true);
+        
+        // Notify user
+        ModForgeNotificationService.getInstance(project).showInfoNotification(
+                project,
+                "ModForge Continuous Development",
+                "Continuous development started for project " + project.getName()
+        );
         
         // Notify listeners
         for (ContinuousDevelopmentListener listener : listeners) {
@@ -131,6 +147,13 @@ public final class ContinuousDevelopmentService {
         }
         
         running.set(false);
+        
+        // Notify user
+        ModForgeNotificationService.getInstance(project).showInfoNotification(
+                project,
+                "ModForge Continuous Development",
+                "Continuous development stopped for project " + project.getName()
+        );
         
         // Notify listeners
         for (ContinuousDevelopmentListener listener : listeners) {
@@ -337,18 +360,46 @@ public final class ContinuousDevelopmentService {
                                     
                                     // Record successful fix
                                     addActionLog("Fixed problems in file " + file.getName());
+                                    
+                                    // Notify user about successful fix
+                                    ModForgeNotificationService.getInstance(project).showInfoNotification(
+                                            project,
+                                            "ModForge Continuous Development",
+                                            "Fixed compilation issues in " + file.getName()
+                                    );
                                 } catch (Exception e) {
                                     LOG.error("Error writing fixed code to file " + file.getName(), e);
+                                    
+                                    // Notify user about the error
+                                    ModForgeNotificationService.getInstance(project).showErrorNotification(
+                                            project,
+                                            "ModForge Continuous Development Error",
+                                            "Failed to write fixed code to file " + file.getName() + ": " + e.getMessage()
+                                    );
                                 }
                             });
                         });
                     }
                 } catch (Exception e) {
                     LOG.error("Error fixing code in file " + file.getName(), e);
+                    
+                    // Notify user about the error
+                    ModForgeNotificationService.getInstance(project).showErrorNotification(
+                            project,
+                            "ModForge AI Error",
+                            "Failed to fix code in " + file.getName() + ": " + e.getMessage()
+                    );
                 }
             }
         } catch (Exception e) {
             LOG.error("Error fixing problems", e);
+            
+            // Notify user about the error
+            ModForgeNotificationService.getInstance(project).showErrorNotification(
+                    project,
+                    "ModForge Continuous Development Error",
+                    "Failed to fix compilation problems: " + e.getMessage()
+            );
         }
     }
     
