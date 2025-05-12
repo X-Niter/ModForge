@@ -6,11 +6,15 @@ import com.intellij.openapi.application.ReadAction;
 import com.intellij.openapi.application.WriteAction;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.editor.Document;
+import com.intellij.openapi.fileEditor.FileEditorManager;
+import com.intellij.openapi.fileEditor.OpenFileDescriptor;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.Computable;
 import com.intellij.openapi.util.ThrowableComputable;
+import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiDocumentManager;
 import com.intellij.psi.PsiFile;
+import com.intellij.ui.Messages;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -254,5 +258,138 @@ public final class CompatibilityUtil {
             LOG.error(errorMsg, e);
             return fallback;
         }
+    }
+    
+    /**
+     * Gets the base directory of a project.
+     *
+     * @param project The project.
+     * @return The base directory or null if not found.
+     */
+    @Nullable
+    public static VirtualFile getProjectBaseDir(@Nullable Project project) {
+        if (project == null) {
+            LOG.warn("Project is null");
+            return null;
+        }
+        
+        try {
+            return ReadAction.compute(() -> project.getBaseDir());
+        } catch (Exception e) {
+            LOG.error("Failed to get project base directory", e);
+            return null;
+        }
+    }
+    
+    /**
+     * Gets a mod file by its relative path.
+     *
+     * @param project       The project.
+     * @param relativePath  The relative path.
+     * @return The file or null if not found.
+     */
+    @Nullable
+    public static VirtualFile getModFileByRelativePath(@NotNull Project project, @NotNull String relativePath) {
+        VirtualFile baseDir = getProjectBaseDir(project);
+        if (baseDir == null) {
+            return null;
+        }
+        
+        try {
+            return ReadAction.compute(() -> baseDir.findFileByRelativePath(relativePath));
+        } catch (Exception e) {
+            LOG.error("Failed to find file by relative path: " + relativePath, e);
+            return null;
+        }
+    }
+    
+    /**
+     * Executes a task on the UI thread.
+     *
+     * @param task The task to run.
+     */
+    public static void executeOnUiThread(@NotNull Runnable task) {
+        Application application = ApplicationManager.getApplication();
+        
+        if (application.isDispatchThread()) {
+            task.run();
+        } else {
+            application.invokeLater(task);
+        }
+    }
+    
+    /**
+     * Computes a value with write access.
+     *
+     * @param action The action to run.
+     * @param <T>    The return type.
+     * @return The result of the action.
+     */
+    public static <T> T computeInWriteAction(@NotNull Computable<T> action) {
+        Application application = ApplicationManager.getApplication();
+        
+        if (application.isWriteAccessAllowed()) {
+            return action.compute();
+        } else {
+            try {
+                return WriteAction.computeAndWait(action);
+            } catch (Throwable e) {
+                LOG.error("Failed to compute in write action", e);
+                throw new RuntimeException("Failed to compute in write action", e);
+            }
+        }
+    }
+    
+    /**
+     * Opens a file in the editor.
+     *
+     * @param project   The project.
+     * @param file      The file.
+     * @param focus     Whether to focus the editor.
+     */
+    public static void openFileInEditor(@NotNull Project project, @NotNull VirtualFile file, boolean focus) {
+        executeOnUiThread(() -> {
+            try {
+                FileEditorManager fileEditorManager = FileEditorManager.getInstance(project);
+                OpenFileDescriptor descriptor = new OpenFileDescriptor(project, file);
+                fileEditorManager.openEditor(descriptor, focus);
+            } catch (Exception e) {
+                LOG.error("Failed to open file in editor: " + file.getPath(), e);
+            }
+        });
+    }
+    
+    /**
+     * Shows an info dialog.
+     *
+     * @param project  The project.
+     * @param message  The message.
+     * @param title    The title.
+     */
+    public static void showInfoDialog(@Nullable Project project, @NotNull String message, @NotNull String title) {
+        executeOnUiThread(() -> {
+            try {
+                Messages.showInfoMessage(project, message, title);
+            } catch (Exception e) {
+                LOG.error("Failed to show info dialog", e);
+            }
+        });
+    }
+    
+    /**
+     * Shows an error dialog.
+     *
+     * @param project  The project.
+     * @param message  The message.
+     * @param title    The title.
+     */
+    public static void showErrorDialog(@Nullable Project project, @NotNull String message, @NotNull String title) {
+        executeOnUiThread(() -> {
+            try {
+                Messages.showErrorDialog(project, message, title);
+            } catch (Exception e) {
+                LOG.error("Failed to show error dialog", e);
+            }
+        });
     }
 }

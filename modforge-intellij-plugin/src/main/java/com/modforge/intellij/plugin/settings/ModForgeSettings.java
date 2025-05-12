@@ -1,59 +1,57 @@
 package com.modforge.intellij.plugin.settings;
 
-import com.intellij.credentialStore.CredentialAttributes;
-import com.intellij.credentialStore.CredentialAttributesKt;
-import com.intellij.credentialStore.Credentials;
-import com.intellij.ide.passwordSafe.PasswordSafe;
 import com.intellij.openapi.application.ApplicationManager;
-import com.intellij.openapi.components.PersistentStateComponent;
-import com.intellij.openapi.components.Service;
-import com.intellij.openapi.components.State;
-import com.intellij.openapi.components.Storage;
+import com.intellij.openapi.components.*;
+import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.options.ShowSettingsUtil;
 import com.intellij.openapi.project.Project;
 import com.intellij.util.xmlb.XmlSerializerUtil;
+import com.intellij.util.xmlb.annotations.Attribute;
+import com.intellij.util.xmlb.annotations.Tag;
 import com.intellij.util.xmlb.annotations.Transient;
 import com.modforge.intellij.plugin.ui.ModForgeConfigurable;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * Persistent settings for ModForge.
+ * Persistent settings for the ModForge plugin.
  * Compatible with IntelliJ IDEA 2025.1.1.1
  */
 @Service
 @State(
-        name = "ModForgeSettings",
-        storages = @Storage("modForgeSettings.xml")
+        name = "com.modforge.intellij.plugin.settings.ModForgeSettings",
+        storages = {
+                @Storage("modforge.xml")
+        }
 )
-public class ModForgeSettings implements PersistentStateComponent<ModForgeSettings> {
-    private static final String CREDENTIAL_SERVICE_NAME = "ModForge";
-    private static final String ACCESS_TOKEN_KEY = "accessToken";
+public final class ModForgeSettings implements PersistentStateComponent<ModForgeSettings> {
+    private static final Logger LOG = Logger.getInstance(ModForgeSettings.class);
     
-    // Server settings
-    private String serverUrl = "https://modforge.ai";
+    // General settings
+    @Attribute("serverUrl")
+    private String serverUrl = "https://modforge.ai/api";
+    
+    @Attribute("requestTimeout")
+    private int requestTimeout = 30;
+    
+    @Attribute("enablePatternRecognition")
+    private boolean enablePatternRecognition = true;
+    
+    @Attribute("enableContinuousDevelopment")
+    private boolean enableContinuousDevelopment = false;
     
     // GitHub settings
-    private String gitHubUsername = "";
-    private boolean useGitHubAuthentication = true;
+    @Attribute("githubUsername")
+    private String githubUsername = "";
     
-    // Feature settings
-    private boolean patternRecognition = true;
-    private boolean continuousDevelopment = false;
-    private boolean analyticsEnabled = true;
-    private boolean autoCommit = false;
-    private boolean autoSave = true;
-    private boolean autoSync = false;
+    @Transient
+    private String accessToken = "";
     
-    // Minecraft settings
-    private String defaultLanguage = "java";
-    private String defaultModLoader = "forge";
-    private int minecraftVersion = 120;
-    
-    // Performance settings
-    private int maxThreads = 4;
-    private int requestTimeout = 30;
-    private String gitExecutablePath = "";
+    /**
+     * Default constructor.
+     */
+    public ModForgeSettings() {
+    }
 
     /**
      * Gets the instance of the settings.
@@ -65,9 +63,9 @@ public class ModForgeSettings implements PersistentStateComponent<ModForgeSettin
     }
 
     /**
-     * Gets the state of the settings.
+     * Gets the state.
      *
-     * @return The settings state.
+     * @return The state.
      */
     @Nullable
     @Override
@@ -76,7 +74,7 @@ public class ModForgeSettings implements PersistentStateComponent<ModForgeSettin
     }
 
     /**
-     * Loads the state of the settings.
+     * Loads the state.
      *
      * @param state The state to load.
      */
@@ -86,21 +84,11 @@ public class ModForgeSettings implements PersistentStateComponent<ModForgeSettin
     }
 
     /**
-     * Opens the settings dialog.
-     *
-     * @param project The project.
-     */
-    public void openSettings(@NotNull Project project) {
-        ShowSettingsUtil.getInstance().showSettingsDialog(project, ModForgeConfigurable.class);
-    }
-
-    // Getters and setters
-
-    /**
      * Gets the server URL.
      *
      * @return The server URL.
      */
+    @NotNull
     public String getServerUrl() {
         return serverUrl;
     }
@@ -110,257 +98,8 @@ public class ModForgeSettings implements PersistentStateComponent<ModForgeSettin
      *
      * @param serverUrl The server URL.
      */
-    public void setServerUrl(String serverUrl) {
+    public void setServerUrl(@NotNull String serverUrl) {
         this.serverUrl = serverUrl;
-    }
-
-    /**
-     * Gets the GitHub username.
-     *
-     * @return The GitHub username.
-     */
-    public String getGitHubUsername() {
-        return gitHubUsername;
-    }
-
-    /**
-     * Sets the GitHub username.
-     *
-     * @param gitHubUsername The GitHub username.
-     */
-    public void setGitHubUsername(String gitHubUsername) {
-        this.gitHubUsername = gitHubUsername;
-    }
-
-    /**
-     * Gets the access token from the password safe.
-     *
-     * @return The access token.
-     */
-    @Transient
-    public String getAccessToken() {
-        CredentialAttributes attributes = createCredentialAttributes(ACCESS_TOKEN_KEY);
-        Credentials credentials = PasswordSafe.getInstance().get(attributes);
-        return credentials != null ? credentials.getPasswordAsString() : null;
-    }
-
-    /**
-     * Sets the access token in the password safe.
-     *
-     * @param accessToken The access token.
-     */
-    public void setAccessToken(@Nullable String accessToken) {
-        CredentialAttributes attributes = createCredentialAttributes(ACCESS_TOKEN_KEY);
-        Credentials credentials = new Credentials(gitHubUsername, accessToken);
-        PasswordSafe.getInstance().set(attributes, credentials);
-    }
-
-    /**
-     * Creates credential attributes for a key.
-     *
-     * @param key The key.
-     * @return The credential attributes.
-     */
-    private @NotNull CredentialAttributes createCredentialAttributes(@NotNull String key) {
-        return new CredentialAttributes(CredentialAttributesKt.generateServiceName(CREDENTIAL_SERVICE_NAME, key));
-    }
-
-    /**
-     * Checks if GitHub authentication is enabled.
-     *
-     * @return Whether GitHub authentication is enabled.
-     */
-    public boolean isUseGitHubAuthentication() {
-        return useGitHubAuthentication;
-    }
-
-    /**
-     * Sets whether GitHub authentication is enabled.
-     *
-     * @param useGitHubAuthentication Whether GitHub authentication is enabled.
-     */
-    public void setUseGitHubAuthentication(boolean useGitHubAuthentication) {
-        this.useGitHubAuthentication = useGitHubAuthentication;
-    }
-
-    /**
-     * Checks if pattern recognition is enabled.
-     *
-     * @return Whether pattern recognition is enabled.
-     */
-    public boolean isPatternRecognition() {
-        return patternRecognition;
-    }
-
-    /**
-     * Sets whether pattern recognition is enabled.
-     *
-     * @param patternRecognition Whether pattern recognition is enabled.
-     */
-    public void setPatternRecognition(boolean patternRecognition) {
-        this.patternRecognition = patternRecognition;
-    }
-
-    /**
-     * Checks if continuous development is enabled.
-     *
-     * @return Whether continuous development is enabled.
-     */
-    public boolean isContinuousDevelopment() {
-        return continuousDevelopment;
-    }
-
-    /**
-     * Sets whether continuous development is enabled.
-     *
-     * @param continuousDevelopment Whether continuous development is enabled.
-     */
-    public void setContinuousDevelopment(boolean continuousDevelopment) {
-        this.continuousDevelopment = continuousDevelopment;
-    }
-
-    /**
-     * Checks if analytics is enabled.
-     *
-     * @return Whether analytics is enabled.
-     */
-    public boolean isAnalyticsEnabled() {
-        return analyticsEnabled;
-    }
-
-    /**
-     * Sets whether analytics is enabled.
-     *
-     * @param analyticsEnabled Whether analytics is enabled.
-     */
-    public void setAnalyticsEnabled(boolean analyticsEnabled) {
-        this.analyticsEnabled = analyticsEnabled;
-    }
-
-    /**
-     * Checks if auto commit is enabled.
-     *
-     * @return Whether auto commit is enabled.
-     */
-    public boolean isAutoCommit() {
-        return autoCommit;
-    }
-
-    /**
-     * Sets whether auto commit is enabled.
-     *
-     * @param autoCommit Whether auto commit is enabled.
-     */
-    public void setAutoCommit(boolean autoCommit) {
-        this.autoCommit = autoCommit;
-    }
-
-    /**
-     * Checks if auto save is enabled.
-     *
-     * @return Whether auto save is enabled.
-     */
-    public boolean isAutoSave() {
-        return autoSave;
-    }
-
-    /**
-     * Sets whether auto save is enabled.
-     *
-     * @param autoSave Whether auto save is enabled.
-     */
-    public void setAutoSave(boolean autoSave) {
-        this.autoSave = autoSave;
-    }
-
-    /**
-     * Checks if auto sync is enabled.
-     *
-     * @return Whether auto sync is enabled.
-     */
-    public boolean isAutoSync() {
-        return autoSync;
-    }
-
-    /**
-     * Sets whether auto sync is enabled.
-     *
-     * @param autoSync Whether auto sync is enabled.
-     */
-    public void setAutoSync(boolean autoSync) {
-        this.autoSync = autoSync;
-    }
-
-    /**
-     * Gets the default language.
-     *
-     * @return The default language.
-     */
-    public String getDefaultLanguage() {
-        return defaultLanguage;
-    }
-
-    /**
-     * Sets the default language.
-     *
-     * @param defaultLanguage The default language.
-     */
-    public void setDefaultLanguage(String defaultLanguage) {
-        this.defaultLanguage = defaultLanguage;
-    }
-
-    /**
-     * Gets the default mod loader.
-     *
-     * @return The default mod loader.
-     */
-    public String getDefaultModLoader() {
-        return defaultModLoader;
-    }
-
-    /**
-     * Sets the default mod loader.
-     *
-     * @param defaultModLoader The default mod loader.
-     */
-    public void setDefaultModLoader(String defaultModLoader) {
-        this.defaultModLoader = defaultModLoader;
-    }
-
-    /**
-     * Gets the Minecraft version.
-     *
-     * @return The Minecraft version.
-     */
-    public int getMinecraftVersion() {
-        return minecraftVersion;
-    }
-
-    /**
-     * Sets the Minecraft version.
-     *
-     * @param minecraftVersion The Minecraft version.
-     */
-    public void setMinecraftVersion(int minecraftVersion) {
-        this.minecraftVersion = minecraftVersion;
-    }
-
-    /**
-     * Gets the maximum number of threads.
-     *
-     * @return The maximum number of threads.
-     */
-    public int getMaxThreads() {
-        return maxThreads;
-    }
-
-    /**
-     * Sets the maximum number of threads.
-     *
-     * @param maxThreads The maximum number of threads.
-     */
-    public void setMaxThreads(int maxThreads) {
-        this.maxThreads = maxThreads;
     }
 
     /**
@@ -382,20 +121,85 @@ public class ModForgeSettings implements PersistentStateComponent<ModForgeSettin
     }
 
     /**
-     * Gets the Git executable path.
+     * Checks if pattern recognition is enabled.
      *
-     * @return The Git executable path.
+     * @return Whether pattern recognition is enabled.
      */
-    public String getGitExecutablePath() {
-        return gitExecutablePath;
+    public boolean isPatternRecognition() {
+        return enablePatternRecognition;
     }
 
     /**
-     * Sets the Git executable path.
+     * Sets whether pattern recognition is enabled.
      *
-     * @param gitExecutablePath The Git executable path.
+     * @param enablePatternRecognition Whether pattern recognition is enabled.
      */
-    public void setGitExecutablePath(String gitExecutablePath) {
-        this.gitExecutablePath = gitExecutablePath;
+    public void setPatternRecognition(boolean enablePatternRecognition) {
+        this.enablePatternRecognition = enablePatternRecognition;
+    }
+
+    /**
+     * Checks if continuous development is enabled.
+     *
+     * @return Whether continuous development is enabled.
+     */
+    public boolean isEnableContinuousDevelopment() {
+        return enableContinuousDevelopment;
+    }
+
+    /**
+     * Sets whether continuous development is enabled.
+     *
+     * @param enableContinuousDevelopment Whether continuous development is enabled.
+     */
+    public void setEnableContinuousDevelopment(boolean enableContinuousDevelopment) {
+        this.enableContinuousDevelopment = enableContinuousDevelopment;
+    }
+
+    /**
+     * Gets the GitHub username.
+     *
+     * @return The GitHub username.
+     */
+    @NotNull
+    public String getGitHubUsername() {
+        return githubUsername != null ? githubUsername : "";
+    }
+
+    /**
+     * Sets the GitHub username.
+     *
+     * @param githubUsername The GitHub username.
+     */
+    public void setGitHubUsername(@Nullable String githubUsername) {
+        this.githubUsername = githubUsername;
+    }
+
+    /**
+     * Gets the access token.
+     *
+     * @return The access token.
+     */
+    @Nullable
+    public String getAccessToken() {
+        return accessToken;
+    }
+
+    /**
+     * Sets the access token.
+     *
+     * @param accessToken The access token.
+     */
+    public void setAccessToken(@Nullable String accessToken) {
+        this.accessToken = accessToken;
+    }
+    
+    /**
+     * Opens the settings dialog.
+     *
+     * @param project The project.
+     */
+    public void openSettings(@Nullable Project project) {
+        ShowSettingsUtil.getInstance().showSettingsDialog(project, ModForgeConfigurable.class);
     }
 }
