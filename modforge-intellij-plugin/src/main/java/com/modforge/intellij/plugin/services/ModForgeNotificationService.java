@@ -7,6 +7,7 @@ import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.Messages;
 import com.intellij.util.ui.UIUtil;
+import com.modforge.intellij.plugin.utils.CompatibilityUtil;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -25,10 +26,10 @@ public final class ModForgeNotificationService {
             NotificationGroupManager.getInstance().getNotificationGroup("ModForge Notifications");
     
     // Constants for dialog return values
-    public static final int YES = Messages.YES;
-    public static final int NO = Messages.NO;
-    public static final int OK = Messages.OK;
-    public static final int CANCEL = Messages.CANCEL;
+    public static final int YES = CompatibilityUtil.DIALOG_YES;
+    public static final int NO = CompatibilityUtil.DIALOG_NO;
+    public static final int OK = CompatibilityUtil.DIALOG_OK;
+    public static final int CANCEL = CompatibilityUtil.DIALOG_CANCEL;
     
     /**
      * Gets the instance of the service.

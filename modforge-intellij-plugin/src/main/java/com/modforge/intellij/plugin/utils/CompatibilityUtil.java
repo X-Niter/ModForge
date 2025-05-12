@@ -645,7 +645,7 @@ public final class CompatibilityUtil {
                     LOG.error("Failed to show yes/no dialog", ex);
                     // Last resort - default to NO and show error
                     ModForgeNotificationService.getInstance().showWarning(title, message + " (Dialog failed, defaulting to NO)");
-                    result[0] = Messages.NO;
+                    result[0] = DIALOG_NO;
                 }
             }
         });
