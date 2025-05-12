@@ -66,7 +66,7 @@ public class TestAuthEndpointsAction extends AnAction {
                     results.toString()
             );
         } else {
-            Messages.showInfoMessage(project, results.toString(), "Authentication Test Results");
+            CompatibilityUtil.showInfoDialog(project, results.toString(), "Authentication Test Results");
         }
         
         LOG.info("Completed testing authentication endpoints");

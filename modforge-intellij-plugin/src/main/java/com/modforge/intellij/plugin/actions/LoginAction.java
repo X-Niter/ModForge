@@ -93,7 +93,7 @@ public class LoginAction extends AnAction {
                                         "Successfully logged in as " + authManager.getUsername()
                                 );
                             } else {
-                                Messages.showInfoMessage(
+                                CompatibilityUtil.showInfoDialog(
                                         project,
                                         "Successfully logged in as " + authManager.getUsername(),
                                         "Login Successful"
@@ -147,7 +147,7 @@ public class LoginAction extends AnAction {
                         "Continuous development is enabled in settings. You can start it from the ModForge menu."
                 );
             } else {
-                Messages.showInfoMessage(
+                CompatibilityUtil.showInfoDialog(
                         project,
                         "Continuous development is enabled in settings. You can start it from the ModForge menu.",
                         "Continuous Development"
