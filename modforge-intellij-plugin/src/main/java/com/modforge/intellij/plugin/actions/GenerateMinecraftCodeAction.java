@@ -81,14 +81,12 @@ public class GenerateMinecraftCodeAction extends AnAction {
             .thenAccept(generatedCode -> {
                 // Show success notification
                 SwingUtilities.invokeLater(() -> {
-                    ModForgeNotificationService notificationService = project.getService(ModForgeNotificationService.class);
-                    if (notificationService != null) {
-                        String message = "Generated " + generatedCode.getCodeType().name().toLowerCase() + 
-                                       " code for " + generatedCode.getClassName() + " at " + 
-                                       generatedCode.getFilePath();
-                        
-                        notificationService.showInfoNotification(project, "Code Generation Success", message);
-                    }
+                    ModForgeNotificationService notificationService = ModForgeNotificationService.getInstance();
+                    String message = "Generated " + generatedCode.getCodeType().name().toLowerCase() + 
+                                   " code for " + generatedCode.getClassName() + " at " + 
+                                   generatedCode.getFilePath();
+                    
+                    notificationService.showInfoNotification(project, "Code Generation Success", message);
                 });
             })
             .exceptionally(ex -> {
