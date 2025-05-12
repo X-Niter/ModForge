@@ -106,7 +106,7 @@ public final class CollaborationService {
         LOG.info("Added participant: " + username + " (ID: " + userId + ")");
         
         // Create and add a participant object for UI notification
-        addParticipant(new Participant(userId, username, false));
+        notifyParticipantJoined(new Participant(userId, username, false));
         
         return true;
     }
@@ -511,7 +511,7 @@ public final class CollaborationService {
      * 
      * @param participant The participant to add
      */
-    public void addParticipant(@NotNull Participant participant) {
+    public void notifyParticipantJoined(@NotNull Participant participant) {
         if (participant == null) {
             LOG.warn("Attempted to add null participant");
             return;
