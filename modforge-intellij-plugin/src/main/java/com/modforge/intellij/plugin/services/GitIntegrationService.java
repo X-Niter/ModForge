@@ -139,7 +139,7 @@ public final class GitIntegrationService {
                 return null;
             }
         }).thenAccept(changes -> {
-            CompatibilityUtil.executeOnUiThread(() -> callback.accept(changes != null ? changes : List.of()));
+            CompatibilityUtil.runOnUiThread(() -> callback.accept(changes != null ? changes : List.of()));
         });
     }
 
@@ -159,7 +159,7 @@ public final class GitIntegrationService {
                 return "main"; // Default to main if the command fails
             }
         }).thenAccept(branch -> {
-            CompatibilityUtil.executeOnUiThread(() -> callback.accept(branch));
+            CompatibilityUtil.runOnUiThread(() -> callback.accept(branch));
         });
     }
 
@@ -180,7 +180,7 @@ public final class GitIntegrationService {
                 return false;
             }
         }).thenAccept(success -> {
-            CompatibilityUtil.executeOnUiThread(() -> callback.accept(success));
+            CompatibilityUtil.runOnUiThread(() -> callback.accept(success));
         });
     }
 
@@ -201,7 +201,7 @@ public final class GitIntegrationService {
                 return false;
             }
         }).thenAccept(success -> {
-            CompatibilityUtil.executeOnUiThread(() -> callback.accept(success));
+            CompatibilityUtil.runOnUiThread(() -> callback.accept(success));
         });
     }
 
@@ -232,7 +232,7 @@ public final class GitIntegrationService {
                 return false;
             }
         }).thenAccept(success -> {
-            CompatibilityUtil.executeOnUiThread(() -> callback.accept(success));
+            CompatibilityUtil.runOnUiThread(() -> callback.accept(success));
         });
     }
 
@@ -255,7 +255,7 @@ public final class GitIntegrationService {
                             return false;
                         }
                     }).thenAccept(pushSuccess -> {
-                        CompatibilityUtil.executeOnUiThread(() -> callback.accept(pushSuccess));
+                        CompatibilityUtil.runOnUiThread(() -> callback.accept(pushSuccess));
                     });
                 });
                 
@@ -267,7 +267,7 @@ public final class GitIntegrationService {
             }
         }).thenAccept(success -> {
             if (success != null && !success) {
-                CompatibilityUtil.executeOnUiThread(() -> callback.accept(false));
+                CompatibilityUtil.runOnUiThread(() -> callback.accept(false));
             }
         });
     }
@@ -288,7 +288,7 @@ public final class GitIntegrationService {
                 return false;
             }
         }).thenAccept(success -> {
-            CompatibilityUtil.executeOnUiThread(() -> callback.accept(success));
+            CompatibilityUtil.runOnUiThread(() -> callback.accept(success));
         });
     }
 

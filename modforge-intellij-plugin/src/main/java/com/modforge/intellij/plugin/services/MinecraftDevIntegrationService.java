@@ -100,7 +100,7 @@ public final class MinecraftDevIntegrationService {
                 return ModLoader.FORGE; // Default to Forge on error
             }
         }).thenAccept(modLoader -> {
-            CompatibilityUtil.executeOnUiThread(() -> callback.accept(modLoader));
+            CompatibilityUtil.runOnUiThread(() -> callback.accept(modLoader));
         });
     }
 
@@ -136,7 +136,7 @@ public final class MinecraftDevIntegrationService {
                 return false;
             }
         }).thenAccept(success -> {
-            CompatibilityUtil.executeOnUiThread(() -> {
+            CompatibilityUtil.runOnUiThread(() -> {
                 if (success) {
                     notificationService.showInfo("Mod Created", "Successfully created basic structure for " + modName);
                 } else {
@@ -179,7 +179,7 @@ public final class MinecraftDevIntegrationService {
                 return null;
             }
         }).thenAccept(file -> {
-            CompatibilityUtil.executeOnUiThread(() -> {
+            CompatibilityUtil.runOnUiThread(() -> {
                 if (file != null) {
                     notificationService.showInfo(elementType + " Created", "Successfully created " + elementName);
                 } else {
@@ -212,7 +212,7 @@ public final class MinecraftDevIntegrationService {
                 return false;
             }
         }).thenAccept(success -> {
-            CompatibilityUtil.executeOnUiThread(() -> {
+            CompatibilityUtil.runOnUiThread(() -> {
                 if (success) {
                     notificationService.showInfo("Conversion Complete", "Successfully converted mod to cross-loader format");
                 } else {
@@ -250,7 +250,7 @@ public final class MinecraftDevIntegrationService {
                 return new ArrayList<>();
             }
         }).thenAccept(elements -> {
-            CompatibilityUtil.executeOnUiThread(() -> callback.accept(elements));
+            CompatibilityUtil.runOnUiThread(() -> callback.accept(elements));
         });
     }
 
@@ -276,7 +276,7 @@ public final class MinecraftDevIntegrationService {
                 return "1.20.1"; // Default version on error
             }
         }).thenAccept(version -> {
-            CompatibilityUtil.executeOnUiThread(() -> callback.accept(version));
+            CompatibilityUtil.runOnUiThread(() -> callback.accept(version));
         });
     }
 }
