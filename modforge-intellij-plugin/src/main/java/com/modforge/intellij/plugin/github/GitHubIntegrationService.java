@@ -12,6 +12,7 @@ import com.intellij.openapi.project.Project;
 import com.intellij.serviceContainer.AlreadyDisposedException;
 import com.intellij.util.concurrency.annotations.RequiresBackgroundThread;
 import com.modforge.intellij.plugin.utils.ConnectionTestUtil;
+import com.modforge.intellij.plugin.utils.CompatibilityUtil;
 import org.jetbrains.annotations.NotNull;
 import org.kohsuke.github.*;
 
