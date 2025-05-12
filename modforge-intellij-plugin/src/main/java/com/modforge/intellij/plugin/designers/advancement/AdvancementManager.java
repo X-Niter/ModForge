@@ -45,7 +45,7 @@ public final class AdvancementManager {
         rootAdvancements.clear();
         
         try {
-            VirtualFile baseDir = LocalFileSystem.getInstance().findFileByPath(basePath);
+            VirtualFile baseDir = CompatibilityUtil.findFileByPath(basePath);
             if (baseDir == null || !baseDir.isDirectory()) {
                 LOG.warn("Invalid base path for advancements: " + basePath);
                 return 0;
@@ -117,7 +117,8 @@ public final class AdvancementManager {
             }
             
             // Refresh the virtual file system
-            LocalFileSystem.getInstance().refreshAndFindFileByPath(outputPath);
+            LocalFileSystem.getInstance().refresh(true);
+            CompatibilityUtil.findFileByPath(outputPath);
             
             return savedCount;
             

@@ -5,6 +5,7 @@ import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vfs.LocalFileSystem;
 import com.intellij.openapi.vfs.VirtualFile;
+import com.modforge.intellij.plugin.utils.CompatibilityUtil;
 import com.modforge.intellij.plugin.designers.structure.models.BlockState;
 import com.modforge.intellij.plugin.designers.structure.models.StructureModel;
 import com.modforge.intellij.plugin.designers.structure.models.StructurePart;
@@ -45,7 +46,7 @@ public final class StructureManager {
         structures.clear();
         
         try {
-            VirtualFile baseDir = LocalFileSystem.getInstance().findFileByPath(basePath);
+            VirtualFile baseDir = CompatibilityUtil.findFileByPath(basePath);
             if (baseDir == null || !baseDir.isDirectory()) {
                 LOG.warn("Invalid base path for structures: " + basePath);
                 return 0;
