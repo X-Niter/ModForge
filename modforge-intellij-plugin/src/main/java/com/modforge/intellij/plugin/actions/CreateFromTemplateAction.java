@@ -371,6 +371,7 @@ public class CreateFromTemplateAction extends AnAction {
      * Dialog for configuring a template.
      */
     private static class TemplateConfigurationDialog extends DialogWrapper {
+        private final Project project;
         private final ModTemplate template;
         private final Map<String, JTextField> variableFields = new HashMap<>();
         private final JBTextField outputDirField;
