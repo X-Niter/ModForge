@@ -48,6 +48,21 @@ public final class CollaborationService {
     public static CollaborationService getInstance(@NotNull Project project) {
         return project.getService(CollaborationService.class);
     }
+    
+    /**
+     * Gets an instance of the CollaborationService.
+     * Note: This method is provided for backward compatibility.
+     * The actual implementation needs a project parameter, so this will return null
+     * when used outside of a project context.
+     *
+     * @return The CollaborationService instance, or null if no active project
+     */
+    @Nullable
+    public static CollaborationService getInstance() {
+        // This is a compatibility method - real implementation requires a project
+        LOG.warn("CollaborationService.getInstance() called without project parameter");
+        return null;
+    }
     private ScheduledFuture<?> pingTask;
     
     // Maps file paths to editors
@@ -70,13 +85,51 @@ public final class CollaborationService {
         LOG.info("CollaborationService initialized for project: " + project.getName());
     }
     
+    // Map to track collaboration participants
+    private final Map<String, ParticipantInfo> participants = new ConcurrentHashMap<>();
+    
     /**
-     * Gets the CollaborationService instance.
-     * @param project The project
-     * @return The CollaborationService instance
+     * Adds a participant to the collaboration session.
+     * 
+     * @param userId The user ID
+     * @param username The username
+     * @return True if the participant was added, false if already present
      */
-    public static CollaborationService getInstance(@NotNull Project project) {
-        return project.getService(CollaborationService.class);
+    public boolean addParticipant(String userId, String username) {
+        if (participants.containsKey(userId)) {
+            LOG.info("Participant already exists: " + username + " (ID: " + userId + ")");
+            return false;
+        }
+        
+        ParticipantInfo info = new ParticipantInfo(userId, username);
+        participants.put(userId, info);
+        LOG.info("Added participant: " + username + " (ID: " + userId + ")");
+        return true;
+    }
+    
+    /**
+     * Removes a participant from the collaboration session.
+     * 
+     * @param userId The user ID
+     * @return True if the participant was removed, false if not found
+     */
+    public boolean removeParticipant(String userId) {
+        ParticipantInfo removed = participants.remove(userId);
+        if (removed != null) {
+            LOG.info("Removed participant: " + removed.getUsername() + " (ID: " + userId + ")");
+            return true;
+        }
+        LOG.info("Participant not found for removal: " + userId);
+        return false;
+    }
+    
+    /**
+     * Gets a map of all participants.
+     * 
+     * @return Map of participants (user ID to participant info)
+     */
+    public Map<String, ParticipantInfo> getParticipants() {
+        return new HashMap<>(participants);
     }
     
     /**
