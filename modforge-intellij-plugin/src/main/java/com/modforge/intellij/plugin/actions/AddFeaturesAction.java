@@ -5,7 +5,7 @@ import com.intellij.openapi.actionSystem.AnActionEvent;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.DialogWrapper;
-import com.intellij.openapi.ui.Messages;
+import com.modforge.intellij.plugin.utils.CompatibilityUtil;
 import com.intellij.ui.components.JBLabel;
 import com.intellij.ui.components.JBScrollPane;
 import com.intellij.ui.components.JBTextArea;
@@ -48,7 +48,7 @@ public class AddFeaturesAction extends AnAction {
                             "You must be logged in to ModForge to add features."
                     );
                 } else {
-                    Messages.showErrorDialog(
+                    CompatibilityUtil.showErrorDialog(
                             project,
                             "You must be logged in to ModForge to add features.",
                             "Authentication Required"
@@ -79,7 +79,7 @@ public class AddFeaturesAction extends AnAction {
                             "Feature description cannot be empty."
                     );
                 } else {
-                    Messages.showErrorDialog(
+                    CompatibilityUtil.showErrorDialog(
                             project,
                             "Feature description cannot be empty.",
                             "Empty Description"
@@ -187,7 +187,7 @@ public class AddFeaturesAction extends AnAction {
                                                     "Failed to add feature: " + message
                                             );
                                         } else {
-                                            com.intellij.openapi.ui.Messages.showErrorDialog(
+                                            CompatibilityUtil.showErrorDialog(
                                                     project,
                                                     "Failed to add feature: " + message,
                                                     "Feature Addition Failed"
@@ -208,7 +208,7 @@ public class AddFeaturesAction extends AnAction {
                                                 "An error occurred while adding the feature: " + ex.getMessage()
                                         );
                                     } else {
-                                        com.intellij.openapi.ui.Messages.showErrorDialog(
+                                        CompatibilityUtil.showErrorDialog(
                                                 project,
                                                 "An error occurred while adding the feature: " + ex.getMessage(),
                                                 "Error Adding Feature"
@@ -231,7 +231,7 @@ public class AddFeaturesAction extends AnAction {
                         "An error occurred: " + ex.getMessage()
                 );
             } else {
-                Messages.showErrorDialog(
+                CompatibilityUtil.showErrorDialog(
                         project,
                         "An error occurred: " + ex.getMessage(),
                         "Error"
