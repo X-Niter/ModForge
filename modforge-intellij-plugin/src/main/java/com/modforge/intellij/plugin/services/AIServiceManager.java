@@ -199,13 +199,13 @@ public final class AIServiceManager {
         
         if (patternResult != null) {
             // Pattern match found
-            recordPatternMatchSuccess(AVG_TOKENS_PER_REQUEST);
+            recordPatternMatchSuccess(AVG_TOKENS_PER_REQUEST, project);
             LOG.info("Used pattern matching for category: " + category);
             return patternResult;
         }
         
         // No pattern match, fallback to API
-        recordApiFallback();
+        recordApiFallback(project);
         LOG.info("Falling back to API for category: " + category);
         
         // Execute the fallback function
@@ -313,7 +313,25 @@ public final class AIServiceManager {
             @Override
             public void projectClosed(@NotNull Project closedProject) {
                 if (closedProject.equals(project)) {
-                    projectServicesMap.remove(project);
+                    ProjectAIServices services = projectServicesMap.remove(project);
+                    
+                    // Show notification if significant cost savings
+                    if (services != null && ModForgeSettings.getInstance().isEnableNotifications()) {
+                        int tokensSaved = services.recognitionService.getEstimatedTokensSaved();
+                        if (tokensSaved > 1000) {  // Only show if we saved more than 1000 tokens
+                            double costSaved = tokensSaved * COST_PER_1K_TOKENS / 1000.0;
+                            
+                            // Show cost savings notification - but only if it's significant
+                            if (costSaved >= 0.01) {  // More than 1 cent
+                                ModForgeNotificationService.getInstance(project).showInfoNotification(
+                                    project,
+                                    "ModForge AI Cost Savings",
+                                    String.format("This session saved approximately $%.2f in API costs through pattern matching.", costSaved)
+                                );
+                            }
+                        }
+                    }
+                    
                     LOG.info("Cleaned up AI services for closed project: " + project.getName());
                 }
             }
