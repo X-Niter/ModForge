@@ -19,7 +19,7 @@ public class WebSocketMessageHandler {
      * @param message The message to handle.
      * @param project The project.
      */
-    public void handleMessage(@NotNull WebSocketMessage message, @NotNull Project project) {
+    public void handleMessage(@NotNull com.modforge.intellij.plugin.collaboration.websocket.WebSocketMessage message, @NotNull Project project) {
         LOG.info("Handling message of type: " + message.getType() + " from: " + message.getSender());
         
         switch (message.getType()) {
@@ -45,7 +45,7 @@ public class WebSocketMessageHandler {
      * @param message The message.
      * @param project The project.
      */
-    private void handleConnect(WebSocketMessage message, Project project) {
+    private void handleConnect(com.modforge.intellij.plugin.collaboration.websocket.WebSocketMessage message, Project project) {
         showNotification(project, "User Connected", message.getSender() + " joined the session", false);
     }
     
@@ -55,7 +55,7 @@ public class WebSocketMessageHandler {
      * @param message The message.
      * @param project The project.
      */
-    private void handleDisconnect(WebSocketMessage message, Project project) {
+    private void handleDisconnect(com.modforge.intellij.plugin.collaboration.websocket.WebSocketMessage message, Project project) {
         showNotification(project, "User Disconnected", message.getSender() + " left the session", false);
     }
     
@@ -65,7 +65,7 @@ public class WebSocketMessageHandler {
      * @param message The message.
      * @param project The project.
      */
-    private void handleChat(WebSocketMessage message, Project project) {
+    private void handleChat(com.modforge.intellij.plugin.collaboration.websocket.WebSocketMessage message, Project project) {
         showNotification(project, "Chat Message", message.getSender() + ": " + message.getContent(), false);
     }
     
@@ -75,7 +75,7 @@ public class WebSocketMessageHandler {
      * @param message The message.
      * @param project The project.
      */
-    private void handleCodeChange(WebSocketMessage message, Project project) {
+    private void handleCodeChange(com.modforge.intellij.plugin.collaboration.websocket.WebSocketMessage message, Project project) {
         // Parse the content and apply the changes
         // This would need to be implemented based on the specific format of code change messages
         LOG.info("Code change received from: " + message.getSender());
@@ -87,7 +87,7 @@ public class WebSocketMessageHandler {
      * @param message The message.
      * @param project The project.
      */
-    private void handleCursorMove(WebSocketMessage message, Project project) {
+    private void handleCursorMove(com.modforge.intellij.plugin.collaboration.websocket.WebSocketMessage message, Project project) {
         // Update the cursor position for the user
         // This would need to be implemented based on the specific format of cursor move messages
         LOG.debug("Cursor move received from: " + message.getSender());
@@ -99,7 +99,7 @@ public class WebSocketMessageHandler {
      * @param message The message.
      * @param project The project.
      */
-    private void handleFileSelect(WebSocketMessage message, Project project) {
+    private void handleFileSelect(com.modforge.intellij.plugin.collaboration.websocket.WebSocketMessage message, Project project) {
         showNotification(project, "File Selection", message.getSender() + " opened: " + message.getContent(), false);
     }
     
@@ -109,7 +109,7 @@ public class WebSocketMessageHandler {
      * @param message The message.
      * @param project The project.
      */
-    private void handleGenerateCode(WebSocketMessage message, Project project) {
+    private void handleGenerateCode(com.modforge.intellij.plugin.collaboration.websocket.WebSocketMessage message, Project project) {
         showNotification(project, "Code Generation", message.getSender() + " requested code generation", true);
     }
     
@@ -119,7 +119,7 @@ public class WebSocketMessageHandler {
      * @param message The message.
      * @param project The project.
      */
-    private void handleAnalyzeCode(WebSocketMessage message, Project project) {
+    private void handleAnalyzeCode(com.modforge.intellij.plugin.collaboration.websocket.WebSocketMessage message, Project project) {
         showNotification(project, "Code Analysis", message.getSender() + " requested code analysis", true);
     }
     
@@ -129,7 +129,7 @@ public class WebSocketMessageHandler {
      * @param message The message.
      * @param project The project.
      */
-    private void handleReviewCode(WebSocketMessage message, Project project) {
+    private void handleReviewCode(com.modforge.intellij.plugin.collaboration.websocket.WebSocketMessage message, Project project) {
         showNotification(project, "Code Review", message.getSender() + " requested code review", true);
     }
     
@@ -139,7 +139,7 @@ public class WebSocketMessageHandler {
      * @param message The message.
      * @param project The project.
      */
-    private void handleError(WebSocketMessage message, Project project) {
+    private void handleError(com.modforge.intellij.plugin.collaboration.websocket.WebSocketMessage message, Project project) {
         showNotification(project, "Error", "Error from " + message.getSender() + ": " + message.getContent(), true);
     }
     
@@ -149,7 +149,7 @@ public class WebSocketMessageHandler {
      * @param message The message.
      * @param project The project.
      */
-    private void handleSystem(WebSocketMessage message, Project project) {
+    private void handleSystem(com.modforge.intellij.plugin.collaboration.websocket.WebSocketMessage message, Project project) {
         showNotification(project, "System Message", message.getContent(), false);
     }
     
@@ -159,7 +159,7 @@ public class WebSocketMessageHandler {
      * @param message The message.
      * @param project The project.
      */
-    private void handleSync(WebSocketMessage message, Project project) {
+    private void handleSync(com.modforge.intellij.plugin.collaboration.websocket.WebSocketMessage message, Project project) {
         // Handle synchronization messages
         // This would need to be implemented based on the specific format of sync messages
         LOG.info("Sync message received from: " + message.getSender());
