@@ -116,8 +116,16 @@ public final class GenerateImplementationAction extends AnAction {
                     prompt
             );
             
-            future.thenAccept(success -> {
-                if (success) {
+            // Use .whenComplete to avoid unwrapping CompletableFuture result
+            future.whenComplete((success, error) -> {
+                if (error != null) {
+                    LOG.error("Error generating implementation", error);
+                    ModForgeNotificationService.getInstance().showErrorNotification(
+                            project,
+                            "Generation Failed",
+                            "Failed to generate implementation for " + className + ": " + error.getMessage()
+                    );
+                } else if (success != null && success) {
                     ModForgeNotificationService.getInstance().showInfoNotification(
                             project,
                             "Implementation Generated",

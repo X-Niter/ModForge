@@ -199,17 +199,23 @@ public class FixErrorsAction extends AnAction {
             @NotNull VirtualFile file,
             @NotNull Collection<Problem> problems) {
         
-        // Use the newer API available in 2025.1.1.1
-        problemSolver.getProblemFiles().forEach(problemFile -> {
-            if (problemFile.equals(file)) {
-                problemSolver.getAllProblems().stream()
-                    .filter(problem -> {
-                        VirtualFile problemFile1 = problem.getVirtualFile();
-                        return problemFile1 != null && problemFile1.equals(file);
-                    })
-                    .forEach(problems::add);
-            }
-        });
+        // Use a compatibility approach to get problems in 2025.1.1.1
+        if (problemSolver.hasProblemFilesBeneath(file)) {
+            // Manually filter through files with problems
+            problemSolver.getFilesWithProblems().stream()
+                .filter(problemFile -> problemFile.equals(file))
+                .forEach(problemFile -> {
+                    // Process problems directly using our file filter
+                    // This avoids direct API calls to getProblemFiles and getAllProblems
+                    problemSolver.processProblems(problem -> {
+                        VirtualFile pFile = problem.getFile();
+                        if (pFile != null && pFile.equals(file)) {
+                            problems.add(problem);
+                        }
+                        return true;
+                    }, file);
+                });
+        }
     }
     
     /**
@@ -219,13 +225,49 @@ public class FixErrorsAction extends AnAction {
      * @return The description
      */
     private String getProblemDescription(@NotNull Problem problem) {
-        try {
-            // First try the standard method (may not be available in 2025.1.1.1)
-            return problem.getDescription();
-        } catch (NoSuchMethodError e) {
-            // Fall back to toString() which should contain the important info
-            return problem.toString();
+        // In IntelliJ IDEA 2025.1.1.1, the best approach is to use the API that's guaranteed to exist
+        
+        // Extract information from the problem using stable methods
+        StringBuilder sb = new StringBuilder();
+        
+        // Get the file information (stable API)
+        VirtualFile file = problem.getFile();
+        if (file != null) {
+            sb.append("[").append(file.getName()).append("] ");
         }
+        
+        // Get line and column if available (stable API)
+        int line = problem.getLine();
+        if (line >= 0) {
+            sb.append("Line ").append(line);
+            
+            int column = problem.getColumn();
+            if (column >= 0) {
+                sb.append(", Column ").append(column);
+            }
+            sb.append(": ");
+        }
+        
+        // Get text attribute key name which can contain error info (stable API)
+        if (problem.getTextAttributesKey() != null) {
+            String keyName = problem.getTextAttributesKey().getExternalName();
+            if (keyName.contains("error") || keyName.contains("warning")) {
+                sb.append(keyName).append(" - ");
+            }
+        }
+        
+        // Provide default text if we have nothing else
+        if (sb.length() == 0) {
+            sb.append("Error detected but no description available");
+        }
+        
+        // If problem information is available via toString(), append it
+        String problemString = problem.toString();
+        if (problemString != null && !problemString.isEmpty() && !problemString.equals(problem.getClass().getName())) {
+            sb.append(problemString);
+        }
+        
+        return sb.toString();
     }
     
     /**
