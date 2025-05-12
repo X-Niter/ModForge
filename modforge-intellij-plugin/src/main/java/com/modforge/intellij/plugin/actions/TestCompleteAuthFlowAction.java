@@ -55,7 +55,7 @@ public class TestCompleteAuthFlowAction extends AnAction {
         String results = AuthTestUtil.testCompleteAuthFlow(username, password);
         
         // Show results in a dialog
-        ModForgeNotificationService notificationService = ModForgeNotificationService.getInstance(project);
+        ModForgeNotificationService notificationService = ModForgeNotificationService.getInstance();
         if (notificationService != null) {
             notificationService.showInfoMessage(
                     project,

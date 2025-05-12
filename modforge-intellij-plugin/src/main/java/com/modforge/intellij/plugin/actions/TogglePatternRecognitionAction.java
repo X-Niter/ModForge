@@ -60,7 +60,7 @@ public class TogglePatternRecognitionAction extends AnAction {
         // Make sure the user is authenticated
         ModAuthenticationManager authManager = ModAuthenticationManager.getInstance();
         if (!authManager.isAuthenticated()) {
-            ModForgeNotificationService notificationService = ModForgeNotificationService.getInstance(project);
+            ModForgeNotificationService notificationService = ModForgeNotificationService.getInstance();
             if (notificationService != null) {
                 notificationService.showErrorDialog(
                         project,
@@ -84,7 +84,7 @@ public class TogglePatternRecognitionAction extends AnAction {
             
             if (currentState) {
                 // Show confirmation dialog before disabling
-                ModForgeNotificationService notificationService = ModForgeNotificationService.getInstance(project);
+                ModForgeNotificationService notificationService = ModForgeNotificationService.getInstance();
                 int result;
                 if (notificationService != null) {
                     result = notificationService.showYesNoDialog(
@@ -132,7 +132,7 @@ public class TogglePatternRecognitionAction extends AnAction {
                 ModForgeSettings settings = ModForgeSettings.getInstance();
                 settings.setEnablePatternRecognition(true);
                 
-                ModForgeNotificationService notificationService = ModForgeNotificationService.getInstance(project);
+                ModForgeNotificationService notificationService = ModForgeNotificationService.getInstance();
                 if (notificationService != null) {
                     notificationService.showInfoDialog(
                             project,
@@ -189,7 +189,7 @@ public class TogglePatternRecognitionAction extends AnAction {
             sb.append("- ").append(type).append(": ").append(numberFormat.format(count)).append("\n");
         });
         
-        ModForgeNotificationService notificationService = ModForgeNotificationService.getInstance(project);
+        ModForgeNotificationService notificationService = ModForgeNotificationService.getInstance();
         if (notificationService != null) {
             notificationService.showInfoDialog(
                     project,

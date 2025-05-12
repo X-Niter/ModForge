@@ -69,7 +69,7 @@ public class ToggleContinuousDevelopmentAction extends AnAction {
         // Make sure the user is authenticated
         ModAuthenticationManager authManager = ModAuthenticationManager.getInstance();
         if (!authManager.isAuthenticated()) {
-            ModForgeNotificationService notificationService = ModForgeNotificationService.getInstance(project);
+            ModForgeNotificationService notificationService = ModForgeNotificationService.getInstance();
             if (notificationService != null) {
                 notificationService.showErrorDialog(
                         project,
@@ -93,7 +93,7 @@ public class ToggleContinuousDevelopmentAction extends AnAction {
             
             if (currentState) {
                 // Show confirmation dialog before disabling
-                ModForgeNotificationService notificationService = ModForgeNotificationService.getInstance(project);
+                ModForgeNotificationService notificationService = ModForgeNotificationService.getInstance();
                 int result;
                 if (notificationService != null) {
                     result = notificationService.showYesNoDialog(
@@ -147,7 +147,7 @@ public class ToggleContinuousDevelopmentAction extends AnAction {
                     settings.setEnableContinuousDevelopment(true);
                     settings.setContinuousDevelopmentScanInterval(interval);
                     
-                    ModForgeNotificationService notificationService = ModForgeNotificationService.getInstance(project);
+                    ModForgeNotificationService notificationService = ModForgeNotificationService.getInstance();
                     if (notificationService != null) {
                         notificationService.showInfoDialog(
                                 project,
@@ -214,7 +214,7 @@ public class ToggleContinuousDevelopmentAction extends AnAction {
             });
         }
         
-        ModForgeNotificationService notificationService = ModForgeNotificationService.getInstance(project);
+        ModForgeNotificationService notificationService = ModForgeNotificationService.getInstance();
         if (notificationService != null) {
             notificationService.showInfoDialog(
                     project,

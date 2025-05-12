@@ -48,7 +48,7 @@ public class PushToGitHubAction extends AnAction {
         // Check if user is authenticated
         ModAuthenticationManager authManager = ModAuthenticationManager.getInstance();
         if (!authManager.isAuthenticated()) {
-            ModForgeNotificationService notificationService = ModForgeNotificationService.getInstance(project);
+            ModForgeNotificationService notificationService = ModForgeNotificationService.getInstance();
             if (notificationService != null) {
                 notificationService.showErrorDialog(
                         project,
@@ -68,7 +68,7 @@ public class PushToGitHubAction extends AnAction {
         // Check if GitHub token is available
         String token = authManager.getGitHubToken();
         if (token == null || token.isEmpty()) {
-            ModForgeNotificationService notificationService = ModForgeNotificationService.getInstance(project);
+            ModForgeNotificationService notificationService = ModForgeNotificationService.getInstance();
             if (notificationService != null) {
                 boolean result = notificationService.showYesNoDialog(
                         project,
@@ -113,7 +113,7 @@ public class PushToGitHubAction extends AnAction {
             // Push to GitHub
             GitHubIntegrationService gitHubService = project.getService(GitHubIntegrationService.class);
             if (gitHubService == null) {
-                ModForgeNotificationService notificationService = ModForgeNotificationService.getInstance(project);
+                ModForgeNotificationService notificationService = ModForgeNotificationService.getInstance();
                 if (notificationService != null) {
                     notificationService.showErrorDialog(
                             project,

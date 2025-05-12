@@ -46,7 +46,7 @@ public class LoginAction extends AnAction {
         ModForgeSettings settings = ModForgeSettings.getInstance();
         String serverUrl = settings.getServerUrl();
         if (serverUrl.isEmpty()) {
-            ModForgeNotificationService notificationService = ModForgeNotificationService.getInstance(project);
+            ModForgeNotificationService notificationService = ModForgeNotificationService.getInstance();
             if (notificationService != null) {
                 notificationService.showErrorDialog(
                         project,
@@ -85,7 +85,7 @@ public class LoginAction extends AnAction {
                     // Show result on UI thread
                     ApplicationManager.getApplication().invokeLater(() -> {
                         if (success.get()) {
-                            ModForgeNotificationService notificationService = ModForgeNotificationService.getInstance(project);
+                            ModForgeNotificationService notificationService = ModForgeNotificationService.getInstance();
                             if (notificationService != null) {
                                 notificationService.showInfoDialog(
                                         project,
@@ -103,7 +103,7 @@ public class LoginAction extends AnAction {
                             // Enable features that require authentication
                             enableContinuousDevelopmentIfPossible(project);
                         } else {
-                            ModForgeNotificationService notificationService = ModForgeNotificationService.getInstance(project);
+                            ModForgeNotificationService notificationService = ModForgeNotificationService.getInstance();
                             if (notificationService != null) {
                                 notificationService.showErrorDialog(
                                         project,
@@ -139,7 +139,7 @@ public class LoginAction extends AnAction {
             // We could automatically start continuous development here
             // but for now, we'll just let the user know it's available
             
-            ModForgeNotificationService notificationService = ModForgeNotificationService.getInstance(project);
+            ModForgeNotificationService notificationService = ModForgeNotificationService.getInstance();
             if (notificationService != null) {
                 notificationService.showInfoDialog(
                         project,
@@ -215,7 +215,7 @@ public class LoginAction extends AnAction {
         @Override
         protected void doOKAction() {
             Project project = getProject();
-            ModForgeNotificationService notificationService = ModForgeNotificationService.getInstance(project);
+            ModForgeNotificationService notificationService = ModForgeNotificationService.getInstance();
             
             if (getUsername().isEmpty()) {
                 if (notificationService != null) {

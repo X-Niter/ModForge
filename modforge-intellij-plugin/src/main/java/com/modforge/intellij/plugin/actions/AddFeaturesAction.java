@@ -40,7 +40,7 @@ public class AddFeaturesAction extends AnAction {
             // Check authentication
             ModAuthenticationManager authManager = ModAuthenticationManager.getInstance();
             if (!authManager.isAuthenticated()) {
-                ModForgeNotificationService notificationService = ModForgeNotificationService.getInstance(project);
+                ModForgeNotificationService notificationService = ModForgeNotificationService.getInstance();
                 if (notificationService != null) {
                     notificationService.showErrorDialog(
                             project,
@@ -71,7 +71,7 @@ public class AddFeaturesAction extends AnAction {
             
             // Check if description is empty
             if (featureDescription == null || featureDescription.trim().isEmpty()) {
-                ModForgeNotificationService notificationService = ModForgeNotificationService.getInstance(project);
+                ModForgeNotificationService notificationService = ModForgeNotificationService.getInstance();
                 if (notificationService != null) {
                     notificationService.showErrorDialog(
                             project,
@@ -90,7 +90,7 @@ public class AddFeaturesAction extends AnAction {
             
             // Show confirmation dialog
             int confirmation;
-            ModForgeNotificationService notificationService = ModForgeNotificationService.getInstance(project);
+            ModForgeNotificationService notificationService = ModForgeNotificationService.getInstance();
             if (notificationService != null) {
                 confirmation = notificationService.showYesNoDialog(
                         project,
@@ -156,7 +156,7 @@ public class AddFeaturesAction extends AnAction {
                                 com.intellij.openapi.application.ApplicationManager.getApplication().invokeLater(() -> {
                                     if (success) {
                                         // Show success message with request ID for tracking
-                                        ModForgeNotificationService notificationService = ModForgeNotificationService.getInstance(project);
+                                        ModForgeNotificationService notificationService = ModForgeNotificationService.getInstance();
                                         if (notificationService != null) {
                                             notificationService.showInfoMessage(
                                                     project,
@@ -179,7 +179,7 @@ public class AddFeaturesAction extends AnAction {
                                                 .show(null);
                                     } else {
                                         // Show error message
-                                        ModForgeNotificationService notificationService = ModForgeNotificationService.getInstance(project);
+                                        ModForgeNotificationService notificationService = ModForgeNotificationService.getInstance();
                                         if (notificationService != null) {
                                             notificationService.showErrorDialog(
                                                     project,
@@ -200,7 +200,7 @@ public class AddFeaturesAction extends AnAction {
                                 
                                 // Show error in UI thread
                                 com.intellij.openapi.application.ApplicationManager.getApplication().invokeLater(() -> {
-                                    ModForgeNotificationService errNotificationService = ModForgeNotificationService.getInstance(project);
+                                    ModForgeNotificationService errNotificationService = ModForgeNotificationService.getInstance();
                                     if (errNotificationService != null) {
                                         errNotificationService.showErrorDialog(
                                                 project,
@@ -223,7 +223,7 @@ public class AddFeaturesAction extends AnAction {
             LOG.error("Error in add features action", ex);
             
             // Show error
-            ModForgeNotificationService notificationService = ModForgeNotificationService.getInstance(project);
+            ModForgeNotificationService notificationService = ModForgeNotificationService.getInstance();
             if (notificationService != null) {
                 notificationService.showErrorDialog(
                         project,

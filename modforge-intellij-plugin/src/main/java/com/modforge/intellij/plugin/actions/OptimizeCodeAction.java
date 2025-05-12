@@ -48,7 +48,7 @@ public class OptimizeCodeAction extends AnAction {
                     
                     // Show result dialog using compatible notification service
                     ApplicationManager.getApplication().invokeLater(() -> {
-                        ModForgeNotificationService.getInstance(project).showInfoNotification(
+                        ModForgeNotificationService.getInstance().showInfoNotification(
                                 project,
                                 "Code Optimization Complete",
                                 String.format(
@@ -65,7 +65,7 @@ public class OptimizeCodeAction extends AnAction {
                 } catch (Exception ex) {
                     // Show error dialog using compatible notification service
                     ApplicationManager.getApplication().invokeLater(() -> {
-                        ModForgeNotificationService.getInstance(project).showErrorNotification(
+                        ModForgeNotificationService.getInstance().showErrorNotification(
                                 project,
                                 "Error",
                                 "Error optimizing code: " + ex.getMessage()

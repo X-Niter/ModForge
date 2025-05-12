@@ -37,7 +37,7 @@ public class ExplainCodeAction extends AnAction {
         String selectedText = selectionModel.getSelectedText();
         
         if (selectedText == null || selectedText.isEmpty()) {
-            ModForgeNotificationService notificationService = ModForgeNotificationService.getInstance(project);
+            ModForgeNotificationService notificationService = ModForgeNotificationService.getInstance();
             if (notificationService != null) {
                 notificationService.showWarningDialog(
                         project,
@@ -72,7 +72,7 @@ public class ExplainCodeAction extends AnAction {
                     explanation = codeGenService.explainCode(selectedText, null).get();
                     
                     if (explanation == null || explanation.isEmpty()) {
-                        ModForgeNotificationService notificationService = ModForgeNotificationService.getInstance(project);
+                        ModForgeNotificationService notificationService = ModForgeNotificationService.getInstance();
                         if (notificationService != null) {
                             notificationService.showErrorDialog(
                                     project,
@@ -91,7 +91,7 @@ public class ExplainCodeAction extends AnAction {
                     
                     indicator.setFraction(1.0);
                 } catch (Exception ex) {
-                    ModForgeNotificationService notificationService = ModForgeNotificationService.getInstance(project);
+                    ModForgeNotificationService notificationService = ModForgeNotificationService.getInstance();
                     if (notificationService != null) {
                         notificationService.showErrorDialog(
                                 project,

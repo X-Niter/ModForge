@@ -65,7 +65,7 @@ public class GenerateDocumentationAction extends AnAction {
                     String documentedCode = codeGenService.generateDocumentation(code, null).get();
                     
                     if (documentedCode == null || documentedCode.isEmpty()) {
-                        ModForgeNotificationService notificationService = ModForgeNotificationService.getInstance(project);
+                        ModForgeNotificationService notificationService = ModForgeNotificationService.getInstance();
                         if (notificationService != null) {
                             notificationService.showErrorDialog(
                                     project,
@@ -93,7 +93,7 @@ public class GenerateDocumentationAction extends AnAction {
                     
                     indicator.setFraction(1.0);
                 } catch (Exception ex) {
-                    ModForgeNotificationService notificationService = ModForgeNotificationService.getInstance(project);
+                    ModForgeNotificationService notificationService = ModForgeNotificationService.getInstance();
                     if (notificationService != null) {
                         notificationService.showErrorDialog(
                                 project,

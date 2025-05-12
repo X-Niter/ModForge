@@ -69,7 +69,7 @@ public class StartCollaborationAction extends AnAction {
                     if (success) {
                         startOrJoinSession(project, collaborationService);
                     } else {
-                        ModForgeNotificationService.getInstance(project).showErrorNotification(
+                        ModForgeNotificationService.getInstance().showErrorNotification(
                                 "Failed to leave the current session",
                                 "Error"
                         );
@@ -100,7 +100,7 @@ public class StartCollaborationAction extends AnAction {
             collaborationService.startSession(username)
                 .thenAccept(sessionId -> {
                     // Show success message with session ID
-                    ModForgeNotificationService.getInstance(project).showInfoNotification(
+                    ModForgeNotificationService.getInstance().showInfoNotification(
                         "Session started with ID: " + sessionId + "\n\n" +
                         "Share this ID with your team members so they can join.",
                         "Session Started"
@@ -109,7 +109,7 @@ public class StartCollaborationAction extends AnAction {
                 // Open collaboration tool window
                 showCollaborationToolWindow(project);
             }).exceptionally(ex -> {
-                ModForgeNotificationService.getInstance(project).showErrorNotification(
+                ModForgeNotificationService.getInstance().showErrorNotification(
                         "Failed to start session: " + ex.getMessage(),
                         "Error"
                 );
@@ -122,7 +122,7 @@ public class StartCollaborationAction extends AnAction {
             
             future.thenAccept(success -> {
                 if (success) {
-                    ModForgeNotificationService.getInstance(project).showInfoNotification(
+                    ModForgeNotificationService.getInstance().showInfoNotification(
                             "Successfully joined session: " + sessionId,
                             "Session Joined"
                     );
@@ -130,13 +130,13 @@ public class StartCollaborationAction extends AnAction {
                     // Open collaboration tool window
                     showCollaborationToolWindow(project);
                 } else {
-                    ModForgeNotificationService.getInstance(project).showErrorNotification(
+                    ModForgeNotificationService.getInstance().showErrorNotification(
                             "Failed to join session: " + sessionId,
                             "Error"
                     );
                 }
             }).exceptionally(ex -> {
-                ModForgeNotificationService.getInstance(project).showErrorNotification(
+                ModForgeNotificationService.getInstance().showErrorNotification(
                         "Failed to join session: " + ex.getMessage(),
                         "Error"
                 );
@@ -229,7 +229,7 @@ public class StartCollaborationAction extends AnAction {
         @Override
         protected void doOKAction() {
             Project project = getProject();
-            ModForgeNotificationService notificationService = ModForgeNotificationService.getInstance(project);
+            ModForgeNotificationService notificationService = ModForgeNotificationService.getInstance();
             
             if (StringUtil.isEmpty(usernameField.getText())) {
                 if (notificationService != null) {

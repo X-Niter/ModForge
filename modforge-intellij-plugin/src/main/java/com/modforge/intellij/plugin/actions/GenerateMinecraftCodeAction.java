@@ -63,7 +63,7 @@ public class GenerateMinecraftCodeAction extends AnAction {
         // Get the code generator service
         MinecraftCodeGenerator codeGenerator = project.getService(MinecraftCodeGenerator.class);
         if (codeGenerator == null) {
-            ModForgeNotificationService notificationService = ModForgeNotificationService.getInstance(project);
+            ModForgeNotificationService notificationService = ModForgeNotificationService.getInstance();
             if (notificationService != null) {
                 notificationService.showErrorDialog(
                         project,

@@ -58,7 +58,7 @@ public class TestAuthEndpointsAction extends AnAction {
         }
         
         // Show dialog with all results
-        ModForgeNotificationService notificationService = ModForgeNotificationService.getInstance(project);
+        ModForgeNotificationService notificationService = ModForgeNotificationService.getInstance();
         if (notificationService != null) {
             notificationService.showInfoMessage(
                     project,

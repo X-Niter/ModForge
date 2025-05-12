@@ -57,7 +57,6 @@ public class GenerateCodeAction extends AnAction {
                                 
                                 // Notify success
                                 notificationService.showInfo(
-                                        project,
                                         "Code Generated",
                                         "Successfully generated code from description: " + description
                                 );
@@ -65,7 +64,6 @@ public class GenerateCodeAction extends AnAction {
                         } else {
                             CompatibilityUtil.executeOnUiThread(() -> {
                                 notificationService.showError(
-                                        project,
                                         "Code Generation Failed",
                                         "Failed to generate code from description: " + description
                                 );
@@ -201,7 +199,7 @@ public class GenerateCodeAction extends AnAction {
         String className = parseClassName(code);
         
         // Save dialog
-        ModForgeNotificationService notificationService = ModForgeNotificationService.getInstance(project);
+        ModForgeNotificationService notificationService = ModForgeNotificationService.getInstance();
         String fileName;
         
         if (notificationService != null) {
@@ -227,7 +225,7 @@ public class GenerateCodeAction extends AnAction {
         // Get target directory
         VirtualFile baseDir = CompatibilityUtil.getProjectBaseDir(project);
         if (baseDir == null) {
-            ModForgeNotificationService notificationService = ModForgeNotificationService.getInstance(project);
+            ModForgeNotificationService notificationService = ModForgeNotificationService.getInstance();
             if (notificationService != null) {
                 notificationService.showErrorDialog(
                         project,
@@ -273,13 +271,13 @@ public class GenerateCodeAction extends AnAction {
                 // Open the file
                 CompatibilityUtil.openFileInEditor(project, file, true);
                 
-                ModForgeNotificationService.getInstance(project).showInfo(
+                ModForgeNotificationService.getInstance().showInfo(
                         "Code Saved",
                         "Generated code saved to " + fileName
                 );
             }
         } catch (Exception e) {
-            ModForgeNotificationService notificationService = ModForgeNotificationService.getInstance(project);
+            ModForgeNotificationService notificationService = ModForgeNotificationService.getInstance();
             if (notificationService != null) {
                 notificationService.showErrorDialog(
                         project,

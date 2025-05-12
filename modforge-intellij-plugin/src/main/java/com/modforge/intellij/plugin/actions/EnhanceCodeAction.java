@@ -43,7 +43,7 @@ public class EnhanceCodeAction extends AnAction {
             
             // If no text is selected, show an error message
             if (selectedText == null || selectedText.isEmpty()) {
-                ModForgeNotificationService notificationService = ModForgeNotificationService.getInstance(project);
+                ModForgeNotificationService notificationService = ModForgeNotificationService.getInstance();
                 if (notificationService != null) {
                     notificationService.showErrorDialog(
                             project,
@@ -67,7 +67,7 @@ public class EnhanceCodeAction extends AnAction {
             // Check authentication
             ModAuthenticationManager authManager = ModAuthenticationManager.getInstance();
             if (!authManager.isAuthenticated()) {
-                ModForgeNotificationService notificationService = ModForgeNotificationService.getInstance(project);
+                ModForgeNotificationService notificationService = ModForgeNotificationService.getInstance();
                 if (notificationService != null) {
                     notificationService.showErrorDialog(
                             project,
@@ -98,7 +98,7 @@ public class EnhanceCodeAction extends AnAction {
                     "Fix Potential Bugs"
             };
             
-            ModForgeNotificationService notificationService = ModForgeNotificationService.getInstance(project);
+            ModForgeNotificationService notificationService = ModForgeNotificationService.getInstance();
             int enhancementTypeIndex;
             if (notificationService != null) {
                 enhancementTypeIndex = notificationService.showChooseDialog(
@@ -188,7 +188,7 @@ public class EnhanceCodeAction extends AnAction {
                                 }
                             } catch (Exception ex) {
                                 LOG.error("Error applying code enhancements", ex);
-                                ModForgeNotificationService localNotificationService = ModForgeNotificationService.getInstance(project);
+                                ModForgeNotificationService localNotificationService = ModForgeNotificationService.getInstance();
                                 if (localNotificationService != null) {
                                     localNotificationService.showErrorDialog(
                                             project,
@@ -208,7 +208,7 @@ public class EnhanceCodeAction extends AnAction {
                         LOG.error("Error enhancing code", ex);
                         
                         // Show error in UI thread
-                        ModForgeNotificationService localNotificationService = ModForgeNotificationService.getInstance(project);
+                        ModForgeNotificationService localNotificationService = ModForgeNotificationService.getInstance();
                         if (localNotificationService != null) {
                             localNotificationService.showErrorDialog(
                                     project,
@@ -229,7 +229,7 @@ public class EnhanceCodeAction extends AnAction {
             LOG.error("Error in enhance code action", ex);
             
             // Show error
-            ModForgeNotificationService notificationService = ModForgeNotificationService.getInstance(project);
+            ModForgeNotificationService notificationService = ModForgeNotificationService.getInstance();
             if (notificationService != null) {
                 notificationService.showErrorDialog(
                         project,

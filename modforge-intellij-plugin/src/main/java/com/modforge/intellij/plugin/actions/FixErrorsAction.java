@@ -76,7 +76,7 @@ public class FixErrorsAction extends AnAction {
         // Make sure the user is authenticated
         ModAuthenticationManager authManager = ModAuthenticationManager.getInstance();
         if (!authManager.isAuthenticated()) {
-            ModForgeNotificationService.getInstance(project).showErrorNotification(
+            ModForgeNotificationService.getInstance().showErrorNotification(
                     "You must be logged in to fix errors.",
                     "Authentication Required"
             );
@@ -97,7 +97,7 @@ public class FixErrorsAction extends AnAction {
         }
         
         if (editor == null || file == null) {
-            ModForgeNotificationService.getInstance(project).showErrorNotification(
+            ModForgeNotificationService.getInstance().showErrorNotification(
                     "Please open a file to fix errors.",
                     "No File Selected"
             );
