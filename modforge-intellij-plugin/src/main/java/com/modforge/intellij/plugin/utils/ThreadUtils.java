@@ -2,39 +2,41 @@ package com.modforge.intellij.plugin.utils;
 
 import com.intellij.openapi.diagnostic.Logger;
 
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ThreadFactory;
-import java.util.concurrent.TimeUnit;
+import java.time.Duration;
+import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
- * Utility class for thread management, optimized for Java 21 virtual threads.
- * Compatible with IntelliJ IDEA 2025.1.1.1
+ * Utility class for thread management.
+ * Compatible with IntelliJ IDEA 2025.1.1.1 and Java 21 virtual threads.
  */
 public final class ThreadUtils {
     private static final Logger LOG = Logger.getInstance(ThreadUtils.class);
-    private static final int VIRTUAL_THREAD_POOL_SIZE = 250;
-    private static final int PLATFORM_THREAD_POOL_SIZE = 16;
     
-    private static final ExecutorService VIRTUAL_THREAD_POOL;
-    private static final ExecutorService PLATFORM_THREAD_POOL;
+    private static final int CORE_POOL_SIZE = Math.max(2, Runtime.getRuntime().availableProcessors() / 2);
+    private static final int MAX_POOL_SIZE = Runtime.getRuntime().availableProcessors() * 2;
+    private static final long KEEP_ALIVE_TIME = 60L;
+    
+    private static final ScheduledExecutorService SCHEDULER;
+    private static final ExecutorService EXECUTOR;
+    private static final AtomicInteger THREAD_COUNT = new AtomicInteger(0);
     
     static {
-        // Initialize virtual thread pool - optimized for Java 21
-        VIRTUAL_THREAD_POOL = createVirtualThreadPool();
+        // Initialize thread pool with a custom thread factory
+        ThreadFactory factory = r -> {
+            Thread thread = Thread.ofVirtual()
+                    .name("ModForge-Worker-" + THREAD_COUNT.incrementAndGet())
+                    .uncaughtExceptionHandler((t, e) -> LOG.error("Uncaught exception in thread " + t.getName(), e))
+                    .factory()
+                    .newThread(r);
+            return thread;
+        };
         
-        // Initialize platform thread pool for tasks that need platform threads
-        PLATFORM_THREAD_POOL = Executors.newFixedThreadPool(
-                PLATFORM_THREAD_POOL_SIZE,
-                new NamedThreadFactory("ModForge-Platform-Thread")
-        );
+        // Create executor services
+        SCHEDULER = Executors.newScheduledThreadPool(CORE_POOL_SIZE, factory);
+        EXECUTOR = Executors.newThreadPerTaskExecutor(factory);
         
-        // Register shutdown hook to clean up threads
-        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
-            shutdownExecutor(VIRTUAL_THREAD_POOL, "Virtual Thread Pool");
-            shutdownExecutor(PLATFORM_THREAD_POOL, "Platform Thread Pool");
-        }));
+        LOG.info("ThreadUtils initialized with " + CORE_POOL_SIZE + " core threads and " + MAX_POOL_SIZE + " max threads");
     }
     
     private ThreadUtils() {
@@ -42,94 +44,123 @@ public final class ThreadUtils {
     }
 
     /**
-     * Executes a task on a virtual thread.
+     * Runs a task asynchronously.
      *
-     * @param runnable The task to run.
+     * @param task The task to run.
+     * @return A CompletableFuture representing the result of the task.
      */
-    public static void executeOnVirtualThread(Runnable runnable) {
-        VIRTUAL_THREAD_POOL.execute(() -> {
+    public static CompletableFuture<Void> runAsync(Runnable task) {
+        return CompletableFuture.runAsync(task, EXECUTOR);
+    }
+
+    /**
+     * Runs a task asynchronously with a result.
+     *
+     * @param task The task to run.
+     * @param <T> The type of the result.
+     * @return A CompletableFuture representing the result of the task.
+     */
+    public static <T> CompletableFuture<T> supplyAsync(Callable<T> task) {
+        return CompletableFuture.supplyAsync(() -> {
             try {
-                runnable.run();
-            } catch (Throwable t) {
-                LOG.error("Error executing task on virtual thread", t);
+                return task.call();
+            } catch (Exception e) {
+                if (e instanceof RuntimeException) {
+                    throw (RuntimeException) e;
+                } else {
+                    throw new CompletionException(e);
+                }
             }
-        });
+        }, EXECUTOR);
     }
 
     /**
-     * Executes a task on a platform thread.
+     * Runs a task after a delay.
      *
-     * @param runnable The task to run.
+     * @param task The task to run.
+     * @param delay The delay.
+     * @param unit The time unit of the delay.
+     * @return A ScheduledFuture representing the scheduled task.
      */
-    public static void executeOnPlatformThread(Runnable runnable) {
-        PLATFORM_THREAD_POOL.execute(() -> {
-            try {
-                runnable.run();
-            } catch (Throwable t) {
-                LOG.error("Error executing task on platform thread", t);
-            }
-        });
+    public static ScheduledFuture<?> runWithDelay(Runnable task, long delay, TimeUnit unit) {
+        return SCHEDULER.schedule(task, delay, unit);
     }
 
     /**
-     * Creates a virtual thread pool using Java 21 virtual threads.
-     * Falls back to a standard thread pool on older JDK versions.
+     * Runs a task after a delay.
      *
-     * @return The executor service.
+     * @param task The task to run.
+     * @param delay The delay.
+     * @return A ScheduledFuture representing the scheduled task.
      */
-    private static ExecutorService createVirtualThreadPool() {
+    public static ScheduledFuture<?> runWithDelay(Runnable task, Duration delay) {
+        return SCHEDULER.schedule(task, delay.toMillis(), TimeUnit.MILLISECONDS);
+    }
+
+    /**
+     * Runs a task periodically.
+     *
+     * @param task The task to run.
+     * @param initialDelay The initial delay.
+     * @param period The period.
+     * @param unit The time unit of the delay and period.
+     * @return A ScheduledFuture representing the scheduled task.
+     */
+    public static ScheduledFuture<?> runPeriodically(Runnable task, long initialDelay, long period, TimeUnit unit) {
+        return SCHEDULER.scheduleAtFixedRate(task, initialDelay, period, unit);
+    }
+
+    /**
+     * Runs a task periodically.
+     *
+     * @param task The task to run.
+     * @param initialDelay The initial delay.
+     * @param period The period.
+     * @return A ScheduledFuture representing the scheduled task.
+     */
+    public static ScheduledFuture<?> runPeriodically(Runnable task, Duration initialDelay, Duration period) {
+        return SCHEDULER.scheduleAtFixedRate(
+                task,
+                initialDelay.toMillis(),
+                period.toMillis(),
+                TimeUnit.MILLISECONDS);
+    }
+
+    /**
+     * Creates a new virtual thread.
+     *
+     * @param name The thread name.
+     * @param task The task to run.
+     * @return The thread.
+     */
+    public static Thread newVirtualThread(String name, Runnable task) {
+        return Thread.ofVirtual()
+                .name(name)
+                .uncaughtExceptionHandler((t, e) -> LOG.error("Uncaught exception in thread " + t.getName(), e))
+                .start(task);
+    }
+
+    /**
+     * Shuts down all thread pools.
+     */
+    public static void shutdown() {
+        LOG.info("Shutting down thread pools");
+        SCHEDULER.shutdown();
+        EXECUTOR.shutdown();
+    }
+
+    /**
+     * Checks if virtual threads are supported.
+     *
+     * @return Whether virtual threads are supported.
+     */
+    public static boolean isVirtualThreadSupported() {
         try {
-            // Attempt to create a virtual thread executor (Java 21+)
-            return Executors.newVirtualThreadPerTaskExecutor();
-        } catch (Throwable t) {
-            LOG.warn("Could not create virtual thread pool. Falling back to standard thread pool.", t);
-            
-            // Fall back to a standard thread pool
-            return Executors.newFixedThreadPool(
-                    VIRTUAL_THREAD_POOL_SIZE,
-                    new NamedThreadFactory("ModForge-Thread")
-            );
-        }
-    }
-
-    /**
-     * Shuts down an executor service.
-     *
-     * @param executorService The executor service.
-     * @param name The name of the executor service.
-     */
-    private static void shutdownExecutor(ExecutorService executorService, String name) {
-        try {
-            LOG.info("Shutting down " + name);
-            executorService.shutdown();
-            if (!executorService.awaitTermination(5, TimeUnit.SECONDS)) {
-                LOG.warn(name + " did not terminate in time, forcing shutdown");
-                executorService.shutdownNow();
-            }
-        } catch (InterruptedException e) {
-            LOG.warn("Interrupted while shutting down " + name, e);
-            Thread.currentThread().interrupt();
-        } catch (Throwable t) {
-            LOG.error("Error shutting down " + name, t);
-        }
-    }
-
-    /**
-     * Thread factory that creates named threads.
-     */
-    private static class NamedThreadFactory implements ThreadFactory {
-        private final AtomicInteger threadNumber = new AtomicInteger(1);
-        private final String namePrefix;
-        
-        NamedThreadFactory(String namePrefix) {
-            this.namePrefix = namePrefix;
-        }
-        
-        @Override
-        public Thread newThread(Runnable r) {
-            Thread thread = new Thread(r, namePrefix + "-" + threadNumber.getAndIncrement());
-            thread.setDaemon(true);
-            return thread;
+            Thread.ofVirtual().name("test-virtual-thread").start(() -> {}).join();
+            return true;
+        } catch (UnsupportedOperationException e) {
+            LOG.warn("Virtual threads are not supported", e);
+            return false;
         }
     }
 }
