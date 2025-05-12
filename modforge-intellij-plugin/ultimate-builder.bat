@@ -377,7 +377,7 @@ echo.
 REM Continue missing methods analysis in the subroutine
 if exist "%TEMP_DIR%\missing_methods.txt" (
     REM Process method names from the log file
-    for /f "tokens=*" %%m in ('%TEMP_DIR%\missing_methods.txt') do (
+    for /f "tokens=*" %%m in ('type "%TEMP_DIR%\missing_methods.txt"') do (
         call :PROCESS_METHOD_LINE "%%m"
     )
     
@@ -417,34 +417,121 @@ if exist "%TEMP_DIR%\missing_methods.txt" (
     echo. >> "%MISSING_METHODS_REPORT%"
     findstr /i /c:"incompatible types:" "%BUILD_LOG%" > "%TEMP_DIR%\type_issues.txt"
     if exist "%TEMP_DIR%\type_issues.txt" (
-        echo Type compatibility issues found: >> "%MISSING_METHODS_REPORT%"
-        echo. >> "%MISSING_METHODS_REPORT%"
-        echo --- Java Code --- >> "%MISSING_METHODS_REPORT%"
-        type "%TEMP_DIR%\type_issues.txt" >> "%MISSING_METHODS_REPORT%"
-        echo --- End Code --- >> "%MISSING_METHODS_REPORT%"
-        echo. >> "%MISSING_METHODS_REPORT%"
-        echo Ensure parameter types match exactly between method calls and definitions. >> "%MISSING_METHODS_REPORT%"
-        echo. >> "%MISSING_METHODS_REPORT%"
+        call :ADD_TYPE_ISSUES
     )
     
     echo ## Method Override Issues >> "%MISSING_METHODS_REPORT%"
     echo. >> "%MISSING_METHODS_REPORT%"
     findstr /i /c:"cannot override" "%BUILD_LOG%" > "%TEMP_DIR%\override_issues.txt"
     if exist "%TEMP_DIR%\override_issues.txt" (
-        echo Method override issues found: >> "%MISSING_METHODS_REPORT%"
-        echo. >> "%MISSING_METHODS_REPORT%"
-        echo --- Java Code --- >> "%MISSING_METHODS_REPORT%"
-        type "%TEMP_DIR%\override_issues.txt" >> "%MISSING_METHODS_REPORT%"
-        echo --- End Code --- >> "%MISSING_METHODS_REPORT%"
-        echo. >> "%MISSING_METHODS_REPORT%"
-        echo Ensure overridden methods have exactly the same return type as the parent class method. >> "%MISSING_METHODS_REPORT%"
-        echo. >> "%MISSING_METHODS_REPORT%"
+        call :ADD_OVERRIDE_ISSUES
     )
 ) else (
     echo No specific missing methods detected from build errors. >> "%MISSING_METHODS_REPORT%"
 )
 
 echo Missing methods analysis complete.
+goto :EOF
+
+REM ===================================
+REM Process Method Line Subroutine
+REM ===================================
+:PROCESS_METHOD_LINE
+set "LINE=%~1"
+set "METHOD=%LINE:*method =%"
+echo - **%METHOD%** >> "%MISSING_METHODS_REPORT%"
+goto :EOF
+
+REM ===================================
+REM Add Settings Methods Subroutine
+REM ===================================
+:ADD_SETTINGS_METHODS
+(
+echo Methods possibly missing from ModForgeSettings:
+echo.
+echo --- Java Method Signatures ---
+echo // Required methods:
+echo // - getAccessToken()
+echo // - isPatternRecognition()
+echo // - getGitHubUsername()
+echo // - openSettings(Project project)
+echo // - other settings methods...
+echo --- End Method Signatures ---
+echo.
+) >> "%MISSING_METHODS_REPORT%"
+goto :EOF
+
+REM ===================================
+REM Add Auth Methods Subroutine
+REM ===================================
+:ADD_AUTH_METHODS
+(
+echo Methods possibly missing from ModAuthenticationManager:
+echo.
+echo --- Java Method Signatures ---
+echo // Required methods:
+echo // - login(String username, String password)
+echo // - logout()
+echo // - getUsername()
+echo // - Other auth methods...
+echo --- End Method Signatures ---
+echo.
+) >> "%MISSING_METHODS_REPORT%"
+goto :EOF
+
+REM ===================================
+REM Add CodeGen Methods Subroutine
+REM ===================================
+:ADD_CODEGEN_METHODS
+(
+echo Methods possibly missing from AutonomousCodeGenerationService:
+echo.
+echo --- Java Method Signatures ---
+echo // Required static method:
+echo // - getInstance(Project project)
+echo.
+echo // Required instance methods:
+echo // - generateCode(String prompt, VirtualFile contextFile, String language)
+echo // - fixCode(String code, String errorMessage, String language)
+echo // - generateDocumentation(String code, Object options)
+echo // - explainCode(String code, Object options)
+echo // - generateImplementation(String interfaceName, String packageName, String className)
+echo // - Other code generation methods...
+echo --- End Method Signatures ---
+echo.
+) >> "%MISSING_METHODS_REPORT%"
+goto :EOF
+
+REM ===================================
+REM Add Type Issues Subroutine
+REM ===================================
+:ADD_TYPE_ISSUES
+(
+echo Type compatibility issues found:
+echo.
+echo --- Java Errors ---
+type "%TEMP_DIR%\type_issues.txt"
+echo --- End Errors ---
+echo.
+echo Ensure parameter types match exactly between method calls and definitions.
+echo.
+) >> "%MISSING_METHODS_REPORT%"
+goto :EOF
+
+REM ===================================
+REM Add Override Issues Subroutine
+REM ===================================
+:ADD_OVERRIDE_ISSUES
+(
+echo Method override issues found:
+echo.
+echo --- Java Errors ---
+type "%TEMP_DIR%\override_issues.txt"
+echo --- End Errors ---
+echo.
+echo Ensure overridden methods have exactly the same return type as the parent class method.
+echo.
+) >> "%MISSING_METHODS_REPORT%"
 goto :EOF
 
 REM ===================================
