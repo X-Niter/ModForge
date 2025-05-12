@@ -60,7 +60,8 @@ public class GenerateCodeAction extends AnAction {
                                 showGeneratedCodeDialog(project, generatedCode, description);
                                 
                                 // Notify success
-                                notificationService.showInfo(
+                                notificationService.showInfoNotification(
+                                        project,
                                         "Code Generated",
                                         "Successfully generated code from description: " + description
                                 );
@@ -273,7 +274,8 @@ public class GenerateCodeAction extends AnAction {
                 // Open the file
                 CompatibilityUtil.openFileInEditor(project, file, true);
                 
-                ModForgeNotificationService.getInstance().showInfo(
+                ModForgeNotificationService.getInstance().showInfoNotification(
+                        project,
                         "Code Saved",
                         "Generated code saved to " + fileName
                 );
