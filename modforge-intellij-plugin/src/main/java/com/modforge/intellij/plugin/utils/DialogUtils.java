@@ -170,4 +170,15 @@ public final class DialogUtils {
         
         return future;
     }
+    
+    /**
+     * Executes the given task on the UI thread.
+     * This method is deprecated and should be replaced with CompatibilityUtil.runOnUiThread.
+     * 
+     * @param runnable The task to execute
+     */
+    @Deprecated
+    public static void executeOnUiThread(@NotNull Runnable runnable) {
+        CompatibilityUtil.runOnUiThread(runnable);
+    }
 }

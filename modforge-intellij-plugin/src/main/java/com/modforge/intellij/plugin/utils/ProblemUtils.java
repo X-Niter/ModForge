@@ -14,6 +14,7 @@ import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiDocumentManager;
 import com.intellij.psi.PsiFile;
+import com.modforge.intellij.plugin.utils.CompatibilityUtil;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.ArrayList;
@@ -139,7 +140,7 @@ public final class ProblemUtils {
                 
                 LogicalPosition position = new LogicalPosition(lineNumber, columnNumber);
                 
-                DialogUtils.executeOnUiThread(() -> {
+                CompatibilityUtil.runOnUiThread(() -> {
                     textEditor.getCaretModel().moveToLogicalPosition(position);
                     textEditor.getScrollingModel().scrollToCaret(ScrollType.CENTER);
                 });
