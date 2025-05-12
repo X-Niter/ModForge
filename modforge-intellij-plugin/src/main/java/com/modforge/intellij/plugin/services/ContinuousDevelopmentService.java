@@ -4,6 +4,8 @@ import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.components.Service;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.project.Project;
+import com.intellij.openapi.project.ProjectManager;
+import com.intellij.openapi.project.ProjectManagerListener;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.problems.Problem;
 import com.intellij.problems.WolfTheProblemSolver;
@@ -62,11 +64,13 @@ public final class ContinuousDevelopmentService {
         enabled.set(settings.isEnableContinuousDevelopment());
         scanInterval = settings.getContinuousDevelopmentScanInterval();
         
-        // Register for project closing
-        project.getMessageBus().connect().subscribe(Project.TOPIC, new Project.ProjectListener() {
+        // Register for project closing using ProjectManagerListener
+        ProjectManager.getInstance().addProjectManagerListener(project, new ProjectManagerListener() {
             @Override
-            public void projectClosing(@NotNull Project project) {
-                stop();
+            public void projectClosing(@NotNull Project closingProject) {
+                if (closingProject.equals(project)) {
+                    stop();
+                }
             }
         });
         
