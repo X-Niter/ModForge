@@ -16,7 +16,7 @@ import com.modforge.intellij.plugin.actions.LoginAction;
 import com.modforge.intellij.plugin.actions.LogoutAction;
 import com.modforge.intellij.plugin.actions.ToggleContinuousDevelopmentAction;
 import com.modforge.intellij.plugin.actions.TogglePatternRecognitionAction;
-import com.modforge.intellij.plugin.auth.ModAuthenticationManager;
+import com.modforge.intellij.plugin.services.ModAuthenticationManager;
 import com.modforge.intellij.plugin.settings.ModForgeSettings;
 import com.modforge.intellij.plugin.utils.ConnectionTestUtil;
 import org.jetbrains.annotations.NotNull;

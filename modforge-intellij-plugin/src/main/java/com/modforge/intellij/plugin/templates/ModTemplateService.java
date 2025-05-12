@@ -7,7 +7,7 @@ import com.google.gson.JsonObject;
 import com.intellij.openapi.components.Service;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.project.Project;
-import com.modforge.intellij.plugin.auth.ModAuthenticationManager;
+import com.modforge.intellij.plugin.services.ModAuthenticationManager;
 import com.modforge.intellij.plugin.utils.ModLoaderContributor;
 import com.modforge.intellij.plugin.utils.ModLoaderDetector;
 import com.modforge.intellij.plugin.utils.TokenAuthConnectionUtil;
