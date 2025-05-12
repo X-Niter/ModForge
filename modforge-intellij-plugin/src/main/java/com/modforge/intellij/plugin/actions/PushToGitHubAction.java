@@ -230,11 +230,6 @@ public class PushToGitHubAction extends AnAction {
         }
         
         /**
-         * Get the owner.
-         *
-         * @return The owner
-         */
-        /**
          * Gets the repository owner name.
          * NOTE: This is a custom method for our purposes, not the DialogWrapper.getOwner()
          * which returns Window.
