@@ -53,7 +53,6 @@ public class CreateFromTemplateAction extends AnAction {
             ModForgeNotificationService notificationService = ModForgeNotificationService.getInstance();
             if (notificationService != null) {
                 notificationService.showErrorDialog(
-                        project,
                         "Service Unavailable",
                         "Template service is not available."
                 );
@@ -80,7 +79,6 @@ public class CreateFromTemplateAction extends AnAction {
             ModForgeNotificationService notificationService = ModForgeNotificationService.getInstance();
             if (notificationService != null) {
                 notificationService.showErrorDialog(
-                        project,
                         "Error Loading Templates",
                         "Failed to load templates: " + error.get().getMessage()
                 );
@@ -100,7 +98,6 @@ public class CreateFromTemplateAction extends AnAction {
             ModForgeNotificationService notificationService = ModForgeNotificationService.getInstance();
             if (notificationService != null) {
                 notificationService.showErrorDialog(
-                        project,
                         "No Templates",
                         "No templates available."
                 );
@@ -138,7 +135,6 @@ public class CreateFromTemplateAction extends AnAction {
                                 
                                 if (notificationService != null) {
                                     notificationService.showInfoNotification(
-                                            project,
                                             "Project Created",
                                             "Project created successfully at " + outputDir.getAbsolutePath()
                                     );
@@ -160,7 +156,6 @@ public class CreateFromTemplateAction extends AnAction {
                                 
                                 if (notificationService != null) {
                                     notificationService.showErrorNotification(
-                                            project,
                                             "Error Creating Project",
                                             "Failed to create project: " + ex.getMessage()
                                     );
@@ -342,7 +337,6 @@ public class CreateFromTemplateAction extends AnAction {
                     ModForgeNotificationService notificationService = ModForgeNotificationService.getInstance();
                     if (notificationService != null) {
                         notificationService.showErrorDialog(
-                                project,
                                 "No Template Selected",
                                 "Please select a template"
                         );
@@ -527,7 +521,6 @@ public class CreateFromTemplateAction extends AnAction {
                     ModForgeNotificationService notificationService = ModForgeNotificationService.getInstance();
                     if (notificationService != null) {
                         notificationService.showErrorDialog(
-                                project,
                                 "No Output Directory",
                                 "Please specify an output directory"
                         );
@@ -555,7 +548,6 @@ public class CreateFromTemplateAction extends AnAction {
                     ModForgeNotificationService notificationService = ModForgeNotificationService.getInstance();
                     if (notificationService != null) {
                         notificationService.showErrorDialog(
-                                project,
                                 "Invalid Output Directory",
                                 "Output directory is a file"
                         );
@@ -582,7 +574,6 @@ public class CreateFromTemplateAction extends AnAction {
                     ModForgeNotificationService notificationService = ModForgeNotificationService.getInstance();
                     if (notificationService != null) {
                         int result = notificationService.showYesNoDialog(
-                                project,
                                 "Output directory is not empty. Continue?",
                                 "Output Directory Not Empty",
                                 "Continue",
