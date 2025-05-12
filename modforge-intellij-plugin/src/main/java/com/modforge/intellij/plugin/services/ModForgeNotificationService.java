@@ -141,6 +141,12 @@ public final class ModForgeNotificationService {
             @NotNull String content,
             @NotNull NotificationType type) {
         
+        // Check if notifications are enabled in settings
+        if (!com.modforge.intellij.plugin.settings.ModForgeSettings.getInstance().isEnableNotifications()) {
+            LOG.info("Notifications are disabled in settings, not showing sticky notification: " + title);
+            return;
+        }
+        
         Notification notification = NOTIFICATION_GROUP.createNotification(title, content, type);
         notification.setImportant(true);
         notification.notify(project);
@@ -186,6 +192,12 @@ public final class ModForgeNotificationService {
             @NotNull String actionText,
             @NotNull Runnable actionRunner) {
         
+        // Check if notifications are enabled in settings
+        if (!com.modforge.intellij.plugin.settings.ModForgeSettings.getInstance().isEnableNotifications()) {
+            LOG.info("Notifications are disabled in settings, not showing notification with action: " + title);
+            return;
+        }
+        
         Notification notification = NOTIFICATION_GROUP.createNotification(title, content, type);
         
         notification.addAction(NotificationAction.createSimple(actionText, () -> {
@@ -218,6 +230,12 @@ public final class ModForgeNotificationService {
             @NotNull String title,
             @NotNull String content,
             @NotNull NotificationType type) {
+        
+        // Check if notifications are enabled in settings
+        if (!com.modforge.intellij.plugin.settings.ModForgeSettings.getInstance().isEnableNotifications()) {
+            LOG.info("Notifications are disabled in settings, not showing notification: " + title);
+            return;
+        }
         
         NOTIFICATION_GROUP
                 .createNotification(title, content, type)
