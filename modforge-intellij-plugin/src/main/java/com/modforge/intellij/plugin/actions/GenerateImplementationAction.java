@@ -4,6 +4,7 @@ import com.intellij.openapi.actionSystem.ActionUpdateThread;
 import com.intellij.openapi.actionSystem.AnAction;
 import com.intellij.openapi.actionSystem.AnActionEvent;
 import com.intellij.openapi.actionSystem.CommonDataKeys;
+import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.project.Project;
@@ -21,6 +22,7 @@ import org.jetbrains.annotations.NotNull;
 
 import java.nio.file.Paths;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
 
 /**
  * Action for generating implementations of interfaces or abstract classes.
@@ -125,7 +127,7 @@ public final class GenerateImplementationAction extends AnAction {
                             "Generation Failed",
                             "Failed to generate implementation for " + className + ": " + error.getMessage()
                     );
-                } else if (Boolean.TRUE.equals(success)) {
+                } else if (success != null && success) { // Fixed boolean dereferencing issue here
                     ModForgeNotificationService.getInstance().showInfoNotification(
                             project,
                             "Implementation Generated",
