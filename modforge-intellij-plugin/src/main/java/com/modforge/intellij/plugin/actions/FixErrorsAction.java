@@ -28,6 +28,7 @@ import com.intellij.util.ui.JBUI;
 import com.modforge.intellij.plugin.auth.ModAuthenticationManager;
 import com.modforge.intellij.plugin.services.AutonomousCodeGenerationService;
 import com.modforge.intellij.plugin.services.ModForgeNotificationService;
+import com.modforge.intellij.plugin.utils.CompatibilityUtil;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -195,36 +196,14 @@ public class FixErrorsAction extends AnAction {
         
         StringBuilder sb = new StringBuilder();
         for (Problem problem : problems) {
-            // Compatible way to get problem description in IntelliJ IDEA 2025.1.1.1
-            sb.append(getProblemDescriptionSimple(problem)).append("\n");
+            // Use CompatibilityUtil for compatible problem description in IntelliJ IDEA 2025.1.1.1
+            sb.append(CompatibilityUtil.getProblemDescription(problem)).append("\n");
         }
         
         return sb.toString();
     }
     
-    /**
-     * Gets the description of a problem using reflection to handle API changes in IntelliJ IDEA 2025.1.1.1
-     * 
-     * @param problem The problem
-     * @return The description
-     */
-    private String getProblemDescriptionSimple(@NotNull Problem problem) {
-        try {
-            // First try the IntelliJ IDEA 2025.1.1.1 method
-            java.lang.reflect.Method getDescMethod = problem.getClass().getMethod("getPresentableText");
-            return (String) getDescMethod.invoke(problem);
-        } catch (Exception e) {
-            try {
-                // Fall back to older method
-                java.lang.reflect.Method getDescMethod = problem.getClass().getMethod("getDescription");
-                return (String) getDescMethod.invoke(problem);
-            } catch (Exception ex) {
-                // If all else fails, return a default message
-                LOG.warn("Could not get problem description", ex);
-                return "Unknown error";
-            }
-        }
-    }
+    // Using CompatibilityUtil.getProblemDescription instead of local implementation
     
     /**
      * Compatibility method to collect problems for a file using available APIs in IntelliJ IDEA 2025.1.1.1
@@ -310,129 +289,7 @@ public class FixErrorsAction extends AnAction {
         }
     }
     
-    /**
-     * Get the description of a problem in a compatible way
-     * 
-     * @param problem The problem
-     * @return The description
-     */
-    private String getProblemDescription(@NotNull Problem problem) {
-        // In IntelliJ IDEA 2025.1.1.1, the API has changed and getDescription() is no longer available
-        // We need to use reflection or extract information from other stable methods
-        
-        // Extract information from the problem using stable methods
-        StringBuilder sb = new StringBuilder();
-        
-        // Get the file information using reflection since the API changed in 2025.1.1.1
-        VirtualFile file = null;
-        try {
-            java.lang.reflect.Method getFileMethod = problem.getClass().getMethod("getVirtualFile");
-            file = (VirtualFile) getFileMethod.invoke(problem);
-        } catch (Exception e) {
-            // If the above fails, try the old method which might still exist as legacy support
-            try {
-                java.lang.reflect.Method getFileMethod = problem.getClass().getMethod("getFile");
-                file = (VirtualFile) getFileMethod.invoke(problem);
-            } catch (Exception ex) {
-                LOG.warn("Could not get file from problem: " + ex.getMessage());
-            }
-        }
-            
-        if (file != null) {
-            sb.append("[").append(file.getName()).append("] ");
-        }
-        
-        // Get line and column if available using reflection
-        try {
-            java.lang.reflect.Method getLineMethod = problem.getClass().getMethod("getLine");
-            Object lineObj = getLineMethod.invoke(problem);
-            if (lineObj instanceof Integer) {
-                int line = (Integer) lineObj;
-                if (line >= 0) {
-                    sb.append("Line ").append(line);
-                    
-                    try {
-                        java.lang.reflect.Method getColumnMethod = problem.getClass().getMethod("getColumn");
-                        Object columnObj = getColumnMethod.invoke(problem);
-                        if (columnObj instanceof Integer) {
-                            int column = (Integer) columnObj;
-                            if (column >= 0) {
-                                sb.append(", Column ").append(column);
-                            }
-                        }
-                    } catch (Exception e) {
-                        LOG.debug("Could not get column from problem: " + e.getMessage());
-                    }
-                    
-                    sb.append(": ");
-                }
-            }
-        } catch (Exception e) {
-            LOG.debug("Could not get line from problem: " + e.getMessage());
-        }
-        
-        // Try to get severity (which might be more reliably available in 2025.1.1.1)
-        try {
-            // Different approaches to get severity or problem type
-            try {
-                java.lang.reflect.Method getSeverityMethod = problem.getClass().getMethod("getSeverity");
-                Object severity = getSeverityMethod.invoke(problem);
-                if (severity != null) {
-                    sb.append("[").append(severity).append("] ");
-                }
-            } catch (Exception e) {
-                // Falling back to text attributes as in the original code
-                java.lang.reflect.Method getTextAttributesKeyMethod = problem.getClass().getMethod("getTextAttributesKey");
-                Object textAttributesKey = getTextAttributesKeyMethod.invoke(problem);
-                if (textAttributesKey != null) {
-                    java.lang.reflect.Method getExternalNameMethod = textAttributesKey.getClass().getMethod("getExternalName");
-                    String keyName = (String) getExternalNameMethod.invoke(textAttributesKey);
-                    if (keyName != null && (keyName.contains("error") || keyName.contains("warning"))) {
-                        sb.append(keyName).append(" - ");
-                    }
-                }
-            }
-        } catch (Exception e) {
-            LOG.debug("Could not get severity info from problem: " + e.getMessage());
-        }
-        
-        // Try multiple approaches to get the description
-        
-        // Approach 1: Try to access the description through reflection (getDescriptionText or getText method)
-        try {
-            // Try multiple potential method names that might exist in different IntelliJ versions
-            for (String methodName : new String[]{"getDescriptionText", "getText", "getDescription", "getMessage"}) {
-                try {
-                    java.lang.reflect.Method method = problem.getClass().getMethod(methodName);
-                    Object result = method.invoke(problem);
-                    if (result instanceof String) {
-                        String description = (String) result;
-                        if (description != null && !description.isEmpty()) {
-                            sb.append(description);
-                            return sb.toString(); // Found a valid description, return immediately
-                        }
-                    }
-                } catch (NoSuchMethodException ignored) {
-                    // Method doesn't exist, try the next one
-                }
-            }
-        } catch (Exception ignored) {
-            // Any reflection exception, continue to fallbacks
-        }
-        
-        // Approach 2: If reflection fails or no description found, try toString
-        String problemString = problem.toString();
-        if (problemString != null && !problemString.isEmpty() && !problemString.equals(problem.getClass().getName())) {
-            sb.append(problemString);
-        } else {
-            // Approach 3: Final fallback - check if we already have some content
-            if (sb.length() == 0) {
-                sb.append("Error detected but no description available");
-            }
-        }
-        
-        return sb.toString();
-    }
+    // Using CompatibilityUtil.getProblemDescription instead of local implementation
     
     /**
      * Fix errors in the code.
