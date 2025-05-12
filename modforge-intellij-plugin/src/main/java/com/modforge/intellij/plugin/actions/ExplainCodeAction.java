@@ -16,6 +16,7 @@ import com.intellij.ui.components.JBScrollPane;
 import com.intellij.ui.components.JBTextArea;
 import com.intellij.util.ui.JBUI;
 import com.modforge.intellij.plugin.services.AutonomousCodeGenerationService;
+import com.modforge.intellij.plugin.services.ModForgeNotificationService;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -36,11 +37,20 @@ public class ExplainCodeAction extends AnAction {
         String selectedText = selectionModel.getSelectedText();
         
         if (selectedText == null || selectedText.isEmpty()) {
-            Messages.showWarningDialog(
-                    project,
-                    "Please select some code to explain.",
-                    "Explain Code"
-            );
+            ModForgeNotificationService notificationService = ModForgeNotificationService.getInstance(project);
+            if (notificationService != null) {
+                notificationService.showWarningDialog(
+                        project,
+                        "Explain Code",
+                        "Please select some code to explain."
+                );
+            } else {
+                Messages.showWarningDialog(
+                        project,
+                        "Please select some code to explain.",
+                        "Explain Code"
+                );
+            }
             return;
         }
         
@@ -62,21 +72,39 @@ public class ExplainCodeAction extends AnAction {
                     explanation = codeGenService.explainCode(selectedText, null).get();
                     
                     if (explanation == null || explanation.isEmpty()) {
-                        Messages.showErrorDialog(
-                                project,
-                                "Failed to explain code.",
-                                "Explain Code"
-                        );
+                        ModForgeNotificationService notificationService = ModForgeNotificationService.getInstance(project);
+                        if (notificationService != null) {
+                            notificationService.showErrorDialog(
+                                    project,
+                                    "Explain Code",
+                                    "Failed to explain code."
+                            );
+                        } else {
+                            Messages.showErrorDialog(
+                                    project,
+                                    "Failed to explain code.",
+                                    "Explain Code"
+                            );
+                        }
                         return;
                     }
                     
                     indicator.setFraction(1.0);
                 } catch (Exception ex) {
-                    Messages.showErrorDialog(
-                            project,
-                            "Error explaining code: " + ex.getMessage(),
-                            "Explain Code"
-                    );
+                    ModForgeNotificationService notificationService = ModForgeNotificationService.getInstance(project);
+                    if (notificationService != null) {
+                        notificationService.showErrorDialog(
+                                project,
+                                "Explain Code",
+                                "Error explaining code: " + ex.getMessage()
+                        );
+                    } else {
+                        Messages.showErrorDialog(
+                                project,
+                                "Error explaining code: " + ex.getMessage(),
+                                "Explain Code"
+                        );
+                    }
                 }
             }
             
