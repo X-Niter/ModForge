@@ -158,7 +158,7 @@ public class ToggleContinuousDevelopmentAction extends AnAction {
                                         formatInterval(interval) + "."
                         );
                     } else {
-                        Messages.showInfoMessage(
+                        CompatibilityUtil.showInfoDialog(
                                 project,
                                 "Continuous development has been enabled. " +
                                         "Your project will be automatically scanned for errors every " +
@@ -223,7 +223,7 @@ public class ToggleContinuousDevelopmentAction extends AnAction {
                     sb.toString()
             );
         } else {
-            Messages.showInfoMessage(
+            CompatibilityUtil.showInfoDialog(
                     project,
                     sb.toString(),
                     "Continuous Development Metrics"

@@ -15,6 +15,7 @@ import com.intellij.util.ui.UIUtil;
 import com.modforge.intellij.plugin.crossloader.ArchitecturyService;
 import com.modforge.intellij.plugin.crossloader.ArchitecturyService.ModLoader;
 import com.modforge.intellij.plugin.crossloader.generator.ArchitecturyTemplateGenerator;
+import com.modforge.intellij.plugin.utils.CompatibilityUtil;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -806,7 +807,8 @@ public class CrossLoaderProjectSetupDialog extends DialogWrapper {
         
         if (success) {
             LOG.info("Successfully generated Architectury mod project: " + modId);
-            Messages.showInfoMessage(
+            CompatibilityUtil.showInfoDialog(
+                    myProject,
                     "Successfully created cross-loader mod project at:\n" + baseDir.getPath(),
                     "Project Created"
             );
@@ -824,7 +826,8 @@ public class CrossLoaderProjectSetupDialog extends DialogWrapper {
      */
     private void createDirectConversionProject() {
         // TODO: Implement direct conversion project creation
-        Messages.showInfoMessage(
+        CompatibilityUtil.showInfoDialog(
+                myProject,
                 "Direct conversion project creation is not yet implemented.\n" +
                 "Please use Architectury for now.",
                 "Not Implemented"
