@@ -156,12 +156,22 @@ public class AddFeaturesAction extends AnAction {
                                 com.intellij.openapi.application.ApplicationManager.getApplication().invokeLater(() -> {
                                     if (success) {
                                         // Show success message with request ID for tracking
-                                        com.intellij.openapi.ui.Messages.showInfoMessage(
-                                                project,
-                                                message + "\n\nRequest ID: " + requestId + 
-                                                "\n\nYou can track the progress in the ModForge panel.",
-                                                "Feature Addition Requested"
-                                        );
+                                        ModForgeNotificationService notificationService = ModForgeNotificationService.getInstance(project);
+                                        if (notificationService != null) {
+                                            notificationService.showInfoMessage(
+                                                    project,
+                                                    "Feature Addition Requested",
+                                                    message + "\n\nRequest ID: " + requestId + 
+                                                    "\n\nYou can track the progress in the ModForge panel."
+                                            );
+                                        } else {
+                                            com.intellij.openapi.ui.Messages.showInfoMessage(
+                                                    project,
+                                                    message + "\n\nRequest ID: " + requestId + 
+                                                    "\n\nYou can track the progress in the ModForge panel.",
+                                                    "Feature Addition Requested"
+                                            );
+                                        }
                                         
                                         // Open ModForge tool window to show progress
                                         com.intellij.openapi.wm.ToolWindowManager.getInstance(project)
@@ -169,11 +179,20 @@ public class AddFeaturesAction extends AnAction {
                                                 .show(null);
                                     } else {
                                         // Show error message
-                                        com.intellij.openapi.ui.Messages.showErrorDialog(
-                                                project,
-                                                "Failed to add feature: " + message,
-                                                "Feature Addition Failed"
-                                        );
+                                        ModForgeNotificationService notificationService = ModForgeNotificationService.getInstance(project);
+                                        if (notificationService != null) {
+                                            notificationService.showErrorDialog(
+                                                    project,
+                                                    "Feature Addition Failed",
+                                                    "Failed to add feature: " + message
+                                            );
+                                        } else {
+                                            com.intellij.openapi.ui.Messages.showErrorDialog(
+                                                    project,
+                                                    "Failed to add feature: " + message,
+                                                    "Feature Addition Failed"
+                                            );
+                                        }
                                     }
                                 });
                             } catch (Exception ex) {
@@ -181,11 +200,20 @@ public class AddFeaturesAction extends AnAction {
                                 
                                 // Show error in UI thread
                                 com.intellij.openapi.application.ApplicationManager.getApplication().invokeLater(() -> {
-                                    com.intellij.openapi.ui.Messages.showErrorDialog(
-                                            project,
-                                            "An error occurred while adding the feature: " + ex.getMessage(),
-                                            "Error Adding Feature"
-                                    );
+                                    ModForgeNotificationService errNotificationService = ModForgeNotificationService.getInstance(project);
+                                    if (errNotificationService != null) {
+                                        errNotificationService.showErrorDialog(
+                                                project,
+                                                "Error Adding Feature",
+                                                "An error occurred while adding the feature: " + ex.getMessage()
+                                        );
+                                    } else {
+                                        com.intellij.openapi.ui.Messages.showErrorDialog(
+                                                project,
+                                                "An error occurred while adding the feature: " + ex.getMessage(),
+                                                "Error Adding Feature"
+                                        );
+                                    }
                                 });
                             }
                         }
