@@ -104,8 +104,8 @@ public class EnhanceCodeAction extends AnAction {
             if (notificationService != null) {
                 enhancementTypeIndex = notificationService.showChooseDialog(
                         project,
-                        "Select Enhancement Type",
                         "What type of enhancement would you like to perform?",
+                        "Select Enhancement Type",
                         enhancementTypes,
                         enhancementTypes[0]
                 );
