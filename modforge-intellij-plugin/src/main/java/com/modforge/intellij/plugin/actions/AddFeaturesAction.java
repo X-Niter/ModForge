@@ -71,21 +71,40 @@ public class AddFeaturesAction extends AnAction {
             
             // Check if description is empty
             if (featureDescription == null || featureDescription.trim().isEmpty()) {
-                Messages.showErrorDialog(
-                        project,
-                        "Feature description cannot be empty.",
-                        "Empty Description"
-                );
+                ModForgeNotificationService notificationService = ModForgeNotificationService.getInstance(project);
+                if (notificationService != null) {
+                    notificationService.showErrorDialog(
+                            project,
+                            "Empty Description",
+                            "Feature description cannot be empty."
+                    );
+                } else {
+                    Messages.showErrorDialog(
+                            project,
+                            "Feature description cannot be empty.",
+                            "Empty Description"
+                    );
+                }
                 return;
             }
             
             // Show confirmation dialog
-            int confirmation = Messages.showYesNoDialog(
-                    project,
-                    "Add the following feature to your mod?\n\n" + featureDescription,
-                    "Confirm Feature Addition",
-                    Messages.getQuestionIcon()
-            );
+            int confirmation;
+            ModForgeNotificationService notificationService = ModForgeNotificationService.getInstance(project);
+            if (notificationService != null) {
+                confirmation = notificationService.showYesNoDialog(
+                        project,
+                        "Confirm Feature Addition",
+                        "Add the following feature to your mod?\n\n" + featureDescription
+                );
+            } else {
+                confirmation = Messages.showYesNoDialog(
+                        project,
+                        "Add the following feature to your mod?\n\n" + featureDescription,
+                        "Confirm Feature Addition",
+                        Messages.getQuestionIcon()
+                );
+            }
             
             if (confirmation != Messages.YES) {
                 // User cancelled
