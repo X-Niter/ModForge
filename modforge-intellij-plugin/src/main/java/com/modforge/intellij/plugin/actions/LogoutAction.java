@@ -56,10 +56,11 @@ public class LogoutAction extends AnAction {
         if (notificationService != null) {
             result = notificationService.showYesNoDialog(
                     project,
-                    "Confirm Logout",
                     "Are you sure you want to log out from ModForge? This will stop all services that require authentication.",
+                    "Confirm Logout",
                     "Logout",
-                    "Cancel"
+                    "Cancel",
+                    null
             );
         } else {
             result = Messages.showYesNoDialog(

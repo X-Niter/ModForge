@@ -583,10 +583,11 @@ public class CreateFromTemplateAction extends AnAction {
                     if (notificationService != null) {
                         int result = notificationService.showYesNoDialog(
                                 project,
-                                "Output Directory Not Empty",
                                 "Output directory is not empty. Continue?",
+                                "Output Directory Not Empty",
                                 "Continue",
-                                "Cancel"
+                                "Cancel",
+                                null
                         );
                         
                         if (result != Messages.YES) {
