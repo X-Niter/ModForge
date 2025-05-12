@@ -203,6 +203,30 @@ public class FixErrorsAction extends AnAction {
     }
     
     /**
+     * Gets the description of a problem using reflection to handle API changes in IntelliJ IDEA 2025.1.1.1
+     * 
+     * @param problem The problem
+     * @return The description
+     */
+    private String getProblemDescription(@NotNull Problem problem) {
+        try {
+            // First try the IntelliJ IDEA 2025.1.1.1 method
+            java.lang.reflect.Method getDescMethod = problem.getClass().getMethod("getPresentableText");
+            return (String) getDescMethod.invoke(problem);
+        } catch (Exception e) {
+            try {
+                // Fall back to older method
+                java.lang.reflect.Method getDescMethod = problem.getClass().getMethod("getDescription");
+                return (String) getDescMethod.invoke(problem);
+            } catch (Exception ex) {
+                // If all else fails, return a default message
+                LOG.warn("Could not get problem description", ex);
+                return "Unknown error";
+            }
+        }
+    }
+    
+    /**
      * Compatibility method to collect problems for a file using available APIs in IntelliJ IDEA 2025.1.1.1
      * 
      * @param problemSolver The problem solver
