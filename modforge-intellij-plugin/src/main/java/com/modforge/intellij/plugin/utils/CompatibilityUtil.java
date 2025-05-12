@@ -809,32 +809,9 @@ public final class CompatibilityUtil {
         return problems;
     }
 
-    /**
-     * Gets description from a Problem instance in a compatible way for IntelliJ IDEA 2025.1.1.1
-     * Uses reflection to access methods that might have different names in different versions.
-     * 
-     * @param problem The problem instance (of type com.intellij.codeInsight.daemon.impl.WolfTheProblemSolver$Problem)
-     * @return The description text
-     */
-    @NotNull
-    public static String getProblemDescription(@NotNull Object problem) {
-        try {
-            // Try the newer method first (IntelliJ IDEA 2025.1.1.1)
-            java.lang.reflect.Method getTextMethod = problem.getClass().getMethod("getPresentableText");
-            String text = (String) getTextMethod.invoke(problem);
-            return text != null ? text : "Unknown error";
-        } catch (Exception e) {
-            try {
-                // Fall back to the older method
-                java.lang.reflect.Method getDescMethod = problem.getClass().getMethod("getDescription");
-                String description = (String) getDescMethod.invoke(problem);
-                return description != null ? description : "Unknown error";
-            } catch (Exception ex) {
-                LOG.warn("Failed to get problem description", ex);
-                return "Unknown error";
-            }
-        }
-    }
+    // Duplicate method removed.
+    // This implementation exists earlier in this file (around line 398).
+    // This comment block is maintained to preserve line numbers.
     
     /**
      * Compatibility wrapper for findFileByPath, which is deprecated in IDEA 2025.1.1.1
