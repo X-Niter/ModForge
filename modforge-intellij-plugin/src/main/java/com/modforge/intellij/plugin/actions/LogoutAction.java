@@ -40,7 +40,7 @@ public class LogoutAction extends AnAction {
                         "You are not currently logged in."
                 );
             } else {
-                Messages.showInfoMessage(
+                CompatibilityUtil.showInfoDialog(
                         project,
                         "You are not currently logged in.",
                         "Logout"
@@ -101,7 +101,7 @@ public class LogoutAction extends AnAction {
                     }
                 } else {
                     ApplicationManager.getApplication().invokeLater(() -> {
-                        Messages.showInfoMessage(
+                        CompatibilityUtil.showInfoDialog(
                                 project,
                                 "You have been logged out from ModForge." +
                                         (username.isEmpty() ? "" : " (Goodbye, " + username + "!)"),
@@ -135,7 +135,7 @@ public class LogoutAction extends AnAction {
                         "Continuous development has been stopped due to logout."
                 );
             } else {
-                Messages.showInfoMessage(
+                CompatibilityUtil.showInfoDialog(
                         project,
                         "Continuous development has been stopped due to logout.",
                         "Continuous Development"

@@ -49,9 +49,12 @@ public final class ModAuthenticationManager {
     
     /**
      * Constructor.
+     * Compatible with IntelliJ IDEA 2025.1.1.1
      */
     public ModAuthenticationManager() {
-        this.settings = ModForgeSettings.getInstance();
+        // Note: We use null for Project since this is an application-level service
+        // In 2025.1.1.1, ModForgeSettings.getInstance(null) handles this appropriately
+        this.settings = ModForgeSettings.getInstance(null);
         this.notificationService = ModForgeNotificationService.getInstance();
     }
 
@@ -62,6 +65,18 @@ public final class ModAuthenticationManager {
      */
     public static ModAuthenticationManager getInstance() {
         return ApplicationManager.getApplication().getService(ModAuthenticationManager.class);
+    }
+    
+    /**
+     * Gets the instance of the service.
+     * This method is provided for compatibility with IntelliJ IDEA 2025.1.1.1
+     * which expects getInstance(Project) in some contexts.
+     *
+     * @param project The project (ignored as this is an application-level service)
+     * @return The service instance.
+     */
+    public static ModAuthenticationManager getInstance(@Nullable Project project) {
+        return getInstance();
     }
 
     /**
