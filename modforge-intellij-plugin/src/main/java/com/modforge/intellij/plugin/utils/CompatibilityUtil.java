@@ -414,13 +414,14 @@ public final class CompatibilityUtil {
     }
     
     /**
-     * Gets WolfTheProblemSolver problems using compatible approaches for IntelliJ IDEA 2025.1.1.1
+     * Gets problem files from a WolfTheProblemSolver instance using reflection to maintain
+     * compatibility with different IntelliJ IDEA versions, particularly 2025.1.1.1.
      * 
      * @param problemSolver The problem solver instance
      * @return Collection of problem files
      */
     @NotNull
-    public static Collection<VirtualFile> getProblemFiles(@NotNull com.intellij.codeInsight.daemon.impl.WolfTheProblemSolver problemSolver) {
+    public static Collection<VirtualFile> getProblemFiles(@NotNull Object problemSolver) {
         try {
             // Try the method available in IntelliJ IDEA 2025.1.1.1
             java.lang.reflect.Method getFilesMethod = problemSolver.getClass().getMethod("getProblemFileSet");
@@ -441,23 +442,22 @@ public final class CompatibilityUtil {
     }
     
     /**
-     * Gets problems from WolfTheProblemSolver in a compatible way for IntelliJ IDEA 2025.1.1.1
+     * Gets problems from a WolfTheProblemSolver instance using reflection to maintain
+     * compatibility with different IntelliJ IDEA versions, particularly 2025.1.1.1.
      * 
      * @param problemSolver The problem solver instance
-     * @return Collection of problems
+     * @return Collection of problem objects
      */
     @NotNull
-    public static Collection<com.intellij.codeInsight.daemon.impl.WolfTheProblemSolver.Problem> getAllProblems(
-            @NotNull com.intellij.codeInsight.daemon.impl.WolfTheProblemSolver problemSolver) {
-        
-        List<com.intellij.codeInsight.daemon.impl.WolfTheProblemSolver.Problem> problems = new ArrayList<>();
+    public static List<Object> getAllProblems(@NotNull Object problemSolver) {
+        List<Object> problems = new ArrayList<>();
         
         try {
             // Try the newer approach using processProblems which takes a processor
             java.lang.reflect.Method processMethod = problemSolver.getClass().getMethod("processProblems", 
                     java.util.function.Predicate.class);
             
-            processMethod.invoke(problemSolver, (java.util.function.Predicate<com.intellij.codeInsight.daemon.impl.WolfTheProblemSolver.Problem>) problem -> {
+            processMethod.invoke(problemSolver, (java.util.function.Predicate<Object>) problem -> {
                 problems.add(problem);
                 return true; // Continue processing
             });
@@ -467,8 +467,7 @@ public final class CompatibilityUtil {
             try {
                 // Try the older getSortedProblems method
                 java.lang.reflect.Method getProblemsMethod = problemSolver.getClass().getMethod("getSortedProblems");
-                Collection<com.intellij.codeInsight.daemon.impl.WolfTheProblemSolver.Problem> foundProblems = 
-                        (Collection<com.intellij.codeInsight.daemon.impl.WolfTheProblemSolver.Problem>) getProblemsMethod.invoke(problemSolver);
+                Collection<?> foundProblems = (Collection<?>) getProblemsMethod.invoke(problemSolver);
                 
                 if (foundProblems != null) {
                     problems.addAll(foundProblems);
@@ -483,12 +482,13 @@ public final class CompatibilityUtil {
 
     /**
      * Gets description from a Problem instance in a compatible way for IntelliJ IDEA 2025.1.1.1
+     * Uses reflection to access methods that might have different names in different versions.
      * 
-     * @param problem The problem instance
+     * @param problem The problem instance (of type com.intellij.codeInsight.daemon.impl.WolfTheProblemSolver$Problem)
      * @return The description text
      */
     @NotNull
-    public static String getProblemDescription(@NotNull com.intellij.codeInsight.daemon.impl.WolfTheProblemSolver.Problem problem) {
+    public static String getProblemDescription(@NotNull Object problem) {
         try {
             // Try the newer method first (IntelliJ IDEA 2025.1.1.1)
             java.lang.reflect.Method getTextMethod = problem.getClass().getMethod("getPresentableText");
@@ -591,38 +591,56 @@ public final class CompatibilityUtil {
     }
     
     /**
-     * Shows an error dialog as a compatibility wrapper around Messages.showErrorDialog
-     * which has different parameters across IntelliJ versions.
+     * Shows an input dialog to prompt the user for text.
+     * Compatibility wrapper for different IntelliJ IDEA versions.
      *
      * @param project The project
-     * @param message The message to display
+     * @param message The prompt message
      * @param title The dialog title
+     * @param initialValue The initial value to display
+     * @return The value entered by the user, or null if canceled
      */
-    public static void showErrorDialog(Project project, String message, String title) {
-        ApplicationManager.getApplication().invokeLater(() -> {
+    @Nullable
+    public static String showInputDialog(@Nullable Project project, @NotNull String message, 
+                                     @NotNull String title, @Nullable String initialValue) {
+        try {
+            return Messages.showInputDialog(project, message, title, null, initialValue, null);
+        } catch (Exception e) {
+            LOG.warn("Failed to show input dialog with project parameter", e);
             try {
-                // Try the method with project parameter first (older versions)
-                try {
-                    Messages.class.getMethod("showErrorDialog", Project.class, String.class, String.class)
-                            .invoke(null, project, message, title);
-                    return;
-                } catch (NoSuchMethodException e) {
-                    // Method not found, try alternative
-                    LOG.debug("showErrorDialog with Project parameter not found, trying alternative", e);
-                }
-                
-                // Try the method without project parameter (newer versions)
-                Messages.class.getMethod("showErrorDialog", String.class, String.class)
-                        .invoke(null, message, title);
-            } catch (Exception e) {
-                LOG.error("Failed to show error dialog", e);
-                // Fallback to simple notification if dialogs fail
-                ModForgeNotificationService.getInstance().showErrorNotification(
-                        project, 
-                        title,
-                        message
-                );
+                return Messages.showInputDialog(message, title, null, initialValue, null);
+            } catch (Exception ex) {
+                LOG.error("Failed to show input dialog", ex);
+                return null;
             }
-        });
+        }
     }
+    
+    /**
+     * Shows a choose dialog (combo box) to select an option.
+     * Compatibility wrapper for different IntelliJ IDEA versions.
+     *
+     * @param project The project
+     * @param message The prompt message
+     * @param title The dialog title
+     * @param options The available options
+     * @param initialValue The initially selected value
+     * @return The selected index, or -1 if canceled
+     */
+    public static int showChooseDialog(@Nullable Project project, @NotNull String message,
+                                   @NotNull String title, @NotNull String[] options,
+                                   @Nullable String initialValue) {
+        try {
+            return Messages.showChooseDialog(project, message, title, options, initialValue, null);
+        } catch (Exception e) {
+            LOG.warn("Failed to show choose dialog with project parameter", e);
+            try {
+                return Messages.showChooseDialog(message, title, options, initialValue, null);
+            } catch (Exception ex) {
+                LOG.error("Failed to show choose dialog", ex);
+                return -1;
+            }
+        }
+    }
+
 }
