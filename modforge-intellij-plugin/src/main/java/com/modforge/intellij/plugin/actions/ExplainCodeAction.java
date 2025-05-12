@@ -70,7 +70,8 @@ public class ExplainCodeAction extends AnAction {
                 
                 try {
                     // Explain code
-                    explanation = codeGenService.explainCode(selectedText, null).get();
+                    // Using the String argument for context parameter instead of null
+                    explanation = codeGenService.explainCode(selectedText, (String)null).get();
                     
                     if (explanation == null || explanation.isEmpty()) {
                         ModForgeNotificationService notificationService = ModForgeNotificationService.getInstance();

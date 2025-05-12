@@ -62,7 +62,8 @@ public class GenerateDocumentationAction extends AnAction {
                 
                 try {
                     // Generate documentation
-                    String documentedCode = codeGenService.generateDocumentation(code, null).get();
+                    // Using the String argument for context parameter instead of null
+                    String documentedCode = codeGenService.generateDocumentation(code, (String)null).get();
                     
                     if (documentedCode == null || documentedCode.isEmpty()) {
                         ModForgeNotificationService notificationService = ModForgeNotificationService.getInstance();
