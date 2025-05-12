@@ -19,7 +19,7 @@ import com.intellij.ui.components.JBScrollPane;
 import com.intellij.ui.components.JBTextField;
 import com.intellij.util.ui.FormBuilder;
 import com.intellij.util.ui.JBUI;
-import com.modforge.intellij.plugin.notifications.ModForgeNotificationService;
+import com.modforge.intellij.plugin.services.ModForgeNotificationService;
 import com.modforge.intellij.plugin.templates.ModTemplate;
 import com.modforge.intellij.plugin.templates.ModTemplateService;
 import com.modforge.intellij.plugin.templates.ModTemplateType;
@@ -50,11 +50,20 @@ public class CreateFromTemplateAction extends AnAction {
         // Get the template service
         ModTemplateService templateService = project.getService(ModTemplateService.class);
         if (templateService == null) {
-            Messages.showErrorDialog(
-                    project,
-                    "Template service is not available.",
-                    "Service Unavailable"
-            );
+            ModForgeNotificationService notificationService = project.getService(ModForgeNotificationService.class);
+            if (notificationService != null) {
+                notificationService.showErrorDialog(
+                        project,
+                        "Service Unavailable",
+                        "Template service is not available."
+                );
+            } else {
+                Messages.showErrorDialog(
+                        project,
+                        "Template service is not available.",
+                        "Service Unavailable"
+                );
+            }
             return;
         }
         
@@ -68,22 +77,40 @@ public class CreateFromTemplateAction extends AnAction {
                 .join();
         
         if (error.get() != null) {
-            Messages.showErrorDialog(
-                    project,
-                    "Failed to load templates: " + error.get().getMessage(),
-                    "Error Loading Templates"
-            );
+            ModForgeNotificationService notificationService = project.getService(ModForgeNotificationService.class);
+            if (notificationService != null) {
+                notificationService.showErrorDialog(
+                        project,
+                        "Error Loading Templates",
+                        "Failed to load templates: " + error.get().getMessage()
+                );
+            } else {
+                Messages.showErrorDialog(
+                        project,
+                        "Failed to load templates: " + error.get().getMessage(),
+                        "Error Loading Templates"
+                );
+            }
             return;
         }
         
         // Get templates
         List<ModTemplate> templates = templateService.getTemplates();
         if (templates.isEmpty()) {
-            Messages.showErrorDialog(
-                    project,
-                    "No templates available.",
-                    "No Templates"
-            );
+            ModForgeNotificationService notificationService = project.getService(ModForgeNotificationService.class);
+            if (notificationService != null) {
+                notificationService.showErrorDialog(
+                        project,
+                        "No Templates",
+                        "No templates available."
+                );
+            } else {
+                Messages.showErrorDialog(
+                        project,
+                        "No templates available.",
+                        "No Templates"
+                );
+            }
             return;
         }
         
@@ -115,6 +142,7 @@ public class CreateFromTemplateAction extends AnAction {
                                             "Project created successfully at " + outputDir.getAbsolutePath()
                                     );
                                 } else {
+                                    // Fallback to standard Messages API since service is not available
                                     Messages.showInfoMessage(
                                             project,
                                             "Project created successfully at " + outputDir.getAbsolutePath(),
@@ -135,6 +163,7 @@ public class CreateFromTemplateAction extends AnAction {
                                             "Failed to create project: " + ex.getMessage()
                                     );
                                 } else {
+                                    // Fallback to standard Messages API since service is not available
                                     Messages.showErrorDialog(
                                             project,
                                             "Failed to create project: " + ex.getMessage(),
