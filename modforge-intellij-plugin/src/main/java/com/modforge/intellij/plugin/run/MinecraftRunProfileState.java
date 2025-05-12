@@ -21,6 +21,7 @@ import com.intellij.openapi.project.Project;
 import com.intellij.openapi.roots.ModuleRootManager;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.modforge.intellij.plugin.run.MinecraftRunConfiguration.RunType;
+import com.modforge.intellij.plugin.utils.CompatibilityUtil;
 import org.jetbrains.annotations.NotNull;
 
 /**
@@ -87,7 +88,11 @@ public class MinecraftRunProfileState extends CommandLineState {
         setupDefaultVMArgs(params);
         
         // Working directory is the project directory
-        params.setWorkingDirectory(project.getBasePath());
+        String basePath = CompatibilityUtil.getProjectBasePath(project);
+        if (basePath == null) {
+            throw new ExecutionException("Could not determine project base path. Cannot run Minecraft client.");
+        }
+        params.setWorkingDirectory(basePath);
         
         // Add program arguments
         if (configuration.getProgramArgs() != null && !configuration.getProgramArgs().isEmpty()) {
