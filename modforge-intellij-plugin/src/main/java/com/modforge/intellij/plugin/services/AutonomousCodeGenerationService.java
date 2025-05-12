@@ -73,6 +73,67 @@ public final class AutonomousCodeGenerationService {
     public static AutonomousCodeGenerationService getInstance() {
         return ApplicationManager.getApplication().getService(AutonomousCodeGenerationService.class);
     }
+    
+    /**
+     * Gets the instance of the service for a specific project.
+     *
+     * @param project The project.
+     * @return The service instance.
+     */
+    public static AutonomousCodeGenerationService getInstance(@NotNull Project project) {
+        return getInstance();
+    }
+    
+    /**
+     * Generates code from a description.
+     *
+     * @param description   The code description.
+     * @param targetPackage The target package.
+     * @param moduleType    The module type.
+     * @return A CompletableFuture that completes with the generated code.
+     */
+    public CompletableFuture<String> generateCode(
+            @NotNull String description,
+            @NotNull String targetPackage,
+            @NotNull String moduleType) {
+        
+        if (isGeneratingCode.getAndSet(true)) {
+            LOG.warn("Code generation already in progress");
+            return CompletableFuture.completedFuture(null);
+        }
+        
+        return ThreadUtils.supplyAsyncVirtual(() -> {
+            try {
+                LOG.info("Generating code with description: " + description);
+                
+                // Check pattern cache first
+                String cacheKey = description + "|" + targetPackage + "|" + moduleType;
+                if (patternCache.containsKey(cacheKey)) {
+                    String cachedResult = patternCache.get(cacheKey);
+                    patternHits.compute(cacheKey, (k, v) -> v == null ? 1 : v + 1);
+                    LOG.info("Using cached result for description (hit count: " + patternHits.get(cacheKey) + ")");
+                    return cachedResult;
+                }
+                
+                // Mock generation for now
+                // TODO: Replace with actual API call
+                String generatedCode = generateMockCode(description + " in " + moduleType + " for package " + targetPackage);
+                
+                // Cache the result if pattern learning is enabled
+                if (settings.isPatternRecognition()) {
+                    patternCache.put(cacheKey, generatedCode);
+                    patternHits.put(cacheKey, 1);
+                }
+                
+                return generatedCode;
+            } catch (Exception e) {
+                LOG.error("Error generating code", e);
+                return null;
+            } finally {
+                isGeneratingCode.set(false);
+            }
+        });
+    }
 
     /**
      * Generates mod code.
