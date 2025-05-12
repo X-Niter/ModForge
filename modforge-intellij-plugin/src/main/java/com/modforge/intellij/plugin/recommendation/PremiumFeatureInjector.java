@@ -13,6 +13,7 @@ import com.intellij.util.ui.JBUI;
 import com.intellij.util.ui.UIUtil;
 import com.modforge.intellij.plugin.services.UserSubscriptionService;
 import com.modforge.intellij.plugin.ui.PremiumFeatureNotificationPanel;
+import com.modforge.intellij.plugin.utils.CompatibilityUtil;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -130,8 +131,8 @@ public class PremiumFeatureInjector {
         PremiumFeatureNotificationPanel panel = new PremiumFeatureNotificationPanel(project, feature, recommender);
         panel.setBorder(JBUI.Borders.empty(0, 0, 10, 0));
         
-        // Create a content for the notification
-        ContentFactory contentFactory = ContentFactory.SERVICE.getInstance();
+        // Create a content for the notification using compatibility method
+        ContentFactory contentFactory = CompatibilityUtil.getContentFactory();
         Content content = contentFactory.createContent(panel, "Premium Feature", false);
         content.setCloseable(true);
         

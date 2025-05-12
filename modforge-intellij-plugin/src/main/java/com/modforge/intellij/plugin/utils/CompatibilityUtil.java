@@ -253,6 +253,19 @@ public final class CompatibilityUtil {
         // We use the new API: ContentFactory.getInstance()
         return com.intellij.ui.content.ContentFactory.getInstance();
     }
+    
+    /**
+     * A utility method to handle project opened events in a compatible way.
+     * This should be used by listeners that implement ProjectManagerListener.
+     *
+     * @param project The project that was opened
+     * @param handler The handler to execute when a project is opened
+     */
+    public static void handleProjectOpened(@NotNull Project project, @NotNull java.util.function.Consumer<Project> handler) {
+        LOG.info("Handling project opened event for project: " + project.getName());
+        // Execute the handler
+        handler.accept(project);
+    }
 
     /**
      * Runs a task on the UI thread.

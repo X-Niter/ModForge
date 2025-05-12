@@ -25,15 +25,22 @@ public class ModForgeProjectListener implements StartupActivity, ProjectManagerL
         projectService.projectOpened();
     }
     
+    /**
+     * @deprecated This method is deprecated in IntelliJ IDEA 2025.1.1.1
+     * Use {@link com.intellij.openapi.project.ProjectManager#TOPIC} with 
+     * {@link com.intellij.openapi.project.ProjectManagerListener} instead
+     */
     @Override
+    @Deprecated
     public void projectOpened(@NotNull Project project) {
-        LOG.info("Project opened: " + project.getName());
-        
-        // Get project service
-        ModForgeProjectService projectService = ModForgeProjectService.getInstance(project);
-        
-        // Call project opened
-        projectService.projectOpened();
+        // Call our compatibility method
+        CompatibilityUtil.handleProjectOpened(project, p -> {
+            // Get project service
+            ModForgeProjectService projectService = ModForgeProjectService.getInstance(p);
+            
+            // Call project opened
+            projectService.projectOpened();
+        });
     }
     
     @Override
