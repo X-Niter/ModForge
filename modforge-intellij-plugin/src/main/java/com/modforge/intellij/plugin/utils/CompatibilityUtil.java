@@ -776,4 +776,38 @@ public final class CompatibilityUtil {
         });
         return result[0];
     }
+    
+    /**
+     * Executes a read action with proper compatibility handling.
+     * Replacement for deprecated ApplicationManager.getApplication().runReadAction
+     *
+     * @param computable The computation to run.
+     * @param <T> The return type.
+     * @return The result of the computation.
+     */
+    public static <T> T runReadAction(@NotNull com.intellij.openapi.util.Computable<T> computable) {
+        return ReadAction.compute(computable::compute);
+    }
+    
+    /**
+     * Executes a write action with proper compatibility handling.
+     * Replacement for deprecated ApplicationManager.getApplication().runWriteAction
+     *
+     * @param runnable The runnable to execute.
+     */
+    public static void runWriteAction(@NotNull Runnable runnable) {
+        WriteAction.run(runnable::run);
+    }
+    
+    /**
+     * Executes a write action with proper compatibility handling and returns a result.
+     * Replacement for deprecated ApplicationManager.getApplication().runWriteAction
+     *
+     * @param computable The computation to run.
+     * @param <T> The return type.
+     * @return The result of the computation.
+     */
+    public static <T> T computeInWriteAction(@NotNull com.intellij.openapi.util.Computable<T> computable) {
+        return WriteAction.compute(computable::compute);
+    }
 }
