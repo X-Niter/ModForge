@@ -376,10 +376,11 @@ echo.
 
 REM Continue missing methods analysis in the subroutine
 if exist "%TEMP_DIR%\missing_methods.txt" (
-    REM Process method names from the log file
-    for /f "tokens=*" %%m in ('type "%TEMP_DIR%\missing_methods.txt"') do (
-        call :PROCESS_METHOD_LINE "%%m"
-    )
+    REM Process missing methods - add a summary to the report
+    echo Methods found in error log: >> "%MISSING_METHODS_REPORT%"
+    echo. >> "%MISSING_METHODS_REPORT%"
+    type "%TEMP_DIR%\missing_methods.txt" >> "%MISSING_METHODS_REPORT%"
+    echo. >> "%MISSING_METHODS_REPORT%"
     
     REM Add section headers for service classes
     (
@@ -437,9 +438,7 @@ REM ===================================
 REM Process Method Line Subroutine
 REM ===================================
 :PROCESS_METHOD_LINE
-set "LINE=%~1"
-set "METHOD=%LINE:*method =%"
-echo - **%METHOD%** >> "%MISSING_METHODS_REPORT%"
+echo - **%~1** >> "%MISSING_METHODS_REPORT%"
 goto :EOF
 
 REM ===================================
