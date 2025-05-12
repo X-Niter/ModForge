@@ -60,11 +60,20 @@ public class TogglePatternRecognitionAction extends AnAction {
         // Make sure the user is authenticated
         ModAuthenticationManager authManager = ModAuthenticationManager.getInstance();
         if (!authManager.isAuthenticated()) {
-            Messages.showErrorDialog(
-                    project,
-                    "You must be logged in to use pattern recognition.",
-                    "Authentication Required"
-            );
+            ModForgeNotificationService notificationService = ModForgeNotificationService.getInstance(project);
+            if (notificationService != null) {
+                notificationService.showErrorDialog(
+                        project,
+                        "Authentication Required",
+                        "You must be logged in to use pattern recognition."
+                );
+            } else {
+                Messages.showErrorDialog(
+                        project,
+                        "You must be logged in to use pattern recognition.",
+                        "Authentication Required"
+                );
+            }
             return;
         }
         
@@ -75,14 +84,26 @@ public class TogglePatternRecognitionAction extends AnAction {
             
             if (currentState) {
                 // Show confirmation dialog before disabling
-                int result = Messages.showYesNoDialog(
-                        project,
-                        "Are you sure you want to disable pattern recognition? This will increase API usage and costs.",
-                        "Disable Pattern Recognition",
-                        "Disable",
-                        "Cancel",
-                        null
-                );
+                ModForgeNotificationService notificationService = ModForgeNotificationService.getInstance(project);
+                int result;
+                if (notificationService != null) {
+                    result = notificationService.showYesNoDialog(
+                            project,
+                            "Disable Pattern Recognition",
+                            "Are you sure you want to disable pattern recognition? This will increase API usage and costs.",
+                            "Disable",
+                            "Cancel"
+                    );
+                } else {
+                    result = Messages.showYesNoDialog(
+                            project,
+                            "Are you sure you want to disable pattern recognition? This will increase API usage and costs.",
+                            "Disable Pattern Recognition",
+                            "Disable",
+                            "Cancel",
+                            null
+                    );
+                }
                 
                 if (result == Messages.YES) {
                     service.setEnabled(false);
@@ -90,11 +111,19 @@ public class TogglePatternRecognitionAction extends AnAction {
                     ModForgeSettings settings = ModForgeSettings.getInstance();
                     settings.setEnablePatternRecognition(false);
                     
-                    Messages.showInfoMessage(
-                            project,
-                            "Pattern recognition has been disabled.",
-                            "Pattern Recognition"
-                    );
+                    if (notificationService != null) {
+                        notificationService.showInfoDialog(
+                                project,
+                                "Pattern Recognition",
+                                "Pattern recognition has been disabled."
+                        );
+                    } else {
+                        Messages.showInfoMessage(
+                                project,
+                                "Pattern recognition has been disabled.",
+                                "Pattern Recognition"
+                        );
+                    }
                 }
             } else {
                 // Enable pattern recognition
@@ -103,11 +132,20 @@ public class TogglePatternRecognitionAction extends AnAction {
                 ModForgeSettings settings = ModForgeSettings.getInstance();
                 settings.setEnablePatternRecognition(true);
                 
-                Messages.showInfoMessage(
-                        project,
-                        "Pattern recognition has been enabled.",
-                        "Pattern Recognition"
-                );
+                ModForgeNotificationService notificationService = ModForgeNotificationService.getInstance(project);
+                if (notificationService != null) {
+                    notificationService.showInfoDialog(
+                            project,
+                            "Pattern Recognition",
+                            "Pattern recognition has been enabled."
+                    );
+                } else {
+                    Messages.showInfoMessage(
+                            project,
+                            "Pattern recognition has been enabled.",
+                            "Pattern Recognition"
+                    );
+                }
             }
         }
     }
@@ -151,10 +189,19 @@ public class TogglePatternRecognitionAction extends AnAction {
             sb.append("- ").append(type).append(": ").append(numberFormat.format(count)).append("\n");
         });
         
-        Messages.showInfoMessage(
-                project,
-                sb.toString(),
-                "Pattern Recognition Metrics"
-        );
+        ModForgeNotificationService notificationService = ModForgeNotificationService.getInstance(project);
+        if (notificationService != null) {
+            notificationService.showInfoDialog(
+                    project,
+                    "Pattern Recognition Metrics",
+                    sb.toString()
+            );
+        } else {
+            Messages.showInfoMessage(
+                    project,
+                    sb.toString(),
+                    "Pattern Recognition Metrics"
+            );
+        }
     }
 }

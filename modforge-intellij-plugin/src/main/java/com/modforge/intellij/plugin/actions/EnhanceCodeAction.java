@@ -13,6 +13,7 @@ import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.Messages;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.modforge.intellij.plugin.auth.ModAuthenticationManager;
+import com.modforge.intellij.plugin.services.ModForgeNotificationService;
 import com.modforge.intellij.plugin.settings.ModForgeSettings;
 import org.jetbrains.annotations.NotNull;
 import org.json.simple.JSONObject;
@@ -42,11 +43,20 @@ public class EnhanceCodeAction extends AnAction {
             
             // If no text is selected, show an error message
             if (selectedText == null || selectedText.isEmpty()) {
-                Messages.showErrorDialog(
-                        project,
-                        "Please select the code you want to enhance.",
-                        "No Code Selected"
-                );
+                ModForgeNotificationService notificationService = ModForgeNotificationService.getInstance(project);
+                if (notificationService != null) {
+                    notificationService.showErrorDialog(
+                            project,
+                            "No Code Selected",
+                            "Please select the code you want to enhance."
+                    );
+                } else {
+                    Messages.showErrorDialog(
+                            project,
+                            "Please select the code you want to enhance.",
+                            "No Code Selected"
+                    );
+                }
                 return;
             }
             
