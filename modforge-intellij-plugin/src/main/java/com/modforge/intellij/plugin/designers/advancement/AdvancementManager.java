@@ -5,8 +5,6 @@ import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vfs.LocalFileSystem;
 import com.intellij.openapi.vfs.VirtualFile;
-import com.intellij.psi.PsiFile;
-import com.intellij.psi.PsiManager;
 import com.modforge.intellij.plugin.designers.advancement.models.AdvancementCriterion;
 import com.modforge.intellij.plugin.designers.advancement.models.AdvancementModel;
 import org.jetbrains.annotations.NotNull;

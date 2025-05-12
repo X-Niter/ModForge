@@ -4,7 +4,6 @@ import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.project.Project;
 import com.intellij.util.concurrency.AppExecutorUtil;
 import com.modforge.intellij.plugin.models.UserProfile;
-import com.modforge.intellij.plugin.services.ModForgeProjectService;
 import com.modforge.intellij.plugin.services.UserSubscriptionService;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;

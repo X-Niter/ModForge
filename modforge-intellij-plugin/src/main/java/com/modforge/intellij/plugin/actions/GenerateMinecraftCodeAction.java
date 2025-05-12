@@ -17,7 +17,6 @@ import com.intellij.ui.components.JBTextField;
 import com.intellij.util.ui.JBUI;
 import com.intellij.util.ui.UIUtil;
 import com.modforge.intellij.plugin.ai.generation.MinecraftCodeGenerator;
-import com.modforge.intellij.plugin.ai.generation.MinecraftCodeGenerator.GeneratedCode;
 import com.modforge.intellij.plugin.notifications.ModForgeNotificationService;
 import com.modforge.intellij.plugin.util.ModLoaderDetector.ModLoader;
 import com.modforge.intellij.plugin.utils.CompatibilityUtil;
@@ -27,7 +26,6 @@ import org.jetbrains.annotations.Nullable;
 import javax.swing.*;
 import java.awt.*;
 import java.util.Arrays;
-import java.util.concurrent.CompletableFuture;
 
 /**
  * Action for generating Minecraft code from a description

@@ -1,7 +1,6 @@
 package com.modforge.intellij.plugin.designers.recipe.models;
 
 import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.HashMap;

@@ -1,6 +1,5 @@
 package com.modforge.intellij.plugin.memory.recovery;
 
-import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.project.ProjectManager;
@@ -9,7 +8,6 @@ import com.modforge.intellij.plugin.memory.MemoryOptimizer;
 import com.modforge.intellij.plugin.memory.MemoryUtils;
 import com.modforge.intellij.plugin.memory.settings.MemoryManagementSettings;
 import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.List;

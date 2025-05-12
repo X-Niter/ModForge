@@ -2,9 +2,9 @@ package com.modforge.intellij.plugin.designers.advancement.models;
 
 import com.intellij.util.xmlb.annotations.Transient;
 import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * Model class for Minecraft advancements

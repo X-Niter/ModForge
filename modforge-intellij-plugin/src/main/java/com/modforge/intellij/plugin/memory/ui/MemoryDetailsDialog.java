@@ -5,18 +5,13 @@ import com.intellij.openapi.ui.DialogWrapper;
 import com.intellij.ui.components.JBScrollPane;
 import com.intellij.ui.components.JBTabbedPane;
 import com.intellij.util.ui.JBUI;
-import com.intellij.util.ui.UI;
-import com.modforge.intellij.plugin.memory.MemoryManager;
 import com.modforge.intellij.plugin.memory.MemoryOptimizer;
 import com.modforge.intellij.plugin.memory.MemoryUtils;
-import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import javax.swing.*;
-import javax.swing.Timer; // Explicitly import the Swing Timer to avoid ambiguity with java.util.Timer
 import java.awt.*;
 import java.lang.management.ManagementFactory;
-import java.lang.management.MemoryMXBean;
 import java.lang.management.MemoryPoolMXBean;
 import java.lang.management.MemoryUsage;
 import java.util.List;

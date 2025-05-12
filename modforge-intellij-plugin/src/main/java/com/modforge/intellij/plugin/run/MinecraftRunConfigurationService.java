@@ -1,7 +1,6 @@
 package com.modforge.intellij.plugin.run;
 
 import com.intellij.execution.RunManager;
-import com.intellij.execution.RunnerAndConfigurationSettings;
 import com.intellij.execution.configurations.RunConfiguration;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.module.Module;
@@ -13,10 +12,8 @@ import com.intellij.openapi.vfs.VirtualFileListener;
 import com.intellij.openapi.vfs.VirtualFileManager;
 import com.modforge.intellij.plugin.notifications.ModForgeNotificationService;
 import com.modforge.intellij.plugin.run.MinecraftRunConfiguration.RunType;
-import com.modforge.intellij.plugin.run.ModLoaderDetector;
 import org.jetbrains.annotations.NotNull;
 
-import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
 

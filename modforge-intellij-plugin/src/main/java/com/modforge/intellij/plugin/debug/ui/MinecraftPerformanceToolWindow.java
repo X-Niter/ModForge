@@ -17,7 +17,6 @@ import com.modforge.intellij.plugin.debug.MinecraftPerformanceMonitor.MethodPerf
 import org.jetbrains.annotations.NotNull;
 
 import javax.swing.*;
-import javax.swing.Timer; // Explicitly import the Swing Timer to avoid ambiguity with java.util.Timer
 import javax.swing.table.DefaultTableCellRenderer;
 import javax.swing.table.DefaultTableModel;
 import java.awt.*;

@@ -3,16 +3,11 @@ package com.modforge.intellij.plugin.crossloader.generator;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vfs.VirtualFile;
-import com.intellij.psi.PsiDirectory;
-import com.intellij.psi.PsiFileFactory;
-import com.intellij.psi.PsiManager;
 import com.modforge.intellij.plugin.crossloader.ArchitecturyService;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.io.IOException;
-import java.util.HashMap;
-import java.util.Map;
 
 /**
  * Generator for Architectury templates.

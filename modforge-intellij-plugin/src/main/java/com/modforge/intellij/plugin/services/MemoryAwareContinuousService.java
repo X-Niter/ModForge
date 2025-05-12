@@ -1,7 +1,6 @@
 package com.modforge.intellij.plugin.services;
 
 import com.intellij.openapi.Disposable;
-import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.project.Project;
 import com.intellij.util.concurrency.AppExecutorUtil;
@@ -10,7 +9,6 @@ import com.modforge.intellij.plugin.memory.MemoryOptimizer;
 import com.modforge.intellij.plugin.memory.MemoryUtils;
 import com.modforge.intellij.plugin.memory.settings.MemoryManagementSettings;
 import com.modforge.intellij.plugin.notifications.ModForgeNotificationService;
-import org.jetbrains.annotations.NotNull;
 
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;

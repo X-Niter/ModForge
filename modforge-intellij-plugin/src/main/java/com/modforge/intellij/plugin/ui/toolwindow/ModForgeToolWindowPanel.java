@@ -11,7 +11,6 @@ import com.intellij.ui.components.JBLabel;
 import com.intellij.ui.components.JBPanel;
 import com.intellij.ui.components.JBScrollPane;
 import com.intellij.ui.components.JBTabbedPane;
-import com.intellij.ui.components.JBTextField;
 import com.intellij.util.ui.JBUI;
 import com.modforge.intellij.plugin.services.AutonomousCodeGenerationService;
 import com.modforge.intellij.plugin.services.ContinuousDevelopmentService;

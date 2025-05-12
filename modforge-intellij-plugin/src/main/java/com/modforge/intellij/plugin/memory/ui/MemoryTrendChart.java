@@ -6,10 +6,8 @@ import com.intellij.util.ui.JBUI;
 import com.modforge.intellij.plugin.memory.MemoryUtils;
 import com.modforge.intellij.plugin.memory.monitoring.MemorySnapshot;
 import com.modforge.intellij.plugin.memory.monitoring.MemorySnapshotManager;
-import org.jetbrains.annotations.NotNull;
 
 import javax.swing.*;
-import javax.swing.Timer; // Explicitly import the Swing Timer to avoid ambiguity with java.util.Timer
 import java.awt.*;
 import java.awt.event.ComponentAdapter;
 import java.awt.event.ComponentEvent;
@@ -17,7 +15,6 @@ import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.awt.geom.Line2D;
 import java.awt.geom.Path2D;
-import java.awt.geom.Point2D;
 import java.awt.geom.Rectangle2D;
 import java.text.SimpleDateFormat;
 import java.time.LocalDateTime;
@@ -26,7 +23,6 @@ import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
-import java.util.concurrent.TimeUnit;
 
 /**
  * Component that displays a chart of memory usage over time.

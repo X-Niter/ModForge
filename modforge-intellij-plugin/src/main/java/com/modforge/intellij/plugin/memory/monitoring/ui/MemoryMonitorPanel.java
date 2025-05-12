@@ -11,7 +11,6 @@ import com.intellij.ui.components.JBPanel;
 import com.intellij.ui.components.JBScrollPane;
 import com.intellij.util.Alarm;
 import com.intellij.util.ui.JBUI;
-import com.intellij.util.ui.UIUtil;
 import com.modforge.intellij.plugin.memory.MemoryUtils;
 import com.modforge.intellij.plugin.memory.monitoring.MemoryHealthMonitor;
 import com.modforge.intellij.plugin.memory.monitoring.MemorySnapshot;
@@ -19,12 +18,10 @@ import com.modforge.intellij.plugin.memory.recovery.MemoryRecoveryManager;
 import org.jetbrains.annotations.NotNull;
 
 import javax.swing.*;
-import javax.swing.border.TitledBorder;
 import java.awt.*;
 import java.awt.event.ItemEvent;
 import java.lang.management.ManagementFactory;
 import java.lang.management.MemoryPoolMXBean;
-import java.util.ArrayList;
 import java.util.List;
 
 /**

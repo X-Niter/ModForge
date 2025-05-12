@@ -14,15 +14,12 @@ import com.intellij.util.ui.JBUI;
 import com.intellij.util.ui.UIUtil;
 import com.modforge.intellij.plugin.crossloader.ArchitecturyService;
 import com.modforge.intellij.plugin.crossloader.CrossLoaderAPI;
-import com.modforge.intellij.plugin.crossloader.actions.CreateCrossLoaderProjectAction;
 import com.modforge.intellij.plugin.crossloader.actions.ConvertToArchitecturyAction;
+import com.modforge.intellij.plugin.crossloader.actions.CreateCrossLoaderProjectAction;
 import org.jetbrains.annotations.NotNull;
 
 import javax.swing.*;
-import javax.swing.border.TitledBorder;
 import java.awt.*;
-import java.util.ArrayList;
-import java.util.List;
 
 /**
  * Panel for managing cross-loader mod development.

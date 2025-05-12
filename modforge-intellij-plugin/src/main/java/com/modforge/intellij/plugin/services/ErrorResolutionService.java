@@ -1,12 +1,10 @@
 package com.modforge.intellij.plugin.services;
 
+import com.google.gson.Gson;
 import com.intellij.openapi.components.Service;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.project.Project;
 import com.intellij.psi.PsiFile;
-import com.google.gson.Gson;
-import com.intellij.openapi.application.ApplicationManager;
-import com.intellij.util.concurrency.AppExecutorUtil;
 import com.modforge.intellij.plugin.recommendation.PremiumFeatureRecommender;
 import com.modforge.intellij.plugin.utils.ApiRequestUtil;
 import org.jetbrains.annotations.NotNull;

@@ -17,7 +17,7 @@ import javax.swing.table.DefaultTableModel;
 import java.awt.*;
 import java.text.NumberFormat;
 import java.util.Map;
-import java.util.Timer; // Explicitly using java.util.Timer for background tasks
+import java.util.Timer;
 import java.util.TimerTask;
 
 /**

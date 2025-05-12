@@ -19,15 +19,13 @@ import java.awt.*;
 import java.awt.event.ComponentAdapter;
 import java.awt.event.ComponentEvent;
 import java.awt.geom.Path2D;
-import java.awt.geom.Rectangle2D;
 import java.text.DecimalFormat;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
-import java.util.*;
 import java.util.concurrent.CopyOnWriteArrayList;
-// Explicitly import the Swing Timer to avoid ambiguity with java.util.Timer
-import javax.swing.Timer;
 
 /**
  * Memory visualization panel

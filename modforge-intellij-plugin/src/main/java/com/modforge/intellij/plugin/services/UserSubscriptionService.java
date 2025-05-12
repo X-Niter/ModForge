@@ -16,8 +16,6 @@ import com.modforge.intellij.plugin.utils.ApiRequestUtil;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-import java.awt.*;
-import java.net.URI;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Random;

@@ -5,7 +5,6 @@ import com.intellij.notification.NotificationAction;
 import com.intellij.notification.NotificationType;
 import com.intellij.notification.Notifications;
 import com.intellij.openapi.Disposable;
-import com.intellij.openapi.actionSystem.AnActionEvent;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.options.ShowSettingsUtil;
 import com.intellij.openapi.project.Project;
@@ -13,7 +12,6 @@ import com.modforge.intellij.plugin.memory.MemoryOptimizer;
 import com.modforge.intellij.plugin.memory.MemoryUtils;
 import com.modforge.intellij.plugin.memory.settings.MemoryManagementSettingsPanel;
 import com.modforge.intellij.plugin.memory.ui.MemoryDetailsDialog;
-import org.jetbrains.annotations.NotNull;
 
 /**
  * Notifier for memory recovery events

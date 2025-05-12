@@ -7,7 +7,6 @@ import com.intellij.openapi.wm.ToolWindowFactory;
 import com.intellij.ui.content.Content;
 import com.intellij.ui.content.ContentFactory;
 import com.modforge.intellij.plugin.crossloader.ui.CrossLoaderPanel;
-import com.modforge.intellij.plugin.models.ModLoaderType;
 import com.modforge.intellij.plugin.services.ModForgeProjectService;
 import org.jetbrains.annotations.NotNull;
 

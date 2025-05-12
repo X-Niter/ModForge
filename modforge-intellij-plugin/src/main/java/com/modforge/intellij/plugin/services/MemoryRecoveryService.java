@@ -8,7 +8,6 @@ import com.modforge.intellij.plugin.memory.MemoryManager;
 import com.modforge.intellij.plugin.memory.MemoryUtils;
 import com.modforge.intellij.plugin.memory.recovery.MemoryRecoveryManager;
 import com.modforge.intellij.plugin.memory.recovery.MemoryRecoveryNotifier;
-import org.jetbrains.annotations.NotNull;
 
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;

@@ -7,15 +7,12 @@ import com.intellij.ui.components.JBLabel;
 import com.intellij.ui.components.JBPanel;
 import com.intellij.ui.components.JBScrollPane;
 import com.intellij.util.ui.JBUI;
-import com.intellij.util.ui.UIUtil;
 import com.modforge.intellij.plugin.services.AIServiceManager;
 import com.modforge.intellij.plugin.services.PatternCachingService;
 import com.modforge.intellij.plugin.services.PatternRecognitionService;
 import org.jetbrains.annotations.NotNull;
 
 import javax.swing.*;
-import javax.swing.Timer; // Explicitly import the Swing Timer to avoid ambiguity with java.util.Timer
-import javax.swing.border.TitledBorder;
 import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;

@@ -12,8 +12,6 @@ import com.intellij.openapi.components.Storage;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.util.xmlb.XmlSerializerUtil;
 import com.intellij.util.xmlb.annotations.Transient;
-import com.modforge.intellij.plugin.github.GitHubIntegrationService;
-import com.modforge.intellij.plugin.utils.ConnectionTestUtil;
 import com.modforge.intellij.plugin.utils.TokenAuthConnectionUtil;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
