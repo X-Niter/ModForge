@@ -511,10 +511,10 @@ REM Add implementation recommendations
 echo ## Fix Recommendations >> "%RESOLUTION_ERRORS_REPORT%"
 echo. >> "%RESOLUTION_ERRORS_REPORT%"
 echo 1. **Update imports** with latest packages >> "%RESOLUTION_ERRORS_REPORT%"
-echo 2. **Use CompatibilityUtil** on deprecated methods >> "%RESOLUTION_ERRORS_REPORT%"
-echo 3. **Fix method signatures** correctly >> "%RESOLUTION_ERRORS_REPORT%"
-echo 4. **Add missing methods** in service classes >> "%RESOLUTION_ERRORS_REPORT%"
-echo 5. **Implement proper getInstance()** methods in services >> "%RESOLUTION_ERRORS_REPORT%"
+echo 2. **Use CompatibilityUtil** on deprecated API calls >> "%RESOLUTION_ERRORS_REPORT%"
+echo 3. **Fix API signatures** correctly >> "%RESOLUTION_ERRORS_REPORT%"
+echo 4. **Add missing implementations** in service classes >> "%RESOLUTION_ERRORS_REPORT%"
+echo 5. **Implement proper getInstance()** functions in services >> "%RESOLUTION_ERRORS_REPORT%"
 echo. >> "%RESOLUTION_ERRORS_REPORT%"
 
 echo Resolution errors analysis complete.
@@ -565,38 +565,38 @@ if "%PATTERN%"=="ApplicationComponent" (
     goto :EOF
 )
 
-echo * **Suggested fix:** Check compatibility with IntelliJ IDEA 2025.1.1.1. Use CompatibilityUtil methods. >> "%OUTPUT_FILE%"
+echo * **Suggested fix:** Check compatibility with IntelliJ IDEA 2025.1.1.1. Use CompatibilityUtil functions. >> "%OUTPUT_FILE%"
 goto :EOF
 
 REM ===================================
-REM Method Suggestion Subroutine
+REM API Suggestion Subroutine
 REM ===================================
-:ADD_METHOD_SUGGESTION
-set "METHOD_NAME=%~1"
+:ADD_API_SUGGESTION
+set "API_NAME=%~1"
 set "OUTPUT_FILE=%~2"
 
-if "%METHOD_NAME%"=="getBaseDir" (
+if "%API_NAME%"=="getBaseDir" (
     echo **Suggested fix:** Use CompatibilityUtil.getProjectBaseDir(project) >> "%OUTPUT_FILE%"
     goto :EOF
 )
-if "%METHOD_NAME%"=="findFileByPath" (
+if "%API_NAME%"=="findFileByPath" (
     echo **Suggested fix:** Use VirtualFileUtil.findFileByPath(path) >> "%OUTPUT_FILE%"
     goto :EOF
 )
-if "%METHOD_NAME%"=="getInstanceEx" (
-    echo **Suggested fix:** Use getInstance() method >> "%OUTPUT_FILE%"
+if "%API_NAME%"=="getInstanceEx" (
+    echo **Suggested fix:** Use getInstance() function >> "%OUTPUT_FILE%"
     goto :EOF
 )
-if "%METHOD_NAME%"=="getFileSystem" (
+if "%API_NAME%"=="getFileSystem" (
     echo **Suggested fix:** Use VirtualFileManager.getInstance().getFileSystem(StandardFileSystems.FILE_PROTOCOL) >> "%OUTPUT_FILE%"
     goto :EOF
 )
-if "%METHOD_NAME%"=="resolveFile" (
+if "%API_NAME%"=="resolveFile" (
     echo **Suggested fix:** Use CompatibilityUtil.findPsiFile(project, file) >> "%OUTPUT_FILE%"
     goto :EOF
 )
 
-echo **Suggested fix:** Use compatibility wrapper methods >> "%OUTPUT_FILE%"
+echo **Suggested fix:** Use compatibility wrapper functions >> "%OUTPUT_FILE%"
 goto :EOF
 
 endlocal
