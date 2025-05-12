@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<idea-plugin require-restart="true">
+<idea-plugin>
     <id>com.modforge.intellij.plugin</id>
-    <name>ModForge AI</name>
-    <name>ModForge AI</name>
+    <name>ModForge</name>
+    <vendor email="support@modforge.ai" url="https://modforge.ai">ModForge, Inc.</vendor>
