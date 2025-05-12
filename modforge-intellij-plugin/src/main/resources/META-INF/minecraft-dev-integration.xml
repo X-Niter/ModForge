@@ -1,6 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
 <idea-plugin>
-  <extensions defaultExtensionNs="com.intellij">
-    <!-- Minecraft development integration services -->
-    <projectService serviceImplementation="com.modforge.intellij.plugin.minecraft.MinecraftIntegrationService"/>
-  </extensions>
+    <extensions defaultExtensionNs="com.intellij">
+        <!-- Minecraft Development specific services and extensions -->
+        <projectService serviceImplementation="com.modforge.intellij.plugin.services.MinecraftDevIntegrationService"/>
+        
+        <!-- Custom inspections for Minecraft code -->
+        <localInspection 
+            language="JAVA" 
+            groupPath="ModForge" 
+            groupName="Minecraft Mod Development" 
+            enabledByDefault="true" 
+            level="WARNING" 
+            implementationClass="com.modforge.intellij.plugin.inspections.ModLoaderVersionInspection" 
+            displayName="Mod Loader Version Check" 
+            shortName="ModLoaderVersionCheck"/>
+    </extensions>
+    
+    <!-- Actions related to Minecraft Development integration -->
+    <actions>
+        <group id="ModForge.MinecraftDev" text="Minecraft Development" description="ModForge Minecraft development operations">
+            <add-to-group group-id="ModForge.MainMenu" anchor="last"/>
+            <action id="ModForge.GenerateModStructure" 
+                    class="com.modforge.intellij.plugin.actions.GenerateModStructureAction" 
+                    text="Generate Mod Structure" 
+                    description="Generate a basic Minecraft mod structure"/>
+            <action id="ModForge.CreateModElement" 
+                    class="com.modforge.intellij.plugin.actions.CreateModElementAction" 
+                    text="Create Mod Element" 
+                    description="Create a new Minecraft mod element (block, item, entity, etc.)"/>
+            <action id="ModForge.CrossLoaderConvert" 
+                    class="com.modforge.intellij.plugin.actions.ConvertToCrossLoaderAction" 
+                    text="Convert to Cross-Loader" 
+                    description="Convert mod to cross-loader (Architectury) format"/>
+        </group>
+    </actions>
 </idea-plugin>

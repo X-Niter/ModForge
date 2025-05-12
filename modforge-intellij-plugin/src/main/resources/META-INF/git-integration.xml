@@ -1,6 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
 <idea-plugin>
-  <extensions defaultExtensionNs="com.intellij">
-    <!-- Git integration services -->
-    <projectService serviceImplementation="com.modforge.intellij.plugin.git.GitIntegrationService"/>
-  </extensions>
+    <extensions defaultExtensionNs="com.intellij">
+        <!-- Git specific services and extensions -->
+        <projectService serviceImplementation="com.modforge.intellij.plugin.services.GitIntegrationService"/>
+    </extensions>
+    
+    <!-- Actions related to Git integration -->
+    <actions>
+        <group id="ModForge.GitIntegration" text="Git Operations" description="ModForge Git integration operations">
+            <add-to-group group-id="ModForge.MainMenu" anchor="last"/>
+            <action id="ModForge.CommitChanges" 
+                    class="com.modforge.intellij.plugin.actions.CommitChangesAction" 
+                    text="Commit AI Changes" 
+                    description="Commit changes made by AI to the Git repository"/>
+            <action id="ModForge.CreateBranch" 
+                    class="com.modforge.intellij.plugin.actions.CreateFeatureBranchAction" 
+                    text="Create Feature Branch" 
+                    description="Create a new Git branch for a feature"/>
+        </group>
+    </actions>
 </idea-plugin>
