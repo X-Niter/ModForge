@@ -118,6 +118,16 @@ public final class ModAuthenticationManager {
             return false;
         }
     }
+    
+    /**
+     * Gets the username of the authenticated user.
+     *
+     * @return The username.
+     */
+    @NotNull
+    public String getUsername() {
+        return settings.getGitHubUsername();
+    }
 
     /**
      * Logs out the current user.

@@ -101,6 +101,39 @@ public final class ModForgeNotificationService {
     public void showError(@Nullable Project project, @NotNull String title, @NotNull String content) {
         show(project, ERROR_GROUP_ID, ERROR_TYPE, title, content);
     }
+    
+    /**
+     * Shows an info notification with simpler signature.
+     * For compatibility with older code.
+     *
+     * @param title   The notification title.
+     * @param content The notification content.
+     */
+    public void showInfo(@NotNull String title, @NotNull String content) {
+        showInfo(null, title, content);
+    }
+
+    /**
+     * Shows a warning notification with simpler signature.
+     * For compatibility with older code.
+     *
+     * @param title   The notification title.
+     * @param content The notification content.
+     */
+    public void showWarning(@NotNull String title, @NotNull String content) {
+        showWarning(null, title, content);
+    }
+
+    /**
+     * Shows an error notification with simpler signature.
+     * For compatibility with older code.
+     *
+     * @param title   The notification title.
+     * @param content The notification content.
+     */
+    public void showError(@NotNull String title, @NotNull String content) {
+        showError(null, title, content);
+    }
 
     /**
      * Shows a balloon notification.
