@@ -6,6 +6,7 @@ import com.intellij.openapi.project.Project;
 import com.intellij.openapi.projectRoots.Sdk;
 import com.intellij.openapi.roots.ModuleRootManager;
 import com.modforge.intellij.plugin.run.ModLoaderDetector.ModLoader;
+import com.modforge.intellij.plugin.utils.CompatibilityUtil;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -121,7 +122,7 @@ public class MinecraftIntegrationUtil {
      * @return Path to the assets directory, or empty if not found
      */
     public static Optional<String> findAssetsDirectory(@NotNull Project project) {
-        String basePath = project.getBasePath();
+        String basePath = CompatibilityUtil.getProjectBasePath(project);
         if (basePath == null) return Optional.empty();
         
         // Common locations for Minecraft assets

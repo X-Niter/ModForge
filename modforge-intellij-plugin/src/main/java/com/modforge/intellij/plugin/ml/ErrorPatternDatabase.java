@@ -6,6 +6,7 @@ import com.google.gson.reflect.TypeToken;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.project.Project;
 import com.intellij.util.concurrency.AppExecutorUtil;
+import com.modforge.intellij.plugin.utils.CompatibilityUtil;
 import com.modforge.intellij.plugin.models.ErrorFix;
 import com.modforge.intellij.plugin.models.Pattern;
 import com.modforge.intellij.plugin.services.AIServiceManager;
@@ -58,7 +59,14 @@ public class ErrorPatternDatabase {
      */
     public ErrorPatternDatabase(@NotNull Project project) {
         this.project = project;
-        this.databaseFile = Paths.get(project.getBasePath(), ".modforge", "error_patterns.json");
+        String basePath = CompatibilityUtil.getProjectBasePath(project);
+        if (basePath == null) {
+            LOG.error("Could not determine project base path for error pattern database");
+            // Fallback to temporary directory
+            this.databaseFile = Paths.get(System.getProperty("java.io.tmpdir"), "modforge_error_patterns_" + project.getName() + ".json");
+        } else {
+            this.databaseFile = Paths.get(basePath, ".modforge", "error_patterns.json");
+        }
         this.gson = new GsonBuilder().setPrettyPrinting().create();
         this.executorService = AppExecutorUtil.getAppExecutorService();
     }
