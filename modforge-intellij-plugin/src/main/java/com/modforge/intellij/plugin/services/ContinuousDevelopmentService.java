@@ -703,6 +703,13 @@ public final class ContinuousDevelopmentService {
         LOG.info("Fixing " + errorDescriptions.size() + " compilation errors");
         addActionLog("Attempting to fix " + errorDescriptions.size() + " compilation errors");
         
+        // Notify user that AI is working on fixing errors
+        ModForgeNotificationService.getInstance(project).showInfoNotification(
+                project,
+                "ModForge AI Working",
+                "Attempting to fix " + errorDescriptions.size() + " compilation errors..."
+        );
+        
         try {
             // Get code generation service
             AutonomousCodeGenerationService codeGenService =
@@ -710,6 +717,14 @@ public final class ContinuousDevelopmentService {
             
             if (codeGenService == null) {
                 LOG.error("Code generation service is not available");
+                
+                // Notify user about the error
+                ModForgeNotificationService.getInstance(project).showErrorNotification(
+                        project,
+                        "ModForge Error",
+                        "Cannot fix compilation errors: AI code generation service is not available"
+                );
+                
                 return;
             }
             
@@ -850,6 +865,14 @@ public final class ContinuousDevelopmentService {
                 String fixedCode = codeGenService.fixCode(code, errorMessage, language)
                         .exceptionally(e -> {
                             LOG.error("Error fixing compilation errors in file " + file.getName(), e);
+                            
+                            // Notify user about the error
+                            ModForgeNotificationService.getInstance(project).showErrorNotification(
+                                    project,
+                                    "ModForge AI Error",
+                                    "Failed to generate fixes for " + file.getName() + ": " + e.getMessage()
+                            );
+                            
                             return null;
                         })
                         .join();
@@ -866,8 +889,22 @@ public final class ContinuousDevelopmentService {
                                 
                                 // Record successful fix
                                 addActionLog("Fixed compilation errors in file " + file.getName());
+                                
+                                // Notify user about successful fix
+                                ModForgeNotificationService.getInstance(project).showInfoNotification(
+                                        project,
+                                        "ModForge AI Success",
+                                        "Fixed compilation errors in " + file.getName()
+                                );
                             } catch (Exception e) {
                                 LOG.error("Error writing fixed code to file " + file.getName(), e);
+                                
+                                // Notify user about the error
+                                ModForgeNotificationService.getInstance(project).showErrorNotification(
+                                        project,
+                                        "ModForge Error",
+                                        "Failed to write fixes to " + file.getName() + ": " + e.getMessage()
+                                );
                             }
                         });
                     });
