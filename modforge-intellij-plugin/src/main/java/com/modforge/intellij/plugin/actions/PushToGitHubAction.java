@@ -78,7 +78,7 @@ public class PushToGitHubAction extends AnAction {
                         "Cancel"
                 );
                 
-                if (result) {
+                if (result == Messages.YES) {
                     // Open settings dialog
                     ModForgeSettings settings = ModForgeSettings.getInstance();
                     settings.openSettings(project);
