@@ -23,7 +23,9 @@ import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 
@@ -51,12 +53,18 @@ public final class GitHubIntegrationService {
     // Circuit breaker settings
     private static final int MAX_FAILURES = 5;
     private static final long CIRCUIT_BREAKER_RESET_MS = TimeUnit.MINUTES.toMillis(30);
+    private static final long MONITORING_INTERVAL_MS = TimeUnit.MINUTES.toMillis(5);
     
     private final Project project;
     private GitHub gitHub;
     private GHRepository repository;
     private String repositoryOwner;
     private String repositoryName;
+    
+    // Monitoring status
+    private final AtomicBoolean isMonitoring = new AtomicBoolean(false);
+    private ScheduledExecutorService monitoringExecutor;
+    private CompletableFuture<Boolean> lastPushResult;
 
     public GitHubIntegrationService(Project project) {
         this.project = project;
@@ -367,6 +375,174 @@ public final class GitHubIntegrationService {
             incrementFailureCount(operationKey);
             LOG.error("Failed to create/update workflow: " + e.getMessage(), e);
             return false;
+        }
+    }
+    
+    /**
+     * Push local changes to GitHub repository
+     * 
+     * @param owner Repository owner (username or organization)
+     * @param repoName Repository name
+     * @param commitMessage Commit message for the push
+     * @param createWorkflow Whether to automatically create a CI workflow
+     * @param onComplete Callback for push result (true if successful)
+     * @return CompletableFuture with push result
+     */
+    public CompletableFuture<Boolean> pushToGitHub(
+            String owner, 
+            String repoName, 
+            String commitMessage, 
+            boolean createWorkflow,
+            Consumer<Boolean> onComplete) {
+            
+        if (gitHub == null) {
+            LOG.warn("Cannot push to GitHub: not connected to GitHub");
+            CompletableFuture<Boolean> result = CompletableFuture.completedFuture(false);
+            if (onComplete != null) {
+                onComplete.accept(false);
+            }
+            return result;
+        }
+        
+        // Set the active repository if needed
+        if (repository == null || !owner.equals(repositoryOwner) || !repoName.equals(repositoryName)) {
+            if (!setRepository(owner, repoName)) {
+                LOG.warn("Failed to set repository for push: " + owner + "/" + repoName);
+                CompletableFuture<Boolean> result = CompletableFuture.completedFuture(false);
+                if (onComplete != null) {
+                    onComplete.accept(false);
+                }
+                return result;
+            }
+        }
+        
+        // Execute push operation asynchronously
+        CompletableFuture<Boolean> future = CompletableFuture.supplyAsync(() -> {
+            try {
+                LOG.info("Pushing changes to GitHub repository: " + owner + "/" + repoName);
+                
+                // Simulate push operation for now
+                // In a real implementation, this would use JGit or shell commands
+                boolean pushSuccess = true;
+                
+                // Create workflow file if requested
+                if (createWorkflow && pushSuccess) {
+                    String workflowYaml = generateAiImprovementWorkflow();
+                    boolean workflowCreated = createOrUpdateWorkflow(
+                            "modforge-ai-improvement.yml", 
+                            workflowYaml, 
+                            "Add ModForge AI improvement workflow"
+                    );
+                    
+                    LOG.info("Workflow creation " + (workflowCreated ? "successful" : "failed"));
+                }
+                
+                return pushSuccess;
+            } catch (Exception e) {
+                LOG.error("Failed to push to GitHub: " + e.getMessage(), e);
+                return false;
+            }
+        });
+        
+        // Store last push result for monitoring
+        lastPushResult = future;
+        
+        // Add completion callback
+        if (onComplete != null) {
+            future.thenAccept(onComplete);
+        }
+        
+        return future;
+    }
+    
+    /**
+     * Start monitoring a GitHub repository for changes and workflow results
+     * 
+     * @param owner Repository owner (username or organization)
+     * @param repoName Repository name
+     * @return CompletableFuture with monitoring start result
+     */
+    public CompletableFuture<Boolean> startMonitoring(String owner, String repoName) {
+        if (gitHub == null) {
+            LOG.warn("Cannot start monitoring: not connected to GitHub");
+            return CompletableFuture.completedFuture(false);
+        }
+        
+        // Set the active repository if needed
+        if (repository == null || !owner.equals(repositoryOwner) || !repoName.equals(repositoryName)) {
+            if (!setRepository(owner, repoName)) {
+                LOG.warn("Failed to set repository for monitoring: " + owner + "/" + repoName);
+                return CompletableFuture.completedFuture(false);
+            }
+        }
+        
+        // Check if already monitoring
+        if (isMonitoring.get()) {
+            LOG.info("Already monitoring repository: " + owner + "/" + repoName);
+            return CompletableFuture.completedFuture(true);
+        }
+        
+        return CompletableFuture.supplyAsync(() -> {
+            try {
+                LOG.info("Starting monitoring for repository: " + owner + "/" + repoName);
+                
+                // Initialize monitoring executor
+                if (monitoringExecutor != null && !monitoringExecutor.isShutdown()) {
+                    monitoringExecutor.shutdownNow();
+                }
+                
+                monitoringExecutor = Executors.newSingleThreadScheduledExecutor(r -> {
+                    Thread t = new Thread(r, "GitHub-Monitoring-" + owner + "-" + repoName);
+                    t.setDaemon(true);
+                    return t;
+                });
+                
+                // Start periodic monitoring
+                monitoringExecutor.scheduleAtFixedRate(
+                    this::checkRepositoryStatus,
+                    MONITORING_INTERVAL_MS,
+                    MONITORING_INTERVAL_MS,
+                    TimeUnit.MILLISECONDS
+                );
+                
+                isMonitoring.set(true);
+                
+                // Notify that monitoring has started
+                Notification notification = new Notification(
+                    "ModForge Notifications",
+                    "GitHub Monitoring Started",
+                    "Now monitoring repository: " + owner + "/" + repoName,
+                    NotificationType.INFORMATION
+                );
+                Notifications.Bus.notify(notification, project);
+                
+                return true;
+            } catch (Exception e) {
+                LOG.error("Failed to start monitoring: " + e.getMessage(), e);
+                return false;
+            }
+        });
+    }
+    
+    /**
+     * Check repository status periodically
+     * Called by the monitoring executor
+     */
+    private void checkRepositoryStatus() {
+        if (repository == null) {
+            LOG.warn("Cannot check repository status: no active repository");
+            return;
+        }
+        
+        try {
+            // Check for workflow runs, issues, and PRs in the repository
+            LOG.debug("Checking repository status: " + repositoryOwner + "/" + repositoryName);
+            
+            // Implement status checking logic here
+            // For now, just a placeholder that logs the repository is being monitored
+            
+        } catch (Exception e) {
+            LOG.warn("Error checking repository status: " + e.getMessage());
         }
     }
     

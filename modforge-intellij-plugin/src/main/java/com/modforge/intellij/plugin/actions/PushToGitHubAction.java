@@ -105,7 +105,7 @@ public class PushToGitHubAction extends AnAction {
         // Show push dialog
         PushToGitHubDialog dialog = new PushToGitHubDialog(project);
         if (dialog.showAndGet()) {
-            String owner = dialog.getOwner();
+            String owner = dialog.getRepositoryOwner();
             String repository = dialog.getRepository();
             String description = dialog.getDescription();
             boolean isPrivate = dialog.isPrivate();
@@ -233,8 +233,21 @@ public class PushToGitHubAction extends AnAction {
          *
          * @return The owner
          */
-        public String getOwner() {
+        /**
+         * Gets the repository owner name.
+         * NOTE: This is a custom method for our purposes, not the DialogWrapper.getOwner()
+         * which returns Window.
+         * 
+         * @return The repository owner name
+         */
+        public String getRepositoryOwner() {
             return ownerField.getText().trim();
+        }
+        
+        @Override
+        public Window getOwner() {
+            // Default implementation required by DialogWrapper
+            return super.getOwner();
         }
         
         /**
@@ -282,7 +295,7 @@ public class PushToGitHubAction extends AnAction {
         
         @Override
         protected ValidationInfo doValidate() {
-            if (getOwner().isEmpty()) {
+            if (getRepositoryOwner().isEmpty()) {
                 return new ValidationInfo("Owner is required.", ownerField);
             }
             

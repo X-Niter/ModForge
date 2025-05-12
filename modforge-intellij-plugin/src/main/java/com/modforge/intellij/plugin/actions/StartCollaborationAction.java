@@ -18,6 +18,7 @@ import com.intellij.util.ui.JBUI;
 import com.modforge.intellij.plugin.collaboration.CollaborationService;
 import com.modforge.intellij.plugin.services.ModForgeNotificationService;
 import com.modforge.intellij.plugin.settings.ModForgeSettings;
+import com.modforge.intellij.plugin.utils.CompatibilityUtil;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
