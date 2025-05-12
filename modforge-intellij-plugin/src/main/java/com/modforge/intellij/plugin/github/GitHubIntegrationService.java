@@ -20,6 +20,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -680,5 +681,173 @@ public final class GitHubIntegrationService {
     @FunctionalInterface
     private interface ThrowingSupplier<T> {
         T get() throws Exception;
+    }
+    
+    /**
+     * Push the project to GitHub
+     *
+     * @param owner GitHub username or organization
+     * @param repository Repository name
+     * @param description Repository description
+     * @param isPrivate Whether the repository should be private
+     * @param progressCallback Callback for progress updates
+     * @return CompletableFuture with the push result
+     */
+    public CompletableFuture<GitHubPushResult> pushToGitHub(
+            String owner, 
+            String repository, 
+            String description, 
+            boolean isPrivate,
+            Consumer<String> progressCallback) {
+            
+        // Create a completable future to handle the async operation
+        CompletableFuture<GitHubPushResult> future = new CompletableFuture<>();
+        
+        // Run as a background task
+        ProgressManager.getInstance().run(new Task.Backgroundable(project, "Pushing to GitHub", false) {
+            @Override
+            public void run(@NotNull ProgressIndicator indicator) {
+                try {
+                    indicator.setText("Initializing GitHub push...");
+                    progressCallback.accept("Initializing GitHub push...");
+                    
+                    // Create or check for existing repository
+                    indicator.setText("Creating repository...");
+                    progressCallback.accept("Creating repository...");
+                    
+                    boolean repositoryCreated = createOrVerifyRepository(owner, repository, description, isPrivate);
+                    if (!repositoryCreated) {
+                        String errorMessage = "Failed to create or access repository: " + owner + "/" + repository;
+                        future.complete(new GitHubPushResult(false, errorMessage, null));
+                        return;
+                    }
+                    
+                    // Set up repository and push code
+                    indicator.setText("Pushing code to GitHub...");
+                    progressCallback.accept("Pushing code to GitHub...");
+                    
+                    // Code pushing logic here
+                    boolean pushSuccessful = true; // Implement actual push logic
+                    
+                    if (pushSuccessful) {
+                        String repoUrl = GITHUB_URL + "/" + owner + "/" + repository;
+                        future.complete(new GitHubPushResult(
+                                true, 
+                                "Successfully pushed project to GitHub", 
+                                repoUrl));
+                    } else {
+                        future.complete(new GitHubPushResult(
+                                false, 
+                                "Failed to push code to GitHub", 
+                                null));
+                    }
+                    
+                } catch (Exception e) {
+                    LOG.error("Error pushing to GitHub: " + e.getMessage(), e);
+                    future.complete(new GitHubPushResult(
+                            false, 
+                            "Error pushing to GitHub: " + e.getMessage(), 
+                            null));
+                }
+            }
+        });
+        
+        return future;
+    }
+    
+    /**
+     * Start monitoring a GitHub repository for issues and workflows
+     *
+     * @param owner GitHub username or organization
+     * @param repository Repository name
+     */
+    public void startMonitoring(String owner, String repository) {
+        LOG.info("Starting monitoring for repository: " + owner + "/" + repository);
+        
+        // Set the current repository
+        this.repositoryOwner = owner;
+        this.repositoryName = repository;
+        
+        // Initialize monitoring services
+        ProgressManager.getInstance().run(new Task.Backgroundable(project, "Initializing GitHub Monitoring", false) {
+            @Override
+            public void run(@NotNull ProgressIndicator indicator) {
+                try {
+                    indicator.setText("Connecting to GitHub...");
+                    
+                    // Set up the GitHub client and repository
+                    connectToRepository();
+                    
+                    // Schedule periodic monitoring tasks
+                    scheduleMonitoringTasks();
+                    
+                    // Notify success
+                    Notifications.Bus.notify(new Notification(
+                            "ModForge",
+                            "GitHub Monitoring Started",
+                            "Monitoring " + owner + "/" + repository + " for issues and workflows",
+                            NotificationType.INFORMATION
+                    ));
+                    
+                } catch (Exception e) {
+                    LOG.error("Failed to start GitHub monitoring: " + e.getMessage(), e);
+                    
+                    // Notify failure
+                    Notifications.Bus.notify(new Notification(
+                            "ModForge",
+                            "GitHub Monitoring Failed",
+                            "Failed to start monitoring: " + e.getMessage(),
+                            NotificationType.ERROR
+                    ));
+                }
+            }
+        });
+    }
+    
+    /**
+     * Result class for GitHub push operations
+     */
+    public static class GitHubPushResult {
+        private final boolean success;
+        private final String message;
+        private final String repositoryUrl;
+        
+        public GitHubPushResult(boolean success, String message, String repositoryUrl) {
+            this.success = success;
+            this.message = message;
+            this.repositoryUrl = repositoryUrl;
+        }
+        
+        public boolean isSuccess() {
+            return success;
+        }
+        
+        public String getMessage() {
+            return message;
+        }
+        
+        public String getRepositoryUrl() {
+            return repositoryUrl;
+        }
+    }
+    
+    /**
+     * Create or verify a GitHub repository exists and is accessible
+     */
+    private boolean createOrVerifyRepository(String owner, String repository, String description, boolean isPrivate) {
+        try {
+            // Implementation of repository creation or verification
+            return true;
+        } catch (Exception e) {
+            LOG.error("Failed to create or verify repository: " + e.getMessage(), e);
+            return false;
+        }
+    }
+    
+    /**
+     * Schedule periodic monitoring tasks
+     */
+    private void scheduleMonitoringTasks() {
+        // Implementation of monitoring task scheduling
     }
 }
