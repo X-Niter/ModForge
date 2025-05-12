@@ -14,6 +14,7 @@ import com.intellij.psi.PsiManager;
 import com.intellij.util.concurrency.AppExecutorUtil;
 import com.modforge.intellij.plugin.services.ModAuthenticationManager;
 import com.modforge.intellij.plugin.settings.ModForgeSettings;
+import com.modforge.intellij.plugin.utils.CompatibilityUtil;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -173,9 +174,8 @@ public final class ContinuousDevelopmentService {
                 return;
             }
             
-            // Get all problem files
-            Collection<VirtualFile> problemFiles = new ArrayList<>();
-            problemSolver.visitProblemFiles(problemFiles::add);
+            // Get all problem files using compatibility helper
+            Collection<VirtualFile> problemFiles = CompatibilityUtil.getProblemFiles(problemSolver);
             
             LOG.info("Found " + problemFiles.size() + " problem files in project " + project.getName());
             
@@ -228,9 +228,8 @@ public final class ContinuousDevelopmentService {
                     continue;
                 }
                 
-                // Get problems for file
-                Collection<Problem> problems = new ArrayList<>();
-                problemSolver.processProblems(problems, file);
+                // Get problems for file using compatibility helper
+                Collection<Problem> problems = CompatibilityUtil.getProblemsForFile(problemSolver, file);
                 
                 if (problems.isEmpty()) {
                     continue;

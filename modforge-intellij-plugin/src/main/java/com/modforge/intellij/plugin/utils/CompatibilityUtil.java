@@ -448,6 +448,41 @@ public final class CompatibilityUtil {
     }
     
     /**
+     * Gets problems for a specific file from a WolfTheProblemSolver instance using reflection
+     * to maintain compatibility with different IntelliJ IDEA versions, particularly 2025.1.1.1.
+     * 
+     * @param problemSolver The problem solver instance
+     * @param file The virtual file to get problems for
+     * @return Collection of problems
+     */
+    @NotNull
+    public static Collection<Problem> getProblemsForFile(@NotNull Object problemSolver, @NotNull VirtualFile file) {
+        Collection<Problem> problems = new ArrayList<>();
+        
+        try {
+            // Try using reflection to get the problems for the file
+            java.lang.reflect.Method method = problemSolver.getClass().getMethod("getProblemsForFile", VirtualFile.class);
+            Collection<Problem> fileProblems = (Collection<Problem>) method.invoke(problemSolver, file);
+            
+            if (fileProblems != null) {
+                problems.addAll(fileProblems);
+            }
+        } catch (Exception e) {
+            LOG.warn("Failed to get problems for file using getProblemsForFile", e);
+            
+            try {
+                // Alternative approach: Try processProblems method
+                java.lang.reflect.Method method = problemSolver.getClass().getMethod("processProblems", Collection.class, VirtualFile.class);
+                method.invoke(problemSolver, problems, file); // This modifies the problems collection
+            } catch (Exception ex) {
+                LOG.error("Failed to get problems for file from WolfTheProblemSolver", ex);
+            }
+        }
+        
+        return problems;
+    }
+    
+    /**
      * Gets problems from a WolfTheProblemSolver instance using reflection to maintain
      * compatibility with different IntelliJ IDEA versions, particularly 2025.1.1.1.
      * 
