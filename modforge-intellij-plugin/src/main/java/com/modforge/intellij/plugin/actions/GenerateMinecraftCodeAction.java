@@ -87,7 +87,7 @@ public class GenerateMinecraftCodeAction extends AnAction {
                                        " code for " + generatedCode.getClassName() + " at " + 
                                        generatedCode.getFilePath();
                         
-                        notificationService.showInfo(project, "Code Generation Success", message);
+                        notificationService.showInfoNotification(project, "Code Generation Success", message);
                     }
                 });
             })
@@ -99,7 +99,7 @@ public class GenerateMinecraftCodeAction extends AnAction {
                     
                     ModForgeNotificationService notificationService = project.getService(ModForgeNotificationService.class);
                     if (notificationService != null) {
-                        notificationService.showError(project, "Code Generation Error", errorMessage);
+                        notificationService.showErrorNotification(project, "Code Generation Error", errorMessage);
                     }
                 });
                 

@@ -85,9 +85,11 @@ public final class GenerateImplementationAction extends AnAction {
         String packageName = ((PsiJavaFile) psiFile).getPackageName();
         
         // Create a suggested output path
-        String baseDir = project.getBasePath();
+        VirtualFile baseDirVf = CompatibilityUtil.getProjectBaseDir(project);
+        String baseDir = baseDirVf != null ? baseDirVf.getPath() : "";
         String relativePath = VirtualFileUtil.getRelativePath(psiFile.getVirtualFile(), project);
-        String directoryPath = Paths.get(relativePath).getParent().toString();
+        String directoryPath = relativePath != null && Paths.get(relativePath).getParent() != null ? 
+                              Paths.get(relativePath).getParent().toString() : "";
         String implName = className + "Impl";
         String outputPath = Paths.get(baseDir, directoryPath, implName + ".java").toString();
         
