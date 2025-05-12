@@ -51,7 +51,7 @@ public class EnhanceCodeAction extends AnAction {
                             "Please select the code you want to enhance."
                     );
                 } else {
-                    Messages.showErrorDialog(
+                    CompatibilityUtil.showErrorDialog(
                             project,
                             "Please select the code you want to enhance.",
                             "No Code Selected"
@@ -75,7 +75,7 @@ public class EnhanceCodeAction extends AnAction {
                             "You must be logged in to ModForge to enhance code."
                     );
                 } else {
-                    Messages.showErrorDialog(
+                    CompatibilityUtil.showErrorDialog(
                             project,
                             "You must be logged in to ModForge to enhance code.",
                             "Authentication Required"
@@ -196,7 +196,7 @@ public class EnhanceCodeAction extends AnAction {
                                             "Error applying code enhancements: " + ex.getMessage()
                                     );
                                 } else {
-                                    Messages.showErrorDialog(
+                                    CompatibilityUtil.showErrorDialog(
                                             project,
                                             "Error applying code enhancements: " + ex.getMessage(),
                                             "Error"
@@ -216,7 +216,7 @@ public class EnhanceCodeAction extends AnAction {
                                     "An error occurred while enhancing code: " + ex.getMessage()
                             );
                         } else {
-                            Messages.showErrorDialog(
+                            CompatibilityUtil.showErrorDialog(
                                     project,
                                     "An error occurred while enhancing code: " + ex.getMessage(),
                                     "Error Enhancing Code"
@@ -237,7 +237,7 @@ public class EnhanceCodeAction extends AnAction {
                         "An error occurred: " + ex.getMessage()
                 );
             } else {
-                Messages.showErrorDialog(
+                CompatibilityUtil.showErrorDialog(
                         project,
                         "An error occurred: " + ex.getMessage(),
                         "Error"
