@@ -539,8 +539,17 @@ public class MemoryRecoveryManager {
             });
             
             // Force full garbage collection
+            // Note: System.runFinalization() has been removed as it's deprecated in Java 21
             System.gc();
-            System.runFinalization();
+            
+            // Allow a brief pause for GC to complete
+            try {
+                Thread.sleep(100);
+            } catch (InterruptedException ie) {
+                Thread.currentThread().interrupt();
+            }
+            
+            // Second GC pass
             System.gc();
             
             return true;

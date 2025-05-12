@@ -10,6 +10,7 @@ import com.intellij.openapi.extensions.PluginId;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.project.ProjectManagerListener;
 import com.intellij.openapi.startup.StartupActivity;
+import com.modforge.intellij.plugin.utils.CompatibilityUtil;
 import com.modforge.intellij.plugin.utils.CompatibilityValidator;
 import com.modforge.intellij.plugin.utils.EnvironmentValidator;
 import org.jetbrains.annotations.NotNull;
@@ -36,9 +37,17 @@ public class ModForgePluginActivator implements StartupActivity.DumbAware {
         // Register project open/close listener
         ApplicationManager.getApplication().getMessageBus().connect()
             .subscribe(ProjectManagerListener.TOPIC, new ProjectManagerListener() {
+                /**
+                 * @deprecated This method is deprecated in IntelliJ IDEA 2025.1.1.1
+                 * Use a different approach for handling project opening events
+                 */
                 @Override
+                @Deprecated
                 public void projectOpened(@NotNull Project project) {
-                    LOG.info("Project opened: " + project.getName());
+                    // Use our compatibility method
+                    CompatibilityUtil.handleProjectOpened(project, p -> {
+                        LOG.info("Project opened: " + p.getName());
+                    });
                 }
 
                 @Override

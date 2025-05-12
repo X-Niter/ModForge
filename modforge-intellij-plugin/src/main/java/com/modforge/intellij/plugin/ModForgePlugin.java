@@ -15,6 +15,7 @@ import com.intellij.openapi.project.ProjectManagerListener;
 import com.intellij.openapi.startup.StartupActivity;
 import com.intellij.util.concurrency.AppExecutorUtil;
 import com.modforge.intellij.plugin.settings.ModForgeSettings;
+import com.modforge.intellij.plugin.utils.CompatibilityUtil;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.concurrent.TimeUnit;
@@ -143,12 +144,21 @@ public class ModForgePlugin implements StartupActivity, ProjectManagerListener {
         });
     }
     
+    /**
+     * @deprecated This method is deprecated in IntelliJ IDEA 2025.1.1.1
+     * Use {@link com.intellij.openapi.project.ProjectManager#TOPIC} with 
+     * {@link com.intellij.openapi.project.ProjectManagerListener} instead
+     */
     @Override
+    @Deprecated
     public void projectOpened(@NotNull Project project) {
-        LOG.info("Project opened: " + project.getName());
-        
-        // Initialize project-specific components
-        // This is done in runActivity, but we also do it here for projects that are already open
+        // Use our compatibility method
+        CompatibilityUtil.handleProjectOpened(project, p -> {
+            LOG.info("Project opened: " + p.getName());
+            
+            // Initialize project-specific components
+            // This is done in runActivity, but we also do it here for projects that are already open
+        });
     }
     
     @Override
