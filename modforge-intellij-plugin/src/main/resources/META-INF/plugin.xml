@@ -45,7 +45,7 @@
             displayName="ModForge AI"/>
             
         <!-- Notification Group -->
-        <notificationGroup id="ModForgeNotifications" 
+        <notificationGroup id="ModForge Notifications" 
                           displayType="BALLOON" 
                           toolWindowId="ModForge"
                           isLogByDefault="true"/>

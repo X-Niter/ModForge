@@ -43,6 +43,7 @@ public class ModForgeSettingsConfigurable implements Configurable {
                 || mySettingsComponent.isUseDarkMode() != settings.isUseDarkMode()
                 || mySettingsComponent.isEnableContinuousDevelopment() != settings.isEnableContinuousDevelopment()
                 || mySettingsComponent.isEnablePatternRecognition() != settings.isEnablePatternRecognition()
+                || mySettingsComponent.isEnableNotifications() != settings.isEnableNotifications()
                 || mySettingsComponent.isEnableGitHubIntegration() != settings.isEnableGitHubIntegration()
                 || !mySettingsComponent.getGithubToken().equals(settings.getGithubToken())
                 || !mySettingsComponent.getGitHubUsername().equals(settings.getGitHubUsername())
@@ -90,6 +91,7 @@ public class ModForgeSettingsConfigurable implements Configurable {
         settings.setUseDarkMode(mySettingsComponent.isUseDarkMode());
         settings.setEnableContinuousDevelopment(mySettingsComponent.isEnableContinuousDevelopment());
         settings.setEnablePatternRecognition(mySettingsComponent.isEnablePatternRecognition());
+        settings.setEnableNotifications(mySettingsComponent.isEnableNotifications());
         settings.setEnableGitHubIntegration(mySettingsComponent.isEnableGitHubIntegration());
         settings.setGithubToken(mySettingsComponent.getGithubToken());
         settings.setGitHubUsername(mySettingsComponent.getGitHubUsername());
@@ -110,6 +112,7 @@ public class ModForgeSettingsConfigurable implements Configurable {
         mySettingsComponent.setUseDarkMode(settings.isUseDarkMode());
         mySettingsComponent.setEnableContinuousDevelopment(settings.isEnableContinuousDevelopment());
         mySettingsComponent.setEnablePatternRecognition(settings.isEnablePatternRecognition());
+        mySettingsComponent.setEnableNotifications(settings.isEnableNotifications());
         mySettingsComponent.setEnableGitHubIntegration(settings.isEnableGitHubIntegration());
         mySettingsComponent.setGithubToken(settings.getGithubToken());
         mySettingsComponent.setGitHubUsername(settings.getGitHubUsername());

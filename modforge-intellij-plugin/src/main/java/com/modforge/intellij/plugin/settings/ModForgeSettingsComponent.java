@@ -100,6 +100,7 @@ public class ModForgeSettingsComponent {
                 .addComponent(useDarkModeCheckbox, 1)
                 .addComponent(enableContinuousDevelopmentCheckbox, 1)
                 .addComponent(enablePatternRecognitionCheckbox, 1)
+                .addComponent(enableNotificationsCheckbox, 1)
                 .addSeparator(10)
                 
                 // GitHub integration settings
@@ -231,6 +232,24 @@ public class ModForgeSettingsComponent {
      */
     public void setEnablePatternRecognition(boolean enablePatternRecognition) {
         enablePatternRecognitionCheckbox.setSelected(enablePatternRecognition);
+    }
+    
+    /**
+     * Check if notifications are enabled.
+     *
+     * @return True if enabled, false otherwise
+     */
+    public boolean isEnableNotifications() {
+        return enableNotificationsCheckbox.isSelected();
+    }
+    
+    /**
+     * Set if notifications are enabled.
+     *
+     * @param enableNotifications True to enable, false to disable
+     */
+    public void setEnableNotifications(boolean enableNotifications) {
+        enableNotificationsCheckbox.setSelected(enableNotifications);
     }
     
     /**
