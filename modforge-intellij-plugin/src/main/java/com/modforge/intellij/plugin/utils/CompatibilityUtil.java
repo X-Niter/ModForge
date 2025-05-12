@@ -300,8 +300,52 @@ public final class CompatibilityUtil {
     public static boolean isIdeaVersionAtLeast(@NotNull String minVersion) {
         String currentVersion = getIdeaMajorVersion();
         
-        // Simple version comparison for now
-        return currentVersion.compareTo(minVersion) >= 0;
+        try {
+            // Split versions into components
+            String[] currentParts = currentVersion.split("\\.");
+            String[] minParts = minVersion.split("\\.");
+            
+            // Compare each part numerically
+            for (int i = 0; i < Math.min(currentParts.length, minParts.length); i++) {
+                int currentNum = extractNumber(currentParts[i]);
+                int minNum = extractNumber(minParts[i]);
+                
+                if (currentNum < minNum) {
+                    return false;
+                } else if (currentNum > minNum) {
+                    return true;
+                }
+                // If equal, continue to the next component
+            }
+            
+            // If we get here, all compared components are equal
+            // Longer version is considered newer (e.g., 2023.1.1 > 2023.1)
+            return currentParts.length >= minParts.length;
+        } catch (Exception e) {
+            LOG.warn("Failed to compare version " + currentVersion + " with " + minVersion, e);
+            // Default to true to avoid blocking functionality
+            return true;
+        }
+    }
+    
+    /**
+     * Extracts the numeric part from a version component.
+     * For example, from "2023a" extracts 2023.
+     * 
+     * @param part The version component.
+     * @return The numeric part.
+     */
+    private static int extractNumber(String part) {
+        StringBuilder numStr = new StringBuilder();
+        for (char c : part.toCharArray()) {
+            if (Character.isDigit(c)) {
+                numStr.append(c);
+            } else {
+                break;
+            }
+        }
+        
+        return numStr.length() > 0 ? Integer.parseInt(numStr.toString()) : 0;
     }
     
     /**

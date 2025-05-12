@@ -318,7 +318,7 @@ public final class VirtualFileUtil {
      */
     @NotNull
     public static String getRelativePath(@NotNull VirtualFile file, @NotNull Project project) {
-        VirtualFile baseDir = project.getBaseDir();
+        VirtualFile baseDir = CompatibilityUtil.getProjectBaseDir(project);
         if (baseDir == null) {
             return file.getPath();
         }
