@@ -255,4 +255,22 @@ public final class GenerateImplementationDialog extends DialogWrapper {
     public String getOutputPath() {
         return outputPath;
     }
+    
+    /**
+     * Gets the output path field component.
+     *
+     * @return The output path field component.
+     */
+    public JBTextField getOutputPathField() {
+        return outputPathField;
+    }
+    
+    /**
+     * Gets the prompt area component.
+     *
+     * @return The prompt area component.
+     */
+    public JBTextArea getComponent() {
+        return promptArea;
+    }
 }

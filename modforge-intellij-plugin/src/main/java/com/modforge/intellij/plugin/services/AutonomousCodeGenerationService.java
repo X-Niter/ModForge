@@ -442,6 +442,213 @@ public final class AutonomousCodeGenerationService {
     }
     
     /**
+     * Generates implementation for a class or interface.
+     *
+     * @param project      The project.
+     * @param psiClass     The PSI class.
+     * @param outputPath   The output path.
+     * @param prompt       The prompt.
+     * @return A CompletableFuture that completes when the implementation is generated.
+     */
+    public CompletableFuture<Boolean> generateImplementation(
+            @NotNull Project project,
+            @NotNull PsiClass psiClass,
+            @NotNull String outputPath,
+            @NotNull String prompt) {
+        
+        if (isGeneratingCode.getAndSet(true)) {
+            LOG.warn("Code generation already in progress");
+            return CompletableFuture.completedFuture(false);
+        }
+        
+        return ThreadUtils.supplyAsyncVirtual(() -> {
+            try {
+                LOG.info("Generating implementation for " + psiClass.getQualifiedName() + " with prompt: " + prompt);
+                
+                // Build a detailed prompt
+                StringBuilder detailedPrompt = new StringBuilder();
+                detailedPrompt.append("Generate a complete implementation for the ");
+                detailedPrompt.append(psiClass.isInterface() ? "interface" : "abstract class");
+                detailedPrompt.append(" ");
+                detailedPrompt.append(psiClass.getQualifiedName());
+                detailedPrompt.append(".\n\n");
+                
+                // Add class details
+                detailedPrompt.append("Class details:\n");
+                
+                if (psiClass.isInterface()) {
+                    detailedPrompt.append("- Type: Interface\n");
+                } else {
+                    detailedPrompt.append("- Type: Abstract class\n");
+                }
+                
+                // Add methods to implement
+                PsiMethod[] methods = psiClass.getMethods();
+                if (methods.length > 0) {
+                    detailedPrompt.append("- Methods to implement:\n");
+                    for (PsiMethod method : methods) {
+                        if (psiClass.isInterface() || method.hasModifierProperty(PsiModifier.ABSTRACT)) {
+                            detailedPrompt.append("  - ")
+                                    .append(PsiUtils.getMethodSignature(method))
+                                    .append("\n");
+                            
+                            // Add JavaDoc if available
+                            PsiDocComment docComment = method.getDocComment();
+                            if (docComment != null) {
+                                detailedPrompt.append("    Documentation: ")
+                                        .append(docComment.getText().replaceAll("\\s+", " ").trim())
+                                        .append("\n");
+                            }
+                        }
+                    }
+                }
+                
+                // Add original prompt
+                detailedPrompt.append("\n").append(prompt);
+                
+                // Generate the implementation
+                String generatedCode = generateMockImplementation(psiClass, detailedPrompt.toString());
+                
+                // Create the output file
+                File outputFile = new File(outputPath);
+                if (!outputFile.getParentFile().exists()) {
+                    if (!outputFile.getParentFile().mkdirs()) {
+                        LOG.warn("Failed to create directories for output file: " + outputPath);
+                        return false;
+                    }
+                }
+                
+                // Write the file
+                FileUtil.writeToFile(outputFile, generatedCode);
+                
+                // Refresh the file
+                VirtualFile vFile = LocalFileSystem.getInstance().refreshAndFindFileByIoFile(outputFile);
+                if (vFile != null) {
+                    vFile.refresh(false, false);
+                    
+                    // Open the file in the editor
+                    CompatibilityUtil.openFileInEditor(project, vFile, true);
+                }
+                
+                return true;
+            } catch (Exception e) {
+                LOG.error("Error generating implementation", e);
+                return false;
+            } finally {
+                isGeneratingCode.set(false);
+            }
+        });
+    }
+    
+    /**
+     * Generates a mock implementation for a class or interface.
+     *
+     * @param psiClass     The PSI class.
+     * @param prompt       The prompt.
+     * @return The generated code.
+     */
+    private String generateMockImplementation(PsiClass psiClass, String prompt) {
+        // This is a temporary implementation
+        String className = psiClass.getName();
+        String implName = className + "Impl";
+        String packageName = ((PsiJavaFile) psiClass.getContainingFile()).getPackageName();
+        
+        StringBuilder sb = new StringBuilder();
+        
+        // Add package declaration
+        sb.append("package ").append(packageName).append(";\n\n");
+        
+        // Add imports (simplified)
+        sb.append("import ").append(psiClass.getQualifiedName()).append(";\n\n");
+        
+        // Add class JavaDoc
+        sb.append("/**\n");
+        sb.append(" * Implementation of ").append(className).append(".\n");
+        sb.append(" * Generated by ModForge on ").append(new java.util.Date()).append(".\n");
+        sb.append(" */\n");
+        
+        // Add class declaration
+        sb.append("public class ").append(implName);
+        if (psiClass.isInterface()) {
+            sb.append(" implements ");
+        } else {
+            sb.append(" extends ");
+        }
+        sb.append(className).append(" {\n\n");
+        
+        // Add methods
+        PsiMethod[] methods = psiClass.getMethods();
+        for (PsiMethod method : methods) {
+            if (psiClass.isInterface() || method.hasModifierProperty(PsiModifier.ABSTRACT)) {
+                // Add method JavaDoc if available
+                PsiDocComment docComment = method.getDocComment();
+                if (docComment != null) {
+                    sb.append(docComment.getText()).append("\n");
+                } else {
+                    sb.append("    /**\n");
+                    sb.append("     * {@inheritDoc}\n");
+                    sb.append("     */\n");
+                }
+                
+                // Add method signature
+                sb.append("    @Override\n");
+                sb.append("    public ");
+                
+                // Add return type
+                PsiType returnType = method.getReturnType();
+                if (returnType != null) {
+                    sb.append(returnType.getPresentableText()).append(" ");
+                }
+                
+                // Add method name and parameters
+                sb.append(method.getName()).append("(");
+                PsiParameter[] parameters = method.getParameterList().getParameters();
+                for (int i = 0; i < parameters.length; i++) {
+                    PsiParameter parameter = parameters[i];
+                    sb.append(parameter.getType().getPresentableText())
+                            .append(" ")
+                            .append(parameter.getName());
+                    
+                    if (i < parameters.length - 1) {
+                        sb.append(", ");
+                    }
+                }
+                sb.append(") {\n");
+                
+                // Add method body (stub implementation)
+                if (!returnType.equals(PsiType.VOID)) {
+                    if (returnType.equals(PsiType.BOOLEAN)) {
+                        sb.append("        return false;\n");
+                    } else if (returnType instanceof PsiPrimitiveType) {
+                        if (returnType.equals(PsiType.INT) || 
+                            returnType.equals(PsiType.BYTE) || 
+                            returnType.equals(PsiType.SHORT) || 
+                            returnType.equals(PsiType.LONG)) {
+                            sb.append("        return 0;\n");
+                        } else if (returnType.equals(PsiType.FLOAT) || 
+                                  returnType.equals(PsiType.DOUBLE)) {
+                            sb.append("        return 0.0;\n");
+                        } else if (returnType.equals(PsiType.CHAR)) {
+                            sb.append("        return '\\0';\n");
+                        }
+                    } else {
+                        sb.append("        return null;\n");
+                    }
+                } else {
+                    sb.append("        // TODO: Implement this method\n");
+                }
+                
+                sb.append("    }\n\n");
+            }
+        }
+        
+        // Close class
+        sb.append("}\n");
+        
+        return sb.toString();
+    }
+    
+    /**
      * Mock implementation of adding features.
      *
      * @param fileContent   The file content.

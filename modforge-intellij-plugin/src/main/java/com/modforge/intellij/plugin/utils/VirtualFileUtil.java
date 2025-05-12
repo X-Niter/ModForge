@@ -308,4 +308,28 @@ public final class VirtualFileUtil {
     public static void saveAllDocuments() {
         FileDocumentManager.getInstance().saveAllDocuments();
     }
+    
+    /**
+     * Gets the relative path of a file to the project base directory.
+     *
+     * @param file    The file.
+     * @param project The project.
+     * @return The relative path, or the absolute path if the file is not under the project.
+     */
+    @NotNull
+    public static String getRelativePath(@NotNull VirtualFile file, @NotNull Project project) {
+        VirtualFile baseDir = project.getBaseDir();
+        if (baseDir == null) {
+            return file.getPath();
+        }
+        
+        String basePath = baseDir.getPath();
+        String filePath = file.getPath();
+        
+        if (filePath.startsWith(basePath)) {
+            return filePath.substring(basePath.length() + 1); // +1 to skip the trailing slash
+        }
+        
+        return filePath;
+    }
 }
