@@ -121,6 +121,11 @@
                     class="com.modforge.intellij.plugin.actions.ToggleContinuousDevelopmentAction" 
                     text="Toggle Continuous Development" 
                     description="Toggle continuous development"/>
+            <separator/>
+            <action id="ModForge.GenerateImplementation" 
+                    class="com.modforge.intellij.plugin.actions.GenerateImplementationAction" 
+                    text="Generate Implementation" 
+                    description="Generate implementation for interface or abstract class"/>
         </group>
 
         <!-- Editor Popup Menu -->
@@ -142,6 +147,11 @@
                     class="com.modforge.intellij.plugin.actions.GenerateDocumentationAction" 
                     text="Generate Documentation" 
                     description="Generate documentation for selected code using AI"/>
+            <separator/>
+            <action id="ModForge.EditorPopup.GenerateImplementation" 
+                    class="com.modforge.intellij.plugin.actions.GenerateImplementationAction" 
+                    text="Generate Implementation" 
+                    description="Generate implementation for interface or abstract class"/>
         </group>
     </actions>
     

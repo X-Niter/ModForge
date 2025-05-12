@@ -7,18 +7,24 @@ import java.util.concurrent.*;
 import java.util.function.Supplier;
 
 /**
- * Utility class for thread operations.
- * Provides support for Java 21 virtual threads.
+ * Utility class for working with threads and asynchronous operations.
  * Compatible with IntelliJ IDEA 2025.1.1.1
+ * Uses Java 21 virtual threads when available.
  */
 public final class ThreadUtils {
     private static final Logger LOG = Logger.getInstance(ThreadUtils.class);
     
-    // Thread pool for virtual threads
-    private static final ExecutorService VIRTUAL_EXECUTOR = Executors.newVirtualThreadPerTaskExecutor();
+    private static final ExecutorService VIRTUAL_THREAD_EXECUTOR;
+    private static final ExecutorService PLATFORM_THREAD_EXECUTOR;
     
-    // Thread pool for regular threads
-    private static final ExecutorService REGULAR_EXECUTOR = Executors.newCachedThreadPool();
+    static {
+        // Initialize executors with Java 21 Virtual Threads when available
+        VIRTUAL_THREAD_EXECUTOR = isVirtualThreadSupported() 
+                ? Executors.newVirtualThreadPerTaskExecutor()
+                : ThreadUtils.newCachedThreadPoolExecutor("ModForge-Virtual");
+        
+        PLATFORM_THREAD_EXECUTOR = ThreadUtils.newCachedThreadPoolExecutor("ModForge-Platform");
+    }
     
     /**
      * Private constructor to prevent instantiation.
@@ -28,120 +34,143 @@ public final class ThreadUtils {
     }
 
     /**
-     * Checks if virtual threads are supported.
+     * Checks if virtual threads are supported on this Java version.
+     * Virtual threads were introduced in Java 21.
      *
      * @return Whether virtual threads are supported.
      */
-    public static boolean areVirtualThreadsSupported() {
+    public static boolean isVirtualThreadSupported() {
         try {
-            // Simple check for virtual thread API
-            Class.forName("java.lang.Thread").getMethod("startVirtualThread", Runnable.class);
+            // Try to access the newVirtualThreadPerTaskExecutor method
+            // which was introduced in Java 21
+            Executors.class.getMethod("newVirtualThreadPerTaskExecutor");
             return true;
-        } catch (NoSuchMethodException | ClassNotFoundException e) {
-            LOG.info("Virtual threads not supported: " + e.getMessage());
+        } catch (NoSuchMethodException e) {
             return false;
         }
     }
 
     /**
-     * Executes a runnable asynchronously using virtual threads if available.
+     * Creates a cached thread pool executor.
      *
-     * @param runnable The runnable to execute.
-     * @return A CompletableFuture that completes when the runnable completes.
+     * @param threadNamePrefix The thread name prefix.
+     * @return The executor.
      */
-    public static CompletableFuture<Void> runAsyncVirtual(@NotNull Runnable runnable) {
-        if (areVirtualThreadsSupported()) {
-            return CompletableFuture.runAsync(runnable, VIRTUAL_EXECUTOR);
-        } else {
-            return CompletableFuture.runAsync(runnable, REGULAR_EXECUTOR);
+    @NotNull
+    public static ExecutorService newCachedThreadPoolExecutor(@NotNull String threadNamePrefix) {
+        return new ThreadPoolExecutor(
+                0, Integer.MAX_VALUE,
+                60L, TimeUnit.SECONDS,
+                new SynchronousQueue<>(),
+                r -> {
+                    Thread thread = Executors.defaultThreadFactory().newThread(r);
+                    thread.setName(threadNamePrefix + "-" + thread.getId());
+                    thread.setDaemon(true);
+                    return thread;
+                }
+        );
+    }
+
+    /**
+     * Executes a task asynchronously using virtual threads.
+     *
+     * @param task The task to execute.
+     * @return A future representing the completion of the task.
+     */
+    @NotNull
+    public static CompletableFuture<Void> runAsyncVirtual(@NotNull Runnable task) {
+        return CompletableFuture.runAsync(task, VIRTUAL_THREAD_EXECUTOR);
+    }
+
+    /**
+     * Executes a task asynchronously using platform threads.
+     *
+     * @param task The task to execute.
+     * @return A future representing the completion of the task.
+     */
+    @NotNull
+    public static CompletableFuture<Void> runAsyncPlatform(@NotNull Runnable task) {
+        return CompletableFuture.runAsync(task, PLATFORM_THREAD_EXECUTOR);
+    }
+
+    /**
+     * Executes a task asynchronously using virtual threads.
+     *
+     * @param task The task to execute.
+     * @param <T>  The return type.
+     * @return A future representing the completion of the task.
+     */
+    @NotNull
+    public static <T> CompletableFuture<T> supplyAsyncVirtual(@NotNull Supplier<T> task) {
+        return CompletableFuture.supplyAsync(task, VIRTUAL_THREAD_EXECUTOR);
+    }
+
+    /**
+     * Executes a task asynchronously using platform threads.
+     *
+     * @param task The task to execute.
+     * @param <T>  The return type.
+     * @return A future representing the completion of the task.
+     */
+    @NotNull
+    public static <T> CompletableFuture<T> supplyAsyncPlatform(@NotNull Supplier<T> task) {
+        return CompletableFuture.supplyAsync(task, PLATFORM_THREAD_EXECUTOR);
+    }
+
+    /**
+     * Waits for all futures to complete, logging any exceptions.
+     *
+     * @param futures The futures to wait for.
+     */
+    @SafeVarargs
+    public static void joinAll(@NotNull CompletableFuture<?>... futures) {
+        try {
+            CompletableFuture.allOf(futures).join();
+        } catch (CompletionException e) {
+            LOG.error("Exception while joining futures", e.getCause());
         }
     }
 
     /**
-     * Supplies a value asynchronously using virtual threads if available.
+     * Sleeps for the given amount of time.
      *
-     * @param supplier The supplier to execute.
-     * @param <T>      The return type.
-     * @return A CompletableFuture that completes with the supplier's result.
+     * @param millis The time to sleep in milliseconds.
      */
-    public static <T> CompletableFuture<T> supplyAsyncVirtual(@NotNull Supplier<T> supplier) {
-        if (areVirtualThreadsSupported()) {
-            return CompletableFuture.supplyAsync(supplier, VIRTUAL_EXECUTOR);
-        } else {
-            return CompletableFuture.supplyAsync(supplier, REGULAR_EXECUTOR);
+    public static void sleep(long millis) {
+        try {
+            Thread.sleep(millis);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
         }
     }
 
     /**
-     * Executes a callable asynchronously using virtual threads if available.
+     * Runs a task with a timeout.
      *
-     * @param callable The callable to execute.
-     * @param <T>      The return type.
-     * @return A Future that completes with the callable's result.
+     * @param task    The task to run.
+     * @param timeout The timeout.
+     * @param unit    The timeout unit.
+     * @param <T>     The return type.
+     * @return The result of the task, or null if timed out.
      */
-    public static <T> Future<T> submitVirtual(@NotNull Callable<T> callable) {
-        if (areVirtualThreadsSupported()) {
-            return VIRTUAL_EXECUTOR.submit(callable);
-        } else {
-            return REGULAR_EXECUTOR.submit(callable);
+    public static <T> T runWithTimeout(@NotNull Callable<T> task, long timeout, @NotNull TimeUnit unit) {
+        try {
+            Future<T> future = VIRTUAL_THREAD_EXECUTOR.submit(task);
+            return future.get(timeout, unit);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return null;
+        } catch (ExecutionException | TimeoutException e) {
+            LOG.warn("Task timed out or failed", e);
+            return null;
         }
     }
 
     /**
-     * Executes a runnable asynchronously using virtual threads if available.
-     *
-     * @param runnable The runnable to execute.
-     * @return A Future that completes when the runnable completes.
+     * Shuts down the executors.
      */
-    public static Future<?> submitVirtual(@NotNull Runnable runnable) {
-        if (areVirtualThreadsSupported()) {
-            return VIRTUAL_EXECUTOR.submit(runnable);
-        } else {
-            return REGULAR_EXECUTOR.submit(runnable);
-        }
-    }
-
-    /**
-     * Waits for a CompletableFuture to complete with a timeout.
-     *
-     * @param future   The future to wait for.
-     * @param timeout  The timeout duration.
-     * @param timeUnit The timeout unit.
-     * @param <T>      The return type.
-     * @return The result of the future.
-     * @throws TimeoutException      If the future times out.
-     * @throws InterruptedException  If the thread is interrupted.
-     * @throws ExecutionException    If the future throws an exception.
-     */
-    public static <T> T waitFor(
-            @NotNull CompletableFuture<T> future,
-            long timeout,
-            @NotNull TimeUnit timeUnit) 
-            throws TimeoutException, InterruptedException, ExecutionException {
-        return future.get(timeout, timeUnit);
-    }
-
-    /**
-     * Waits for a CompletableFuture to complete with the default timeout (30 seconds).
-     *
-     * @param future The future to wait for.
-     * @param <T>    The return type.
-     * @return The result of the future.
-     * @throws TimeoutException      If the future times out.
-     * @throws InterruptedException  If the thread is interrupted.
-     * @throws ExecutionException    If the future throws an exception.
-     */
-    public static <T> T waitFor(@NotNull CompletableFuture<T> future) 
-            throws TimeoutException, InterruptedException, ExecutionException {
-        return waitFor(future, 30, TimeUnit.SECONDS);
-    }
-
-    /**
-     * Shuts down the thread pools.
-     * Call this when the plugin is unloaded.
-     */
-    public static void shutdown() {
-        VIRTUAL_EXECUTOR.shutdown();
-        REGULAR_EXECUTOR.shutdown();
+    public static void shutdownExecutors() {
+        VIRTUAL_THREAD_EXECUTOR.shutdown();
+        PLATFORM_THREAD_EXECUTOR.shutdown();
     }
 }
