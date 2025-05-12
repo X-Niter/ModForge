@@ -68,19 +68,36 @@ public class PushToGitHubAction extends AnAction {
         // Check if GitHub token is available
         String token = authManager.getGitHubToken();
         if (token == null || token.isEmpty()) {
-            int result = Messages.showYesNoDialog(
-                    project,
-                    "No GitHub token found. Do you want to configure it in the settings?",
-                    "GitHub Token Required",
-                    "Open Settings",
-                    "Cancel",
-                    Messages.getQuestionIcon()
-            );
-            
-            if (result == Messages.YES) {
-                // Open settings dialog
-                ModForgeSettings settings = ModForgeSettings.getInstance();
-                settings.openSettings(project);
+            ModForgeNotificationService notificationService = ModForgeNotificationService.getInstance(project);
+            if (notificationService != null) {
+                boolean result = notificationService.showYesNoDialog(
+                        project,
+                        "GitHub Token Required",
+                        "No GitHub token found. Do you want to configure it in the settings?",
+                        "Open Settings",
+                        "Cancel"
+                );
+                
+                if (result) {
+                    // Open settings dialog
+                    ModForgeSettings settings = ModForgeSettings.getInstance();
+                    settings.openSettings(project);
+                }
+            } else {
+                int result = Messages.showYesNoDialog(
+                        project,
+                        "No GitHub token found. Do you want to configure it in the settings?",
+                        "GitHub Token Required",
+                        "Open Settings",
+                        "Cancel",
+                        Messages.getQuestionIcon()
+                );
+                
+                if (result == Messages.YES) {
+                    // Open settings dialog
+                    ModForgeSettings settings = ModForgeSettings.getInstance();
+                    settings.openSettings(project);
+                }
             }
             return;
         }
@@ -96,11 +113,20 @@ public class PushToGitHubAction extends AnAction {
             // Push to GitHub
             GitHubIntegrationService gitHubService = project.getService(GitHubIntegrationService.class);
             if (gitHubService == null) {
-                Messages.showErrorDialog(
-                        project,
-                        "GitHub integration service is not available.",
-                        "Service Unavailable"
-                );
+                ModForgeNotificationService notificationService = ModForgeNotificationService.getInstance(project);
+                if (notificationService != null) {
+                    notificationService.showErrorDialog(
+                            project,
+                            "Service Unavailable",
+                            "GitHub integration service is not available."
+                    );
+                } else {
+                    Messages.showErrorDialog(
+                            project,
+                            "GitHub integration service is not available.",
+                            "Service Unavailable"
+                    );
+                }
                 return;
             }
             
