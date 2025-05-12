@@ -212,7 +212,8 @@ public final class MinecraftCodeGenerator {
         }
         
         // Detect from project
-        ModLoader detected = ModLoaderDetector.detectModLoader(project);
+        String detectedLoader = ModLoaderDetector.detectModLoader(project);
+        ModLoader detected = ModLoader.fromId(detectedLoader);
         
         // If unable to detect, default to Forge
         if (detected == ModLoader.UNKNOWN) {
