@@ -1,7 +1,7 @@
 # ModForge IntelliJ IDEA 2025.1.1.1 Compatibility Issues 
  
 This report contains potential compatibility issues found in the codebase. 
-Generated on Mon 05/12/2025  6:39:52.75. 
+Generated on Mon 05/12/2025 15:25:08.94. 
  
 ## Overview 
  
@@ -18,9 +18,9 @@ that might affect plugin functionality for IntelliJ IDEA 2025.1.1.1.
  
 ## Summary 
  
-* Total Java files scanned: 233 
+* Total Java files scanned: 238 
 * Files with potential compatibility issues: 9 
-* Total potential issues found: 12 
+* Total potential issues found: 14 
  
 ## Detailed Issue List 
  
@@ -67,6 +67,14 @@ that might affect plugin functionality for IntelliJ IDEA 2025.1.1.1.
 ### Issue in G 
  
 * Potential problem: \JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\ui\toolwindow\panels\AIAssistPanel.java 
+ 
+### Issue in G 
+ 
+* Potential problem: \JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\utils\CompatibilityUtil.java 
+ 
+### Issue in G 
+ 
+* Potential problem: \JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\utils\CompatibilityUtil.java 
  
 ### Issue in G 
  
