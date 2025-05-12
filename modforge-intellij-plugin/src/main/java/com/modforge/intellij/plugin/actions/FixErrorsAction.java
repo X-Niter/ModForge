@@ -155,12 +155,9 @@ public class FixErrorsAction extends AnAction {
         WolfTheProblemSolver problemSolver = WolfTheProblemSolver.getInstance(project);
         Collection<Object> problems = new ArrayList<>();
         
-        if (problemSolver.hasProblemFilesBeneath(psiElement -> {
-            if (psiElement instanceof PsiFile) {
-                return ((PsiFile) psiElement).getVirtualFile().equals(file);
-            }
-            return false;
-        })) {
+        // Use the compatibility wrapper for hasProblemFilesBeneath
+        // Since this predicate can have different signatures in different versions
+        if (CompatibilityUtil.hasProblemsIn(problemSolver, file)) {
             // In IntelliJ IDEA 2025.1.1.1, the signature has changed
             // Create a compatible wrapper for processProblems
             collectProblemsForFile(problemSolver, file, problems);
