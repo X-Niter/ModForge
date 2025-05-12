@@ -202,8 +202,6 @@ public class FixErrorsAction extends AnAction {
         return sb.toString();
     }
     
-    // Using CompatibilityUtil.getProblemDescription instead of local implementation
-    
     /**
      * Compatibility method to collect problems for a file using available APIs in IntelliJ IDEA 2025.1.1.1
      * 
@@ -287,8 +285,6 @@ public class FixErrorsAction extends AnAction {
             }
         }
     }
-    
-    // Using CompatibilityUtil.getProblemDescription instead of local implementation
     
     /**
      * Fix errors in the code.
