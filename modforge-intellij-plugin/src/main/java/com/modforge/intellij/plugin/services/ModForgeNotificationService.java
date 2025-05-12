@@ -363,4 +363,137 @@ public final class ModForgeNotificationService {
     public void showOkDialog(@NotNull String title, @NotNull String message) {
         showOkDialog(null, title, message);
     }
+
+    /**
+     * Shows a dialog with an input field.
+     * Compatible with IntelliJ IDEA 2025.1.1.1
+     *
+     * @param project      The project
+     * @param message      The message to display
+     * @param title        The dialog title
+     * @param initialValue The initial value to display in the input field
+     * @return The text entered by the user, or null if canceled
+     */
+    @Nullable
+    public String showInputDialog(
+            @NotNull Project project,
+            @NotNull String message,
+            @NotNull String title,
+            @Nullable String initialValue) {
+        
+        // Use application thread to show dialog
+        final String[] result = new String[1];
+        
+        ApplicationManager.getApplication().invokeAndWait(() -> {
+            try {
+                result[0] = Messages.showInputDialog(project, message, title, null, initialValue, null);
+            } catch (Exception e) {
+                LOG.warn("Failed to show input dialog with project parameter", e);
+                try {
+                    result[0] = Messages.showInputDialog(message, title, null, initialValue, null);
+                } catch (Exception ex) {
+                    LOG.error("Failed to show input dialog", ex);
+                    result[0] = null;
+                }
+            }
+        });
+        
+        return result[0];
+    }
+    
+    /**
+     * Shows a dialog with an input field.
+     * Compatible with IntelliJ IDEA 2025.1.1.1
+     *
+     * @param message      The message to display
+     * @param title        The dialog title
+     * @param initialValue The initial value to display in the input field
+     * @return The text entered by the user, or null if canceled
+     */
+    @Nullable
+    public String showInputDialog(
+            @NotNull String message,
+            @NotNull String title,
+            @Nullable String initialValue) {
+        return showInputDialog(null, message, title, initialValue);
+    }
+    
+    /**
+     * Shows a dialog with a dropdown selector.
+     * Compatible with IntelliJ IDEA 2025.1.1.1
+     *
+     * @param project      The project
+     * @param message      The message to display
+     * @param title        The dialog title
+     * @param options      The array of options to choose from
+     * @param initialValue The initially selected value
+     * @return The index of the selected option, or -1 if canceled
+     */
+    public int showChooseDialog(
+            @NotNull Project project,
+            @NotNull String message,
+            @NotNull String title,
+            @NotNull String[] options,
+            @NotNull String initialValue) {
+        
+        // Use application thread to show dialog
+        final int[] result = new int[1];
+        
+        ApplicationManager.getApplication().invokeAndWait(() -> {
+            try {
+                result[0] = Messages.showChooseDialog(project, message, title, options, initialValue, null);
+            } catch (Exception e) {
+                LOG.warn("Failed to show choose dialog with project parameter", e);
+                try {
+                    result[0] = Messages.showChooseDialog(message, title, options, initialValue, null);
+                } catch (Exception ex) {
+                    LOG.error("Failed to show choose dialog", ex);
+                    result[0] = -1;
+                }
+            }
+        });
+        
+        return result[0];
+    }
+    
+    /**
+     * Shows a dialog with a dropdown selector.
+     * Compatible with IntelliJ IDEA 2025.1.1.1
+     *
+     * @param message      The message to display
+     * @param title        The dialog title
+     * @param options      The array of options to choose from
+     * @param initialValue The initially selected value
+     * @return The index of the selected option, or -1 if canceled
+     */
+    public int showChooseDialog(
+            @NotNull String message,
+            @NotNull String title,
+            @NotNull String[] options,
+            @NotNull String initialValue) {
+        return showChooseDialog(null, message, title, options, initialValue);
+    }
+    
+    /**
+     * Shows an information message as a notification (not a dialog).
+     * Added for compatibility with code that expects this method.
+     *
+     * @param project The project
+     * @param title   The notification title
+     * @param message The notification message
+     */
+    public void showInfoMessage(@Nullable Project project, @NotNull String title, @NotNull String message) {
+        showInfoNotification(project, title, message);
+    }
+    
+    /**
+     * Shows an information message as a notification (not a dialog).
+     * Added for compatibility with code that expects this method.
+     *
+     * @param title   The notification title
+     * @param message The notification message
+     */
+    public void showInfoMessage(@NotNull String title, @NotNull String message) {
+        showInfoMessage(null, title, message);
+    }
 }

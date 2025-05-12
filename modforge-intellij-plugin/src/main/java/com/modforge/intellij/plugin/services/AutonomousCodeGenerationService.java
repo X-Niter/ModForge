@@ -15,6 +15,7 @@ import com.modforge.intellij.plugin.utils.CompatibilityUtil;
 import com.modforge.intellij.plugin.utils.PsiUtils;
 import com.modforge.intellij.plugin.utils.ThreadUtils;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 import java.io.File;
 import java.nio.file.Files;
@@ -399,6 +400,150 @@ public final class AutonomousCodeGenerationService {
         LOG.info("Clearing pattern cache");
         patternCache.clear();
         patternHits.clear();
+    }
+    
+    /**
+     * Explains code using AI analysis.
+     *
+     * @param code The code to explain.
+     * @param context Optional additional context, can be null.
+     * @return A CompletableFuture that completes with the explanation.
+     */
+    public CompletableFuture<String> explainCode(
+            @NotNull String code,
+            @Nullable String context) {
+        
+        if (isGeneratingCode.getAndSet(true)) {
+            LOG.warn("Code explanation already in progress");
+            return CompletableFuture.completedFuture(null);
+        }
+        
+        return ThreadUtils.supplyAsyncVirtual(() -> {
+            try {
+                LOG.info("Explaining code of length: " + code.length());
+                
+                // If the context is not null, use it to enhance the explanation
+                String codeToExplain = code;
+                if (context != null && !context.isEmpty()) {
+                    codeToExplain = "Context: " + context + "\n\nCode to explain:\n" + code;
+                }
+                
+                // Cache key for pattern learning - use a hash of the code
+                String cacheKey = "explain_" + Integer.toHexString(codeToExplain.hashCode());
+                
+                // Check the pattern cache
+                if (patternCache.containsKey(cacheKey)) {
+                    // We found a match in our pattern cache
+                    String cachedExplanation = patternCache.get(cacheKey);
+                    int hits = patternHits.getOrDefault(cacheKey, 0) + 1;
+                    patternHits.put(cacheKey, hits);
+                    LOG.info("Pattern cache hit for explanation (hit #" + hits + ")");
+                    return cachedExplanation;
+                }
+                
+                // Call the API to explain the code
+                ModForgeSettings settings = ModForgeSettings.getInstance();
+                String apiUrl = settings.getApiUrl() + "/api/explain-code";
+                String apiKey = settings.getApiKey();
+                
+                // Prepare the request payload
+                String json = "{\"code\": " + escapeJson(codeToExplain) + "}";
+                
+                // Make the API request
+                String result = makeApiRequest(apiUrl, apiKey, json);
+                
+                if (result != null && !result.isEmpty()) {
+                    // Parse the result JSON to extract the explanation
+                    String explanation = parseExplanationFromJson(result);
+                    
+                    // Cache the result for pattern learning
+                    patternCache.put(cacheKey, explanation);
+                    patternHits.put(cacheKey, 1);
+                    
+                    return explanation;
+                } else {
+                    LOG.warn("Failed to explain code: Empty response from API");
+                    return "Failed to explain code. Please try again later.";
+                }
+            } catch (Exception e) {
+                LOG.error("Error explaining code", e);
+                return "Error explaining code: " + e.getMessage();
+            } finally {
+                isGeneratingCode.set(false);
+            }
+        });
+    }
+    
+    /**
+     * Generates documentation for code.
+     *
+     * @param code The code to document.
+     * @param context Optional additional context, can be null.
+     * @return A CompletableFuture that completes with the documented code.
+     */
+    public CompletableFuture<String> generateDocumentation(
+            @NotNull String code,
+            @Nullable String context) {
+        
+        if (isGeneratingCode.getAndSet(true)) {
+            LOG.warn("Documentation generation already in progress");
+            return CompletableFuture.completedFuture(null);
+        }
+        
+        return ThreadUtils.supplyAsyncVirtual(() -> {
+            try {
+                LOG.info("Generating documentation for code of length: " + code.length());
+                
+                // If the context is not null, use it to enhance the documentation
+                String codeToDocument = code;
+                if (context != null && !context.isEmpty()) {
+                    codeToDocument = "Context: " + context + "\n\nCode to document:\n" + code;
+                }
+                
+                // Cache key for pattern learning - use a hash of the code
+                String cacheKey = "document_" + Integer.toHexString(codeToDocument.hashCode());
+                
+                // Check the pattern cache
+                if (patternCache.containsKey(cacheKey)) {
+                    // We found a match in our pattern cache
+                    String cachedDocumentation = patternCache.get(cacheKey);
+                    int hits = patternHits.getOrDefault(cacheKey, 0) + 1;
+                    patternHits.put(cacheKey, hits);
+                    LOG.info("Pattern cache hit for documentation (hit #" + hits + ")");
+                    return cachedDocumentation;
+                }
+                
+                // Call the API to generate documentation
+                ModForgeSettings settings = ModForgeSettings.getInstance();
+                String apiUrl = settings.getApiUrl() + "/api/generate-documentation";
+                String apiKey = settings.getApiKey();
+                
+                // Prepare the request payload
+                String json = "{\"code\": " + escapeJson(codeToDocument) + "}";
+                
+                // Make the API request
+                String result = makeApiRequest(apiUrl, apiKey, json);
+                
+                if (result != null && !result.isEmpty()) {
+                    // Parse the result JSON to extract the documented code
+                    String documentation = parseDocumentationFromJson(result);
+                    
+                    // Cache the result for pattern learning
+                    patternCache.put(cacheKey, documentation);
+                    patternHits.put(cacheKey, 1);
+                    
+                    return documentation;
+                } else {
+                    LOG.warn("Failed to generate documentation: Empty response from API");
+                    return "Failed to generate documentation. Please try again later.";
+                }
+            } catch (Exception e) {
+                LOG.error("Error generating documentation", e);
+                return "Error generating documentation: " + e.getMessage();
+            } finally {
+                isGeneratingCode.set(false);
+            }
+        });
     }
     
     /**
