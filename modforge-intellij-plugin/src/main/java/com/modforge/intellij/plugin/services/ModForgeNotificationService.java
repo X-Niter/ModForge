@@ -44,6 +44,25 @@ public final class ModForgeNotificationService {
     public void showInfoNotification(@NotNull String title, @NotNull String content) {
         showInfo(title, content);
     }
+    
+    /**
+     * Shows an important information notification that requires attention.
+     * This notification won't expire automatically and might be highlighted.
+     *
+     * @param title   The notification title
+     * @param content The notification content
+     */
+    public void showImportantNotification(@NotNull String title, @NotNull String content) {
+        // Create a special notification that's marked as important and doesn't expire automatically
+        Notification notification = NotificationGroupManager.getInstance()
+                .getNotificationGroup(NOTIFICATION_GROUP_ID)
+                .createNotification(content, NotificationType.INFORMATION)
+                .setTitle(title)
+                .setImportant(true); // Mark as important so it doesn't expire
+        
+        // Show the notification
+        notification.notify(project);
+    }
 
     /**
      * Shows an error notification.
