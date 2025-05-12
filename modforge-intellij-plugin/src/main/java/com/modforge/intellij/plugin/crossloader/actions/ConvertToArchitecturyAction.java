@@ -5,6 +5,7 @@ import com.intellij.openapi.actionSystem.AnAction;
 import com.intellij.openapi.actionSystem.AnActionEvent;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.Messages;
+import com.modforge.intellij.plugin.utils.CompatibilityUtil;
 import org.jetbrains.annotations.NotNull;
 
 /**
@@ -34,7 +35,8 @@ public class ConvertToArchitecturyAction extends AnAction {
         // This would involve analyzing the current project structure,
         // creating the necessary Architectury modules, and migrating code
         
-        Messages.showInfoMessage(
+        CompatibilityUtil.showInfoDialog(
+                project,
                 "Project conversion to Architectury is not yet implemented.\n" +
                 "Please create a new cross-loader project instead.",
                 "Not Implemented"
