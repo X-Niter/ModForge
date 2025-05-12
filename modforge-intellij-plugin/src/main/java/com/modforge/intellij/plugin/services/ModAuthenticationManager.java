@@ -122,24 +122,32 @@ public final class ModAuthenticationManager {
     /**
      * Logs out the current user.
      * Compatible with IntelliJ IDEA 2025.1.1.1
+     * 
+     * @return A CompletableFuture with a boolean indicating if logout was successful.
      */
-    public void logout() {
+    public CompletableFuture<Boolean> logout() {
         if (isAuthenticating.get()) {
             LOG.warn("Authentication in progress, cannot logout");
-            return;
+            return CompletableFuture.completedFuture(false);
         }
         
-        ThreadUtils.runAsyncVirtual(() -> {
-            LOG.info("Logging out user: " + getUsername());
-            
-            // Clear all credentials
-            settings.setAccessToken(null);
-            settings.setGitHubUsername("");
-            settings.setGitHubToken("");
-            
-            isAuthenticated.set(false);
-            
-            LOG.info("Logout complete");
+        return ThreadUtils.supplyAsyncVirtual(() -> {
+            try {
+                LOG.info("Logging out user: " + getUsername());
+                
+                // Clear all credentials
+                settings.setAccessToken(null);
+                settings.setGitHubUsername("");
+                settings.setGitHubToken("");
+                
+                isAuthenticated.set(false);
+                
+                LOG.info("Logout complete");
+                return true;
+            } catch (Exception e) {
+                LOG.error("Logout error", e);
+                return false;
+            }
         });
     }
 

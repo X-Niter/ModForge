@@ -2,11 +2,12 @@ package com.modforge.intellij.plugin.actions;
 
 import com.intellij.openapi.actionSystem.AnAction;
 import com.intellij.openapi.actionSystem.AnActionEvent;
+import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.Messages;
-import com.modforge.intellij.plugin.auth.ModAuthenticationManager;
 import com.modforge.intellij.plugin.services.ContinuousDevelopmentService;
+import com.modforge.intellij.plugin.services.ModAuthenticationManager;
 import com.modforge.intellij.plugin.services.ModForgeNotificationService;
 import org.jetbrains.annotations.NotNull;
 
@@ -77,24 +78,38 @@ public class LogoutAction extends AnAction {
             // Stop continuous development if it's running
             stopContinuousDevelopment(project);
             
-            // Logout
-            authManager.logout();
-            
-            if (notificationService != null) {
-                notificationService.showInfoDialog(
-                        project,
-                        "Logout Successful",
-                        "You have been logged out from ModForge." +
-                                (username.isEmpty() ? "" : " (Goodbye, " + username + "!)")
-                );
-            } else {
-                Messages.showInfoMessage(
-                        project,
-                        "You have been logged out from ModForge." +
-                                (username.isEmpty() ? "" : " (Goodbye, " + username + "!)"),
-                        "Logout Successful"
-                );
-            }
+            // Logout - handle returned CompletableFuture
+            authManager.logout().thenAccept(success -> {
+                if (notificationService != null) {
+                    if (success) {
+                        ApplicationManager.getApplication().invokeLater(() -> {
+                            notificationService.showInfoDialog(
+                                    project,
+                                    "Logout Successful",
+                                    "You have been logged out from ModForge." +
+                                            (username.isEmpty() ? "" : " (Goodbye, " + username + "!)")
+                            );
+                        });
+                    } else {
+                        ApplicationManager.getApplication().invokeLater(() -> {
+                            notificationService.showErrorDialog(
+                                    project,
+                                    "Logout Failed",
+                                    "Failed to log out from ModForge."
+                            );
+                        });
+                    }
+                } else {
+                    ApplicationManager.getApplication().invokeLater(() -> {
+                        Messages.showInfoMessage(
+                                project,
+                                "You have been logged out from ModForge." +
+                                        (username.isEmpty() ? "" : " (Goodbye, " + username + "!)"),
+                                "Logout Successful"
+                        );
+                    });
+                }
+            });
         }
     }
     
