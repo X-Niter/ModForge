@@ -739,7 +739,7 @@ public final class AutomatedRefactoringService {
         
         ApplicationManager.getApplication().invokeLater(() -> {
             CommandProcessor.getInstance().executeCommand(project, () -> {
-                ApplicationManager.getApplication().runWriteAction(runnable);
+                CompatibilityUtil.runWriteAction(runnable);
             }, "Add @Override Annotation", null);
         });
         
@@ -788,7 +788,7 @@ public final class AutomatedRefactoringService {
         
         ApplicationManager.getApplication().invokeLater(() -> {
             CommandProcessor.getInstance().executeCommand(project, () -> {
-                ApplicationManager.getApplication().runWriteAction(runnable);
+                CompatibilityUtil.runWriteAction(runnable);
             }, "Add Null Check", null);
         });
         
@@ -869,7 +869,7 @@ public final class AutomatedRefactoringService {
             
             ApplicationManager.getApplication().invokeLater(() -> {
                 CommandProcessor.getInstance().executeCommand(project, () -> {
-                    ApplicationManager.getApplication().runWriteAction(runnable);
+                    CompatibilityUtil.runWriteAction(runnable);
                 }, "Add Javadoc", null);
             });
             
