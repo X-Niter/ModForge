@@ -45,6 +45,19 @@ public final class ModForgeSettings implements PersistentStateComponent<ModForge
     @Attribute("enableContinuousDevelopment")
     private boolean enableContinuousDevelopment = false;
     
+    // OpenAI settings
+    @Attribute("openAiApiKey")
+    private String openAiApiKey = "";
+    
+    @Attribute("openAiModel")
+    private String openAiModel = "gpt-4o";
+    
+    @Attribute("maxTokens")
+    private int maxTokens = 2048;
+    
+    @Attribute("temperature")
+    private double temperature = 0.7;
+    
     // GitHub settings
     @Attribute("githubUsername")
     private String githubUsername = "";
@@ -359,5 +372,77 @@ public final class ModForgeSettings implements PersistentStateComponent<ModForge
      */
     public void openSettings(@Nullable Project project) {
         ShowSettingsUtil.getInstance().showSettingsDialog(project, ModForgeConfigurable.class);
+    }
+    
+    /**
+     * Gets the OpenAI API key.
+     *
+     * @return The OpenAI API key.
+     */
+    public String getOpenAiApiKey() {
+        return openAiApiKey;
+    }
+
+    /**
+     * Sets the OpenAI API key.
+     *
+     * @param openAiApiKey The OpenAI API key.
+     */
+    public void setOpenAiApiKey(String openAiApiKey) {
+        this.openAiApiKey = openAiApiKey;
+    }
+
+    /**
+     * Gets the OpenAI model.
+     *
+     * @return The OpenAI model.
+     */
+    public String getOpenAiModel() {
+        return openAiModel;
+    }
+
+    /**
+     * Sets the OpenAI model.
+     *
+     * @param openAiModel The OpenAI model.
+     */
+    public void setOpenAiModel(String openAiModel) {
+        this.openAiModel = openAiModel;
+    }
+
+    /**
+     * Gets the maximum number of tokens for OpenAI requests.
+     *
+     * @return The maximum number of tokens.
+     */
+    public int getMaxTokens() {
+        return maxTokens;
+    }
+
+    /**
+     * Sets the maximum number of tokens for OpenAI requests.
+     *
+     * @param maxTokens The maximum number of tokens.
+     */
+    public void setMaxTokens(int maxTokens) {
+        this.maxTokens = maxTokens;
+    }
+
+    /**
+     * Gets the temperature for OpenAI requests.
+     *
+     * @return The temperature.
+     */
+    public double getTemperature() {
+        return temperature;
+    }
+
+    /**
+     * Sets the temperature for OpenAI requests.
+     *
+     * @param temperature The temperature.
+     */
+    public void setTemperature(double temperature) {
+        this.temperature = temperature;
     }
 }
