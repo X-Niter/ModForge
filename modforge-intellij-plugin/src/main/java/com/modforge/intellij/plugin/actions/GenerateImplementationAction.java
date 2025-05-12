@@ -125,7 +125,7 @@ public final class GenerateImplementationAction extends AnAction {
                             "Generation Failed",
                             "Failed to generate implementation for " + className + ": " + error.getMessage()
                     );
-                } else if (success != null && success) {
+                } else if (Boolean.TRUE.equals(success)) {
                     ModForgeNotificationService.getInstance().showInfoNotification(
                             project,
                             "Implementation Generated",
