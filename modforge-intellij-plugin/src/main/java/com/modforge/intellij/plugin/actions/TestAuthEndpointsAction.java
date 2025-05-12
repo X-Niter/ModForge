@@ -26,7 +26,7 @@ public class TestAuthEndpointsAction extends AnAction {
             return;
         }
         
-        ModForgeSettings settings = ModForgeSettings.getInstance();
+        ModForgeSettings settings = ModForgeSettings.getInstance(project);
         
         if (!settings.isAuthenticated() || settings.getAccessToken().isEmpty()) {
             showNotification(project, "Not Authenticated", 
