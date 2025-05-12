@@ -211,8 +211,8 @@ public class FixErrorsAction extends AnAction {
             @NotNull VirtualFile file,
             @NotNull Collection<Object> problems) {
         
-        // Use a compatibility approach to get problems in 2025.1.1.1
-        if (problemSolver.hasProblemFilesBeneath(virtualFile -> virtualFile.equals(file))) {
+        // Use our compatibility wrapper to check if file has problems
+        if (CompatibilityUtil.hasProblemsIn(problemSolver, file)) {
             // Use reflection to call processProblems which has different signatures in different IntelliJ versions
             try {
                 // Try the newer version of processProblems which takes a single processor parameter

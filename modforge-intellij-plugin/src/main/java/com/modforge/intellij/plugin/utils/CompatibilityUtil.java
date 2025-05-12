@@ -561,6 +561,38 @@ public final class CompatibilityUtil {
     }
     
     /**
+     * Compatibility method to check if a file has problems.
+     * Compatible with IntelliJ IDEA 2025.1.1.1.
+     * 
+     * @param problemSolver The WolfTheProblemSolver instance
+     * @param file The file to check
+     * @return True if the file has problems, false otherwise
+     */
+    public static boolean hasProblemsIn(@NotNull WolfTheProblemSolver problemSolver, @NotNull VirtualFile file) {
+        try {
+            // Try using hasProblemFilesBeneath with a VirtualFile predicate (newer API)
+            return problemSolver.hasProblemFilesBeneath(virtualFile -> virtualFile.equals(file));
+        } catch (Exception e) {
+            LOG.warn("Failed to use hasProblemFilesBeneath with VirtualFile predicate", e);
+            
+            try {
+                // Try using hasProblemFilesBeneath with a PsiElement predicate (older API)
+                return problemSolver.hasProblemFilesBeneath(psiElement -> {
+                    if (psiElement instanceof com.intellij.psi.PsiFile) {
+                        return ((com.intellij.psi.PsiFile) psiElement).getVirtualFile().equals(file);
+                    }
+                    return false;
+                });
+            } catch (Exception ex) {
+                LOG.warn("Failed to use hasProblemFilesBeneath with PsiElement predicate", ex);
+                
+                // Last resort: check if the file is in the problem files collection
+                return getProblemFiles(problemSolver).contains(file);
+            }
+        }
+    }
+    
+    /**
      * Gets problems for a specific file from a WolfTheProblemSolver instance using reflection
      * to maintain compatibility with different IntelliJ IDEA versions, particularly 2025.1.1.1.
      * 
