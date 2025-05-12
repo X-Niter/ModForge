@@ -336,11 +336,28 @@ public class CreateFromTemplateAction extends AnAction {
         @Override
         protected void doOKAction() {
             if (templateList.getSelectedValue() == null) {
-                Messages.showErrorDialog(
-                        getContentPanel(),
-                        "Please select a template",
-                        "No Template Selected"
-                );
+                if (project != null) {
+                    ModForgeNotificationService notificationService = project.getService(ModForgeNotificationService.class);
+                    if (notificationService != null) {
+                        notificationService.showErrorDialog(
+                                project,
+                                "No Template Selected",
+                                "Please select a template"
+                        );
+                    } else {
+                        Messages.showErrorDialog(
+                                getContentPanel(),
+                                "Please select a template",
+                                "No Template Selected"
+                        );
+                    }
+                } else {
+                    Messages.showErrorDialog(
+                            getContentPanel(),
+                            "Please select a template",
+                            "No Template Selected"
+                    );
+                }
                 return;
             }
             
@@ -504,39 +521,104 @@ public class CreateFromTemplateAction extends AnAction {
         protected void doOKAction() {
             // Check if output directory is specified
             if (outputDirField.getText().isEmpty()) {
-                Messages.showErrorDialog(
-                        getContentPanel(),
-                        "Please specify an output directory",
-                        "No Output Directory"
-                );
+                if (project != null) {
+                    ModForgeNotificationService notificationService = project.getService(ModForgeNotificationService.class);
+                    if (notificationService != null) {
+                        notificationService.showErrorDialog(
+                                project,
+                                "No Output Directory",
+                                "Please specify an output directory"
+                        );
+                    } else {
+                        Messages.showErrorDialog(
+                                getContentPanel(),
+                                "Please specify an output directory",
+                                "No Output Directory"
+                        );
+                    }
+                } else {
+                    Messages.showErrorDialog(
+                            getContentPanel(),
+                            "Please specify an output directory",
+                            "No Output Directory"
+                    );
+                }
                 return;
             }
             
             // Check if output directory exists or can be created
             File outputDir = getOutputDirectory();
             if (outputDir.exists() && outputDir.isFile()) {
-                Messages.showErrorDialog(
-                        getContentPanel(),
-                        "Output directory is a file",
-                        "Invalid Output Directory"
-                );
+                if (project != null) {
+                    ModForgeNotificationService notificationService = project.getService(ModForgeNotificationService.class);
+                    if (notificationService != null) {
+                        notificationService.showErrorDialog(
+                                project,
+                                "Invalid Output Directory",
+                                "Output directory is a file"
+                        );
+                    } else {
+                        Messages.showErrorDialog(
+                                getContentPanel(),
+                                "Output directory is a file",
+                                "Invalid Output Directory"
+                        );
+                    }
+                } else {
+                    Messages.showErrorDialog(
+                            getContentPanel(),
+                            "Output directory is a file",
+                            "Invalid Output Directory"
+                    );
+                }
                 return;
             }
             
             // Check if output directory is empty
             if (outputDir.exists() && outputDir.listFiles() != null && outputDir.listFiles().length > 0) {
-                // Use the compatible version with Project parameter in IntelliJ IDEA 2025.1.1.1
-                int result = Messages.showYesNoDialog(
-                        project,
-                        "Output directory is not empty. Continue?",
-                        "Output Directory Not Empty",
-                        "Continue",
-                        "Cancel",
-                        null
-                );
-                
-                if (result != Messages.YES) {
-                    return;
+                if (project != null) {
+                    ModForgeNotificationService notificationService = project.getService(ModForgeNotificationService.class);
+                    if (notificationService != null) {
+                        int result = notificationService.showYesNoDialog(
+                                project,
+                                "Output Directory Not Empty",
+                                "Output directory is not empty. Continue?",
+                                "Continue",
+                                "Cancel"
+                        );
+                        
+                        if (result != Messages.YES) {
+                            return;
+                        }
+                    } else {
+                        // Use the compatible version with Project parameter in IntelliJ IDEA 2025.1.1.1
+                        int result = Messages.showYesNoDialog(
+                                project,
+                                "Output directory is not empty. Continue?",
+                                "Output Directory Not Empty",
+                                "Continue",
+                                "Cancel",
+                                null
+                        );
+                        
+                        if (result != Messages.YES) {
+                            return;
+                        }
+                    }
+                } else {
+                    // Use the compatible version with Project parameter in IntelliJ IDEA 2025.1.1.1
+                    int result = Messages.showYesNoDialog(
+                            project,
+                            "Output directory is not empty. Continue?",
+                            "Output Directory Not Empty",
+                            "Continue",
+                            "Cancel",
+                            null
+                    );
+                    
+                    if (result != Messages.YES) {
+                        return;
+                    }
                 }
             }
             
