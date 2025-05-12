@@ -95,7 +95,7 @@ public final class CollaborationService {
      * @param username The username
      * @return True if the participant was added, false if already present
      */
-    public boolean addParticipant(String userId, String username) {
+    public boolean addParticipant(@NotNull String userId, @NotNull String username) {
         if (participants.containsKey(userId)) {
             LOG.info("Participant already exists: " + username + " (ID: " + userId + ")");
             return false;
@@ -104,6 +104,10 @@ public final class CollaborationService {
         ParticipantInfo info = new ParticipantInfo(userId, username);
         participants.put(userId, info);
         LOG.info("Added participant: " + username + " (ID: " + userId + ")");
+        
+        // Create and add a participant object for UI notification
+        addParticipant(new Participant(userId, username, false));
+        
         return true;
     }
     
@@ -502,17 +506,18 @@ public final class CollaborationService {
     }
     
     /**
-     * Adds a participant to the collaboration session.
+     * Sends a notification that a participant has been added to the collaboration session.
+     * This method is for UI notifications only and doesn't update the internal participant list.
      * 
      * @param participant The participant to add
      */
-    public void addParticipant(Participant participant) {
+    public void addParticipant(@NotNull Participant participant) {
         if (participant == null) {
             LOG.warn("Attempted to add null participant");
             return;
         }
         
-        LOG.info("Adding participant: " + participant.username + " (ID: " + participant.userId + ")");
+        LOG.info("Notifying about participant: " + participant.username + " (ID: " + participant.userId + ")");
         
         // Notify UI about new participant
         Map<String, Object> data = new HashMap<>();

@@ -120,6 +120,7 @@ public final class ModForgeSettings implements PersistentStateComponent<ModForge
      *
      * @return The access token
      */
+    @Nullable
     public String getAccessToken() {
         return accessToken;
     }
@@ -129,7 +130,7 @@ public final class ModForgeSettings implements PersistentStateComponent<ModForge
      *
      * @param accessToken The access token to set
      */
-    public void setAccessToken(String accessToken) {
+    public void setAccessToken(@Nullable String accessToken) {
         this.accessToken = accessToken;
     }
     
@@ -330,24 +331,7 @@ public final class ModForgeSettings implements PersistentStateComponent<ModForge
         this.githubUsername = githubUsername;
     }
 
-    /**
-     * Gets the access token.
-     *
-     * @return The access token.
-     */
-    @Nullable
-    public String getAccessToken() {
-        return accessToken;
-    }
-
-    /**
-     * Sets the access token.
-     *
-     * @param accessToken The access token.
-     */
-    public void setAccessToken(@Nullable String accessToken) {
-        this.accessToken = accessToken;
-    }
+    /* Removed duplicate getAccessToken and setAccessToken methods */
     
     /**
      * Gets the GitHub token.
