@@ -220,7 +220,8 @@ public class FixErrorsAction extends AnAction {
      * @return The description
      */
     private String getProblemDescription(@NotNull Problem problem) {
-        // In IntelliJ IDEA 2025.1.1.1, the best approach is to use the API that's guaranteed to exist
+        // In IntelliJ IDEA 2025.1.1.1, the API has changed and getDescription() is no longer available
+        // We need to use reflection or extract information from other stable methods
         
         // Extract information from the problem using stable methods
         StringBuilder sb = new StringBuilder();
@@ -251,27 +252,38 @@ public class FixErrorsAction extends AnAction {
             }
         }
         
-        // Check for problem description using reflection (safer than direct API call)
+        // Try multiple approaches to get the description
+        
+        // Approach 1: Try to access the description through reflection (getDescriptionText or getText method)
         try {
-            // Try to access getDescription method through reflection
-            // This is safer than direct API calls which might not exist in all versions
-            java.lang.reflect.Method getDescMethod = problem.getClass().getMethod("getDescription");
-            if (getDescMethod != null) {
-                String description = (String) getDescMethod.invoke(problem);
-                if (description != null && !description.isEmpty()) {
-                    sb.append(description);
+            // Try multiple potential method names that might exist in different IntelliJ versions
+            for (String methodName : new String[]{"getDescriptionText", "getText", "getDescription", "getMessage"}) {
+                try {
+                    java.lang.reflect.Method method = problem.getClass().getMethod(methodName);
+                    Object result = method.invoke(problem);
+                    if (result instanceof String) {
+                        String description = (String) result;
+                        if (description != null && !description.isEmpty()) {
+                            sb.append(description);
+                            return sb.toString(); // Found a valid description, return immediately
+                        }
+                    }
+                } catch (NoSuchMethodException ignored) {
+                    // Method doesn't exist, try the next one
                 }
             }
-        } catch (Exception e) {
-            // If reflection fails, fall back to toString
-            String problemString = problem.toString();
-            if (problemString != null && !problemString.isEmpty() && !problemString.equals(problem.getClass().getName())) {
-                sb.append(problemString);
-            } else {
-                // Provide default text if we have nothing else
-                if (sb.length() == 0) {
-                    sb.append("Error detected but no description available");
-                }
+        } catch (Exception ignored) {
+            // Any reflection exception, continue to fallbacks
+        }
+        
+        // Approach 2: If reflection fails or no description found, try toString
+        String problemString = problem.toString();
+        if (problemString != null && !problemString.isEmpty() && !problemString.equals(problem.getClass().getName())) {
+            sb.append(problemString);
+        } else {
+            // Approach 3: Final fallback - check if we already have some content
+            if (sb.length() == 0) {
+                sb.append("Error detected but no description available");
             }
         }
         
