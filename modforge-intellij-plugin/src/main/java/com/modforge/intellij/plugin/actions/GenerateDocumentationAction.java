@@ -15,6 +15,7 @@ import com.intellij.openapi.ui.Messages;
 import com.intellij.psi.PsiDocumentManager;
 import com.intellij.psi.PsiFile;
 import com.modforge.intellij.plugin.services.AutonomousCodeGenerationService;
+import com.modforge.intellij.plugin.services.ModForgeNotificationService;
 import org.jetbrains.annotations.NotNull;
 
 /**
@@ -64,11 +65,20 @@ public class GenerateDocumentationAction extends AnAction {
                     String documentedCode = codeGenService.generateDocumentation(code, null).get();
                     
                     if (documentedCode == null || documentedCode.isEmpty()) {
-                        Messages.showErrorDialog(
-                                project,
-                                "Failed to generate documentation.",
-                                "Generate Documentation"
-                        );
+                        ModForgeNotificationService notificationService = ModForgeNotificationService.getInstance(project);
+                        if (notificationService != null) {
+                            notificationService.showErrorDialog(
+                                    project,
+                                    "Generate Documentation",
+                                    "Failed to generate documentation."
+                            );
+                        } else {
+                            Messages.showErrorDialog(
+                                    project,
+                                    "Failed to generate documentation.",
+                                    "Generate Documentation"
+                            );
+                        }
                         return;
                     }
                     
@@ -83,11 +93,20 @@ public class GenerateDocumentationAction extends AnAction {
                     
                     indicator.setFraction(1.0);
                 } catch (Exception ex) {
-                    Messages.showErrorDialog(
-                            project,
-                            "Error generating documentation: " + ex.getMessage(),
-                            "Generate Documentation"
-                    );
+                    ModForgeNotificationService notificationService = ModForgeNotificationService.getInstance(project);
+                    if (notificationService != null) {
+                        notificationService.showErrorDialog(
+                                project,
+                                "Generate Documentation",
+                                "Error generating documentation: " + ex.getMessage()
+                        );
+                    } else {
+                        Messages.showErrorDialog(
+                                project,
+                                "Error generating documentation: " + ex.getMessage(),
+                                "Generate Documentation"
+                        );
+                    }
                 }
             }
         });
