@@ -192,9 +192,9 @@ REM Perform in-depth compatibility analysis
 echo Performing API compatibility analysis...
 call :RUN_COMPATIBILITY_SCAN
 
-REM Analyze missing methods
-echo Analyzing missing methods and "cannot find symbol" errors...
-call :FIND_MISSING_METHODS
+REM Analyze code issues
+echo Analyzing symbol resolution errors...
+call :ANALYZE_CODE_ISSUES
 
 REM Analyze resolution errors
 echo Analyzing potential resolution errors...
@@ -325,9 +325,9 @@ echo Compatibility analysis complete.
 goto :EOF
 
 REM ===================================
-REM Missing Methods Scan Subroutine
+REM Code Issues Analysis Subroutine
 REM ===================================
-:FIND_MISSING_METHODS
+:ANALYZE_CODE_ISSUES
 echo.
 echo === Running Missing Methods Analysis ===
 
@@ -369,7 +369,7 @@ echo - generateCode >> "%MISSING_METHODS_REPORT%"
 echo - fixCode >> "%MISSING_METHODS_REPORT%"
 echo. >> "%MISSING_METHODS_REPORT%"
 
-echo Missing methods analysis complete.
+echo Analysis complete.
 goto :EOF
 
 REM We've completely refactored this section to avoid syntax issues
