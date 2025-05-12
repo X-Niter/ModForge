@@ -217,6 +217,16 @@ public final class ModAuthenticationManager {
     public String getAccessToken() {
         return settings.getAccessToken();
     }
+    
+    /**
+     * Gets the GitHub token for API access.
+     *
+     * @return The GitHub token or null if not available.
+     */
+    @Nullable
+    public String getGitHubToken() {
+        return settings.getAccessToken();
+    }
 
     /**
      * Verifies authentication with the GitHub API.

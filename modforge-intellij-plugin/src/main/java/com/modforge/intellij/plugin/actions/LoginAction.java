@@ -13,6 +13,7 @@ import com.intellij.openapi.ui.Messages;
 import com.intellij.ui.components.JBLabel;
 import com.intellij.ui.components.JBPasswordField;
 import com.intellij.ui.components.JBTextField;
+import com.modforge.intellij.plugin.utils.CompatibilityUtil;
 import com.intellij.util.ui.FormBuilder;
 import com.modforge.intellij.plugin.services.ModAuthenticationManager;
 import com.modforge.intellij.plugin.services.ModForgeNotificationService;
