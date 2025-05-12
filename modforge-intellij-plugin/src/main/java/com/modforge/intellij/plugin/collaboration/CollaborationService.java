@@ -38,6 +38,16 @@ public final class CollaborationService {
     private String sessionId;
     private WebSocketClient webSocketClient;
     private boolean connected = false;
+    
+    /**
+     * Gets an instance of the CollaborationService for the specified project.
+     *
+     * @param project The project
+     * @return The CollaborationService instance
+     */
+    public static CollaborationService getInstance(@NotNull Project project) {
+        return project.getService(CollaborationService.class);
+    }
     private ScheduledFuture<?> pingTask;
     
     // Maps file paths to editors

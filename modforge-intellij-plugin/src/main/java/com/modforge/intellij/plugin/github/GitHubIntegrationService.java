@@ -872,7 +872,7 @@ public final class GitHubIntegrationService {
      * @param progressCallback Callback for progress updates
      * @return CompletableFuture with the push result
      */
-    public CompletableFuture<GitHubPushResult> pushToGitHub(
+    public CompletableFuture<GitHubPushResult> pushToGitHubV2(
             String owner, 
             String repository, 
             String description, 
@@ -935,12 +935,12 @@ public final class GitHubIntegrationService {
     }
     
     /**
-     * Start monitoring a GitHub repository for issues and workflows
+     * Start monitoring a GitHub repository for issues and workflows (synchronous version)
      *
      * @param owner GitHub username or organization
      * @param repository Repository name
      */
-    public void startMonitoring(String owner, String repository) {
+    public void startMonitoringSynchronous(String owner, String repository) {
         LOG.info("Starting monitoring for repository: " + owner + "/" + repository);
         
         // Set the current repository
