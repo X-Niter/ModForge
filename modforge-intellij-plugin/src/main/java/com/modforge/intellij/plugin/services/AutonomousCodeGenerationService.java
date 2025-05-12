@@ -348,6 +348,57 @@ public final class AutonomousCodeGenerationService {
         patternHits.clear();
     }
     
+    /**
+     * Fixes code with errors.
+     *
+     * @param code         The code with errors.
+     * @param errorMessage The error message.
+     * @param language     The programming language.
+     * @return A CompletableFuture that completes with the fixed code.
+     */
+    public CompletableFuture<String> fixCode(
+            @NotNull String code,
+            @NotNull String errorMessage,
+            @NotNull String language) {
+        
+        if (isGeneratingCode.getAndSet(true)) {
+            LOG.warn("Code generation already in progress");
+            return CompletableFuture.completedFuture(null);
+        }
+        
+        return ThreadUtils.supplyAsyncVirtual(() -> {
+            try {
+                LOG.info("Fixing code in language: " + language);
+                
+                // Check pattern cache first
+                String cacheKey = code + "|" + errorMessage + "|" + language;
+                if (patternCache.containsKey(cacheKey)) {
+                    String cachedResult = patternCache.get(cacheKey);
+                    patternHits.compute(cacheKey, (k, v) -> v == null ? 1 : v + 1);
+                    LOG.info("Using cached result for fixing (hit count: " + patternHits.get(cacheKey) + ")");
+                    return cachedResult;
+                }
+                
+                // Mock fix for now
+                // TODO: Replace with actual API call
+                String fixedCode = mockFixErrors(code, List.of(errorMessage.split("\n")));
+                
+                // Cache the result if pattern learning is enabled
+                if (settings.isPatternRecognition()) {
+                    patternCache.put(cacheKey, fixedCode);
+                    patternHits.put(cacheKey, 1);
+                }
+                
+                return fixedCode;
+            } catch (Exception e) {
+                LOG.error("Error fixing code", e);
+                return null;
+            } finally {
+                isGeneratingCode.set(false);
+            }
+        });
+    }
+    
     // Mock implementations for testing - to be replaced with API calls
     
     /**
