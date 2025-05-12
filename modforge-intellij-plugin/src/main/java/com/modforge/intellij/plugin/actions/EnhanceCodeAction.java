@@ -208,11 +208,20 @@ public class EnhanceCodeAction extends AnAction {
                         LOG.error("Error enhancing code", ex);
                         
                         // Show error in UI thread
-                        Messages.showErrorDialog(
-                                project,
-                                "An error occurred while enhancing code: " + ex.getMessage(),
-                                "Error Enhancing Code"
-                        );
+                        ModForgeNotificationService localNotificationService = ModForgeNotificationService.getInstance(project);
+                        if (localNotificationService != null) {
+                            localNotificationService.showErrorDialog(
+                                    project,
+                                    "Error Enhancing Code",
+                                    "An error occurred while enhancing code: " + ex.getMessage()
+                            );
+                        } else {
+                            Messages.showErrorDialog(
+                                    project,
+                                    "An error occurred while enhancing code: " + ex.getMessage(),
+                                    "Error Enhancing Code"
+                            );
+                        }
                     }
                 }
             });
@@ -220,11 +229,20 @@ public class EnhanceCodeAction extends AnAction {
             LOG.error("Error in enhance code action", ex);
             
             // Show error
-            Messages.showErrorDialog(
-                    project,
-                    "An error occurred: " + ex.getMessage(),
-                    "Error"
-            );
+            ModForgeNotificationService notificationService = ModForgeNotificationService.getInstance(project);
+            if (notificationService != null) {
+                notificationService.showErrorDialog(
+                        project,
+                        "Error",
+                        "An error occurred: " + ex.getMessage()
+                );
+            } else {
+                Messages.showErrorDialog(
+                        project,
+                        "An error occurred: " + ex.getMessage(),
+                        "Error"
+                );
+            }
         }
     }
     

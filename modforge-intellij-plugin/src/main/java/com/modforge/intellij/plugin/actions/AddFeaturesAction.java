@@ -12,6 +12,7 @@ import com.intellij.ui.components.JBTextArea;
 import com.intellij.util.ui.FormBuilder;
 import com.intellij.util.ui.JBUI;
 import com.modforge.intellij.plugin.auth.ModAuthenticationManager;
+import com.modforge.intellij.plugin.services.ModForgeNotificationService;
 import com.modforge.intellij.plugin.settings.ModForgeSettings;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -39,11 +40,20 @@ public class AddFeaturesAction extends AnAction {
             // Check authentication
             ModAuthenticationManager authManager = ModAuthenticationManager.getInstance();
             if (!authManager.isAuthenticated()) {
-                Messages.showErrorDialog(
-                        project,
-                        "You must be logged in to ModForge to add features.",
-                        "Authentication Required"
-                );
+                ModForgeNotificationService notificationService = ModForgeNotificationService.getInstance(project);
+                if (notificationService != null) {
+                    notificationService.showErrorDialog(
+                            project,
+                            "Authentication Required",
+                            "You must be logged in to ModForge to add features."
+                    );
+                } else {
+                    Messages.showErrorDialog(
+                            project,
+                            "You must be logged in to ModForge to add features.",
+                            "Authentication Required"
+                    );
+                }
                 return;
             }
             
