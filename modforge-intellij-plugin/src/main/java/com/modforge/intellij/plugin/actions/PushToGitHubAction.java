@@ -150,7 +150,7 @@ public class PushToGitHubAction extends AnAction {
                     ).thenAccept(result -> {
                         ApplicationManager.getApplication().invokeLater(() -> {
                             ModForgeNotificationService notificationService = 
-                                    project.getService(ModForgeNotificationService.class);
+                                    ModForgeNotificationService.getInstance();
                             
                             if (result.isSuccess()) {
                                 if (notificationService != null) {

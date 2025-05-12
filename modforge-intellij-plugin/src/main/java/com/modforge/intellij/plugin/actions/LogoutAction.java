@@ -31,7 +31,7 @@ public class LogoutAction extends AnAction {
         
         // Make sure the user is authenticated
         if (!authManager.isAuthenticated()) {
-            ModForgeNotificationService notificationService = project.getService(ModForgeNotificationService.class);
+            ModForgeNotificationService notificationService = ModForgeNotificationService.getInstance();
             if (notificationService != null) {
                 notificationService.showInfoDialog(
                         project,
@@ -52,7 +52,7 @@ public class LogoutAction extends AnAction {
         String username = authManager.getUsername();
         int result;
         
-        ModForgeNotificationService notificationService = project.getService(ModForgeNotificationService.class);
+        ModForgeNotificationService notificationService = ModForgeNotificationService.getInstance();
         if (notificationService != null) {
             result = notificationService.showYesNoDialog(
                     project,
@@ -111,7 +111,7 @@ public class LogoutAction extends AnAction {
         if (continuousService != null && continuousService.isRunning()) {
             continuousService.stop();
             
-            ModForgeNotificationService notificationService = project.getService(ModForgeNotificationService.class);
+            ModForgeNotificationService notificationService = ModForgeNotificationService.getInstance();
             if (notificationService != null) {
                 notificationService.showInfoDialog(
                         project,

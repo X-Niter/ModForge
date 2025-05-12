@@ -42,7 +42,7 @@ public class StartCollaborationAction extends AnAction {
         
         // Check if already connected
         if (collaborationService.isConnected()) {
-            ModForgeNotificationService notificationService = project.getService(ModForgeNotificationService.class);
+            ModForgeNotificationService notificationService = ModForgeNotificationService.getInstance();
             int result;
             if (notificationService != null) {
                 result = notificationService.showYesNoDialog(
