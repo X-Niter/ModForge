@@ -1,6 +1,7 @@
 package com.modforge.intellij.plugin.utils;
 
 import com.intellij.openapi.application.Application;
+import com.intellij.openapi.application.ApplicationInfo;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.application.ReadAction;
 import com.intellij.openapi.application.WriteAction;
@@ -125,6 +126,10 @@ public final class CompatibilityUtil {
         }, ApplicationManager.getApplication().getExecutorService());
     }
 
+    // Map to store listeners for removal
+    private static final java.util.Map<String, com.intellij.openapi.vfs.VirtualFileListener> fileListeners = 
+            new java.util.concurrent.ConcurrentHashMap<>();
+            
     /**
      * Creates a virtual file listener.
      *
@@ -133,9 +138,43 @@ public final class CompatibilityUtil {
      */
     @NotNull
     public static String createVirtualFileListener(@NotNull Runnable callback) {
-        // TODO: This is a mock implementation.
-        // In the real code, we would register a VFS listener.
-        return "listener-" + System.currentTimeMillis();
+        String listenerId = "listener-" + System.currentTimeMillis();
+        
+        // Create a virtual file listener that invokes the callback on any file change
+        com.intellij.openapi.vfs.VirtualFileListener listener = new com.intellij.openapi.vfs.VirtualFileListener() {
+            @Override
+            public void contentsChanged(@NotNull com.intellij.openapi.vfs.events.VFileEvent event) {
+                callback.run();
+            }
+            
+            @Override
+            public void fileCreated(@NotNull com.intellij.openapi.vfs.events.VFileEvent event) {
+                callback.run();
+            }
+            
+            @Override
+            public void fileDeleted(@NotNull com.intellij.openapi.vfs.events.VFileEvent event) {
+                callback.run();
+            }
+            
+            @Override
+            public void fileMoved(@NotNull com.intellij.openapi.vfs.events.VFileMoveEvent event) {
+                callback.run();
+            }
+            
+            @Override
+            public void fileCopied(@NotNull com.intellij.openapi.vfs.events.VFileCopyEvent event) {
+                callback.run();
+            }
+        };
+        
+        // Register the listener with the VFS
+        com.intellij.openapi.vfs.VirtualFileManager.getInstance().addVirtualFileListener(listener);
+        
+        // Store the listener for later removal
+        fileListeners.put(listenerId, listener);
+        
+        return listenerId;
     }
 
     /**
@@ -144,8 +183,10 @@ public final class CompatibilityUtil {
      * @param listenerId The listener ID.
      */
     public static void removeVirtualFileListener(@NotNull String listenerId) {
-        // TODO: This is a mock implementation.
-        // In the real code, we would unregister the VFS listener.
+        com.intellij.openapi.vfs.VirtualFileListener listener = fileListeners.remove(listenerId);
+        if (listener != null) {
+            com.intellij.openapi.vfs.VirtualFileManager.getInstance().removeVirtualFileListener(listener);
+        }
     }
 
     /**
@@ -199,9 +240,26 @@ public final class CompatibilityUtil {
      */
     @NotNull
     public static String getIdeaMajorVersion() {
-        // TODO: This is a mock implementation.
-        // In the real code, we would get the actual IDE version.
-        return "2025.1";
+        // Use ApplicationInfo to get the current version
+        ApplicationInfo appInfo = ApplicationInfo.getInstance();
+        
+        // Get the full version and extract the major parts (year and first component)
+        String fullVersion = appInfo.getFullVersion();
+        
+        try {
+            // Parse version like "2025.1.1.1" to get "2025.1"
+            String[] parts = fullVersion.split("\\.");
+            if (parts.length >= 2) {
+                return parts[0] + "." + parts[1];
+            } else if (parts.length == 1) {
+                return parts[0];
+            }
+        } catch (Exception e) {
+            LOG.warn("Failed to parse IDE version: " + fullVersion, e);
+        }
+        
+        // Fall back to current API year
+        return appInfo.getCurrentApiVersion();
     }
     
     /**
