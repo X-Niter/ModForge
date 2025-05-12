@@ -603,6 +603,7 @@ public class CreateFromTemplateAction extends AnAction {
                     }
                 } else {
                     // Use the compatible version with Project parameter in IntelliJ IDEA 2025.1.1.1
+                    ModForgeNotificationService notificationService = ModForgeNotificationService.getInstance();
                     int result = notificationService.showYesNoDialog(
                             project,
                             "Output Directory Not Empty",
