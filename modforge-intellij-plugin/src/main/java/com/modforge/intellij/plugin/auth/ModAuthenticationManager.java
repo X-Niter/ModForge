@@ -348,4 +348,37 @@ public final class ModAuthenticationManager implements PersistentStateComponent<
     public boolean isAuthenticated() {
         return isGitHubTokenValid() || isOpenAIApiKeyValid();
     }
+    
+    /**
+     * Login with username and password
+     * 
+     * @param username The username
+     * @param password The password
+     * @return A CompletableFuture that completes with true if login is successful, false otherwise
+     */
+    public CompletableFuture<Boolean> login(String username, String password) {
+        // For now, store the username and simulate a GitHub token
+        setGitHubUsername(username);
+        
+        // Simulate generating a token from credentials
+        String simulatedToken = "github_pat_" + System.currentTimeMillis();
+        setGitHubToken(simulatedToken, true);
+        
+        // Return async validation result
+        CompletableFuture<Boolean> result = new CompletableFuture<>();
+        validateGitHubTokenAsync(isValid -> {
+            result.complete(isValid);
+        });
+        
+        return result;
+    }
+    
+    /**
+     * Get the current username
+     * 
+     * @return The username
+     */
+    public String getUsername() {
+        return getGitHubUsername();
+    }
 }

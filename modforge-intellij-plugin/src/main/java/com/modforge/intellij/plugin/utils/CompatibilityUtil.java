@@ -162,6 +162,16 @@ public final class CompatibilityUtil {
             application.invokeLater(task);
         }
     }
+    
+    /**
+     * Executes a task on the UI thread.
+     * This is an alias for runOnUiThread to maintain backward compatibility.
+     *
+     * @param task The task to run.
+     */
+    public static void executeOnUiThread(@NotNull Runnable task) {
+        runOnUiThread(task);
+    }
 
     /**
      * Runs a task on the UI thread and waits for it to complete.
@@ -192,6 +202,35 @@ public final class CompatibilityUtil {
         // TODO: This is a mock implementation.
         // In the real code, we would get the actual IDE version.
         return "2025.1";
+    }
+    
+    /**
+     * Computes a result in a write action.
+     *
+     * @param computable The computable task.
+     * @param <T>        The return type.
+     * @return The result of the computation.
+     */
+    @Nullable
+    public static <T> T computeInWriteAction(@NotNull Callable<T> computable) {
+        try {
+            return WriteAction.compute(computable::call);
+        } catch (Exception e) {
+            LOG.error("Error executing write action", e);
+            return null;
+        }
+    }
+    
+    /**
+     * Refreshes all files in the project.
+     *
+     * @param project The project.
+     */
+    public static void refreshAll(@NotNull Project project) {
+        VirtualFile baseDir = getProjectBaseDir(project);
+        if (baseDir != null) {
+            baseDir.refresh(true, true);
+        }
     }
     
     /**

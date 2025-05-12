@@ -29,6 +29,16 @@ public final class ModForgeNotificationService {
     }
     
     /**
+     * Gets the instance of the service.
+     *
+     * @param project The project.
+     * @return The service instance.
+     */
+    public static ModForgeNotificationService getInstance(@Nullable Project project) {
+        return getInstance();
+    }
+    
+    /**
      * Shows an information notification.
      *
      * @param project The project.
@@ -37,6 +47,28 @@ public final class ModForgeNotificationService {
      */
     public void showInfoNotification(@Nullable Project project, @NotNull String title, @NotNull String content) {
         showNotification(project, title, content, NotificationType.INFORMATION);
+    }
+    
+    /**
+     * Shows an information notification.
+     * Simplified method without project parameter for backwards compatibility.
+     *
+     * @param title   The title.
+     * @param content The content.
+     */
+    public void showInfo(@NotNull String title, @NotNull String content) {
+        showInfoNotification(null, title, content);
+    }
+    
+    /**
+     * Shows an information notification.
+     *
+     * @param project The project.
+     * @param title   The title.
+     * @param content The content.
+     */
+    public void showInfo(@Nullable Project project, @NotNull String title, @NotNull String content) {
+        showInfoNotification(project, title, content);
     }
     
     /**
@@ -59,6 +91,28 @@ public final class ModForgeNotificationService {
      */
     public void showErrorNotification(@Nullable Project project, @NotNull String title, @NotNull String content) {
         showNotification(project, title, content, NotificationType.ERROR);
+    }
+    
+    /**
+     * Shows an error notification.
+     * Simplified method without project parameter for backwards compatibility.
+     *
+     * @param title   The title.
+     * @param content The content.
+     */
+    public void showError(@NotNull String title, @NotNull String content) {
+        showErrorNotification(null, title, content);
+    }
+    
+    /**
+     * Shows an error notification.
+     *
+     * @param project The project.
+     * @param title   The title.
+     * @param content The content.
+     */
+    public void showError(@Nullable Project project, @NotNull String title, @NotNull String content) {
+        showErrorNotification(project, title, content);
     }
     
     /**
