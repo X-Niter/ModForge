@@ -14,6 +14,7 @@ import com.modforge.intellij.plugin.services.ModForgeNotificationService;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.*;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Supplier;
@@ -387,6 +388,100 @@ public final class CompatibilityUtil {
     }
     
     /**
+     * Gets WolfTheProblemSolver problems using compatible approaches for IntelliJ IDEA 2025.1.1.1
+     * 
+     * @param problemSolver The problem solver instance
+     * @return Collection of problem files
+     */
+    @NotNull
+    public static Collection<VirtualFile> getProblemFiles(@NotNull com.intellij.codeInsight.daemon.impl.WolfTheProblemSolver problemSolver) {
+        try {
+            // Try the method available in IntelliJ IDEA 2025.1.1.1
+            java.lang.reflect.Method getFilesMethod = problemSolver.getClass().getMethod("getProblemFileSet");
+            Set<VirtualFile> files = (Set<VirtualFile>) getFilesMethod.invoke(problemSolver);
+            return files != null ? files : Collections.emptySet();
+        } catch (Exception e) {
+            LOG.warn("Failed to get problem files using getProblemFileSet", e);
+            
+            try {
+                // Try the older method
+                java.lang.reflect.Method getFilesMethod = problemSolver.getClass().getMethod("getProblemFiles");
+                return (Collection<VirtualFile>) getFilesMethod.invoke(problemSolver);
+            } catch (Exception ex) {
+                LOG.error("Failed to get problem files from WolfTheProblemSolver", ex);
+                return Collections.emptySet();
+            }
+        }
+    }
+    
+    /**
+     * Gets problems from WolfTheProblemSolver in a compatible way for IntelliJ IDEA 2025.1.1.1
+     * 
+     * @param problemSolver The problem solver instance
+     * @return Collection of problems
+     */
+    @NotNull
+    public static Collection<com.intellij.codeInsight.daemon.impl.WolfTheProblemSolver.Problem> getAllProblems(
+            @NotNull com.intellij.codeInsight.daemon.impl.WolfTheProblemSolver problemSolver) {
+        
+        List<com.intellij.codeInsight.daemon.impl.WolfTheProblemSolver.Problem> problems = new ArrayList<>();
+        
+        try {
+            // Try the newer approach using processProblems which takes a processor
+            java.lang.reflect.Method processMethod = problemSolver.getClass().getMethod("processProblems", 
+                    java.util.function.Predicate.class);
+            
+            processMethod.invoke(problemSolver, (java.util.function.Predicate<com.intellij.codeInsight.daemon.impl.WolfTheProblemSolver.Problem>) problem -> {
+                problems.add(problem);
+                return true; // Continue processing
+            });
+        } catch (Exception e) {
+            LOG.warn("Failed to process problems using processProblems", e);
+            
+            try {
+                // Try the older getSortedProblems method
+                java.lang.reflect.Method getProblemsMethod = problemSolver.getClass().getMethod("getSortedProblems");
+                Collection<com.intellij.codeInsight.daemon.impl.WolfTheProblemSolver.Problem> foundProblems = 
+                        (Collection<com.intellij.codeInsight.daemon.impl.WolfTheProblemSolver.Problem>) getProblemsMethod.invoke(problemSolver);
+                
+                if (foundProblems != null) {
+                    problems.addAll(foundProblems);
+                }
+            } catch (Exception ex) {
+                LOG.error("Failed to get problems from WolfTheProblemSolver", ex);
+            }
+        }
+        
+        return problems;
+    }
+
+    /**
+     * Gets description from a Problem instance in a compatible way for IntelliJ IDEA 2025.1.1.1
+     * 
+     * @param problem The problem instance
+     * @return The description text
+     */
+    @NotNull
+    public static String getProblemDescription(@NotNull com.intellij.codeInsight.daemon.impl.WolfTheProblemSolver.Problem problem) {
+        try {
+            // Try the newer method first (IntelliJ IDEA 2025.1.1.1)
+            java.lang.reflect.Method getTextMethod = problem.getClass().getMethod("getPresentableText");
+            String text = (String) getTextMethod.invoke(problem);
+            return text != null ? text : "Unknown error";
+        } catch (Exception e) {
+            try {
+                // Fall back to the older method
+                java.lang.reflect.Method getDescMethod = problem.getClass().getMethod("getDescription");
+                String description = (String) getDescMethod.invoke(problem);
+                return description != null ? description : "Unknown error";
+            } catch (Exception ex) {
+                LOG.warn("Failed to get problem description", ex);
+                return "Unknown error";
+            }
+        }
+    }
+    
+    /**
      * Checks if the current IntelliJ IDEA version is at least the given version.
      *
      * @param minVersion The minimum version.
@@ -454,9 +549,20 @@ public final class CompatibilityUtil {
     public static void showInfoDialog(Project project, String message, String title) {
         ApplicationManager.getApplication().invokeLater(() -> {
             try {
-                // Try the method with project parameter first (older versions)
+                // Try the method with project parameter first (newer versions in 2025.1.1.1)
+                Messages.showInfoMessage(project, message, title);
+            } catch (Exception e) {
                 try {
-                    Messages.class.getMethod("showInfoDialog", Project.class, String.class, String.class)
+                    // Fall back to version without project parameter
+                    Messages.showInfoMessage(message, title);
+                } catch (Exception ex) {
+                    LOG.error("Failed to show info dialog", ex);
+                    // Last resort - use notification service
+                    ModForgeNotificationService.getInstance().showInfo(title, message);
+                }
+            }
+        });
+    }ialog", Project.class, String.class, String.class)
                             .invoke(null, project, message, title);
                     return;
                 } catch (NoSuchMethodException e) {
