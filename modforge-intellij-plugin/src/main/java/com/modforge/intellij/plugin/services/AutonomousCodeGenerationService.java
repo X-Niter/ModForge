@@ -5,6 +5,7 @@ import com.intellij.openapi.components.Service;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.io.FileUtil;
+import com.intellij.openapi.util.text.StringUtil;
 import com.intellij.openapi.vfs.LocalFileSystem;
 import com.intellij.openapi.vfs.VfsUtil;
 import com.intellij.openapi.vfs.VirtualFile;
@@ -18,6 +19,8 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.io.File;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -1056,14 +1059,76 @@ public final class AutonomousCodeGenerationService {
     }
     
     /**
-     * Makes an API request to the ModForge API.
+     * Explains code to the user in a simplified way.
      * 
-     * @param url The API URL.
-     * @param apiKey The API key.
-     * @param json The JSON payload.
-     * @return The response JSON.
-     * @throws Exception If an error occurs.
+     * @param project The project
+     * @param fileContent The content of the file to explain
+     * @param contextDescription Optional additional context
+     * @return A CompletableFuture that completes with the code explanation
      */
+    public CompletableFuture<String> explainCode(
+            @NotNull Project project,
+            @NotNull String fileContent,
+            @Nullable String contextDescription) {
+        
+        if (isGeneratingCode.getAndSet(true)) {
+            LOG.warn("Code generation already in progress");
+            return CompletableFuture.completedFuture("Code generation already in progress. Please try again later.");
+        }
+        
+        return ThreadUtils.supplyAsyncVirtual(() -> {
+            try {
+                LOG.info("Explaining code with " + (contextDescription != null ? "context: " + contextDescription : "no specific context"));
+                
+                // Get user's API settings from project settings
+                ModForgeSettings settings = ModForgeSettings.getInstance(project);
+                if (settings == null) {
+                    LOG.error("Failed to get ModForge settings");
+                    return "Failed to get ModForge settings. Please configure the plugin in the settings.";
+                }
+                
+                String apiEndpoint = settings.getApiEndpoint();
+                String apiKey = settings.getApiKey();
+                
+                if (StringUtil.isEmpty(apiEndpoint) || StringUtil.isEmpty(apiKey)) {
+                    LOG.error("API endpoint or API key not configured");
+                    return "API endpoint or API key not configured. Please configure the plugin in the settings.";
+                }
+                
+                // Prepare the API request
+                String url = apiEndpoint + "/api/explain-code";
+                
+                StringBuilder jsonBuilder = new StringBuilder();
+                jsonBuilder.append("{");
+                jsonBuilder.append("\"code\": ").append(escapeJson(fileContent));
+                
+                if (contextDescription != null && !contextDescription.isEmpty()) {
+                    jsonBuilder.append(", \"context\": ").append(escapeJson(contextDescription));
+                }
+                
+                jsonBuilder.append("}");
+                String json = jsonBuilder.toString();
+                
+                // Make the API request
+                String response = makeApiRequest(url, apiKey, json);
+                
+                // Parse the explanation
+                String explanation = parseExplanationFromJson(response);
+                if (explanation == null || explanation.isEmpty()) {
+                    LOG.error("Failed to parse explanation from API response");
+                    return "Failed to get code explanation from the API.";
+                }
+                
+                return explanation;
+            } catch (Exception e) {
+                LOG.error("Error explaining code", e);
+                return "Error explaining code: " + e.getMessage();
+            } finally {
+                isGeneratingCode.set(false);
+            }
+        });
+    }
+    
     private String makeApiRequest(String url, String apiKey, String json) throws Exception {
         java.net.HttpURLConnection conn = null;
         try {

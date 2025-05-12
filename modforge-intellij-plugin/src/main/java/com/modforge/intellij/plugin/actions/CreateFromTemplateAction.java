@@ -157,6 +157,7 @@ public class CreateFromTemplateAction extends AnAction {
                                 
                                 if (notificationService != null) {
                                     notificationService.showErrorNotification(
+                                            project,
                                             "Error Creating Project",
                                             "Failed to create project: " + ex.getMessage()
                                     );
