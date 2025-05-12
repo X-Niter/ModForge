@@ -78,7 +78,7 @@ public final class GitIntegrationService {
      */
     @NotNull
     private String executeGitCommand(@NotNull List<String> args) throws Exception {
-        String projectPath = project.getBasePath();
+        String projectPath = CompatibilityUtil.getProjectBasePath(project);
         if (projectPath == null) {
             throw new IllegalStateException("Project base path is null");
         }

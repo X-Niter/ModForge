@@ -6,6 +6,7 @@ import com.intellij.openapi.project.Project;
 import com.intellij.openapi.startup.StartupActivity;
 import com.modforge.intellij.plugin.services.ModAuthenticationManager;
 import com.modforge.intellij.plugin.settings.ModForgeSettings;
+import com.modforge.intellij.plugin.utils.CompatibilityUtil;
 import org.jetbrains.annotations.NotNull;
 import org.json.simple.JSONObject;
 
@@ -68,7 +69,7 @@ public final class ModForgeProjectService {
             
             // Add project info
             info.put("name", project.getName());
-            info.put("basePath", project.getBasePath());
+            info.put("basePath", CompatibilityUtil.getProjectBasePath(project));
             info.put("isDefault", project.isDefault());
             
             // Add authentication info
