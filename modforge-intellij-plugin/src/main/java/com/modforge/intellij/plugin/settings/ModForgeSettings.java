@@ -46,11 +46,20 @@ public final class ModForgeSettings implements PersistentStateComponent<ModForge
     @Attribute("githubUsername")
     private String githubUsername = "";
     
+    @Attribute("username")
+    private String username = "";
+    
     @Transient
     private String accessToken = "";
     
     @Transient
+    private String password = "";
+    
+    @Transient
     private String githubToken = "";
+    
+    @Attribute("continuousDevelopmentScanInterval")
+    private long continuousDevelopmentScanInterval = 60000; // Default to 1 minute
     
     /**
      * Default constructor.

@@ -70,8 +70,9 @@ public class StartCollaborationAction extends AnAction {
                         startOrJoinSession(project, collaborationService);
                     } else {
                         ModForgeNotificationService.getInstance().showErrorNotification(
-                                "Failed to leave the current session",
-                                "Error"
+                                project,
+                                "Error",
+                                "Failed to leave the current session"
                         );
                     }
                 });
@@ -101,17 +102,19 @@ public class StartCollaborationAction extends AnAction {
                 .thenAccept(sessionId -> {
                     // Show success message with session ID
                     ModForgeNotificationService.getInstance().showInfoNotification(
+                        project,
+                        "Session Started",
                         "Session started with ID: " + sessionId + "\n\n" +
-                        "Share this ID with your team members so they can join.",
-                        "Session Started"
+                        "Share this ID with your team members so they can join."
                 );
                 
                 // Open collaboration tool window
                 showCollaborationToolWindow(project);
             }).exceptionally(ex -> {
                 ModForgeNotificationService.getInstance().showErrorNotification(
-                        "Failed to start session: " + ex.getMessage(),
-                        "Error"
+                        project,
+                        "Error",
+                        "Failed to start session: " + ex.getMessage()
                 );
                 return null;
             });
