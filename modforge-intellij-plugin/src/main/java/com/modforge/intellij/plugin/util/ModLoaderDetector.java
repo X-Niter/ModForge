@@ -11,6 +11,8 @@ import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Arrays;
+import java.util.stream.Collectors;
 
 /**
  * Utility class for detecting Minecraft mod loaders.
