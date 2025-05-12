@@ -371,11 +371,10 @@ public class CreateFromTemplateAction extends AnAction {
      * Dialog for configuring a template.
      */
     private static class TemplateConfigurationDialog extends DialogWrapper {
-        private final Project project;
+        private final Project project; // Project reference
         private final ModTemplate template;
         private final Map<String, JTextField> variableFields = new HashMap<>();
         private final JBTextField outputDirField;
-        private final Project project; // Store project reference as class field
         
         public TemplateConfigurationDialog(@Nullable Project project, @NotNull ModTemplate template) {
             super(project);
