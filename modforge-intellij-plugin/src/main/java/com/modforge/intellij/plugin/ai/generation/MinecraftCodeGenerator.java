@@ -453,7 +453,7 @@ public final class MinecraftCodeGenerator {
                 
                 if (virtualFile != null) {
                     // Open the file in the editor
-                    CompatibilityUtil.runOnUIThread(() -> {
+                    CompatibilityUtil.runOnUiThread(() -> {
                         CompatibilityUtil.openFileInEditor(project, virtualFile, true);
                     });
                 }
