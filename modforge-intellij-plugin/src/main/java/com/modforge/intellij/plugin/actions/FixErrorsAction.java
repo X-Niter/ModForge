@@ -1,5 +1,6 @@
 package com.modforge.intellij.plugin.actions;
 
+import com.intellij.icons.AllIcons;
 import com.intellij.openapi.actionSystem.AnAction;
 import com.intellij.openapi.actionSystem.AnActionEvent;
 import com.intellij.openapi.actionSystem.CommonDataKeys;
@@ -27,6 +28,7 @@ import com.intellij.util.ui.FormBuilder;
 import com.intellij.util.ui.JBUI;
 import com.modforge.intellij.plugin.auth.ModAuthenticationManager;
 import com.modforge.intellij.plugin.services.AutonomousCodeGenerationService;
+import com.modforge.intellij.plugin.services.ModForgeNotificationService;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -198,16 +200,74 @@ public class FixErrorsAction extends AnAction {
             @NotNull Collection<Problem> problems) {
         
         // Use a compatibility approach to get problems in 2025.1.1.1
-        if (problemSolver.hasProblemFilesBeneath(file)) {
-            // Use the stable processProblems API to directly process problems without
-            // first retrieving collections that might have API changes in 2025.1.1.1
-            problemSolver.processProblems(problem -> {
-                VirtualFile pFile = problem.getFile();
-                if (pFile != null && pFile.equals(file)) {
-                    problems.add(problem);
+        if (problemSolver.hasProblemFilesBeneath(virtualFile -> virtualFile.equals(file))) {
+            // Use reflection to call processProblems which has different signatures in different IntelliJ versions
+            try {
+                // Try the newer version of processProblems which takes a single processor parameter
+                java.lang.reflect.Method processProbsMethod = problemSolver.getClass().getMethod("processProblems", 
+                    java.util.function.Predicate.class);
+                
+                processProbsMethod.invoke(problemSolver, (java.util.function.Predicate<Problem>) problem -> {
+                    // Get file using reflection
+                    try {
+                        VirtualFile pFile = null;
+                        try {
+                            java.lang.reflect.Method getFileMethod = problem.getClass().getMethod("getVirtualFile");
+                            pFile = (VirtualFile) getFileMethod.invoke(problem);
+                        } catch (Exception e) {
+                            try {
+                                java.lang.reflect.Method getFileMethod = problem.getClass().getMethod("getFile");
+                                pFile = (VirtualFile) getFileMethod.invoke(problem);
+                            } catch (Exception ex) {
+                                // Couldn't get file, skip this problem
+                                return true;
+                            }
+                        }
+                        
+                        if (pFile != null && pFile.equals(file)) {
+                            problems.add(problem);
+                        }
+                    } catch (Exception e) {
+                        LOG.debug("Error processing problem: " + e.getMessage());
+                    }
+                    return true;
+                });
+            } catch (NoSuchMethodException e) {
+                // Fall back to the older version that takes a processor and a file
+                try {
+                    java.lang.reflect.Method processProbsMethod = problemSolver.getClass().getMethod("processProblems", 
+                        java.util.function.Predicate.class, VirtualFile.class);
+                    
+                    processProbsMethod.invoke(problemSolver, (java.util.function.Predicate<Problem>) problem -> {
+                        try {
+                            VirtualFile pFile = null;
+                            try {
+                                java.lang.reflect.Method getFileMethod = problem.getClass().getMethod("getVirtualFile");
+                                pFile = (VirtualFile) getFileMethod.invoke(problem);
+                            } catch (Exception ex1) {
+                                try {
+                                    java.lang.reflect.Method getFileMethod = problem.getClass().getMethod("getFile");
+                                    pFile = (VirtualFile) getFileMethod.invoke(problem);
+                                } catch (Exception ex2) {
+                                    // Couldn't get file, skip this problem
+                                    return true;
+                                }
+                            }
+                            
+                            if (pFile != null && pFile.equals(file)) {
+                                problems.add(problem);
+                            }
+                        } catch (Exception ex) {
+                            LOG.debug("Error processing problem: " + ex.getMessage());
+                        }
+                        return true;
+                    }, file);
+                } catch (Exception ex) {
+                    LOG.warn("Could not process problems: " + ex.getMessage());
                 }
-                return true;
-            }, file);
+            } catch (Exception e) {
+                LOG.warn("Could not process problems: " + e.getMessage());
+            }
         }
     }
     
@@ -224,30 +284,77 @@ public class FixErrorsAction extends AnAction {
         // Extract information from the problem using stable methods
         StringBuilder sb = new StringBuilder();
         
-        // Get the file information (stable API)
-        VirtualFile file = problem.getFile();
+        // Get the file information using reflection since the API changed in 2025.1.1.1
+        VirtualFile file = null;
+        try {
+            java.lang.reflect.Method getFileMethod = problem.getClass().getMethod("getVirtualFile");
+            file = (VirtualFile) getFileMethod.invoke(problem);
+        } catch (Exception e) {
+            // If the above fails, try the old method which might still exist as legacy support
+            try {
+                java.lang.reflect.Method getFileMethod = problem.getClass().getMethod("getFile");
+                file = (VirtualFile) getFileMethod.invoke(problem);
+            } catch (Exception ex) {
+                LOG.warn("Could not get file from problem: " + ex.getMessage());
+            }
+        }
+            
         if (file != null) {
             sb.append("[").append(file.getName()).append("] ");
         }
         
-        // Get line and column if available (stable API)
-        int line = problem.getLine();
-        if (line >= 0) {
-            sb.append("Line ").append(line);
-            
-            int column = problem.getColumn();
-            if (column >= 0) {
-                sb.append(", Column ").append(column);
+        // Get line and column if available using reflection
+        try {
+            java.lang.reflect.Method getLineMethod = problem.getClass().getMethod("getLine");
+            Object lineObj = getLineMethod.invoke(problem);
+            if (lineObj instanceof Integer) {
+                int line = (Integer) lineObj;
+                if (line >= 0) {
+                    sb.append("Line ").append(line);
+                    
+                    try {
+                        java.lang.reflect.Method getColumnMethod = problem.getClass().getMethod("getColumn");
+                        Object columnObj = getColumnMethod.invoke(problem);
+                        if (columnObj instanceof Integer) {
+                            int column = (Integer) columnObj;
+                            if (column >= 0) {
+                                sb.append(", Column ").append(column);
+                            }
+                        }
+                    } catch (Exception e) {
+                        LOG.debug("Could not get column from problem: " + e.getMessage());
+                    }
+                    
+                    sb.append(": ");
+                }
             }
-            sb.append(": ");
+        } catch (Exception e) {
+            LOG.debug("Could not get line from problem: " + e.getMessage());
         }
         
-        // Get text attribute key name which can contain error info (stable API)
-        if (problem.getTextAttributesKey() != null) {
-            String keyName = problem.getTextAttributesKey().getExternalName();
-            if (keyName.contains("error") || keyName.contains("warning")) {
-                sb.append(keyName).append(" - ");
+        // Try to get severity (which might be more reliably available in 2025.1.1.1)
+        try {
+            // Different approaches to get severity or problem type
+            try {
+                java.lang.reflect.Method getSeverityMethod = problem.getClass().getMethod("getSeverity");
+                Object severity = getSeverityMethod.invoke(problem);
+                if (severity != null) {
+                    sb.append("[").append(severity).append("] ");
+                }
+            } catch (Exception e) {
+                // Falling back to text attributes as in the original code
+                java.lang.reflect.Method getTextAttributesKeyMethod = problem.getClass().getMethod("getTextAttributesKey");
+                Object textAttributesKey = getTextAttributesKeyMethod.invoke(problem);
+                if (textAttributesKey != null) {
+                    java.lang.reflect.Method getExternalNameMethod = textAttributesKey.getClass().getMethod("getExternalName");
+                    String keyName = (String) getExternalNameMethod.invoke(textAttributesKey);
+                    if (keyName != null && (keyName.contains("error") || keyName.contains("warning"))) {
+                        sb.append(keyName).append(" - ");
+                    }
+                }
             }
+        } catch (Exception e) {
+            LOG.debug("Could not get severity info from problem: " + e.getMessage());
         }
         
         // Try multiple approaches to get the description

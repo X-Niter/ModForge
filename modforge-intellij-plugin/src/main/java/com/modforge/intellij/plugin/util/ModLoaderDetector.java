@@ -29,6 +29,56 @@ public final class ModLoaderDetector {
     public static final String UNKNOWN = "unknown";
     
     /**
+     * Enum representing Minecraft mod loaders
+     * This is referenced by several parts of the codebase
+     */
+    public enum ModLoader {
+        FORGE("Forge", ModLoaderDetector.FORGE),
+        FABRIC("Fabric", ModLoaderDetector.FABRIC),
+        QUILT("Quilt", ModLoaderDetector.QUILT),
+        ARCHITECTURY("Architectury", ModLoaderDetector.ARCHITECTURY),
+        UNKNOWN("Unknown", ModLoaderDetector.UNKNOWN);
+        
+        private final String displayName;
+        private final String id;
+        
+        ModLoader(String displayName, String id) {
+            this.displayName = displayName;
+            this.id = id;
+        }
+        
+        public String getDisplayName() {
+            return displayName;
+        }
+        
+        public String getId() {
+            return id;
+        }
+        
+        /**
+         * Get ModLoader by ID
+         * @param id The ID of the mod loader
+         * @return The ModLoader enum value
+         */
+        public static ModLoader fromId(String id) {
+            return Arrays.stream(values())
+                .filter(loader -> loader.getId().equals(id))
+                .findFirst()
+                .orElse(UNKNOWN);
+        }
+        
+        /**
+         * Get all ModLoader values as a list of IDs
+         * @return List of mod loader IDs
+         */
+        public static List<String> getAllLoaderIds() {
+            return Arrays.stream(values())
+                .map(ModLoader::getId)
+                .collect(Collectors.toList());
+        }
+    }
+    
+    /**
      * Private constructor to prevent instantiation.
      */
     private ModLoaderDetector() {
