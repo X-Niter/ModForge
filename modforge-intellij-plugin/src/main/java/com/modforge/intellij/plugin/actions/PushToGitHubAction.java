@@ -160,7 +160,7 @@ public class PushToGitHubAction extends AnAction {
                                             result.getRepositoryUrl()
                                     );
                                 } else {
-                                    Messages.showInfoMessage(
+                                    com.modforge.intellij.plugin.utils.CompatibilityUtil.showInfoDialog(
                                             project,
                                             result.getMessage(),
                                             "Push Successful"

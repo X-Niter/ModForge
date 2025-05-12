@@ -10,6 +10,7 @@ import com.modforge.intellij.plugin.ai.PatternRecognitionService;
 import com.modforge.intellij.plugin.services.ModAuthenticationManager;
 import com.modforge.intellij.plugin.services.ModForgeNotificationService;
 import com.modforge.intellij.plugin.settings.ModForgeSettings;
+import com.modforge.intellij.plugin.utils.CompatibilityUtil;
 import org.jetbrains.annotations.NotNull;
 
 import java.text.NumberFormat;
@@ -197,7 +198,7 @@ public class TogglePatternRecognitionAction extends AnAction {
                     sb.toString()
             );
         } else {
-            Messages.showInfoMessage(
+            CompatibilityUtil.showInfoDialog(
                     project,
                     sb.toString(),
                     "Pattern Recognition Metrics"
