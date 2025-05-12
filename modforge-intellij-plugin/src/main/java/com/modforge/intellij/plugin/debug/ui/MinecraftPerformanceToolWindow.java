@@ -14,6 +14,7 @@ import com.intellij.util.ui.JBUI;
 import com.intellij.util.ui.UIUtil;
 import com.modforge.intellij.plugin.debug.MinecraftPerformanceMonitor;
 import com.modforge.intellij.plugin.debug.MinecraftPerformanceMonitor.MethodPerformanceData;
+import com.modforge.intellij.plugin.utils.CompatibilityUtil;
 import org.jetbrains.annotations.NotNull;
 
 import javax.swing.*;
@@ -45,8 +46,8 @@ public class MinecraftPerformanceToolWindow implements ToolWindowFactory, Dispos
         // Create the UI components
         JComponent content = createContent();
         
-        // Add the content to the tool window
-        Content toolContent = ContentFactory.SERVICE.getInstance().createContent(content, "", false);
+        // Add the content to the tool window using compatibility method
+        Content toolContent = CompatibilityUtil.getContentFactory().createContent(content, "", false);
         toolWindow.getContentManager().addContent(toolContent);
         
         // Start periodic updates

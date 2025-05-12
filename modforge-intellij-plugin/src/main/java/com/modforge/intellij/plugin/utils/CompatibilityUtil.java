@@ -240,6 +240,19 @@ public final class CompatibilityUtil {
             com.intellij.openapi.vfs.VirtualFileManager.getInstance().removeVirtualFileListener(listener);
         }
     }
+    
+    /**
+     * Gets the ContentFactory instance in a compatible way across IntelliJ versions.
+     * Handles the deprecated ContentFactory.SERVICE.getInstance() pattern.
+     *
+     * @return The ContentFactory instance
+     */
+    @NotNull
+    public static com.intellij.ui.content.ContentFactory getContentFactory() {
+        // In IntelliJ 2025.1+, ContentFactory.SERVICE is deprecated
+        // We use the new API: ContentFactory.getInstance()
+        return com.intellij.ui.content.ContentFactory.getInstance();
+    }
 
     /**
      * Runs a task on the UI thread.

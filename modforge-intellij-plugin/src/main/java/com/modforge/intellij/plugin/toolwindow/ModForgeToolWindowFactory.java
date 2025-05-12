@@ -8,6 +8,7 @@ import com.intellij.ui.content.Content;
 import com.intellij.ui.content.ContentFactory;
 import com.modforge.intellij.plugin.crossloader.ui.CrossLoaderPanel;
 import com.modforge.intellij.plugin.services.ModForgeProjectService;
+import com.modforge.intellij.plugin.utils.CompatibilityUtil;
 import org.jetbrains.annotations.NotNull;
 
 /**
@@ -20,8 +21,8 @@ public class ModForgeToolWindowFactory implements ToolWindowFactory {
     public void createToolWindowContent(@NotNull Project project, @NotNull ToolWindow toolWindow) {
         LOG.info("Creating ModForge AI tool window for project: " + project.getName());
         
-        // Get the ContentFactory instance
-        ContentFactory contentFactory = ContentFactory.SERVICE.getInstance();
+        // Get the ContentFactory instance using compatibility method
+        ContentFactory contentFactory = CompatibilityUtil.getContentFactory();
         
         // Create the tool window content
         ModForgeToolWindowContent toolWindowContent = new ModForgeToolWindowContent(project);
