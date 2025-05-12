@@ -69,9 +69,8 @@ public class ExplainCodeAction extends AnAction {
                 indicator.setFraction(0.2);
                 
                 try {
-                    // Explain code
-                    // Using the String argument for context parameter instead of null
-                    explanation = codeGenService.explainCode(selectedText, (String)null).get();
+                    // Explain code using the project-aware method
+                    explanation = codeGenService.explainCode(project, selectedText, null).get();
                     
                     if (explanation == null || explanation.isEmpty()) {
                         ModForgeNotificationService notificationService = ModForgeNotificationService.getInstance();
