@@ -15,7 +15,7 @@ import com.intellij.ui.components.JBRadioButton;
 import com.intellij.ui.components.JBTextField;
 import com.intellij.util.ui.FormBuilder;
 import com.intellij.util.ui.JBUI;
-import com.modforge.intellij.plugin.collaboration.CollaborationService;
+import com.modforge.intellij.plugin.services.CollaborationService;
 import com.modforge.intellij.plugin.services.ModForgeNotificationService;
 import com.modforge.intellij.plugin.settings.ModForgeSettings;
 import com.modforge.intellij.plugin.utils.CompatibilityUtil;
@@ -53,18 +53,18 @@ public class StartCollaborationAction extends AnAction {
                         "No"
                 );
             } else {
-                // Fallback to standard Messages dialog
-                result = Messages.showYesNoDialog(
+                // Fallback to compatibility wrapper for Messages dialog
+                result = CompatibilityUtil.showYesNoDialog(
                         project,
-                        "You are already in a collaboration session. Do you want to leave it?",
                         "Already in Session",
+                        "You are already in a collaboration session. Do you want to leave it?",
                         "Yes",
                         "No",
                         AllIcons.General.QuestionDialog
                 );
             }
             
-            if (result == Messages.YES) {
+            if (result == CompatibilityUtil.DIALOG_YES) { // Using compatibility constant (value: 0)
                 collaborationService.leaveSession().thenAccept(success -> {
                     if (success) {
                         startOrJoinSession(project, collaborationService);
