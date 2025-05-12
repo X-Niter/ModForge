@@ -331,105 +331,86 @@ REM ===================================
 echo.
 echo === Running Missing Methods Analysis ===
 
+REM Call subroutine to handle the missing methods analysis
+call :ANALYZE_MISSING_METHODS
+goto :SKIP_MISSING_METHODS_ANALYSIS
+
+REM ===================================
+REM Missing Methods Analysis Subroutine
+REM ===================================
+:ANALYZE_MISSING_METHODS
+
 REM Create output file with header
-echo # Missing Methods and Symbol Resolution Report > "%MISSING_METHODS_REPORT%"
-echo. >> "%MISSING_METHODS_REPORT%"
-echo This report identifies methods that are called but might not be implemented, >> "%MISSING_METHODS_REPORT%"
-echo causing "cannot find symbol" errors during compilation. >> "%MISSING_METHODS_REPORT%"
-echo. >> "%MISSING_METHODS_REPORT%"
-echo Generated on %DATE% %TIME%. >> "%MISSING_METHODS_REPORT%"
-echo. >> "%MISSING_METHODS_REPORT%"
-echo ## Overview >> "%MISSING_METHODS_REPORT%"
-echo. >> "%MISSING_METHODS_REPORT%"
-echo This analysis looks for: >> "%MISSING_METHODS_REPORT%"
-echo. >> "%MISSING_METHODS_REPORT%"
-echo 1. Methods called on service classes that might not exist >> "%MISSING_METHODS_REPORT%"
-echo 2. Method signature mismatches between calls and definitions >> "%MISSING_METHODS_REPORT%"
-echo 3. Missing getInstance() methods on service classes >> "%MISSING_METHODS_REPORT%"
-echo 4. Missing methods in common utility classes >> "%MISSING_METHODS_REPORT%"
-echo. >> "%MISSING_METHODS_REPORT%"
+(
+echo # Missing Methods and Symbol Resolution Report
+echo.
+echo This report identifies methods that are called but might not be implemented,
+echo causing "cannot find symbol" errors during compilation.
+echo.
+echo Generated on %DATE% %TIME%.
+echo.
+echo ## Overview
+echo.
+echo This analysis looks for:
+echo.
+echo 1. Methods called on service classes that might not exist
+echo 2. Method signature mismatches between calls and definitions
+echo 3. Missing getInstance() methods on service classes
+echo 4. Missing methods in common utility classes
+echo.
+) > "%MISSING_METHODS_REPORT%"
 
 REM Extract method calls from build errors
 findstr /i /c:"symbol:   method" "%BUILD_LOG%" > "%TEMP_DIR%\missing_methods.txt"
 findstr /i /c:"location: variable" "%BUILD_LOG%" > "%TEMP_DIR%\locations.txt"
 
 REM Create a consolidated report of missing methods
-echo ## Missing Methods from Build Errors >> "%MISSING_METHODS_REPORT%"
-echo. >> "%MISSING_METHODS_REPORT%"
-echo These methods are referenced in the code but could not be found during compilation: >> "%MISSING_METHODS_REPORT%"
-echo. >> "%MISSING_METHODS_REPORT%"
+(
+echo ## Missing Methods from Build Errors
+echo.
+echo These methods are referenced in the code but could not be found during compilation:
+echo.
+) >> "%MISSING_METHODS_REPORT%"
 
-REM Process missing methods from build log
+:SKIP_MISSING_METHODS_ANALYSIS
+
+REM Continue missing methods analysis in the subroutine
 if exist "%TEMP_DIR%\missing_methods.txt" (
-    for /f "tokens=*" %%m in (%TEMP_DIR%\missing_methods.txt) do (
-        set "METHOD_LINE=%%m"
-        set "METHOD=!METHOD_LINE:*method =!"
-        echo - **!METHOD!** >> "%MISSING_METHODS_REPORT%"
+    REM Process method names from the log file
+    for /f "tokens=*" %%m in ('%TEMP_DIR%\missing_methods.txt') do (
+        call :PROCESS_METHOD_LINE "%%m"
     )
     
-    echo. >> "%MISSING_METHODS_REPORT%"
-    echo ## Service Classes with Missing Methods >> "%MISSING_METHODS_REPORT%"
-    echo. >> "%MISSING_METHODS_REPORT%"
+    REM Add section headers for service classes
+    (
+    echo.
+    echo ## Service Classes with Missing Methods
+    echo.
+    ) >> "%MISSING_METHODS_REPORT%"
     
-    REM Analyze common service classes
+    REM Check ModForgeSettings issues
     echo ### ModForgeSettings Implementation Issues >> "%MISSING_METHODS_REPORT%"
     echo. >> "%MISSING_METHODS_REPORT%"
+    
     findstr /i /c:"settings" "%TEMP_DIR%\locations.txt" > "%TEMP_DIR%\settings_locations.txt"
     if exist "%TEMP_DIR%\settings_locations.txt" (
-        echo Methods possibly missing from ModForgeSettings: >> "%MISSING_METHODS_REPORT%"
-        echo. >> "%MISSING_METHODS_REPORT%"
-        echo --- Java Code --- >> "%MISSING_METHODS_REPORT%"
-        echo // Required methods: >> "%MISSING_METHODS_REPORT%"
-        echo public class ModForgeSettings ^{ >> "%MISSING_METHODS_REPORT%"
-        echo     public String getAccessToken() ^{ ... ^} >> "%MISSING_METHODS_REPORT%"
-        echo     public boolean isPatternRecognition() ^{ ... ^} >> "%MISSING_METHODS_REPORT%"
-        echo     public String getGitHubUsername() ^{ ... ^} >> "%MISSING_METHODS_REPORT%"
-        echo     public void openSettings(Project project) ^{ ... ^} >> "%MISSING_METHODS_REPORT%"
-        echo     // other methods... >> "%MISSING_METHODS_REPORT%"
-        echo ^} >> "%MISSING_METHODS_REPORT%"
-        echo --- End Code --- >> "%MISSING_METHODS_REPORT%"
-        echo. >> "%MISSING_METHODS_REPORT%"
+        call :ADD_SETTINGS_METHODS
     )
     
     echo ### ModAuthenticationManager Implementation Issues >> "%MISSING_METHODS_REPORT%"
     echo. >> "%MISSING_METHODS_REPORT%"
+    
     findstr /i /c:"authManager" "%TEMP_DIR%\locations.txt" > "%TEMP_DIR%\auth_locations.txt"
     if exist "%TEMP_DIR%\auth_locations.txt" (
-        echo Methods possibly missing from ModAuthenticationManager: >> "%MISSING_METHODS_REPORT%"
-        echo. >> "%MISSING_METHODS_REPORT%"
-        echo --- Java Code --- >> "%MISSING_METHODS_REPORT%"
-        echo // Required methods: >> "%MISSING_METHODS_REPORT%"
-        echo public class ModAuthenticationManager ^{ >> "%MISSING_METHODS_REPORT%"
-        echo     public boolean login(String username, String password) ^{ ... ^} >> "%MISSING_METHODS_REPORT%"
-        echo     public void logout() ^{ ... ^} >> "%MISSING_METHODS_REPORT%"
-        echo     public String getUsername() ^{ ... ^} >> "%MISSING_METHODS_REPORT%"
-        echo     // other methods... >> "%MISSING_METHODS_REPORT%"
-        echo ^} >> "%MISSING_METHODS_REPORT%"
-        echo --- End Code --- >> "%MISSING_METHODS_REPORT%"
-        echo. >> "%MISSING_METHODS_REPORT%"
+        call :ADD_AUTH_METHODS
     )
     
     echo ### AutonomousCodeGenerationService Implementation Issues >> "%MISSING_METHODS_REPORT%"
     echo. >> "%MISSING_METHODS_REPORT%"
+    
     findstr /i /c:"codeGenService" /c:"AutonomousCodeGenerationService" "%TEMP_DIR%\locations.txt" > "%TEMP_DIR%\codegen_locations.txt"
     if exist "%TEMP_DIR%\codegen_locations.txt" (
-        echo Methods possibly missing from AutonomousCodeGenerationService: >> "%MISSING_METHODS_REPORT%"
-        echo. >> "%MISSING_METHODS_REPORT%"
-        echo --- Java Code --- >> "%MISSING_METHODS_REPORT%"
-        echo // Required static method: >> "%MISSING_METHODS_REPORT%"
-        echo public class AutonomousCodeGenerationService ^{ >> "%MISSING_METHODS_REPORT%"
-        echo     public static AutonomousCodeGenerationService getInstance(Project project) ^{ ... ^} >> "%MISSING_METHODS_REPORT%"
-        echo      >> "%MISSING_METHODS_REPORT%"
-        echo     // Required instance methods: >> "%MISSING_METHODS_REPORT%"
-        echo     public String generateCode(String prompt, VirtualFile contextFile, String language) ^{ ... ^} >> "%MISSING_METHODS_REPORT%"
-        echo     public String fixCode(String code, String errorMessage, String language) ^{ ... ^} >> "%MISSING_METHODS_REPORT%"
-        echo     public CompletableFuture^<String^> generateDocumentation(String code, Object options) ^{ ... ^} >> "%MISSING_METHODS_REPORT%"
-        echo     public CompletableFuture^<String^> explainCode(String code, Object options) ^{ ... ^} >> "%MISSING_METHODS_REPORT%"
-        echo     public boolean generateImplementation(String interfaceName, String packageName, String className) ^{ ... ^} >> "%MISSING_METHODS_REPORT%"
-        echo     // other methods... >> "%MISSING_METHODS_REPORT%"
-        echo ^} >> "%MISSING_METHODS_REPORT%"
-        echo --- End Code --- >> "%MISSING_METHODS_REPORT%"
-        echo. >> "%MISSING_METHODS_REPORT%"
+        call :ADD_CODEGEN_METHODS
     )
     
     echo ## Type Compatibility Issues >> "%MISSING_METHODS_REPORT%"
