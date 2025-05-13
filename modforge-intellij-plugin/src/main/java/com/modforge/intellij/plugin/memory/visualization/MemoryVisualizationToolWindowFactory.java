@@ -59,13 +59,13 @@ public class MemoryVisualizationToolWindowFactory implements ToolWindowFactory {
             content.setCloseable(false);
             toolWindow.getContentManager().addContent(content);
             
-            // Register project disposal handler
-            project.getMessageBus().connect().subscribe(Project.TOPIC, new Project.ProjectListener() {
+            // Register project disposal handler using ProjectManagerListener
+            ProjectManager.getInstance().addProjectManagerListener(project, new ProjectManagerListener() {
                 @Override
-                public void projectClosing(@NotNull Project project) {
+                public void projectClosing(@NotNull Project closingProject) {
                     try {
-                        LOG.info("Project closing, disposing memory visualization panel: " + project.getName());
-                        disposePanel(project);
+                        LOG.info("Project closing, disposing memory visualization panel: " + closingProject.getName());
+                        disposePanel(closingProject);
                     } catch (Exception ex) {
                         LOG.error("Error disposing memory visualization panel", ex);
                     }
