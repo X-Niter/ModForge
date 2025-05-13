@@ -58,6 +58,10 @@ public final class ModForgeSettings implements PersistentStateComponent<ModForge
     @Attribute("openAiModel")
     private String openAiModel = "gpt-4o";
     
+    // User settings
+    @Attribute("userId")
+    private String userId = "";
+    
     @Attribute("maxTokens")
     private int maxTokens = 2048;
     
@@ -733,5 +737,23 @@ public final class ModForgeSettings implements PersistentStateComponent<ModForge
      */
     public boolean isEnablePatternRecognition() {
         return isPatternRecognition();
+    }
+    
+    /**
+     * Gets the user ID.
+     *
+     * @return The user ID.
+     */
+    public String getUserId() {
+        return userId;
+    }
+
+    /**
+     * Sets the user ID.
+     *
+     * @param userId The user ID.
+     */
+    public void setUserId(String userId) {
+        this.userId = userId;
     }
 }
