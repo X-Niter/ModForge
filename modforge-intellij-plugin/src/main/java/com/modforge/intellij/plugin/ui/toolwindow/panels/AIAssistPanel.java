@@ -26,6 +26,7 @@ import com.intellij.util.ui.JBUI;
 import com.intellij.util.ui.components.BorderLayoutPanel;
 import com.modforge.intellij.plugin.ai.AIServiceManager;
 import com.modforge.intellij.plugin.settings.ModForgeSettings;
+import com.modforge.intellij.plugin.utils.CompatibilityUtil;
 import org.jetbrains.annotations.NotNull;
 
 import javax.swing.*;
@@ -439,7 +440,8 @@ public class AIAssistPanel {
         }
         
         // Insert text
-        ApplicationManager.getApplication().runWriteAction(() -> {
+        // Using CompatibilityUtil for better compatibility with IntelliJ IDEA 2025.1.1.1
+        CompatibilityUtil.runWriteAction(() -> {
             CommandProcessor.getInstance().executeCommand(
                     project,
                     () -> {
