@@ -3,6 +3,7 @@ package com.modforge.intellij.plugin.utils;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.util.io.HttpRequests;
 import com.intellij.util.io.RequestBuilder;
+import com.modforge.intellij.plugin.settings.ModForgeSettings;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -22,6 +23,20 @@ public final class TokenAuthConnectionUtil {
      */
     private TokenAuthConnectionUtil() {
         // Utility class
+    }
+    
+    /**
+     * Tests if token authentication works using server URL and token from settings.
+     *
+     * @return True if authentication works, false otherwise
+     */
+    public static boolean testTokenAuthentication() {
+        ModForgeSettings settings = ModForgeSettings.getInstance();
+        if (settings == null) {
+            return false;
+        }
+        
+        return testTokenAuthentication(settings.getServerUrl(), settings.getAccessToken());
     }
     
     /**
