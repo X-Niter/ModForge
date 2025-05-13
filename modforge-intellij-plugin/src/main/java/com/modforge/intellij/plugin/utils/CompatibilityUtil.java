@@ -444,6 +444,88 @@ public final class CompatibilityUtil {
      * @param problem The Problem instance or any problem object
      * @return The problem description, or "Unknown error" if not available
      */
+     
+    /**
+     * Checks if a file exists in the project.
+     *
+     * @param project The project
+     * @param relativePath The relative path from the project root
+     * @return True if the file exists, false otherwise
+     */
+    public static boolean fileExists(@NotNull Project project, @NotNull String relativePath) {
+        VirtualFile file = getModFileByRelativePath(project, relativePath);
+        return file != null && file.exists();
+    }
+    
+    /**
+     * Checks if a file contains the specified text.
+     *
+     * @param project The project
+     * @param relativePath The relative path from the project root
+     * @param searchText The text to search for
+     * @return True if the file contains the text, false otherwise
+     */
+    public static boolean fileContainsText(@NotNull Project project, @NotNull String relativePath, @NotNull String searchText) {
+        VirtualFile file = getModFileByRelativePath(project, relativePath);
+        if (file == null || !file.exists() || file.isDirectory()) {
+            return false;
+        }
+        
+        try {
+            String content = new String(file.contentsToByteArray());
+            return content.contains(searchText);
+        } catch (Exception e) {
+            LOG.warn("Failed to read file contents for " + relativePath, e);
+            return false;
+        }
+    }
+    
+    /**
+     * Extracts a version from a file.
+     *
+     * @param project The project
+     * @param relativePath The relative path from the project root
+     * @param versionKey The key to look for (e.g., "minecraft_version")
+     * @param prefixes An array of possible prefixes for the version line
+     * @return The extracted version or null if not found
+     */
+    @Nullable
+    public static String extractVersionFromFile(@NotNull Project project, @NotNull String relativePath, 
+                                               @NotNull String versionKey, @NotNull String[] prefixes) {
+        VirtualFile file = getModFileByRelativePath(project, relativePath);
+        if (file == null || !file.exists() || file.isDirectory()) {
+            return null;
+        }
+        
+        try {
+            String content = new String(file.contentsToByteArray());
+            String[] lines = content.split("\n");
+            
+            for (String line : lines) {
+                // Check if the line is a version line
+                for (String prefix : prefixes) {
+                    if (line.trim().startsWith(prefix)) {
+                        // Extract the version
+                        int startIndex = line.indexOf(prefix) + prefix.length();
+                        String versionPart = line.substring(startIndex).trim();
+                        
+                        // Remove quotes, closing brackets, etc.
+                        versionPart = versionPart.replaceAll("['\",\\]\\)]", "");
+                        versionPart = versionPart.trim();
+                        
+                        if (!versionPart.isEmpty()) {
+                            return versionPart;
+                        }
+                    }
+                }
+            }
+        } catch (Exception e) {
+            LOG.warn("Failed to extract version from file " + relativePath, e);
+        }
+        
+        return null;
+    }
+    
     @NotNull
     public static String getProblemDescription(@NotNull Object problem) {
         try {
