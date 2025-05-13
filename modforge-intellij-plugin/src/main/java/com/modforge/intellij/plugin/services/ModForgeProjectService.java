@@ -467,7 +467,8 @@ public final class ModForgeProjectService {
     private VirtualFile findDirectoryInProject(@NotNull String dirPath) {
         String basePath = project.getBasePath();
         if (basePath != null) {
-            VirtualFile baseDir = project.getBaseDir();
+            // Using CompatibilityUtil for better compatibility with IntelliJ IDEA 2025.1.1.1
+            VirtualFile baseDir = CompatibilityUtil.getProjectBaseDir(project);
             if (baseDir != null) {
                 String[] parts = dirPath.split("/");
                 VirtualFile current = baseDir;
