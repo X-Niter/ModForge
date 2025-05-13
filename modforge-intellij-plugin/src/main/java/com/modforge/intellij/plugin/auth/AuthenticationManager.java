@@ -131,8 +131,13 @@ public class AuthenticationManager {
                                 userIdEnd = responseStr.indexOf("}", userIdStart);
                             }
                             if (userIdEnd != -1) {
-                                String userId = responseStr.substring(userIdStart, userIdEnd).trim();
-                                settings.setUserId(userId);
+                                String userIdStr = responseStr.substring(userIdStart, userIdEnd).trim();
+                                try {
+                                    int userId = Integer.parseInt(userIdStr);
+                                    settings.setUserId(userId);
+                                } catch (NumberFormatException e) {
+                                    LOG.warn("Failed to parse user ID: " + userIdStr, e);
+                                }
                             }
                         }
                         
@@ -179,7 +184,7 @@ public class AuthenticationManager {
             // Clear authentication state
             settings.setAuthenticated(false);
             settings.setAccessToken("");
-            settings.setUserId("");
+            settings.setUserId(0);
             LOG.warn("Authentication is no longer valid");
         } else {
             LOG.info("Successfully verified authentication with ModForge server");

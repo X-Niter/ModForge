@@ -7,7 +7,7 @@ import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.codeInsight.daemon.DaemonCodeAnalyzer;
-import com.intellij.openapi.ui.Icon;
+import javax.swing.Icon;
 import com.intellij.psi.PsiFile;
 import com.intellij.psi.PsiManager;
 import org.jetbrains.annotations.NotNull;
@@ -124,7 +124,7 @@ public final class CompatibilityUtil {
      * @return The selected option index
      */
     public static int showChooseDialog(Project project, String message, String title, String[] options, String defaultOption) {
-        com.intellij.openapi.ui.Icon icon = null; // No icon
+        Icon icon = null; // No icon
         return com.intellij.openapi.ui.Messages.showChooseDialog(project, message, title, options, defaultOption, icon);
     }
     
