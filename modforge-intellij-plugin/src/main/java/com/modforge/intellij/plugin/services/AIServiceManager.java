@@ -194,7 +194,7 @@ public final class AIServiceManager {
         
         // Add configuration settings
         ModForgeSettings settings = ModForgeSettings.getInstance();
-        metrics.put("enabled", settings.isPatternRecognitionEnabled());
+        metrics.put("enabled", settings.isPatternRecognition());
         metrics.put("learningRate", settings.getPatternLearningRate());
         
         return metrics;

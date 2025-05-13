@@ -48,6 +48,9 @@ public final class ModForgeSettings implements PersistentStateComponent<ModForge
     @Attribute("enableNotifications")
     private boolean enableNotifications = true;
     
+    @Attribute("patternLearningRate")
+    private double patternLearningRate = 0.5;
+    
     // OpenAI settings
     @Attribute("openAiApiKey")
     private String openAiApiKey = "";
@@ -308,6 +311,18 @@ public final class ModForgeSettings implements PersistentStateComponent<ModForge
     public boolean isPatternRecognition() {
         return enablePatternRecognition;
     }
+    
+    /**
+     * Checks if pattern recognition is enabled.
+     * Compatibility method for code that expects this method name.
+     *
+     * @return Whether pattern recognition is enabled.
+     * @deprecated Use {@link #isPatternRecognition()} instead for consistency
+     */
+    @Deprecated
+    public boolean isPatternRecognitionEnabled() {
+        return isPatternRecognition();
+    }
 
     /**
      * Sets whether pattern recognition is enabled.
@@ -413,6 +428,7 @@ public final class ModForgeSettings implements PersistentStateComponent<ModForge
         enablePatternRecognition = true;
         enableContinuousDevelopment = false;
         enableNotifications = true;
+        patternLearningRate = 0.5;
         
         openAiApiKey = "";
         openAiModel = "gpt-4o";
@@ -493,5 +509,25 @@ public final class ModForgeSettings implements PersistentStateComponent<ModForge
      */
     public void setTemperature(double temperature) {
         this.temperature = temperature;
+    }
+    
+    /**
+     * Gets the pattern learning rate.
+     * This controls how aggressively the system learns from patterns.
+     *
+     * @return The pattern learning rate between 0.0 and 1.0.
+     */
+    public double getPatternLearningRate() {
+        return patternLearningRate;
+    }
+
+    /**
+     * Sets the pattern learning rate.
+     * This controls how aggressively the system learns from patterns.
+     *
+     * @param patternLearningRate The pattern learning rate between 0.0 and 1.0.
+     */
+    public void setPatternLearningRate(double patternLearningRate) {
+        this.patternLearningRate = Math.max(0.0, Math.min(1.0, patternLearningRate));
     }
 }
