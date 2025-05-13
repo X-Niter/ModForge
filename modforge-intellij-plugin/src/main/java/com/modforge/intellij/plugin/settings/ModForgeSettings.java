@@ -172,8 +172,10 @@ public final class ModForgeSettings implements PersistentStateComponent<ModForge
      * Gets the server URL.
      *
      * @return The server URL
+     * @deprecated Use the annotated version {@link #getServerUrl()} with NotNull annotation
      */
-    public String getServerUrl() {
+    @Deprecated
+    public String getServerUrlLegacy() {
         return serverUrl;
     }
     
@@ -181,8 +183,10 @@ public final class ModForgeSettings implements PersistentStateComponent<ModForge
      * Sets the server URL.
      *
      * @param serverUrl The server URL to set
+     * @deprecated Use the annotated version {@link #setServerUrl(String)} with NotNull annotation
      */
-    public void setServerUrl(String serverUrl) {
+    @Deprecated
+    public void setServerUrlLegacy(String serverUrl) {
         this.serverUrl = serverUrl;
     }
     
