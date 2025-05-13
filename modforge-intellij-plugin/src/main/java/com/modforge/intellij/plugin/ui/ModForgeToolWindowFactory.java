@@ -2,6 +2,8 @@ package com.modforge.intellij.plugin.ui;
 
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.project.Project;
+import com.intellij.openapi.project.ProjectManager;
+import com.intellij.openapi.project.ProjectManagerListener;
 import com.intellij.openapi.wm.ToolWindow;
 import com.intellij.openapi.wm.ToolWindowFactory;
 import com.intellij.ui.components.JBLabel;
@@ -64,10 +66,10 @@ public class ModForgeToolWindowFactory implements ToolWindowFactory {
         // Update status initially
         updateStatus(project);
         
-        // Register for project closing
-        project.getMessageBus().connect().subscribe(Project.TOPIC, new Project.ProjectListener() {
+        // Register for project closing using ProjectManagerListener
+        ProjectManager.getInstance().addProjectManagerListener(project, new ProjectManagerListener() {
             @Override
-            public void projectClosing(@NotNull Project project) {
+            public void projectClosing(@NotNull Project closingProject) {
                 if (updateTimer != null && updateTimer.isRunning()) {
                     updateTimer.stop();
                 }

@@ -311,10 +311,11 @@ public final class AIServiceManager {
      */
     public void registerProjectForCleanup(@NotNull Project project) {
         // Remove the project from the services map when it's closed
-        project.getMessageBus().connect().subscribe(Project.TOPIC, new Project.ProjectListener() {
+        // Register for project closing using ProjectManagerListener
+        ProjectManager.getInstance().addProjectManagerListener(project, new ProjectManagerListener() {
             @Override
-            public void projectClosed(@NotNull Project closedProject) {
-                if (closedProject.equals(project)) {
+            public void projectClosing(@NotNull Project closingProject) {
+                if (closingProject.equals(project)) {
                     ProjectAIServices services = projectServicesMap.remove(project);
                     
                     // Show notification if significant cost savings
