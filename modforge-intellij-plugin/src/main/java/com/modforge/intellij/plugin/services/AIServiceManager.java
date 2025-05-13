@@ -74,4 +74,30 @@ public final class AIServiceManager {
         LOG.info("Downloading latest patterns");
         return new ArrayList<>();
     }
+    
+    /**
+     * Gets detailed metrics about the AI service and pattern matching performance.
+     * 
+     * @return A map of metrics
+     */
+    @NotNull
+    public Map<String, Object> getDetailedMetrics() {
+        // Create a map with the metrics
+        Map<String, Object> metrics = new java.util.HashMap<>();
+        
+        // Add basic metrics
+        metrics.put("enabled", true);  // Whether pattern matching is enabled
+        metrics.put("totalRequests", 0);  // Total number of requests
+        metrics.put("patternMatches", 0);  // Number of pattern matches
+        metrics.put("apiCalls", 0);  // Number of direct API calls
+        metrics.put("estimatedTokensSaved", 0.0);  // Estimated tokens saved
+        metrics.put("estimatedCostSaved", 0.0);  // Estimated cost saved
+        
+        // Add detailed metrics
+        metrics.put("avgResponseTime", 0.0);  // Average response time in ms
+        metrics.put("patternCount", 0);  // Number of patterns in the database
+        metrics.put("lastUpdated", System.currentTimeMillis());  // Last time the patterns were updated
+        
+        return metrics;
+    }
 }

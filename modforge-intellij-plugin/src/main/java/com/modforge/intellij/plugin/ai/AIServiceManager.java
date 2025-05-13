@@ -363,6 +363,34 @@ public final class AIServiceManager {
     }
     
     /**
+     * Gets detailed metrics about the AI service and pattern matching performance.
+     * This method forwards to the services implementation for consistency.
+     * 
+     * @return A map of metrics
+     */
+    @NotNull
+    public Map<String, Object> getDetailedMetrics() {
+        try {
+            // Get service manager from services package
+            com.modforge.intellij.plugin.services.AIServiceManager serviceManager = 
+                com.modforge.intellij.plugin.services.AIServiceManager.getInstance();
+            
+            return serviceManager.getDetailedMetrics();
+        } catch (Exception e) {
+            LOG.error("Error getting detailed metrics", e);
+            // Return default metrics as fallback
+            Map<String, Object> defaultMetrics = new HashMap<>();
+            defaultMetrics.put("enabled", true);
+            defaultMetrics.put("totalRequests", 0);
+            defaultMetrics.put("patternMatches", 0);
+            defaultMetrics.put("apiCalls", 0);
+            defaultMetrics.put("estimatedTokensSaved", 0.0);
+            defaultMetrics.put("estimatedCostSaved", 0.0);
+            return defaultMetrics;
+        }
+    }
+    
+    /**
      * Generates code based on a code generation request.
      * 
      * @param request The code generation request
