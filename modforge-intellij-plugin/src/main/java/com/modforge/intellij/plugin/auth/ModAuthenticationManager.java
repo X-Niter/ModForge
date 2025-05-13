@@ -442,4 +442,36 @@ public final class ModAuthenticationManager implements PersistentStateComponent<
             return false;
         }
     }
+    
+    /**
+     * Get the server URL from settings
+     *
+     * @return The server URL
+     */
+    public String getServerUrl() {
+        com.modforge.intellij.plugin.settings.ModForgeSettings settings = 
+            com.modforge.intellij.plugin.settings.ModForgeSettings.getInstance();
+        return settings.getServerUrl();
+    }
+    
+    /**
+     * Get the authentication token
+     * This is the primary token used for API authentication
+     *
+     * @return The authentication token, or null if not set
+     */
+    @Nullable
+    public String getToken() {
+        // First try to get the access token from settings
+        com.modforge.intellij.plugin.settings.ModForgeSettings settings = 
+            com.modforge.intellij.plugin.settings.ModForgeSettings.getInstance();
+        String token = settings.getAccessToken();
+        
+        // If no access token, fall back to GitHub token
+        if (token == null || token.isEmpty()) {
+            token = getGitHubToken();
+        }
+        
+        return token;
+    }
 }

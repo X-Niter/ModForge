@@ -80,6 +80,29 @@ public final class ModForgeSettings implements PersistentStateComponent<ModForge
     @Transient
     private String githubToken = "";
     
+    // UI settings
+    @Attribute("useDarkMode")
+    private boolean useDarkMode = true;
+    
+    // GitHub integration settings
+    @Attribute("enableGitHubIntegration")
+    private boolean enableGitHubIntegration = false;
+    
+    @Attribute("gitHubRepository")
+    private String gitHubRepository = "";
+    
+    @Attribute("autoMonitorRepository")
+    private boolean autoMonitorRepository = false;
+    
+    @Attribute("autoRespondToIssues")
+    private boolean autoRespondToIssues = false;
+    
+    @Attribute("maxApiRequestsPerDay")
+    private int maxApiRequestsPerDay = 100;
+    
+    @Attribute("authenticated")
+    private boolean authenticated = false;
+    
     @Attribute("continuousDevelopmentScanInterval")
     private long continuousDevelopmentScanInterval = 60000; // Default to 1 minute
     
@@ -126,11 +149,11 @@ public final class ModForgeSettings implements PersistentStateComponent<ModForge
     }
     
     /**
-     * Checks if the user is authenticated.
+     * Checks if the user is authenticated based on access token.
      *
      * @return True if authenticated, false otherwise
      */
-    public boolean isAuthenticated() {
+    public boolean isTokenAuthenticated() {
         return accessToken != null && !accessToken.isEmpty();
     }
     
@@ -529,5 +552,164 @@ public final class ModForgeSettings implements PersistentStateComponent<ModForge
      */
     public void setPatternLearningRate(double patternLearningRate) {
         this.patternLearningRate = Math.max(0.0, Math.min(1.0, patternLearningRate));
+    }
+    
+    /**
+     * Checks if dark mode is enabled.
+     *
+     * @return Whether dark mode is enabled.
+     */
+    public boolean isUseDarkMode() {
+        return useDarkMode;
+    }
+
+    /**
+     * Sets whether dark mode is enabled.
+     *
+     * @param useDarkMode Whether dark mode is enabled.
+     */
+    public void setUseDarkMode(boolean useDarkMode) {
+        this.useDarkMode = useDarkMode;
+    }
+    
+    /**
+     * Checks if GitHub integration is enabled.
+     *
+     * @return Whether GitHub integration is enabled.
+     */
+    public boolean isEnableGitHubIntegration() {
+        return enableGitHubIntegration;
+    }
+
+    /**
+     * Sets whether GitHub integration is enabled.
+     *
+     * @param enableGitHubIntegration Whether GitHub integration is enabled.
+     */
+    public void setEnableGitHubIntegration(boolean enableGitHubIntegration) {
+        this.enableGitHubIntegration = enableGitHubIntegration;
+    }
+    
+    /**
+     * Gets the GitHub token.
+     * Compatibility method for older code that expects this method name.
+     *
+     * @return The GitHub token.
+     */
+    @NotNull
+    public String getGithubToken() {
+        return githubToken != null ? githubToken : "";
+    }
+
+    /**
+     * Sets the GitHub token.
+     * Compatibility method for older code that expects this method name.
+     *
+     * @param githubToken The GitHub token.
+     */
+    public void setGithubToken(@NotNull String githubToken) {
+        this.githubToken = githubToken;
+    }
+    
+    /**
+     * Gets the GitHub repository.
+     *
+     * @return The GitHub repository.
+     */
+    @NotNull
+    public String getGitHubRepository() {
+        return gitHubRepository != null ? gitHubRepository : "";
+    }
+
+    /**
+     * Sets the GitHub repository.
+     *
+     * @param gitHubRepository The GitHub repository.
+     */
+    public void setGitHubRepository(@NotNull String gitHubRepository) {
+        this.gitHubRepository = gitHubRepository;
+    }
+    
+    /**
+     * Checks if automatic repository monitoring is enabled.
+     *
+     * @return Whether automatic repository monitoring is enabled.
+     */
+    public boolean isAutoMonitorRepository() {
+        return autoMonitorRepository;
+    }
+
+    /**
+     * Sets whether automatic repository monitoring is enabled.
+     *
+     * @param autoMonitorRepository Whether automatic repository monitoring is enabled.
+     */
+    public void setAutoMonitorRepository(boolean autoMonitorRepository) {
+        this.autoMonitorRepository = autoMonitorRepository;
+    }
+    
+    /**
+     * Checks if automatic issue responses are enabled.
+     *
+     * @return Whether automatic issue responses are enabled.
+     */
+    public boolean isAutoRespondToIssues() {
+        return autoRespondToIssues;
+    }
+
+    /**
+     * Sets whether automatic issue responses are enabled.
+     *
+     * @param autoRespondToIssues Whether automatic issue responses are enabled.
+     */
+    public void setAutoRespondToIssues(boolean autoRespondToIssues) {
+        this.autoRespondToIssues = autoRespondToIssues;
+    }
+    
+    /**
+     * Gets the maximum number of API requests per day.
+     *
+     * @return The maximum number of API requests per day.
+     */
+    public int getMaxApiRequestsPerDay() {
+        return maxApiRequestsPerDay;
+    }
+
+    /**
+     * Sets the maximum number of API requests per day.
+     *
+     * @param maxApiRequestsPerDay The maximum number of API requests per day.
+     */
+    public void setMaxApiRequestsPerDay(int maxApiRequestsPerDay) {
+        this.maxApiRequestsPerDay = maxApiRequestsPerDay;
+    }
+    
+    /**
+     * Checks if the user is authenticated.
+     * This is a compatibility method for older code that expects this method name.
+     *
+     * @return Whether the user is authenticated.
+     */
+    public boolean isAuthenticated() {
+        return authenticated || isTokenAuthenticated();
+    }
+
+    /**
+     * Sets whether the user is authenticated.
+     *
+     * @param authenticated Whether the user is authenticated.
+     */
+    public void setAuthenticated(boolean authenticated) {
+        this.authenticated = authenticated;
+    }
+    
+    /**
+     * Check if pattern recognition is enabled.
+     * This is a convenience method alias for isPatternRecognition().
+     *
+     * @return Whether pattern recognition is enabled.
+     */
+    public boolean isEnablePatternRecognition() {
+        return isPatternRecognition();
     }
 }

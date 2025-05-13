@@ -1,0 +1,650 @@
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\settings\ModForgeSettingsConfigurable.java:53: error: cannot find symbol
+                || mySettingsComponent.getMaxApiRequestsPerDay() != settings.getMaxApiRequestsPerDay()
+                                                                            ^
+  symbol:   method getMaxApiRequestsPerDay()
+  location: variable settings of type ModForgeSettings
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\settings\ModForgeSettingsConfigurable.java:91: error: cannot find symbol
+        settings.setUseDarkMode(mySettingsComponent.isUseDarkMode());
+                ^
+  symbol:   method setUseDarkMode(boolean)
+  location: variable settings of type ModForgeSettings
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\settings\ModForgeSettingsConfigurable.java:95: error: cannot find symbol
+        settings.setEnableGitHubIntegration(mySettingsComponent.isEnableGitHubIntegration());
+                ^
+  symbol:   method setEnableGitHubIntegration(boolean)
+  location: variable settings of type ModForgeSettings
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\settings\ModForgeSettingsConfigurable.java:96: error: cannot find symbol
+        settings.setGithubToken(mySettingsComponent.getGithubToken());
+                ^
+  symbol:   method setGithubToken(@org.jetbrains.annotations.NotNull String)
+  location: variable settings of type ModForgeSettings
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\settings\ModForgeSettingsConfigurable.java:98: error: cannot find symbol
+        settings.setGitHubRepository(mySettingsComponent.getGitHubRepository());
+                ^
+  symbol:   method setGitHubRepository(@org.jetbrains.annotations.NotNull String)
+  location: variable settings of type ModForgeSettings
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\settings\ModForgeSettingsConfigurable.java:99: error: cannot find symbol
+        settings.setAutoMonitorRepository(mySettingsComponent.isAutoMonitorRepository());
+                ^
+  symbol:   method setAutoMonitorRepository(boolean)
+  location: variable settings of type ModForgeSettings
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\settings\ModForgeSettingsConfigurable.java:100: error: cannot find symbol
+        settings.setAutoRespondToIssues(mySettingsComponent.isAutoRespondToIssues());
+                ^
+  symbol:   method setAutoRespondToIssues(boolean)
+  location: variable settings of type ModForgeSettings
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\settings\ModForgeSettingsConfigurable.java:101: error: cannot find symbol
+        settings.setMaxApiRequestsPerDay(mySettingsComponent.getMaxApiRequestsPerDay());
+                ^
+  symbol:   method setMaxApiRequestsPerDay(int)
+  location: variable settings of type ModForgeSettings
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\settings\ModForgeSettingsConfigurable.java:112: error: cannot find symbol
+        mySettingsComponent.setUseDarkMode(settings.isUseDarkMode());
+                                                   ^
+  symbol:   method isUseDarkMode()
+  location: variable settings of type ModForgeSettings
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\settings\ModForgeSettingsConfigurable.java:114: error: cannot find symbol
+        mySettingsComponent.setEnablePatternRecognition(settings.isEnablePatternRecognition());
+                                                                ^
+  symbol:   method isEnablePatternRecognition()
+  location: variable settings of type ModForgeSettings
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\settings\ModForgeSettingsConfigurable.java:116: error: cannot find symbol
+        mySettingsComponent.setEnableGitHubIntegration(settings.isEnableGitHubIntegration());
+                                                               ^
+  symbol:   method isEnableGitHubIntegration()
+  location: variable settings of type ModForgeSettings
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\settings\ModForgeSettingsConfigurable.java:117: error: cannot find symbol
+        mySettingsComponent.setGithubToken(settings.getGithubToken());
+                                                   ^
+  symbol:   method getGithubToken()
+  location: variable settings of type ModForgeSettings
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\settings\ModForgeSettingsConfigurable.java:119: error: cannot find symbol
+        mySettingsComponent.setGitHubRepository(settings.getGitHubRepository());
+                                                        ^
+  symbol:   method getGitHubRepository()
+  location: variable settings of type ModForgeSettings
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\settings\ModForgeSettingsConfigurable.java:120: error: cannot find symbol
+        mySettingsComponent.setAutoMonitorRepository(settings.isAutoMonitorRepository());
+                                                             ^
+  symbol:   method isAutoMonitorRepository()
+  location: variable settings of type ModForgeSettings
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\settings\ModForgeSettingsConfigurable.java:121: error: cannot find symbol
+        mySettingsComponent.setAutoRespondToIssues(settings.isAutoRespondToIssues());
+                                                           ^
+  symbol:   method isAutoRespondToIssues()
+  location: variable settings of type ModForgeSettings
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\settings\ModForgeSettingsConfigurable.java:122: error: cannot find symbol
+        mySettingsComponent.setMaxApiRequestsPerDay(settings.getMaxApiRequestsPerDay());
+                                                            ^
+  symbol:   method getMaxApiRequestsPerDay()
+  location: variable settings of type ModForgeSettings
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\startup\AuthenticationStartupActivity.java:34: error: cannot find symbol
+            settings.setAuthenticated(false); // Reset authenticated state
+                    ^
+  symbol:   method setAuthenticated(boolean)
+  location: variable settings of type ModForgeSettings
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\startup\AuthenticationStartupActivity.java:41: error: cannot find symbol
+                boolean isValid = TokenAuthConnectionUtil.testTokenAuthentication();
+                                                         ^
+  symbol:   method testTokenAuthentication()
+  location: class TokenAuthConnectionUtil
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\startup\AuthenticationStartupActivity.java:45: error: cannot find symbol
+                    settings.setAuthenticated(false);
+                            ^
+  symbol:   method setAuthenticated(boolean)
+  location: variable settings of type ModForgeSettings
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\templates\ModTemplateService.java:350: error: cannot find symbol
+        String serverUrl = authManager.getServerUrl();
+                                      ^
+  symbol:   method getServerUrl()
+  location: variable authManager of type ModAuthenticationManager
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\templates\ModTemplateService.java:351: error: cannot find symbol
+        String token = authManager.getToken();
+                                  ^
+  symbol:   method getToken()
+  location: variable authManager of type ModAuthenticationManager
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\templates\ModTemplateService.java:355: error: cannot find symbol
+        return TokenAuthConnectionUtil.executeGet(templatesUrl, token)
+                                      ^
+  symbol:   method executeGet(String,String)
+  location: class TokenAuthConnectionUtil
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\toolwindow\CodeGeneratorPanel.java:182: error: cannot find symbol
+                projectService.getModLoaderType(),
+                              ^
+  symbol:   method getModLoaderType()
+  location: variable projectService of type ModForgeProjectService
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\toolwindow\CodeGeneratorPanel.java:183: error: cannot find symbol
+                projectService.getMinecraftVersion()
+                              ^
+  symbol:   method getMinecraftVersion()
+  location: variable projectService of type ModForgeProjectService
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\toolwindow\CodeGeneratorPanel.java:190: error: cannot find symbol
+                return aiServiceManager.generateCode(request);
+                                       ^
+  symbol:   method generateCode(CodeGenerationRequest)
+  location: variable aiServiceManager of type AIServiceManager
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\toolwindow\ModForgeToolWindowContent.java:50: error: cannot find symbol
+        if (projectService.isModProject()) {
+                          ^
+  symbol:   method isModProject()
+  location: variable projectService of type ModForgeProjectService
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\toolwindow\ModForgeToolWindowContent.java:51: error: cannot find symbol
+            ModLoaderType modLoaderType = projectService.getModLoaderType();
+                                                        ^
+  symbol:   method getModLoaderType()
+  location: variable projectService of type ModForgeProjectService
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\toolwindow\ModForgeToolWindowContent.java:52: error: cannot find symbol
+            String mcVersion = projectService.getMinecraftVersion() != null ?
+                                             ^
+  symbol:   method getMinecraftVersion()
+  location: variable projectService of type ModForgeProjectService
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\toolwindow\ModForgeToolWindowContent.java:53: error: cannot find symbol
+                    projectService.getMinecraftVersion() : "Unknown";
+                                  ^
+  symbol:   method getMinecraftVersion()
+  location: variable projectService of type ModForgeProjectService
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\toolwindow\ModForgeToolWindowContent.java:68: error: cannot find symbol
+        JPanel contentPanel = createContentPanel(projectService.isModProject());
+                                                               ^
+  symbol:   method isModProject()
+  location: variable projectService of type ModForgeProjectService
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\toolwindow\ModForgeToolWindowFactory.java:56: error: cannot find symbol
+        ErrorResolverPanel errorResolverPanel = new ErrorResolverPanel(project);
+        ^
+  symbol:   class ErrorResolverPanel
+  location: class ModForgeToolWindowFactory
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\toolwindow\ModForgeToolWindowFactory.java:56: error: cannot find symbol
+        ErrorResolverPanel errorResolverPanel = new ErrorResolverPanel(project);
+                                                    ^
+  symbol:   class ErrorResolverPanel
+  location: class ModForgeToolWindowFactory
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\toolwindow\ModForgeToolWindowFactory.java:65: error: cannot find symbol
+        FeatureSuggesterPanel featureSuggesterPanel = new FeatureSuggesterPanel(project);
+        ^
+  symbol:   class FeatureSuggesterPanel
+  location: class ModForgeToolWindowFactory
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\toolwindow\ModForgeToolWindowFactory.java:65: error: cannot find symbol
+        FeatureSuggesterPanel featureSuggesterPanel = new FeatureSuggesterPanel(project);
+                                                          ^
+  symbol:   class FeatureSuggesterPanel
+  location: class ModForgeToolWindowFactory
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\toolwindow\ModForgeToolWindowFactory.java:74: error: cannot find symbol
+        JarAnalyzerPanel jarAnalyzerPanel = new JarAnalyzerPanel(project);
+        ^
+  symbol:   class JarAnalyzerPanel
+  location: class ModForgeToolWindowFactory
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\toolwindow\ModForgeToolWindowFactory.java:74: error: cannot find symbol
+        JarAnalyzerPanel jarAnalyzerPanel = new JarAnalyzerPanel(project);
+                                                ^
+  symbol:   class JarAnalyzerPanel
+  location: class ModForgeToolWindowFactory
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\toolwindow\ModForgeToolWindowFactory.java:101: error: cannot find symbol
+        SettingsPanel settingsPanel = new SettingsPanel(project);
+        ^
+  symbol:   class SettingsPanel
+  location: class ModForgeToolWindowFactory
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\toolwindow\ModForgeToolWindowFactory.java:101: error: cannot find symbol
+        SettingsPanel settingsPanel = new SettingsPanel(project);
+                                          ^
+  symbol:   class SettingsPanel
+  location: class ModForgeToolWindowFactory
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\ui\dialog\LoginDialog.java:80: error: cannot find symbol
+        rememberCheckBox.setSelected(settings.isRememberCredentials());
+                                             ^
+  symbol:   method isRememberCredentials()
+  location: variable settings of type ModForgeSettings
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\ui\dialog\LoginDialog.java:109: error: cannot find symbol
+        settings.setRememberCredentials(remember);
+                ^
+  symbol:   method setRememberCredentials(boolean)
+  location: variable settings of type ModForgeSettings
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\ui\dialog\LoginDialog.java:113: error: incompatible types: CompletableFuture<Boolean> cannot be converted to boolean
+        boolean success = authManager.login(username, password);
+                                           ^
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\ui\dialogs\GenerateImplementationDialog.java:207: error: cannot find symbol
+                getProject(),
+                ^
+  symbol:   method getProject()
+  location: class GenerateImplementationDialog
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\ui\login\LoginDialog.java:53: error: cannot find symbol
+        if (settings.isRememberCredentials() && !settings.getPassword().isEmpty()) {
+                    ^
+  symbol:   method isRememberCredentials()
+  location: variable settings of type ModForgeSettings
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\ui\login\LoginDialog.java:57: error: cannot find symbol
+        rememberCredentialsCheckBox = new JBCheckBox("Remember credentials", settings.isRememberCredentials());
+                                                                                     ^
+  symbol:   method isRememberCredentials()
+  location: variable settings of type ModForgeSettings
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\ui\login\LoginDialog.java:138: error: method login in class ModAuthenticationManager cannot be applied to given types;
+            JSONObject response = authManager.login(serverUrl, username, password);
+                                             ^
+  required: @org.jetbrains.annotations.NotNull String,@org.jetbrains.annotations.NotNull String
+  found:    String,String,String
+  reason: actual and formal argument lists differ in length
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\ui\login\LoginDialog.java:175: error: cannot find symbol
+            settings.setRememberCredentials(rememberCredentials);
+                    ^
+  symbol:   method setRememberCredentials(boolean)
+  location: variable settings of type ModForgeSettings
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\ui\ModForgeToolWindowFactory.java:179: error: incompatible types: Component cannot be converted to JComponent
+                .addComponentFillVertically(Box.createVerticalStrut(10), 0)
+                                                                   ^
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\ui\ModForgeToolWindowFactory.java:276: error: cannot find symbol
+        boolean patternRecogEnabled = settings.isEnablePatternRecognition();
+                                              ^
+  symbol:   method isEnablePatternRecognition()
+  location: variable settings of type ModForgeSettings
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\ui\ModForgeToolWindowFactory.java:488: error: getPreferredFocusedComponent() in LoginDialog cannot override getPreferredFocusedComponent() in DialogWrapper
+        protected JComponent getPreferredFocusedComponent() {
+                             ^
+  attempting to assign weaker access privileges; was public
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\ui\ModForgeToolWindowFactory.java:531: error: cannot find symbol
+                Messages.showErrorDialog(
+                ^
+  symbol:   variable Messages
+  location: class LoginDialog
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\ui\ModForgeToolWindowFactory.java:540: error: cannot find symbol
+                Messages.showErrorDialog(
+                ^
+  symbol:   variable Messages
+  location: class LoginDialog
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\ui\PremiumFeatureNotificationPanel.java:74: error: cannot find symbol
+                BorderFactory.createLineBorder(UIUtil.getBorderColor()),
+                                                     ^
+  symbol:   method getBorderColor()
+  location: class UIUtil
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\ui\toolwindow\AIAssistPanel.java:197: error: cannot find symbol
+            ((EditorEx) outputEditor).setHighlighter(EditorHighlighterFactory.getInstance().createHighlighter(project, "java"));
+                                                                                           ^
+  symbol:   method createHighlighter(Project,String)
+  location: class EditorHighlighterFactory
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\ui\toolwindow\AIAssistPanel.java:207: error: incompatible types: AIAssistPanel cannot be converted to Disposable
+        Disposer.register(this, () -> EditorFactory.getInstance().releaseEditor(outputEditor));
+                          ^
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\ui\toolwindow\AIAssistPanel.java:227: error: cannot find symbol
+            ((EditorEx) outputEditor).setHighlighter(EditorHighlighterFactory.getInstance().createHighlighter(project, fileType.getName()));
+                                                                                           ^
+  symbol:   method createHighlighter(Project,String)
+  location: class EditorHighlighterFactory
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\ui\toolwindow\AIAssistPanel.java:308: error: incompatible types: String cannot be converted to @org.jetbrains.annotations.Nullable VirtualFile
+                future = codeGenerationService.generateCode(prompt, language, null);
+                                                                    ^
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\ui\toolwindow\MetricsPanel.java:49: error: cannot find symbol
+        this.patternRecognitionService = PatternRecognitionService.getInstance(project);
+                                                                  ^
+  symbol:   method getInstance(@org.jetbrains.annotations.NotNull Project)
+  location: class PatternRecognitionService
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\ui\toolwindow\MetricsPanel.java:87: error: cannot find symbol
+                BorderFactory.createLineBorder(UIUtil.getBorderColor()),
+                                                     ^
+  symbol:   method getBorderColor()
+  location: class UIUtil
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\ui\toolwindow\MetricsPanel.java:115: error: cannot find symbol
+                BorderFactory.createLineBorder(UIUtil.getBorderColor()),
+                                                     ^
+  symbol:   method getBorderColor()
+  location: class UIUtil
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\ui\toolwindow\MetricsPanel.java:139: error: cannot find symbol
+                BorderFactory.createLineBorder(UIUtil.getBorderColor()),
+                                                     ^
+  symbol:   method getBorderColor()
+  location: class UIUtil
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\ui\toolwindow\MetricsPanel.java:190: error: cannot find symbol
+        Map<String, Object> metrics = patternRecognitionService.getUsageMetrics();
+                                                               ^
+  symbol:   method getUsageMetrics()
+  location: variable patternRecognitionService of type PatternRecognitionService
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\ui\toolwindow\MetricsPanel.java:247: error: method does not override or implement a method from a supertype
+    @Override
+    ^
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\ui\toolwindow\MetricsPanel.java:254: error: cannot find symbol
+        super.dispose();
+             ^
+  symbol: method dispose()
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\ui\toolwindow\ModForgeToolWindowContent.java:173: error: cannot find symbol
+            if (settings.isContinuousDevelopment()) {
+                        ^
+  symbol:   method isContinuousDevelopment()
+  location: variable settings of type ModForgeSettings
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\ui\toolwindow\ModForgeToolWindowPanel.java:274: error: cannot find symbol
+        ContinuousDevelopmentService service = ContinuousDevelopmentService.getInstance(project);
+                                                                           ^
+  symbol:   method getInstance(Project)
+  location: class ContinuousDevelopmentService
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\ui\toolwindow\ModForgeToolWindowPanel.java:297: error: cannot find symbol
+            settings.setContinuousDevelopmentEnabled(newState);
+                    ^
+  symbol:   method setContinuousDevelopmentEnabled(boolean)
+  location: variable settings of type ModForgeSettings
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\ui\toolwindow\ModForgeToolWindowPanel.java:373: error: cannot find symbol
+        continuousCheckbox.setSelected(settings.isContinuousDevelopmentEnabled());
+                                               ^
+  symbol:   method isContinuousDevelopmentEnabled()
+  location: variable settings of type ModForgeSettings
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\ui\toolwindow\ModForgeToolWindowPanel.java:375: error: cannot find symbol
+                settings.setContinuousDevelopmentEnabled(continuousCheckbox.isSelected()));
+                        ^
+  symbol:   method setContinuousDevelopmentEnabled(boolean)
+  location: variable settings of type ModForgeSettings
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\ui\toolwindow\ModForgeToolWindowPanel.java:388: error: cannot find symbol
+                settings.setPatternRecognitionEnabled(patternCheckbox.isSelected()));
+                        ^
+  symbol:   method setPatternRecognitionEnabled(boolean)
+  location: variable settings of type ModForgeSettings
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\ui\toolwindow\ModForgeToolWindowPanel.java:398: error: cannot find symbol
+        JTextField frequencyField = new JTextField(String.valueOf(settings.getUpdateFrequencyMinutes()));
+                                                                          ^
+  symbol:   method getUpdateFrequencyMinutes()
+  location: variable settings of type ModForgeSettings
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\ui\toolwindow\ModForgeToolWindowPanel.java:403: error: cannot find symbol
+                    settings.setUpdateFrequencyMinutes(frequency);
+                            ^
+  symbol:   method setUpdateFrequencyMinutes(int)
+  location: variable settings of type ModForgeSettings
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\ui\toolwindow\ModForgeToolWindowPanel.java:407: error: cannot find symbol
+                frequencyField.setText(String.valueOf(settings.getUpdateFrequencyMinutes()));
+                                                              ^
+  symbol:   method getUpdateFrequencyMinutes()
+  location: variable settings of type ModForgeSettings
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\ui\toolwindow\ModForgeToolWindowPanel.java:424: error: cannot find symbol
+            continuousCheckbox.setSelected(settings.isContinuousDevelopmentEnabled());
+                                                   ^
+  symbol:   method isContinuousDevelopmentEnabled()
+  location: variable settings of type ModForgeSettings
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\ui\toolwindow\ModForgeToolWindowPanel.java:426: error: cannot find symbol
+            frequencyField.setText(String.valueOf(settings.getUpdateFrequencyMinutes()));
+                                                          ^
+  symbol:   method getUpdateFrequencyMinutes()
+  location: variable settings of type ModForgeSettings
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\ui\toolwindow\ModForgeToolWindowPanel.java:436: error: cannot find symbol
+            settings.setContinuousDevelopmentEnabled(continuousCheckbox.isSelected());
+                    ^
+  symbol:   method setContinuousDevelopmentEnabled(boolean)
+  location: variable settings of type ModForgeSettings
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\ui\toolwindow\ModForgeToolWindowPanel.java:437: error: cannot find symbol
+            settings.setPatternRecognitionEnabled(patternCheckbox.isSelected());
+                    ^
+  symbol:   method setPatternRecognitionEnabled(boolean)
+  location: variable settings of type ModForgeSettings
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\ui\toolwindow\ModForgeToolWindowPanel.java:443: error: cannot find symbol
+                    settings.setUpdateFrequencyMinutes(frequency);
+                            ^
+  symbol:   method setUpdateFrequencyMinutes(int)
+  location: variable settings of type ModForgeSettings
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\ui\toolwindow\ModForgeToolWindowPanel.java:446: error: cannot find symbol
+                frequencyField.setText(String.valueOf(settings.getUpdateFrequencyMinutes()));
+                                                              ^
+  symbol:   method getUpdateFrequencyMinutes()
+  location: variable settings of type ModForgeSettings
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\ui\toolwindow\panels\AIAssistPanel.java:119: error: cannot find symbol
+            editorEx.setHighlighter(EditorHighlighterFactory.getInstance().createHighlighter(
+                                                                          ^
+  symbol:   method createHighlighter(@org.jetbrains.annotations.NotNull Project,FileType)
+  location: class EditorHighlighterFactory
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\ui\toolwindow\panels\AIAssistPanel.java:297: error: method getInstance in class AIServiceManager cannot be applied to given types;
+        AIServiceManager aiServiceManager = AIServiceManager.getInstance(project);
+                                                            ^
+  required: no arguments
+  found:    Project
+  reason: actual and formal argument lists differ in length
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\ui\toolwindow\panels\AIAssistPanel.java:302: error: incompatible types: @org.jetbrains.annotations.NotNull String cannot be converted to CompletableFuture<String>
+                future = aiServiceManager.generateCode(prompt, getLanguageFromFile(activeFile), options);
+                                                      ^
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\ui\toolwindow\panels\AIAssistPanel.java:307: error: incompatible types: @org.jetbrains.annotations.NotNull String cannot be converted to CompletableFuture<String>
+                future = aiServiceManager.fixCode(code, null, options);
+                                                 ^
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\ui\toolwindow\panels\AIAssistPanel.java:312: error: incompatible types: @org.jetbrains.annotations.NotNull String cannot be converted to CompletableFuture<String>
+                future = aiServiceManager.generateDocumentation(codeToDocument, options);
+                                                               ^
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\ui\toolwindow\panels\AIAssistPanel.java:317: error: incompatible types: @org.jetbrains.annotations.NotNull String cannot be converted to CompletableFuture<String>
+                future = aiServiceManager.explainCode(codeToExplain, options);
+                                                     ^
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\ui\toolwindow\panels\AIAssistPanel.java:350: error: cannot find symbol
+                    editorEx.setHighlighter(EditorHighlighterFactory.getInstance().createHighlighter(
+                                                                                  ^
+  symbol:   method createHighlighter(Project,FileType)
+  location: class EditorHighlighterFactory
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\ui\toolwindow\panels\AIAssistPanel.java:443: error: cannot find symbol
+            CommandProcessor.getInstance().executeCommand(
+            ^
+  symbol:   variable CommandProcessor
+  location: class AIAssistPanel
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\ui\toolwindow\panels\MetricsPanel.java:179: error: method getInstance in class AIServiceManager cannot be applied to given types;
+            AIServiceManager aiServiceManager = AIServiceManager.getInstance(project);
+                                                                ^
+  required: no arguments
+  found:    Project
+  reason: actual and formal argument lists differ in length
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\ui\toolwindow\panels\MetricsPanel.java:181: error: cannot find symbol
+            long requestCount = aiServiceManager.getRequestCount();
+                                                ^
+  symbol:   method getRequestCount()
+  location: variable aiServiceManager of type AIServiceManager
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\ui\toolwindow\panels\MetricsPanel.java:182: error: cannot find symbol
+            long cacheHitCount = aiServiceManager.getCacheHitCount();
+                                                 ^
+  symbol:   method getCacheHitCount()
+  location: variable aiServiceManager of type AIServiceManager
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\ui\toolwindow\panels\MetricsPanel.java:183: error: cannot find symbol
+            long failureCount = aiServiceManager.getFailureCount();
+                                                ^
+  symbol:   method getFailureCount()
+  location: variable aiServiceManager of type AIServiceManager
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\ui\toolwindow\panels\MetricsPanel.java:184: error: cannot find symbol
+            long tokensUsed = aiServiceManager.getTotalTokensUsed();
+                                              ^
+  symbol:   method getTotalTokensUsed()
+  location: variable aiServiceManager of type AIServiceManager
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\ui\toolwindow\panels\MetricsPanel.java:185: error: cannot find symbol
+            double estimatedCost = aiServiceManager.getEstimatedCost();
+                                                   ^
+  symbol:   method getEstimatedCost()
+  location: variable aiServiceManager of type AIServiceManager
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\ui\toolwindow\panels\ModGenerationPanel.java:57: error: cannot find symbol
+        modNameField.setEmptyText("Your mod name");
+                    ^
+  symbol:   method setEmptyText(String)
+  location: variable modNameField of type JBTextField
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\ui\toolwindow\panels\ModGenerationPanel.java:60: error: cannot find symbol
+        modIdField.setEmptyText("your_mod_id");
+                  ^
+  symbol:   method setEmptyText(String)
+  location: variable modIdField of type JBTextField
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\ui\toolwindow\panels\SettingsPanel.java:180: error: cannot find symbol
+        enableAIAssistCheckBox.setSelected(settings.isEnableAIAssist());
+                                                   ^
+  symbol:   method isEnableAIAssist()
+  location: variable settings of type ModForgeSettings
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\ui\toolwindow\panels\SettingsPanel.java:181: error: cannot find symbol
+        usePatternRecognitionCheckBox.setSelected(settings.isUsePatternRecognition());
+                                                          ^
+  symbol:   method isUsePatternRecognition()
+  location: variable settings of type ModForgeSettings
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\ui\toolwindow\panels\SettingsPanel.java:193: error: cannot find symbol
+        settings.setEnableAIAssist(enableAIAssistCheckBox.isSelected());
+                ^
+  symbol:   method setEnableAIAssist(boolean)
+  location: variable settings of type ModForgeSettings
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\ui\toolwindow\panels\SettingsPanel.java:194: error: cannot find symbol
+        settings.setUsePatternRecognition(usePatternRecognitionCheckBox.isSelected());
+                ^
+  symbol:   method setUsePatternRecognition(boolean)
+  location: variable settings of type ModForgeSettings
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\ui\toolwindow\SettingsPanel.java:50: error: cannot find symbol
+        this.continuousDevelopmentService = ContinuousDevelopmentService.getInstance(project);
+                                                                        ^
+  symbol:   method getInstance(@org.jetbrains.annotations.NotNull Project)
+  location: class ContinuousDevelopmentService
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\ui\toolwindow\SettingsPanel.java:110: error: cannot find symbol
+        continuousDevelopmentCheckbox = new JBCheckBox("Enable Continuous Development", settings.isContinuousDevelopmentEnabled());
+                                                                                                ^
+  symbol:   method isContinuousDevelopmentEnabled()
+  location: variable settings of type ModForgeSettings
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\ui\toolwindow\SettingsPanel.java:155: error: cannot find symbol
+        autoCompileCheckbox = new JBCheckBox("Auto-Compile", settings.isAutoCompileEnabled());
+                                                                     ^
+  symbol:   method isAutoCompileEnabled()
+  location: variable settings of type ModForgeSettings
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\ui\toolwindow\SettingsPanel.java:156: error: cannot find symbol
+        autoFixCheckbox = new JBCheckBox("Auto-Fix Errors", settings.isAutoFixEnabled());
+                                                                    ^
+  symbol:   method isAutoFixEnabled()
+  location: variable settings of type ModForgeSettings
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\ui\toolwindow\SettingsPanel.java:157: error: cannot find symbol
+        autoDocumentCheckbox = new JBCheckBox("Auto-Document Code", settings.isAutoDocumentEnabled());
+                                                                            ^
+  symbol:   method isAutoDocumentEnabled()
+  location: variable settings of type ModForgeSettings
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\ui\toolwindow\SettingsPanel.java:180: error: cannot find symbol
+        forgeSupportCheckbox = new JBCheckBox("Forge", settings.isForgeSupported());
+                                                               ^
+  symbol:   method isForgeSupported()
+  location: variable settings of type ModForgeSettings
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\ui\toolwindow\SettingsPanel.java:181: error: cannot find symbol
+        fabricSupportCheckbox = new JBCheckBox("Fabric", settings.isFabricSupported());
+                                                                 ^
+  symbol:   method isFabricSupported()
+  location: variable settings of type ModForgeSettings
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\ui\toolwindow\SettingsPanel.java:182: error: cannot find symbol
+        quiltSupportCheckbox = new JBCheckBox("Quilt", settings.isQuiltSupported());
+                                                               ^
+  symbol:   method isQuiltSupported()
+  location: variable settings of type ModForgeSettings
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\ui\toolwindow\SettingsPanel.java:196: error: cannot find symbol
+        continuousDevelopmentCheckbox.setSelected(settings.isContinuousDevelopmentEnabled());
+                                                          ^
+  symbol:   method isContinuousDevelopmentEnabled()
+  location: variable settings of type ModForgeSettings
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\ui\toolwindow\SettingsPanel.java:200: error: cannot find symbol
+        long checkIntervalMs = settings.getCheckIntervalMs();
+                                       ^
+  symbol:   method getCheckIntervalMs()
+  location: variable settings of type ModForgeSettings
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\ui\toolwindow\SettingsPanel.java:218: error: cannot find symbol
+        autoCompileCheckbox.setSelected(settings.isAutoCompileEnabled());
+                                                ^
+  symbol:   method isAutoCompileEnabled()
+  location: variable settings of type ModForgeSettings
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\ui\toolwindow\SettingsPanel.java:219: error: cannot find symbol
+        autoFixCheckbox.setSelected(settings.isAutoFixEnabled());
+                                            ^
+  symbol:   method isAutoFixEnabled()
+  location: variable settings of type ModForgeSettings
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\ui\toolwindow\SettingsPanel.java:220: error: cannot find symbol
+        autoDocumentCheckbox.setSelected(settings.isAutoDocumentEnabled());
+                                                 ^
+  symbol:   method isAutoDocumentEnabled()
+  location: variable settings of type ModForgeSettings
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\ui\toolwindow\SettingsPanel.java:223: error: cannot find symbol
+        forgeSupportCheckbox.setSelected(settings.isForgeSupported());
+                                                 ^
+  symbol:   method isForgeSupported()
+  location: variable settings of type ModForgeSettings
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\ui\toolwindow\SettingsPanel.java:224: error: cannot find symbol
+        fabricSupportCheckbox.setSelected(settings.isFabricSupported());
+                                                  ^
+  symbol:   method isFabricSupported()
+  location: variable settings of type ModForgeSettings
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\ui\toolwindow\SettingsPanel.java:225: error: cannot find symbol
+        quiltSupportCheckbox.setSelected(settings.isQuiltSupported());
+                                                 ^
+  symbol:   method isQuiltSupported()
+  location: variable settings of type ModForgeSettings
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\ui\toolwindow\SettingsPanel.java:233: error: cannot find symbol
+        settings.setContinuousDevelopmentEnabled(continuousDevelopmentCheckbox.isSelected());
+                ^
+  symbol:   method setContinuousDevelopmentEnabled(boolean)
+  location: variable settings of type ModForgeSettings
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\ui\toolwindow\SettingsPanel.java:234: error: cannot find symbol
+        settings.setPatternRecognitionEnabled(patternRecognitionCheckbox.isSelected());
+                ^
+  symbol:   method setPatternRecognitionEnabled(boolean)
+  location: variable settings of type ModForgeSettings
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\ui\toolwindow\SettingsPanel.java:258: error: cannot find symbol
+        settings.setCheckIntervalMs(checkIntervalMs);
+                ^
+  symbol:   method setCheckIntervalMs(long)
+  location: variable settings of type ModForgeSettings
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\ui\toolwindow\SettingsPanel.java:259: error: cannot find symbol
+        continuousDevelopmentService.setCheckInterval(checkIntervalMs);
+                                    ^
+  symbol:   method setCheckInterval(long)
+  location: variable continuousDevelopmentService of type ContinuousDevelopmentService
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\ui\toolwindow\SettingsPanel.java:261: error: cannot find symbol
+        settings.setAutoCompileEnabled(autoCompileCheckbox.isSelected());
+                ^
+  symbol:   method setAutoCompileEnabled(boolean)
+  location: variable settings of type ModForgeSettings
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\ui\toolwindow\SettingsPanel.java:262: error: cannot find symbol
+        settings.setAutoFixEnabled(autoFixCheckbox.isSelected());
+                ^
+  symbol:   method setAutoFixEnabled(boolean)
+  location: variable settings of type ModForgeSettings
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\ui\toolwindow\SettingsPanel.java:263: error: cannot find symbol
+        settings.setAutoDocumentEnabled(autoDocumentCheckbox.isSelected());
+                ^
+  symbol:   method setAutoDocumentEnabled(boolean)
+  location: variable settings of type ModForgeSettings
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\ui\toolwindow\SettingsPanel.java:266: error: cannot find symbol
+        settings.setForgeSupported(forgeSupportCheckbox.isSelected());
+                ^
+  symbol:   method setForgeSupported(boolean)
+  location: variable settings of type ModForgeSettings
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\ui\toolwindow\SettingsPanel.java:267: error: cannot find symbol
+        settings.setFabricSupported(fabricSupportCheckbox.isSelected());
+                ^
+  symbol:   method setFabricSupported(boolean)
+  location: variable settings of type ModForgeSettings
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\ui\toolwindow\SettingsPanel.java:268: error: cannot find symbol
+        settings.setQuiltSupported(quiltSupportCheckbox.isSelected());
+                ^
+  symbol:   method setQuiltSupported(boolean)
+  location: variable settings of type ModForgeSettings
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\ui\toolwindow\SettingsPanel.java:271: error: cannot find symbol
+        if (settings.isContinuousDevelopmentEnabled()) {
+                    ^
+  symbol:   method isContinuousDevelopmentEnabled()
+  location: variable settings of type ModForgeSettings
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\ui\toolwindow\ToolWindowCleanupListener.java:36: error: cannot find symbol
+            metricsPanel.stopRefreshTimer();
+                        ^
+  symbol:   method stopRefreshTimer()
+  location: variable metricsPanel of type MetricsPanel
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\util\MinecraftModUtil.java:34: error: incompatible types: @org.jetbrains.annotations.NotNull String cannot be converted to ModLoader
+        ModLoaderDetector.ModLoader modLoader = ModLoaderDetector.detectModLoader(project);
+                                                                                 ^
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\util\MinecraftModUtil.java:70: error: incompatible types: @org.jetbrains.annotations.NotNull String cannot be converted to ModLoader
+        ModLoaderDetector.ModLoader modLoader = ModLoaderDetector.detectModLoader(project);
+                                                                                 ^
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\util\MinecraftModUtil.java:106: error: incompatible types: @org.jetbrains.annotations.NotNull String cannot be converted to ModLoader
+        ModLoaderDetector.ModLoader modLoader = ModLoaderDetector.detectModLoader(project);
+                                                                                 ^
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\utils\AuthTestUtil.java:129: error: cannot find symbol
+            return ModForgeSettings.getInstance().getAccessToken();
+                   ^
+  symbol:   variable ModForgeSettings
+  location: class AuthTestUtil
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\utils\AuthTestUtil.java:170: error: cannot find symbol
+            ModForgeSettings.getInstance().setAccessToken(token);
+            ^
+  symbol:   variable ModForgeSettings
+  location: class AuthTestUtil
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\utils\DialogUtils.java:50: error: cannot find symbol
+                CompatibilityUtil.showInfoMessage(project, message, title)
+                                 ^
+  symbol:   method showInfoMessage(@org.jetbrains.annotations.Nullable Project,@org.jetbrains.annotations.NotNull String,@org.jetbrains.annotations.NotNull String)
+  location: class CompatibilityUtil
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\utils\error\ErrorHandler.java:86: error: incompatible types: @org.jetbrains.annotations.NotNull String cannot be converted to @org.jetbrains.annotations.Nullable Project
+        return notificationService.showNotification(title, content, NotificationType.ERROR, null);
+                                                    ^
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\utils\LibraryAnalyzer.java:67: error: cannot find symbol
+        Module[] modules = ModuleRootManager.getInstance(project.getModules()[0]).getDependencies();
+                                                                ^
+  symbol:   method getModules()
+  location: variable project of type Project
+G:\JavaMinecraftProjects\ModForge\modforge-intellij-plugin\src\main\java\com\modforge\intellij\plugin\utils\LibraryAnalyzer.java:223: error: cannot find symbol
+                .map(p -> p.getType().getPresentableText() + " " + p.getName())
+                                     ^
+  symbol:   method getPresentableText()
+  location: interface JvmType

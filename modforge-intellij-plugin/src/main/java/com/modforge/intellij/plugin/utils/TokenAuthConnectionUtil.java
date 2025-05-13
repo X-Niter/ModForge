@@ -268,4 +268,61 @@ public class TokenAuthConnectionUtil {
     public static void clearTokenCache() {
         TOKEN_VALIDITY_CACHE.clear();
     }
+    
+    /**
+     * Tests if the current authentication token is valid
+     * by making a request to the ModForge API
+     *
+     * @return true if authentication is valid, false otherwise
+     */
+    public static boolean testTokenAuthentication() {
+        try {
+            com.modforge.intellij.plugin.settings.ModForgeSettings settings = 
+                com.modforge.intellij.plugin.settings.ModForgeSettings.getInstance();
+            
+            String token = settings.getAccessToken();
+            if (token == null || token.isEmpty()) {
+                LOG.warn("No access token available for testing");
+                return false;
+            }
+            
+            String apiUrl = settings.getServerUrl() + "/auth/validate";
+            return testToken(apiUrl, token);
+        } catch (Exception e) {
+            LOG.warn("Error testing token authentication: " + e.getMessage(), e);
+            return false;
+        }
+    }
+    
+    /**
+     * Execute a GET request with token authentication
+     * 
+     * @param url The URL to request
+     * @param token The authentication token
+     * @return The response body as string
+     * @throws IOException If an I/O error occurs
+     * @throws InterruptedException If the operation is interrupted
+     */
+    @RequiresBackgroundThread
+    public static String executeGet(String url, String token) throws IOException, InterruptedException {
+        if (token == null || token.isEmpty()) {
+            throw new IOException("Authentication token is missing or empty");
+        }
+        
+        HttpRequest request = HttpRequest.newBuilder()
+            .uri(URI.create(url))
+            .timeout(Duration.ofSeconds(REQUEST_TIMEOUT_SEC))
+            .header("Authorization", "Bearer " + token)
+            .GET()
+            .build();
+            
+        HttpResponse<String> response = HTTP_CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
+        
+        if (response.statusCode() >= 200 && response.statusCode() < 300) {
+            return response.body();
+        } else {
+            throw new IOException("Request failed with status code: " + response.statusCode() + 
+                                  ", response: " + response.body());
+        }
+    }
 }
