@@ -503,7 +503,7 @@ public final class PatternRecognitionService {
         metrics.put("patternMissCount", patternMissCount.get());
         
         // Status
-        metrics.put("enabled", ModForgeSettings.getInstance().isPatternRecognition());
+        metrics.put("enabled", com.modforge.intellij.plugin.settings.ModForgeSettings.getInstance().isPatternRecognition());
         
         // Derived metrics
         int totalRequests = patternMatchCount.get() + patternMissCount.get();

@@ -239,7 +239,7 @@ public final class CompatibilityUtil {
                 LOG.error("Failed to run task under write action", e);
                 throw new RuntimeException(e);
             }
-        }, ApplicationManager.getApplication().getExecutorService());
+        }, getCompatibleExecutorService());
     }
 
     // Map to store listeners for removal
@@ -415,8 +415,22 @@ public final class CompatibilityUtil {
             LOG.warn("Failed to parse IDE version: " + fullVersion, e);
         }
         
-        // Fall back to current API year
-        return appInfo.getCurrentApiVersion();
+        // Fall back to current API version from build number
+        try {
+            // Try to extract API version from build number which is more reliable
+            String buildNumber = appInfo.getBuild().asString();
+            if (buildNumber.contains("-")) {
+                String[] parts = buildNumber.split("-");
+                if (parts.length > 0) {
+                    return parts[0]; // Return the first part which is typically the year
+                }
+            }
+        } catch (Exception e) {
+            LOG.warn("Failed to get build number", e);
+        }
+        
+        // Ultimate fallback
+        return "2025.1"; // Since we know this is for 2025.1.1.1
     }
     
     /**
@@ -1211,11 +1225,15 @@ public final class CompatibilityUtil {
                                    @NotNull String title, @NotNull String[] options,
                                    @Nullable String initialValue) {
         try {
-            return Messages.showChooseDialog(project, message, title, options, initialValue, null);
+            // Use different method signature compatible with 2025.1.1.1
+            javax.swing.Icon icon = null; // No icon
+            return Messages.showChooseDialog(project, message, title, icon, options, initialValue);
         } catch (Exception e) {
             LOG.warn("Failed to show choose dialog with project parameter", e);
             try {
-                return Messages.showChooseDialog(message, title, options, initialValue, null);
+                // Use different method signature compatible with 2025.1.1.1
+                javax.swing.Icon icon = null; // No icon
+                return Messages.showChooseDialog(message, title, icon, options, initialValue);
             } catch (Exception ex) {
                 LOG.error("Failed to show choose dialog", ex);
                 return -1;
