@@ -18,6 +18,8 @@ import com.modforge.intellij.plugin.services.ModForgeNotificationService;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import javax.swing.*;
+import java.awt.*;
 import java.util.*;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CompletableFuture;
@@ -1242,5 +1244,74 @@ public final class CompatibilityUtil {
      */
     public static <T> T computeInWriteAction(@NotNull com.intellij.openapi.util.Computable<T> computable) {
         return WriteAction.compute(computable::compute);
+    }
+    
+    /**
+     * Compatibility class for JBRadioButton that may be missing in some IntelliJ IDEA versions.
+     * This provides a replacement using standard JRadioButton with IntelliJ styling.
+     */
+    public static class JBRadioButton extends JRadioButton {
+        private static final Logger LOG = Logger.getInstance(JBRadioButton.class);
+        
+        public JBRadioButton() {
+            super();
+            applyIntelliJStyling();
+        }
+        
+        public JBRadioButton(String text) {
+            super(text);
+            applyIntelliJStyling();
+        }
+        
+        public JBRadioButton(String text, boolean selected) {
+            super(text, selected);
+            applyIntelliJStyling();
+        }
+        
+        /**
+         * Applies IntelliJ-specific styling to make this look like JBRadioButton
+         */
+        private void applyIntelliJStyling() {
+            try {
+                // Try to use UIUtil or JBUI for styling if available
+                try {
+                    // Try to access JBUI class for proper margin and styling
+                    Class<?> jbuiClass = Class.forName("com.intellij.util.ui.JBUI");
+                    java.lang.reflect.Method createEmptyBorderMethod = jbuiClass.getMethod("emptyInsets");
+                    Object insets = createEmptyBorderMethod.invoke(null);
+                    
+                    if (insets instanceof Insets) {
+                        ((Insets) insets).left = 4;
+                        ((Insets) insets).right = 4;
+                        setBorder(BorderFactory.createEmptyBorder(
+                            ((Insets) insets).top, 
+                            ((Insets) insets).left, 
+                            ((Insets) insets).bottom, 
+                            ((Insets) insets).right
+                        ));
+                    }
+                } catch (Exception e) {
+                    LOG.debug("Could not apply JBUI styling to JBRadioButton: " + e.getMessage());
+                    // Fall back to standard styling
+                    setBorder(BorderFactory.createEmptyBorder(2, 4, 2, 4));
+                }
+                
+                // Try to get IntelliJ font
+                try {
+                    Class<?> uiUtilClass = Class.forName("com.intellij.util.ui.UIUtil");
+                    java.lang.reflect.Method getLabelFontMethod = uiUtilClass.getMethod("getLabelFont");
+                    Object labelFont = getLabelFontMethod.invoke(null);
+                    
+                    if (labelFont instanceof Font) {
+                        setFont((Font) labelFont);
+                    }
+                } catch (Exception e) {
+                    LOG.debug("Could not apply UIUtil font to JBRadioButton: " + e.getMessage());
+                    // Keep default font
+                }
+            } catch (Exception ex) {
+                LOG.debug("Failed to apply IntelliJ styling to JBRadioButton", ex);
+            }
+        }
     }
 }
