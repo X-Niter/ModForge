@@ -13,6 +13,7 @@ import com.intellij.psi.PsiManager;
 import com.intellij.util.concurrency.AppExecutorUtil;
 import com.modforge.intellij.plugin.services.ModAuthenticationManager;
 import com.modforge.intellij.plugin.services.ModForgeNotificationService;
+import com.modforge.intellij.plugin.models.Problem;
 import com.modforge.intellij.plugin.settings.ModForgeSettings;
 import com.modforge.intellij.plugin.utils.CompatibilityUtil;
 import org.jetbrains.annotations.NotNull;

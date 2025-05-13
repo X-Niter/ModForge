@@ -24,6 +24,7 @@ import java.util.function.Consumer;
 import java.util.function.Supplier;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import javax.swing.Icon;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -783,9 +784,11 @@ public final class CompatibilityUtil {
      * @return A future that completes with the result of the supplier
      */
     @NotNull
-    public static <T> CompletableFuture<T> runUnderWriteActionAsync(@NotNull Supplier<T> supplier) {
+    public static <T> CompletableFuture<T> runUnderWriteActionAsync(@NotNull java.util.function.Supplier<T> supplier) {
         return CompletableFuture.supplyAsync(() -> 
-            ApplicationManager.getApplication().runWriteAction(supplier)
+            ApplicationManager.getApplication().runWriteAction(
+                (com.intellij.openapi.util.Computable<T>) supplier::get
+            )
         );
     }
     
@@ -797,9 +800,11 @@ public final class CompatibilityUtil {
      * @return A future that completes with the result of the supplier
      */
     @NotNull
-    public static <T> CompletableFuture<T> runUnderReadActionAsync(@NotNull Supplier<T> supplier) {
+    public static <T> CompletableFuture<T> runUnderReadActionAsync(@NotNull java.util.function.Supplier<T> supplier) {
         return CompletableFuture.supplyAsync(() -> 
-            ApplicationManager.getApplication().runReadAction(supplier)
+            ApplicationManager.getApplication().runReadAction(
+                (com.intellij.openapi.util.Computable<T>) supplier::get
+            )
         );
     }
     
