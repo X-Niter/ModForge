@@ -3,131 +3,86 @@ package com.modforge.intellij.plugin.settings;
 import com.intellij.openapi.options.Configurable;
 import com.intellij.openapi.options.ConfigurationException;
 import com.intellij.openapi.util.NlsContexts;
+import com.modforge.intellij.plugin.ui.ModForgeConfigurable;
 import org.jetbrains.annotations.Nullable;
 
 import javax.swing.*;
 
 /**
- * Settings configurable for ModForge settings.
+ * Configurable for ModForge settings.
+ * This class manages the settings UI for the ModForge plugin.
  */
 public class ModForgeSettingsConfigurable implements Configurable {
-    private ModForgeSettingsComponent mySettingsComponent;
+    private ModForgeConfigurable panel;
     
     /**
-     * Create a settings configurable.
+     * Gets the display name of the configurable.
+     *
+     * @return The display name
      */
-    public ModForgeSettingsConfigurable() {
-    }
-    
     @Override
     public @NlsContexts.ConfigurableName String getDisplayName() {
         return "ModForge";
     }
     
+    /**
+     * Gets the help topic ID.
+     *
+     * @return The help topic ID
+     */
     @Override
-    public JComponent getPreferredFocusedComponent() {
-        return mySettingsComponent.getPreferredFocusedComponent();
+    public @Nullable String getHelpTopic() {
+        return "preferences.ModForge";
     }
     
-    @Nullable
+    /**
+     * Creates the component for the settings UI.
+     *
+     * @return The component
+     */
     @Override
-    public JComponent createComponent() {
-        mySettingsComponent = new ModForgeSettingsComponent();
-        return mySettingsComponent.getPanel();
+    public @Nullable JComponent createComponent() {
+        panel = new ModForgeConfigurable();
+        return panel.getPanel();
     }
     
+    /**
+     * Checks if the settings have been modified.
+     *
+     * @return True if the settings have been modified, false otherwise
+     */
     @Override
     public boolean isModified() {
-        ModForgeSettings settings = ModForgeSettings.getInstance();
-        return !mySettingsComponent.getServerUrl().equals(settings.getServerUrl())
-                || mySettingsComponent.isUseDarkMode() != settings.isUseDarkMode()
-                || mySettingsComponent.isEnableContinuousDevelopment() != settings.isEnableContinuousDevelopment()
-                || mySettingsComponent.isEnablePatternRecognition() != settings.isEnablePatternRecognition()
-                || mySettingsComponent.isEnableNotifications() != settings.isEnableNotifications()
-                || mySettingsComponent.isEnableGitHubIntegration() != settings.isEnableGitHubIntegration()
-                || !mySettingsComponent.getGithubToken().equals(settings.getGithubToken())
-                || !mySettingsComponent.getGitHubUsername().equals(settings.getGitHubUsername())
-                || !mySettingsComponent.getGitHubRepository().equals(settings.getGitHubRepository())
-                || mySettingsComponent.isAutoMonitorRepository() != settings.isAutoMonitorRepository()
-                || mySettingsComponent.isAutoRespondToIssues() != settings.isAutoRespondToIssues()
-                || mySettingsComponent.getMaxApiRequestsPerDay() != settings.getMaxApiRequestsPerDay()
-                || !mySettingsComponent.getOpenAiApiKey().equals(settings.getOpenAiApiKey())
-                || !mySettingsComponent.getOpenAiModel().equals(settings.getOpenAiModel())
-                || mySettingsComponent.getMaxTokens() != settings.getMaxTokens()
-                || mySettingsComponent.getTemperature() != settings.getTemperature();
+        return panel != null && panel.isModified();
     }
     
+    /**
+     * Applies the settings.
+     *
+     * @throws ConfigurationException If there's an error applying the settings
+     */
     @Override
     public void apply() throws ConfigurationException {
-        ModForgeSettings settings = ModForgeSettings.getInstance();
-        
-        // Validate serverUrl
-        if (mySettingsComponent.getServerUrl().isEmpty()) {
-            throw new ConfigurationException("Server URL cannot be empty");
+        if (panel != null) {
+            panel.apply();
         }
-        
-        // Validate GitHub settings if GitHub integration is enabled
-        if (mySettingsComponent.isEnableGitHubIntegration()) {
-            if (mySettingsComponent.getGithubToken().isEmpty()) {
-                throw new ConfigurationException("GitHub token cannot be empty when GitHub integration is enabled");
-            }
-            
-            if (mySettingsComponent.getGitHubUsername().isEmpty()) {
-                throw new ConfigurationException("GitHub username cannot be empty when GitHub integration is enabled");
-            }
-        }
-        
-        // Validate OpenAI settings
-        if (mySettingsComponent.getOpenAiApiKey().isEmpty()) {
-            throw new ConfigurationException("OpenAI API key cannot be empty");
-        }
-        
-        if (mySettingsComponent.getOpenAiModel().isEmpty()) {
-            throw new ConfigurationException("OpenAI model cannot be empty");
-        }
-        
-        // Apply changes
-        settings.setServerUrl(mySettingsComponent.getServerUrl());
-        settings.setUseDarkMode(mySettingsComponent.isUseDarkMode());
-        settings.setEnableContinuousDevelopment(mySettingsComponent.isEnableContinuousDevelopment());
-        settings.setEnablePatternRecognition(mySettingsComponent.isEnablePatternRecognition());
-        settings.setEnableNotifications(mySettingsComponent.isEnableNotifications());
-        settings.setEnableGitHubIntegration(mySettingsComponent.isEnableGitHubIntegration());
-        settings.setGithubToken(mySettingsComponent.getGithubToken());
-        settings.setGitHubUsername(mySettingsComponent.getGitHubUsername());
-        settings.setGitHubRepository(mySettingsComponent.getGitHubRepository());
-        settings.setAutoMonitorRepository(mySettingsComponent.isAutoMonitorRepository());
-        settings.setAutoRespondToIssues(mySettingsComponent.isAutoRespondToIssues());
-        settings.setMaxApiRequestsPerDay(mySettingsComponent.getMaxApiRequestsPerDay());
-        settings.setOpenAiApiKey(mySettingsComponent.getOpenAiApiKey());
-        settings.setOpenAiModel(mySettingsComponent.getOpenAiModel());
-        settings.setMaxTokens(mySettingsComponent.getMaxTokens());
-        settings.setTemperature(mySettingsComponent.getTemperature());
     }
     
+    /**
+     * Resets the settings.
+     */
     @Override
     public void reset() {
-        ModForgeSettings settings = ModForgeSettings.getInstance();
-        mySettingsComponent.setServerUrl(settings.getServerUrl());
-        mySettingsComponent.setUseDarkMode(settings.isUseDarkMode());
-        mySettingsComponent.setEnableContinuousDevelopment(settings.isEnableContinuousDevelopment());
-        mySettingsComponent.setEnablePatternRecognition(settings.isEnablePatternRecognition());
-        mySettingsComponent.setEnableNotifications(settings.isEnableNotifications());
-        mySettingsComponent.setEnableGitHubIntegration(settings.isEnableGitHubIntegration());
-        mySettingsComponent.setGithubToken(settings.getGithubToken());
-        mySettingsComponent.setGitHubUsername(settings.getGitHubUsername());
-        mySettingsComponent.setGitHubRepository(settings.getGitHubRepository());
-        mySettingsComponent.setAutoMonitorRepository(settings.isAutoMonitorRepository());
-        mySettingsComponent.setAutoRespondToIssues(settings.isAutoRespondToIssues());
-        mySettingsComponent.setMaxApiRequestsPerDay(settings.getMaxApiRequestsPerDay());
-        mySettingsComponent.setOpenAiApiKey(settings.getOpenAiApiKey());
-        mySettingsComponent.setOpenAiModel(settings.getOpenAiModel());
-        mySettingsComponent.setMaxTokens(settings.getMaxTokens());
-        mySettingsComponent.setTemperature(settings.getTemperature());
+        if (panel != null) {
+            panel.reset();
+        }
     }
     
+    /**
+     * Disposes the UI resources.
+     */
     @Override
     public void disposeUIResources() {
-        mySettingsComponent = null;
+        panel = null;
     }
 }

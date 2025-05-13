@@ -80,6 +80,9 @@ public final class ModForgeSettings implements PersistentStateComponent<ModForge
     @Transient
     private String githubToken = "";
     
+    @Transient
+    private String token = "";
+    
     // UI settings
     @Attribute("useDarkMode")
     private boolean useDarkMode = true;
@@ -607,8 +610,27 @@ public final class ModForgeSettings implements PersistentStateComponent<ModForge
      *
      * @param githubToken The GitHub token.
      */
-    public void setGithubToken(@NotNull String githubToken) {
+    public void setGithubToken(String githubToken) {
         this.githubToken = githubToken;
+    }
+    
+    /**
+     * Gets the authentication token.
+     *
+     * @return The authentication token
+     */
+    @NotNull
+    public String getToken() {
+        return token != null ? token : "";
+    }
+    
+    /**
+     * Sets the authentication token.
+     *
+     * @param token The authentication token
+     */
+    public void setToken(@Nullable String token) {
+        this.token = token;
     }
     
     /**
@@ -691,7 +713,7 @@ public final class ModForgeSettings implements PersistentStateComponent<ModForge
      * @return Whether the user is authenticated.
      */
     public boolean isAuthenticated() {
-        return authenticated || isTokenAuthenticated();
+        return authenticated || (token != null && !token.isEmpty());
     }
 
     /**

@@ -1,181 +1,190 @@
 package com.modforge.intellij.plugin.ui;
 
-import com.intellij.openapi.options.Configurable;
 import com.intellij.openapi.options.ConfigurationException;
 import com.intellij.ui.components.JBCheckBox;
 import com.intellij.ui.components.JBLabel;
+import com.intellij.ui.components.JBPasswordField;
 import com.intellij.ui.components.JBTextField;
 import com.intellij.util.ui.FormBuilder;
 import com.intellij.util.ui.JBUI;
+import com.intellij.util.ui.UI;
 import com.modforge.intellij.plugin.settings.ModForgeSettings;
-import org.jetbrains.annotations.Nls;
-import org.jetbrains.annotations.Nullable;
+import org.jetbrains.annotations.NotNull;
 
 import javax.swing.*;
 import java.awt.*;
 
 /**
- * Configurable for ModForge settings.
- * Compatible with IntelliJ IDEA 2025.1.1.1
+ * UI for ModForge settings.
+ * This class provides the UI components for the ModForge settings.
  */
-public final class ModForgeConfigurable implements Configurable {
-    private JPanel mainPanel;
-    private JBTextField serverUrlField;
-    private JSpinner requestTimeoutSpinner;
-    private JBCheckBox enablePatternRecognitionCheckBox;
-    private JBCheckBox enableContinuousDevelopmentCheckBox;
-    private JBTextField githubUsernameField;
-    private JPasswordField accessTokenField;
-    
-    private final ModForgeSettings settings;
+public class ModForgeConfigurable {
+    private final JPanel panel;
+    private final JBTextField serverUrlField;
+    private final JBTextField collaborationServerUrlField;
+    private final JBTextField usernameField;
+    private final JBPasswordField passwordField;
+    private final JBTextField openAiApiKeyField;
+    private final JBTextField openAiModelField;
+    private final JBTextField maxTokensField;
+    private final JBTextField temperatureField;
+    private final JBTextField githubUsernameField;
+    private final JBPasswordField githubTokenField;
+    private final JBCheckBox enablePatternRecognitionCheckBox;
+    private final JBCheckBox enableContinuousDevelopmentCheckBox;
+    private final JBCheckBox enableNotificationsCheckBox;
+    private final JBCheckBox useDarkModeCheckBox;
+    private final JBCheckBox enableGitHubIntegrationCheckBox;
     
     /**
-     * Constructor.
+     * Creates a new ModForge configurable.
      */
     public ModForgeConfigurable() {
-        settings = ModForgeSettings.getInstance();
+        // Initialize fields
+        serverUrlField = new JBTextField();
+        collaborationServerUrlField = new JBTextField();
+        usernameField = new JBTextField();
+        passwordField = new JBPasswordField();
+        openAiApiKeyField = new JBTextField();
+        openAiModelField = new JBTextField();
+        maxTokensField = new JBTextField();
+        temperatureField = new JBTextField();
+        githubUsernameField = new JBTextField();
+        githubTokenField = new JBPasswordField();
+        enablePatternRecognitionCheckBox = new JBCheckBox("Enable Pattern Recognition");
+        enableContinuousDevelopmentCheckBox = new JBCheckBox("Enable Continuous Development");
+        enableNotificationsCheckBox = new JBCheckBox("Enable Notifications");
+        useDarkModeCheckBox = new JBCheckBox("Use Dark Mode");
+        enableGitHubIntegrationCheckBox = new JBCheckBox("Enable GitHub Integration");
+        
+        // Build UI
+        JPanel generalPanel = FormBuilder.createFormBuilder()
+                .addLabeledComponent("Server URL:", serverUrlField)
+                .addLabeledComponent("Collaboration Server URL:", collaborationServerUrlField)
+                .addLabeledComponent("Username:", usernameField)
+                .addLabeledComponent("Password:", passwordField)
+                .addComponent(enablePatternRecognitionCheckBox)
+                .addComponent(enableContinuousDevelopmentCheckBox)
+                .addComponent(enableNotificationsCheckBox)
+                .addComponent(useDarkModeCheckBox)
+                .getPanel();
+        
+        JPanel openAIPanel = FormBuilder.createFormBuilder()
+                .addLabeledComponent("OpenAI API Key:", openAiApiKeyField)
+                .addLabeledComponent("OpenAI Model:", openAiModelField)
+                .addLabeledComponent("Max Tokens:", maxTokensField)
+                .addLabeledComponent("Temperature:", temperatureField)
+                .getPanel();
+        
+        JPanel githubPanel = FormBuilder.createFormBuilder()
+                .addComponent(enableGitHubIntegrationCheckBox)
+                .addLabeledComponent("GitHub Username:", githubUsernameField)
+                .addLabeledComponent("GitHub Token:", githubTokenField)
+                .getPanel();
+        
+        JTabbedPane tabbedPane = new JTabbedPane();
+        tabbedPane.addTab("General", generalPanel);
+        tabbedPane.addTab("OpenAI", openAIPanel);
+        tabbedPane.addTab("GitHub", githubPanel);
+        
+        panel = new JPanel(new BorderLayout());
+        panel.add(tabbedPane, BorderLayout.CENTER);
+        panel.setBorder(JBUI.Borders.empty(10));
+        
+        // Load settings
+        reset();
     }
-
+    
     /**
-     * Gets the display name.
+     * Gets the panel.
      *
-     * @return The display name.
+     * @return The panel
      */
-    @Nls(capitalization = Nls.Capitalization.Title)
-    @Override
-    public String getDisplayName() {
-        return "ModForge";
+    public JPanel getPanel() {
+        return panel;
     }
-
+    
     /**
-     * Gets the help topic.
+     * Checks if the settings have been modified.
      *
-     * @return The help topic.
+     * @return True if the settings have been modified, false otherwise
      */
-    @Nullable
-    @Override
-    public String getHelpTopic() {
-        return "ModForge.Settings";
-    }
-
-    /**
-     * Creates the component.
-     *
-     * @return The component.
-     */
-    @Override
-    public JComponent createComponent() {
-        mainPanel = createSettingsPanel();
-        return mainPanel;
-    }
-
-    /**
-     * Checks if the settings are modified.
-     *
-     * @return Whether the settings are modified.
-     */
-    @Override
     public boolean isModified() {
+        ModForgeSettings settings = ModForgeSettings.getInstance();
+        
         return !serverUrlField.getText().equals(settings.getServerUrl())
-                || (int) requestTimeoutSpinner.getValue() != settings.getRequestTimeout()
+                || !collaborationServerUrlField.getText().equals(settings.getCollaborationServerUrl())
+                || !usernameField.getText().equals(settings.getUsername())
+                || !String.valueOf(passwordField.getPassword()).equals(settings.getPassword())
+                || !openAiApiKeyField.getText().equals(settings.getOpenAiApiKey())
+                || !openAiModelField.getText().equals(settings.getOpenAiModel())
+                || !maxTokensField.getText().equals(String.valueOf(settings.getMaxTokens()))
+                || !temperatureField.getText().equals(String.valueOf(settings.getTemperature()))
+                || !githubUsernameField.getText().equals(settings.getGitHubUsername())
+                || !String.valueOf(githubTokenField.getPassword()).equals(settings.getGithubToken())
                 || enablePatternRecognitionCheckBox.isSelected() != settings.isPatternRecognition()
                 || enableContinuousDevelopmentCheckBox.isSelected() != settings.isEnableContinuousDevelopment()
-                || !githubUsernameField.getText().equals(settings.getGitHubUsername())
-                || !new String(accessTokenField.getPassword()).equals(settings.getAccessToken());
+                || enableNotificationsCheckBox.isSelected() != settings.isEnableNotifications()
+                || useDarkModeCheckBox.isSelected() != settings.isUseDarkMode()
+                || enableGitHubIntegrationCheckBox.isSelected() != settings.isEnableGitHubIntegration();
     }
-
+    
     /**
      * Applies the settings.
      *
-     * @throws ConfigurationException If the settings are invalid.
+     * @throws ConfigurationException If there's an error applying the settings
      */
-    @Override
     public void apply() throws ConfigurationException {
+        ModForgeSettings settings = ModForgeSettings.getInstance();
+        
         settings.setServerUrl(serverUrlField.getText());
-        settings.setRequestTimeout((int) requestTimeoutSpinner.getValue());
+        settings.setCollaborationServerUrl(collaborationServerUrlField.getText());
+        settings.setUsername(usernameField.getText());
+        settings.setPassword(String.valueOf(passwordField.getPassword()));
+        settings.setOpenAiApiKey(openAiApiKeyField.getText());
+        settings.setOpenAiModel(openAiModelField.getText());
+        
+        try {
+            settings.setMaxTokens(Integer.parseInt(maxTokensField.getText()));
+        } catch (NumberFormatException e) {
+            throw new ConfigurationException("Max Tokens must be a valid integer");
+        }
+        
+        try {
+            settings.setTemperature(Double.parseDouble(temperatureField.getText()));
+        } catch (NumberFormatException e) {
+            throw new ConfigurationException("Temperature must be a valid number");
+        }
+        
+        settings.setGitHubUsername(githubUsernameField.getText());
+        settings.setGithubToken(String.valueOf(githubTokenField.getPassword()));
         settings.setPatternRecognition(enablePatternRecognitionCheckBox.isSelected());
         settings.setEnableContinuousDevelopment(enableContinuousDevelopmentCheckBox.isSelected());
-        settings.setGitHubUsername(githubUsernameField.getText());
-        settings.setAccessToken(new String(accessTokenField.getPassword()));
+        settings.setEnableNotifications(enableNotificationsCheckBox.isSelected());
+        settings.setUseDarkMode(useDarkModeCheckBox.isSelected());
+        settings.setEnableGitHubIntegration(enableGitHubIntegrationCheckBox.isSelected());
     }
-
+    
     /**
      * Resets the settings.
      */
-    @Override
     public void reset() {
+        ModForgeSettings settings = ModForgeSettings.getInstance();
+        
         serverUrlField.setText(settings.getServerUrl());
-        requestTimeoutSpinner.setValue(settings.getRequestTimeout());
+        collaborationServerUrlField.setText(settings.getCollaborationServerUrl());
+        usernameField.setText(settings.getUsername());
+        passwordField.setText(settings.getPassword());
+        openAiApiKeyField.setText(settings.getOpenAiApiKey());
+        openAiModelField.setText(settings.getOpenAiModel());
+        maxTokensField.setText(String.valueOf(settings.getMaxTokens()));
+        temperatureField.setText(String.valueOf(settings.getTemperature()));
+        githubUsernameField.setText(settings.getGitHubUsername());
+        githubTokenField.setText(settings.getGithubToken());
         enablePatternRecognitionCheckBox.setSelected(settings.isPatternRecognition());
         enableContinuousDevelopmentCheckBox.setSelected(settings.isEnableContinuousDevelopment());
-        githubUsernameField.setText(settings.getGitHubUsername());
-        accessTokenField.setText(settings.getAccessToken());
-    }
-
-    /**
-     * Creates the settings panel.
-     *
-     * @return The settings panel.
-     */
-    private JPanel createSettingsPanel() {
-        // API Settings
-        serverUrlField = new JBTextField(settings.getServerUrl());
-        
-        SpinnerNumberModel timeoutModel = new SpinnerNumberModel(
-                settings.getRequestTimeout(),
-                1,
-                300,
-                1
-        );
-        requestTimeoutSpinner = new JSpinner(timeoutModel);
-        
-        // Feature Settings
-        enablePatternRecognitionCheckBox = new JBCheckBox("Enable pattern recognition", settings.isPatternRecognition());
-        enableContinuousDevelopmentCheckBox = new JBCheckBox("Enable continuous development", settings.isEnableContinuousDevelopment());
-        
-        // GitHub Settings
-        githubUsernameField = new JBTextField(settings.getGitHubUsername());
-        accessTokenField = new JPasswordField(settings.getAccessToken());
-        
-        // Build the form
-        FormBuilder apiBuilder = FormBuilder.createFormBuilder()
-                .addLabeledComponent(new JBLabel("Server URL:"), serverUrlField)
-                .addLabeledComponent(new JBLabel("Request timeout (seconds):"), requestTimeoutSpinner)
-                .addComponentToRightColumn(new JBLabel(""))
-                .addComponentToRightColumn(enablePatternRecognitionCheckBox)
-                .addComponentToRightColumn(enableContinuousDevelopmentCheckBox);
-        
-        FormBuilder githubBuilder = FormBuilder.createFormBuilder()
-                .addLabeledComponent(new JBLabel("GitHub username:"), githubUsernameField)
-                .addLabeledComponent(new JBLabel("Access token:"), accessTokenField);
-        
-        JPanel apiPanel = apiBuilder.getPanel();
-        JPanel githubPanel = githubBuilder.getPanel();
-        
-        // Create tabbed pane
-        JTabbedPane tabbedPane = new JTabbedPane();
-        tabbedPane.addTab("API Settings", apiPanel);
-        tabbedPane.addTab("GitHub Settings", githubPanel);
-        
-        // Wrap in panel with padding
-        JPanel wrapper = new JPanel(new BorderLayout());
-        wrapper.add(tabbedPane, BorderLayout.CENTER);
-        wrapper.setBorder(JBUI.Borders.empty(10));
-        
-        return wrapper;
-    }
-
-    /**
-     * Disposes the component.
-     */
-    @Override
-    public void disposeUIResources() {
-        mainPanel = null;
-        serverUrlField = null;
-        requestTimeoutSpinner = null;
-        enablePatternRecognitionCheckBox = null;
-        enableContinuousDevelopmentCheckBox = null;
-        githubUsernameField = null;
-        accessTokenField = null;
+        enableNotificationsCheckBox.setSelected(settings.isEnableNotifications());
+        useDarkModeCheckBox.setSelected(settings.isUseDarkMode());
+        enableGitHubIntegrationCheckBox.setSelected(settings.isEnableGitHubIntegration());
     }
 }
