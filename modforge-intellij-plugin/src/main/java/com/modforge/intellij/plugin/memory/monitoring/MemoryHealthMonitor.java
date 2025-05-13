@@ -319,6 +319,15 @@ public class MemoryHealthMonitor implements Disposable {
      * 
      * @return The current memory health status
      */
+    public MemoryHealthStatus getCurrentHealthStatus() {
+        return getCurrentStatus();
+    }
+    
+    /**
+     * Get the current memory status
+     * 
+     * @return The current memory status
+     */
     public MemoryHealthStatus getCurrentStatus() {
         MemorySnapshot snapshot = takeMemorySnapshot();
         return calculateHealthStatus(snapshot);

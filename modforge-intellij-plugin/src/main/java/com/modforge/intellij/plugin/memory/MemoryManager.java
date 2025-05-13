@@ -51,6 +51,14 @@ public class MemoryManager {
     }
     
     /**
+     * Gets the current memory snapshot
+     * @return The current memory snapshot
+     */
+    public com.modforge.intellij.plugin.memory.monitoring.MemorySnapshot getCurrentMemorySnapshot() {
+        return com.modforge.intellij.plugin.memory.monitoring.MemorySnapshot.createCurrentSnapshot("NORMAL");
+    }
+    
+    /**
      * Reinitialize the memory manager
      * This can be called to restart memory monitoring and optimization after issues
      */
