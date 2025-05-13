@@ -81,6 +81,70 @@ public final class AutonomousCodeGenerationService {
     }
     
     /**
+     * Generates code based on a prompt and context file.
+     * This method signature is for compatibility with IntelliJ IDEA 2025.1.1.1
+     *
+     * @param prompt      The code generation prompt
+     * @param contextFile The context file for additional context, can be null
+     * @param language    The programming language
+     * @return A CompletableFuture that completes with the generated code
+     */
+    public CompletableFuture<String> generateCode(
+            @NotNull String prompt,
+            @Nullable VirtualFile contextFile,
+            @NotNull String language) {
+        
+        if (isGeneratingCode.getAndSet(true)) {
+            LOG.warn("Code generation already in progress");
+            return CompletableFuture.completedFuture(null);
+        }
+        
+        return ThreadUtils.supplyAsyncVirtual(() -> {
+            try {
+                LOG.info("Generating code with prompt in language: " + language);
+                
+                // Additional context from file if provided
+                String contextContent = "";
+                if (contextFile != null && contextFile.exists()) {
+                    try {
+                        contextContent = new String(contextFile.contentsToByteArray());
+                    } catch (Exception e) {
+                        LOG.warn("Failed to read context file: " + e.getMessage());
+                    }
+                }
+                
+                // Check pattern cache first
+                String cacheKey = prompt + "|" + contextContent + "|" + language;
+                if (patternCache.containsKey(cacheKey)) {
+                    String cachedResult = patternCache.get(cacheKey);
+                    patternHits.compute(cacheKey, (k, v) -> v == null ? 1 : v + 1);
+                    LOG.info("Using cached result for prompt (hit count: " + patternHits.get(cacheKey) + ")");
+                    return cachedResult;
+                }
+                
+                // Mock generation for now
+                // TODO: Replace with actual API call
+                String generatedCode = generateMockCode(prompt + 
+                    (contextContent.isEmpty() ? "" : "\nContext: " + contextContent) + 
+                    "\nLanguage: " + language);
+                
+                // Cache the result if pattern learning is enabled
+                if (settings.isPatternRecognition()) {
+                    patternCache.put(cacheKey, generatedCode);
+                    patternHits.put(cacheKey, 1);
+                }
+                
+                return generatedCode;
+            } catch (Exception e) {
+                LOG.error("Error generating code", e);
+                return null;
+            } finally {
+                isGeneratingCode.set(false);
+            }
+        });
+    }
+    
+    /**
      * Generates code from a description.
      *
      * @param description   The code description.

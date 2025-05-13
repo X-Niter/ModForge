@@ -23,11 +23,15 @@ import java.awt.*;
 import java.lang.reflect.Constructor;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.function.Supplier;
+
+// Import List explicitly from java.util to avoid ambiguous references
+import java.util.List;
 
 /**
  * Utility class for handling compatibility issues between different IntelliJ IDEA versions.
