@@ -28,8 +28,8 @@ public class VerifyAuthenticationAction extends AnAction {
         // Get authentication manager
         ModAuthenticationManager authManager = ModAuthenticationManager.getInstance();
         
-        // Verify authentication
-        boolean isValid = authManager.verifyAuthentication();
+        // Check authentication status - use isAuthenticated() instead of the private verifyAuthentication() method
+        boolean isValid = authManager.isAuthenticated();
         
         if (isValid) {
             LOG.info("Authentication verification successful");
