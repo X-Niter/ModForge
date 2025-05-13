@@ -10,6 +10,7 @@ import com.intellij.openapi.ui.Messages;
 import com.intellij.openapi.ui.ValidationInfo;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.ui.components.*;
+import com.modforge.intellij.plugin.utils.CompatibilityUtil.JBRadioButton;
 import com.intellij.util.ui.JBUI;
 import com.intellij.util.ui.UIUtil;
 import com.modforge.intellij.plugin.crossloader.ArchitecturyService;
