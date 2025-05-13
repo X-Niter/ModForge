@@ -589,6 +589,31 @@ public final class CompatibilityUtil {
     }
     
     /**
+     * Compatibility wrapper for WolfTheProblemSolver.visitProblemFiles().
+     * Use this method instead of directly calling problemSolver.visitProblemFiles().
+     * 
+     * @param problemSolver The WolfTheProblemSolver instance
+     * @param consumer The consumer that will receive each problem file
+     */
+    public static void visitProblemFiles(@NotNull WolfTheProblemSolver problemSolver, 
+                                         @NotNull java.util.function.Consumer<VirtualFile> consumer) {
+        try {
+            // Try the method available in IntelliJ IDEA 2025.1.1.1
+            java.lang.reflect.Method visitMethod = problemSolver.getClass().getMethod("visitProblemFiles", 
+                                                                                     java.util.function.Consumer.class);
+            visitMethod.invoke(problemSolver, consumer);
+        } catch (Exception e) {
+            LOG.warn("Failed to visit problem files using visitProblemFiles method", e);
+            
+            // Fall back to using getProblemFiles and manually iterating
+            Collection<VirtualFile> problemFiles = getProblemFiles(problemSolver);
+            for (VirtualFile file : problemFiles) {
+                consumer.accept(file);
+            }
+        }
+    }
+    
+    /**
      * Compatibility method to check if a file has problems.
      * Compatible with IntelliJ IDEA 2025.1.1.1.
      * 
@@ -653,6 +678,35 @@ public final class CompatibilityUtil {
         }
         
         return problems;
+    }
+    
+    /**
+     * Compatibility wrapper for WolfTheProblemSolver.processProblems().
+     * Use this method instead of directly calling problemSolver.processProblems().
+     *
+     * @param problemSolver The WolfTheProblemSolver instance
+     * @param problems Collection of problems to process
+     * @param file The virtual file
+     */
+    public static void processProblems(@NotNull WolfTheProblemSolver problemSolver,
+                                      @NotNull Collection<Problem> problems,
+                                      @NotNull VirtualFile file) {
+        try {
+            // Try using reflection to call the method
+            java.lang.reflect.Method method = problemSolver.getClass().getMethod("processProblems", 
+                                                                              Collection.class, VirtualFile.class);
+            method.invoke(problemSolver, problems, file);
+        } catch (Exception e) {
+            LOG.warn("Failed to process problems using processProblems method", e);
+            
+            // If the direct method fails, try to add problems individually
+            try {
+                Collection<Problem> fileProblems = getProblemsForFile(problemSolver, file);
+                problems.addAll(fileProblems);
+            } catch (Exception ex) {
+                LOG.error("Failed to process problems for file from WolfTheProblemSolver", ex);
+            }
+        }
     }
     
     /**
