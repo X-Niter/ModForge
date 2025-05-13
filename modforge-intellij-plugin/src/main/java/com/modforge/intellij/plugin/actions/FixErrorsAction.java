@@ -196,66 +196,9 @@ public class FixErrorsAction extends AnAction {
         return sb.toString();
     }
     
-    /**
-     * Compatibility method to collect problems for a file using available APIs in IntelliJ IDEA 2025.1.1.1
-     * 
-     * @param problemSolver The problem solver
-     * @param file The file to check
-     * @param problems The collection to populate with problems
-     */
-    private void collectProblemsForFile(
-            @NotNull WolfTheProblemSolver problemSolver,
-            @NotNull VirtualFile file,
-            @NotNull Collection<Object> problems) {
-        
-        // Use our compatibility wrapper to check if file has problems
-        if (CompatibilityUtil.hasProblemsIn(problemSolver, file)) {
-            // Use reflection to call processProblems which has different signatures in different IntelliJ versions
-            try {
-                // Try the newer version of processProblems which takes a single processor parameter
-                java.lang.reflect.Method processProbsMethod = problemSolver.getClass().getMethod("processProblems", 
-                    java.util.function.Predicate.class);
-                
-                processProbsMethod.invoke(problemSolver, (java.util.function.Predicate<Object>) problem -> {
-                    try {
-                        // Use compatibility method to get the virtual file
-                        VirtualFile pFile = CompatibilityUtil.getProblemVirtualFile(problem);
-                        
-                        if (pFile != null && pFile.equals(file)) {
-                            problems.add(problem);
-                        }
-                    } catch (Exception e) {
-                        LOG.debug("Error processing problem: " + e.getMessage());
-                    }
-                    return true;
-                });
-            } catch (NoSuchMethodException e) {
-                // Fall back to the older version that takes a processor and a file
-                try {
-                    java.lang.reflect.Method processProbsMethod = problemSolver.getClass().getMethod("processProblems", 
-                        java.util.function.Predicate.class, VirtualFile.class);
-                    
-                    processProbsMethod.invoke(problemSolver, (java.util.function.Predicate<Object>) problem -> {
-                        try {
-                            // Use compatibility method to get the virtual file
-                            VirtualFile pFile = CompatibilityUtil.getProblemVirtualFile(problem);
-                            
-                            if (pFile != null && pFile.equals(file)) {
-                                problems.add(problem);
-                            }
-                        } catch (Exception ex) {
-                            LOG.debug("Error processing problem: " + ex.getMessage());
-                        }
-                        return true;
-                    }, file);
-                } catch (Exception ex) {
-                    LOG.warn("Could not process problems: " + ex.getMessage());
-                }
-            } catch (Exception e) {
-                LOG.warn("Could not process problems: " + e.getMessage());
-            }
-        }
-    }
+    // collectProblemsForFile method has been removed as it's no longer needed
+    // We now use CompatibilityUtil methods which use DaemonCodeAnalyzer instead of WolfTheProblemSolver
+    // This provides better compatibility with IntelliJ IDEA 2025.1.1.1
     
     /**
      * Fix errors in the code.
