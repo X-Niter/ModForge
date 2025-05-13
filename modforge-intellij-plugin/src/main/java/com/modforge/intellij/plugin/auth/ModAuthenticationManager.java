@@ -71,6 +71,16 @@ public final class ModAuthenticationManager {
     }
     
     /**
+     * Gets the username.
+     *
+     * @return The username
+     */
+    @NotNull
+    public String getUsername() {
+        return Objects.requireNonNullElse(settings.getUsername(), "");
+    }
+    
+    /**
      * Authenticates with the ModForge server.
      *
      * @param username The username
@@ -171,6 +181,18 @@ public final class ModAuthenticationManager {
      */
     public CompletableFuture<Boolean> authenticateAsync(@NotNull String username, @NotNull String password) {
         return CompletableFuture.supplyAsync(() -> authenticate(username, password));
+    }
+    
+    /**
+     * Alias for authenticate method to match expected interface.
+     *
+     * @param username The username
+     * @param password The password
+     * @return True if login was successful, false otherwise
+     */
+    @RequiresBackgroundThread
+    public boolean login(@NotNull String username, @NotNull String password) {
+        return authenticate(username, password);
     }
     
     /**
