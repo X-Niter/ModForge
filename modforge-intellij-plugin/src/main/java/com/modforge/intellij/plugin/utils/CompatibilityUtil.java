@@ -7,6 +7,7 @@ import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.codeInsight.daemon.DaemonCodeAnalyzer;
+import com.intellij.openapi.ui.Icon;
 import com.intellij.psi.PsiFile;
 import com.intellij.psi.PsiManager;
 import org.jetbrains.annotations.NotNull;
@@ -97,6 +98,22 @@ public final class CompatibilityUtil {
     }
     
     /**
+     * Shows a yes/no dialog with the given message and customized button texts.
+     *
+     * @param project The project
+     * @param title The title
+     * @param message The message
+     * @param yesText The text for the "Yes" button
+     * @param noText The text for the "No" button
+     * @param icon The icon to display
+     * @return The user's choice (DIALOG_YES or DIALOG_NO)
+     */
+    public static int showYesNoDialog(Project project, String title, String message, String yesText, String noText, Icon icon) {
+        int result = com.intellij.openapi.ui.Messages.showYesNoDialog(project, message, title, yesText, noText, icon);
+        return result == com.intellij.openapi.ui.Messages.YES ? DIALOG_YES : DIALOG_NO;
+    }
+    
+    /**
      * Shows a dialog with the given options and returns the selected option index.
      *
      * @param project The project
@@ -107,7 +124,8 @@ public final class CompatibilityUtil {
      * @return The selected option index
      */
     public static int showChooseDialog(Project project, String message, String title, String[] options, String defaultOption) {
-        return com.intellij.openapi.ui.Messages.showChooseDialog(project, message, title, options, defaultOption, null);
+        com.intellij.openapi.ui.Icon icon = null; // No icon
+        return com.intellij.openapi.ui.Messages.showChooseDialog(project, message, title, options, defaultOption, icon);
     }
     
     /**
@@ -572,18 +590,29 @@ public final class CompatibilityUtil {
      * @return The extracted version, or null if not found
      */
     @Nullable
-    public static String extractVersionFromFile(String content, String versionKey) {
+    public static String extractVersionFromFile(@Nullable String content, @Nullable String versionKey) {
         if (content == null || versionKey == null) {
             return null;
         }
         
-        // Look for patterns like: minecraft_version = "1.16.5" or "minecraft_version": "1.16.5"
-        Pattern pattern = Pattern.compile(
-                versionKey + "\\s*[=:]\\s*[\"']([^\"']+)[\"']", 
-                Pattern.MULTILINE);
-        Matcher matcher = pattern.matcher(content);
-        if (matcher.find()) {
-            return matcher.group(1);
+        try {
+            // Look for patterns like: minecraft_version = "1.16.5" or "minecraft_version": "1.16.5"
+            Pattern pattern = Pattern.compile(
+                    versionKey + "\\s*[=:]\\s*[\"']([^\"']+)[\"']", 
+                    Pattern.MULTILINE);
+            Matcher matcher = pattern.matcher(content);
+            if (matcher.find()) {
+                return matcher.group(1);
+            }
+            
+            // Try to match the key with the standard properties format key=value (no quotes)
+            pattern = Pattern.compile(versionKey + "\\s*=\\s*([^\\s]+)");
+            matcher = pattern.matcher(content);
+            if (matcher.find()) {
+                return matcher.group(1);
+            }
+        } catch (Exception e) {
+            LOG.warn("Failed to extract version from file content for key: " + versionKey, e);
         }
         
         return null;
@@ -630,37 +659,7 @@ public final class CompatibilityUtil {
         }
     }
     
-    /**
-     * Extracts a version from a properties file content.
-     *
-     * @param content The content of the properties file
-     * @param key The key of the version property
-     * @return The extracted version, or null if not found
-     */
-    @Nullable
-    public static String extractVersionFromFile(@NotNull String content, @NotNull String key) {
-        try {
-            // Try to match the key with the standard properties format key=value
-            Pattern pattern = Pattern.compile(Pattern.quote(key) + "\\s*=\\s*([^\\s]+)");
-            Matcher matcher = pattern.matcher(content);
-            
-            if (matcher.find()) {
-                return matcher.group(1);
-            }
-            
-            // Try alternative format with quotes
-            pattern = Pattern.compile(Pattern.quote(key) + "\\s*=\\s*['\"]([^'\"]+)['\"]");
-            matcher = pattern.matcher(content);
-            
-            if (matcher.find()) {
-                return matcher.group(1);
-            }
-        } catch (Exception e) {
-            LOG.warn("Failed to extract version from file content for key: " + key, e);
-        }
-        
-        return null;
-    }
+    // Second implementation of extractVersionFromFile was removed to fix duplication
     
     /**
      * Checks if a mod loader version is compatible with a given Minecraft version.
