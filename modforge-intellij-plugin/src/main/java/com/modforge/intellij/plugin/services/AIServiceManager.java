@@ -176,6 +176,31 @@ public final class AIServiceManager {
     }
     
     /**
+     * Gets metrics as a map with object values.
+     * This method is used by UI components that need to display metrics.
+     * 
+     * @return Map of metrics with String keys and Object values
+     */
+    @NotNull
+    public Map<String, Object> getMetrics() {
+        Map<String, Object> metrics = new HashMap<>();
+        
+        // Add usage statistics
+        metrics.put("totalRequests", totalRequests.get());
+        metrics.put("patternMatches", patternMatches.get());
+        metrics.put("apiCalls", apiCalls.get());
+        metrics.put("estimatedTokensSaved", (double)estimatedTokensSaved.get());
+        metrics.put("estimatedCostSavedInCents", (double)estimatedCostSavedInCents.get());
+        
+        // Add configuration settings
+        ModForgeSettings settings = ModForgeSettings.getInstance();
+        metrics.put("enabled", settings.isPatternRecognitionEnabled());
+        metrics.put("learningRate", settings.getPatternLearningRate());
+        
+        return metrics;
+    }
+    
+    /**
      * Executes an AI request with pattern matching optimization.
      * @param project The project
      * @param input The input
