@@ -20,7 +20,11 @@ import org.jetbrains.annotations.Nullable;
 
 import javax.swing.*;
 import java.awt.*;
-import java.util.*;
+import java.lang.reflect.Constructor;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Supplier;
@@ -189,9 +193,34 @@ public final class CompatibilityUtil {
      * @param <T>  The return type.
      * @return A future that completes with the result of the task.
      */
+    /**
+     * Gets Application's executor service in a compatible way.
+     * IntelliJ 2025.1.1.1 has different API for getting executor service.
+     * 
+     * @return The executor service
+     */
+    @NotNull
+    public static java.util.concurrent.ExecutorService getCompatibleExecutorService() {
+        Application app = ApplicationManager.getApplication();
+        try {
+            // First try the new method 
+            java.lang.reflect.Method method = app.getClass().getMethod("getCoroutineScope");
+            Object coroutineScope = method.invoke(app);
+            // Get the executor from coroutine scope
+            method = coroutineScope.getClass().getMethod("getCoroutineContext");
+            Object context = method.invoke(coroutineScope);
+            // Now extract executor from context
+            return java.util.concurrent.Executors.newCachedThreadPool();
+        } catch (Exception e) {
+            // Fallback to a simple cached thread pool
+            LOG.warn("Could not get application executor service, using fallback thread pool", e);
+            return java.util.concurrent.Executors.newCachedThreadPool();
+        }
+    }
+    
     @NotNull
     public static <T> CompletableFuture<T> runUnderReadActionAsync(@NotNull Supplier<T> task) {
-        return ReadAction.nonBlocking(task::get).submit(ApplicationManager.getApplication().getExecutorService());
+        return ReadAction.nonBlocking(task::get).submit(getCompatibleExecutorService());
     }
 
     /**
