@@ -1,5 +1,6 @@
 package com.modforge.intellij.plugin.models;
 
+import com.modforge.intellij.plugin.model.ModLoaderType;
 import java.util.ArrayList;
 import java.util.List;
 

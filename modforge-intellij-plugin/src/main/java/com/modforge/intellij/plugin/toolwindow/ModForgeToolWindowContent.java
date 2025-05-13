@@ -6,7 +6,7 @@ import com.intellij.ui.components.JBLabel;
 import com.intellij.ui.components.JBPanel;
 import com.intellij.ui.components.JBScrollPane;
 import com.intellij.util.ui.JBUI;
-import com.modforge.intellij.plugin.models.ModLoaderType;
+import com.modforge.intellij.plugin.model.ModLoaderType;
 import com.modforge.intellij.plugin.services.ModForgeProjectService;
 
 import javax.swing.*;

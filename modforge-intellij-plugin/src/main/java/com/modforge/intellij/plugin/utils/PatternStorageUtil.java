@@ -5,7 +5,7 @@ import com.google.gson.GsonBuilder;
 import com.google.gson.reflect.TypeToken;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.project.Project;
-import com.modforge.intellij.plugin.models.ModLoaderType;
+import com.modforge.intellij.plugin.model.ModLoaderType;
 import com.modforge.intellij.plugin.models.Pattern;
 import com.modforge.intellij.plugin.utils.CompatibilityUtil;
 import org.jetbrains.annotations.NotNull;
