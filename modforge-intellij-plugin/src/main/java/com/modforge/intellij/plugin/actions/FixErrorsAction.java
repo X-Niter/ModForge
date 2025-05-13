@@ -17,7 +17,7 @@ import com.intellij.openapi.progress.Task;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.DialogWrapper;
 import com.intellij.openapi.vfs.VirtualFile;
-import com.intellij.problems.WolfTheProblemSolver;
+import com.intellij.codeInsight.daemon.DaemonCodeAnalyzer;
 import com.intellij.psi.PsiFile;
 import com.intellij.ui.components.JBLabel;
 import com.intellij.ui.components.JBScrollPane;
@@ -152,15 +152,12 @@ public class FixErrorsAction extends AnAction {
      * @return A collection of problems
      */
     private Collection<?> getProblemsInFile(@NotNull Project project, @NotNull VirtualFile file) {
-        WolfTheProblemSolver problemSolver = WolfTheProblemSolver.getInstance(project);
+        // Use the CompatibilityUtil methods to get problems in the file
+        // This will use DaemonCodeAnalyzer instead of WolfTheProblemSolver which is more compatible with IntelliJ IDEA 2025.1.1.1
         Collection<Object> problems = new ArrayList<>();
         
-        // Use the compatibility wrapper for hasProblemFilesBeneath
-        // Since this predicate can have different signatures in different versions
-        if (CompatibilityUtil.hasProblemsIn(problemSolver, file)) {
-            // In IntelliJ IDEA 2025.1.1.1, the signature has changed
-            // Create a compatible wrapper for processProblems
-            collectProblemsForFile(problemSolver, file, problems);
+        if (CompatibilityUtil.hasProblemsIn(project, file)) {
+            problems.addAll(CompatibilityUtil.getProblemsForFile(project, file));
         }
         
         return problems;
