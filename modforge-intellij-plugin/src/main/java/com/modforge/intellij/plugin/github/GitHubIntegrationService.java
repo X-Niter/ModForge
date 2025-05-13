@@ -1040,6 +1040,32 @@ public final class GitHubIntegrationService {
      * @param progressConsumer Consumer for progress updates
      * @return CompletableFuture with push result
      */
+    
+    /**
+     * Compatibility method for pushToGitHubV2 with PushResult return type.
+     * This handles the method signature conflict in the error logs.
+     * 
+     * @param owner Repository owner
+     * @param repository Repository name
+     * @param description Repository description
+     * @param isPrivate Whether repository should be private
+     * @param progressConsumer Consumer for progress updates
+     * @return CompletableFuture with push result
+     */
+    @Deprecated
+    public CompletableFuture<PushResult> pushToGitHubV2Compat(
+            String owner,
+            String repository,
+            String description,
+            boolean isPrivate,
+            Consumer<String> progressConsumer) {
+        // Delegate to V3 method
+        return pushToGitHubV3(owner, repository, description, isPrivate, progressConsumer);
+    }
+    
+    /**
+     * Version 3 implementation
+     */
     public CompletableFuture<PushResult> pushToGitHubV3(
             String owner,
             String repository,
