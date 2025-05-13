@@ -576,12 +576,14 @@ public final class CompatibilityUtil {
     public static void showErrorDialog(Project project, String message, String title) {
         ApplicationManager.getApplication().invokeLater(() -> {
             try {
-                // Try the method with project parameter first (newer versions in 2025.1.1.1)
-                Messages.showErrorDialog(project, message, title);
+                // Use icon-based method signature compatible with 2025.1.1.1
+                Messages.showDialog(project, message, title, new String[]{"OK"}, 0, 
+                        Messages.getErrorIcon());
             } catch (Exception e) {
                 try {
                     // Fall back to version without project parameter
-                    Messages.showErrorDialog(message, title);
+                    Messages.showDialog(message, title, new String[]{"OK"}, 0, 
+                            Messages.getErrorIcon());
                 } catch (Exception ex) {
                     LOG.error("Failed to show error dialog", ex);
                     // Last resort - use notification service
@@ -1093,12 +1095,14 @@ public final class CompatibilityUtil {
     public static void showWarningDialog(Project project, String message, String title) {
         ApplicationManager.getApplication().invokeLater(() -> {
             try {
-                // Try the method with project parameter first (newer versions in 2025.1.1.1)
-                Messages.showWarningDialog(project, message, title);
+                // Use icon-based method signature which is compatible with 2025.1.1.1
+                Messages.showDialog(project, message, title, new String[]{"OK"}, 0, 
+                        Messages.getWarningIcon());
             } catch (Exception e) {
                 try {
                     // Fall back to version without project parameter
-                    Messages.showWarningDialog(message, title);
+                    Messages.showDialog(message, title, new String[]{"OK"}, 0, 
+                            Messages.getWarningIcon());
                 } catch (Exception ex) {
                     LOG.error("Failed to show warning dialog", ex);
                     // Last resort - use notification service
@@ -1252,7 +1256,8 @@ public final class CompatibilityUtil {
         runOnUiThreadAndWait(() -> {
             try {
                 if (project == null || !project.isDisposed()) {
-                    Messages.showErrorDialog(project, message, title);
+                    Messages.showDialog(project, message, title, new String[]{"OK"}, 0, 
+                            Messages.getErrorIcon());
                 }
             } catch (Exception ex) {
                 LOG.error("Failed to show error dialog", ex);
