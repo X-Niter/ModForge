@@ -266,7 +266,8 @@ public class GenerateCodeAction extends AnAction {
             // Write content
             Document document = FileDocumentManager.getInstance().getDocument(file);
             if (document != null) {
-                ApplicationManager.getApplication().runWriteAction(() -> {
+                // Using CompatibilityUtil for better compatibility with IntelliJ IDEA 2025.1.1.1
+                CompatibilityUtil.runWriteAction(() -> {
                     document.setText(code);
                     FileDocumentManager.getInstance().saveDocument(document);
                 });

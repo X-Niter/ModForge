@@ -24,6 +24,7 @@ import com.intellij.ui.components.JBScrollPane;
 import com.intellij.ui.components.JBTextArea;
 import com.intellij.util.ui.JBUI;
 import com.modforge.intellij.plugin.services.AutonomousCodeGenerationService;
+import com.modforge.intellij.plugin.utils.CompatibilityUtil;
 import org.jetbrains.annotations.NotNull;
 
 import javax.swing.*;
@@ -228,7 +229,8 @@ public class AIAssistPanel extends SimpleToolWindowPanel {
         }
         
         // Update editor content
-        ApplicationManager.getApplication().runWriteAction(() -> {
+        // Using CompatibilityUtil for better compatibility with IntelliJ IDEA 2025.1.1.1
+        CompatibilityUtil.runWriteAction(() -> {
             Document document = outputEditor.getDocument();
             document.setText(content);
         });

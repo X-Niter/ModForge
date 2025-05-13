@@ -353,7 +353,8 @@ public final class ContinuousDevelopmentService {
                         LOG.info("Applying fixed code to file " + file.getName());
                         
                         ApplicationManager.getApplication().invokeLater(() -> {
-                            ApplicationManager.getApplication().runWriteAction(() -> {
+                            // Using CompatibilityUtil for better compatibility with IntelliJ IDEA 2025.1.1.1
+                            CompatibilityUtil.runWriteAction(() -> {
                                 try {
                                     // Write fixed code to file
                                     file.setBinaryContent(fixedCode.getBytes());
@@ -882,7 +883,8 @@ public final class ContinuousDevelopmentService {
                     LOG.info("Applying fixed code to file " + file.getName());
                     
                     ApplicationManager.getApplication().invokeLater(() -> {
-                        ApplicationManager.getApplication().runWriteAction(() -> {
+                        // Using CompatibilityUtil for better compatibility with IntelliJ IDEA 2025.1.1.1
+                        CompatibilityUtil.runWriteAction(() -> {
                             try {
                                 // Write fixed code to file
                                 file.setBinaryContent(fixedCode.getBytes());
