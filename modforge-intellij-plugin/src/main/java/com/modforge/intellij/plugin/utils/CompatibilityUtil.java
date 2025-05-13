@@ -798,4 +798,15 @@ public final class CompatibilityUtil {
             ApplicationManager.getApplication().runReadAction(supplier)
         );
     }
+    
+    /**
+     * Finds a file by its path.
+     *
+     * @param path The path to the file
+     * @return The virtual file, or null if not found
+     */
+    @Nullable
+    public static VirtualFile findFileByPath(@NotNull String path) {
+        return com.intellij.openapi.vfs.LocalFileSystem.getInstance().findFileByPath(path);
+    }
 }
