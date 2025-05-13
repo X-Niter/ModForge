@@ -135,7 +135,7 @@ public class AuthenticationManager {
                                 String userIdStr = responseStr.substring(userIdStart, userIdEnd).trim();
                                 try {
                                     int userId = Integer.parseInt(userIdStr);
-                                    settings.setUserId(userId);
+                                    settings.setUserId(String.valueOf(userId));
                                 } catch (NumberFormatException e) {
                                     LOG.warn("Failed to parse user ID: " + userIdStr, e);
                                 }
@@ -185,7 +185,7 @@ public class AuthenticationManager {
             // Clear authentication state
             settings.setAuthenticated(false);
             settings.setAccessToken("");
-            settings.setUserId(0);
+            settings.setUserId("");
             LOG.warn("Authentication is no longer valid");
         } else {
             LOG.info("Successfully verified authentication with ModForge server");
