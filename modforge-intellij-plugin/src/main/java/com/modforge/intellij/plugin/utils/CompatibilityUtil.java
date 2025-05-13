@@ -6,7 +6,7 @@ import com.intellij.openapi.application.WriteAction;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vfs.VirtualFile;
-import com.intellij.codeInsight.daemon.impl.WolfTheProblemSolver;
+import com.intellij.codeInsight.daemon.DaemonCodeAnalyzer;
 import com.intellij.psi.PsiFile;
 import com.intellij.psi.PsiManager;
 import org.jetbrains.annotations.NotNull;
@@ -127,17 +127,23 @@ public final class CompatibilityUtil {
     /**
      * Checks if the file has problems.
      *
-     * @param problemSolver The problem solver
+     * @param project The project
      * @param file The file
      * @return True if the file has problems, false otherwise
      */
-    public static boolean hasProblemsIn(WolfTheProblemSolver problemSolver, @NotNull VirtualFile file) {
-        return problemSolver != null && problemSolver.hasProblemFilesBeneath(element -> {
-            if (element instanceof VirtualFile) {
-                return ((VirtualFile) element).equals(file);
-            }
+    public static boolean hasProblemsIn(@Nullable Project project, @NotNull VirtualFile file) {
+        if (project == null) {
             return false;
-        });
+        }
+        
+        PsiFile psiFile = PsiManager.getInstance(project).findFile(file);
+        if (psiFile == null) {
+            return false;
+        }
+        
+        DaemonCodeAnalyzer analyzer = DaemonCodeAnalyzer.getInstance(project);
+        return analyzer.isErrorAnalyzingFinished(psiFile) && 
+               analyzer.hasErrors(psiFile);
     }
     
     /**
@@ -445,35 +451,117 @@ public final class CompatibilityUtil {
     /**
      * Gets all problem files.
      *
-     * @param problemSolver The problem solver
+     * @param project The project
      * @return The problem files
      */
     @NotNull
-    public static Collection<VirtualFile> getProblemFiles(WolfTheProblemSolver problemSolver) {
+    public static Collection<VirtualFile> getProblemFiles(@Nullable Project project) {
         Collection<VirtualFile> result = new ArrayList<>();
-        if (problemSolver != null) {
-            problemSolver.computeProblemFiles(result::add);
+        if (project == null) {
+            return result;
         }
+        
+        DaemonCodeAnalyzer analyzer = DaemonCodeAnalyzer.getInstance(project);
+        
+        // Get all files in the project
+        VirtualFile baseDir = getProjectBaseDir(project);
+        if (baseDir != null) {
+            collectFilesWithProblems(project, baseDir, analyzer, result);
+        }
+        
         return result;
+    }
+    
+    /**
+     * Recursively collects files with problems.
+     *
+     * @param project The project
+     * @param directory The directory to search
+     * @param analyzer The analyzer
+     * @param result The collection to add results to
+     */
+    private static void collectFilesWithProblems(
+            @NotNull Project project, 
+            @NotNull VirtualFile directory, 
+            @NotNull DaemonCodeAnalyzer analyzer,
+            @NotNull Collection<VirtualFile> result) {
+        
+        for (VirtualFile child : directory.getChildren()) {
+            if (child.isDirectory()) {
+                collectFilesWithProblems(project, child, analyzer, result);
+            } else {
+                PsiFile psiFile = PsiManager.getInstance(project).findFile(child);
+                if (psiFile != null && analyzer.isErrorAnalyzingFinished(psiFile) && analyzer.hasErrors(psiFile)) {
+                    result.add(child);
+                }
+            }
+        }
     }
     
     /**
      * Gets problems for a file.
      *
-     * @param problemSolver The problem solver
+     * @param project The project
      * @param file The file
      * @return The problems
      */
     @NotNull
-    public static Collection<Object> getProblemsForFile(WolfTheProblemSolver problemSolver, VirtualFile file) {
+    public static Collection<Object> getProblemsForFile(@Nullable Project project, @Nullable VirtualFile file) {
         Collection<Object> result = new ArrayList<>();
-        if (problemSolver != null && file != null) {
-            problemSolver.processProblems(file, (problem, state) -> {
-                result.add(problem);
-                return true;
-            });
+        if (project == null || file == null) {
+            return result;
         }
+        
+        PsiFile psiFile = PsiManager.getInstance(project).findFile(file);
+        if (psiFile == null) {
+            return result;
+        }
+        
+        DaemonCodeAnalyzer analyzer = DaemonCodeAnalyzer.getInstance(project);
+        if (analyzer.isErrorAnalyzingFinished(psiFile) && analyzer.hasErrors(psiFile)) {
+            // Since we can't get the actual problems from DaemonCodeAnalyzer directly,
+            // we'll create a generic problem description
+            result.add(new Problem(file, "Compilation error detected"));
+        }
+        
         return result;
+    }
+    
+    /**
+     * Simple problem class to represent code issues.
+     */
+    public static class Problem {
+        private final VirtualFile file;
+        private final String description;
+        
+        /**
+         * Creates a new problem.
+         *
+         * @param file The file with the problem
+         * @param description The problem description
+         */
+        public Problem(VirtualFile file, String description) {
+            this.file = file;
+            this.description = description;
+        }
+        
+        /**
+         * Gets the file with the problem.
+         *
+         * @return The file
+         */
+        public VirtualFile getFile() {
+            return file;
+        }
+        
+        /**
+         * Gets the problem description.
+         *
+         * @return The description
+         */
+        public String getDescription() {
+            return description;
+        }
     }
     
     /**
