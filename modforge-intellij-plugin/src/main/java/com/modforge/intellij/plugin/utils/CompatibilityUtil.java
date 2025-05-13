@@ -770,4 +770,32 @@ public final class CompatibilityUtil {
         
         return null;
     }
+    
+    /**
+     * Runs a supplier under write action asynchronously.
+     *
+     * @param supplier The supplier to run
+     * @param <T> The result type
+     * @return A future that completes with the result of the supplier
+     */
+    @NotNull
+    public static <T> CompletableFuture<T> runUnderWriteActionAsync(@NotNull Supplier<T> supplier) {
+        return CompletableFuture.supplyAsync(() -> 
+            ApplicationManager.getApplication().runWriteAction(supplier)
+        );
+    }
+    
+    /**
+     * Runs a supplier under read action asynchronously.
+     *
+     * @param supplier The supplier to run
+     * @param <T> The result type
+     * @return A future that completes with the result of the supplier
+     */
+    @NotNull
+    public static <T> CompletableFuture<T> runUnderReadActionAsync(@NotNull Supplier<T> supplier) {
+        return CompletableFuture.supplyAsync(() -> 
+            ApplicationManager.getApplication().runReadAction(supplier)
+        );
+    }
 }

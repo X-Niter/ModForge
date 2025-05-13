@@ -214,6 +214,16 @@ public final class ModAuthenticationManager {
     }
     
     /**
+     * Gets the GitHub token if available.
+     *
+     * @return The GitHub token, or null if not available
+     */
+    @Nullable
+    public String getGitHubToken() {
+        return settings.getGitHubToken();
+    }
+    
+    /**
      * Executes a POST request with the given URL and body.
      *
      * @param url The URL
