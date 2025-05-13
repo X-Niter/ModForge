@@ -447,11 +447,55 @@ public final class PatternRecognitionService {
      * @return The metrics
      */
     @NotNull
-    public Map<String, Integer> getMetrics() {
+    /**
+     * Returns metrics as Map<String, Integer>
+     * @deprecated Use {@link #getMetrics()} that returns Map<String, Object> instead
+     * @return Map with metrics
+     */
+    @Deprecated
+    public Map<String, Integer> getMetricsInt() {
         Map<String, Integer> metrics = new HashMap<>();
         metrics.put("patternCount", patterns.size());
         metrics.put("patternMatchCount", patternMatchCount.get());
         metrics.put("patternMissCount", patternMissCount.get());
+        
+    }
+        
+    /**
+     * Gets metrics about pattern recognition system.
+     * This provides a comprehensive view of how the system is performing.
+     *
+     * @return Map of metrics with various types of values
+     */
+    @NotNull
+    public Map<String, Object> getMetrics() {
+        Map<String, Object> metrics = new HashMap<>();
+        
+        // Basic counts
+        metrics.put("patternCount", patterns.size());
+        metrics.put("patternMatchCount", patternMatchCount.get());
+        metrics.put("patternMissCount", patternMissCount.get());
+        
+        // Status
+        metrics.put("enabled", ModForgeSettings.getInstance().isPatternRecognition());
+        
+        // Derived metrics
+        int totalRequests = patternMatchCount.get() + patternMissCount.get();
+        metrics.put("totalRequests", totalRequests);
+        metrics.put("patternMatches", patternMatchCount.get());
+        metrics.put("apiCalls", patternMissCount.get());
+        
+        // Calculate tokens saved (estimated)
+        int estimatedTokensSaved = patternMatchCount.get() * 1000; // Assume 1000 tokens saved per match
+        metrics.put("estimatedTokensSaved", (double)estimatedTokensSaved);
+        
+        // Calculate cost saved (estimated at $0.002 per 1K tokens)
+        double estimatedCostSaved = estimatedTokensSaved * 0.002 / 1000.0;
+        metrics.put("estimatedCostSaved", estimatedCostSaved);
+        
+        // Get pattern counts by category
+        Map<String, Integer> patternCountsByType = getPatternCountsByCategory();
+        metrics.put("patternCountsByType", patternCountsByType);
         
         // Count patterns by category
         Map<PatternCategory, Integer> categoryCounts = new EnumMap<>(PatternCategory.class);
