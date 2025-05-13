@@ -51,7 +51,27 @@ public final class PatternRecognitionService {
         FEATURE_SUGGESTION,
         CLASS_STRUCTURE,
         METHOD_IMPLEMENTATION,
-        ARCHITECTURY_LOADER
+        ARCHITECTURY_LOADER;
+        
+        /**
+         * Convert to the AI package's PatternCategory enum.
+         * @return The corresponding PatternCategory in the AI package
+         */
+        @NotNull
+        public com.modforge.intellij.plugin.ai.PatternCategory toAICategory() {
+            return com.modforge.intellij.plugin.ai.PatternCategory.valueOf(this.name());
+        }
+        
+        /**
+         * Create from the AI package's PatternCategory enum.
+         * @param category The category from the AI package
+         * @return The corresponding PatternCategory in this package
+         */
+        @NotNull
+        public static PatternCategory fromAICategory(
+                @NotNull com.modforge.intellij.plugin.ai.PatternCategory category) {
+            return PatternCategory.valueOf(category.name());
+        }
     }
     
     /**
