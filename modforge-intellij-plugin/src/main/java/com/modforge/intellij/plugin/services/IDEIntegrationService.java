@@ -20,6 +20,7 @@ import com.intellij.psi.*;
 import com.intellij.psi.search.FileTypeIndex;
 import com.intellij.psi.search.GlobalSearchScope;
 import com.intellij.util.messages.MessageBusConnection;
+import com.modforge.intellij.plugin.utils.CompatibilityUtil;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -139,7 +140,8 @@ public final class IDEIntegrationService {
                 file = directory.createChildData(this, fileName);
             }
             
-            ApplicationManager.getApplication().runWriteAction(() -> {
+            // Using CompatibilityUtil for better compatibility with IntelliJ IDEA 2025.1.1.1
+            CompatibilityUtil.runWriteAction(() -> {
                 try {
                     file.setBinaryContent(content.getBytes(StandardCharsets.UTF_8));
                 } catch (IOException e) {

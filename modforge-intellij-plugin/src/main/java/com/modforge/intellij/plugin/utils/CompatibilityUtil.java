@@ -130,6 +130,7 @@ public final class CompatibilityUtil {
     
     /**
      * Gets the base directory of the project.
+     * Compatible with IntelliJ IDEA 2025.1.1.1.
      *
      * @param project The project
      * @return The base directory, or null if not found
@@ -139,7 +140,31 @@ public final class CompatibilityUtil {
         if (project == null) {
             return null;
         }
-        return project.getBaseDir();
+        
+        try {
+            // First try the new modern API available in IntelliJ IDEA 2020.1+
+            String basePath = project.getBasePath();
+            if (basePath != null) {
+                return com.intellij.openapi.vfs.LocalFileSystem.getInstance().findFileByPath(basePath);
+            }
+            return null;
+        } catch (Exception e) {
+            LOG.warn("Error getting project base directory using modern API, falling back to legacy method", e);
+            
+            // Fall back to legacy method if available
+            try {
+                // Use reflection to access deprecated method to maintain backward compatibility
+                java.lang.reflect.Method getBaseDirMethod = Project.class.getMethod("getBaseDir");
+                Object result = getBaseDirMethod.invoke(project);
+                if (result instanceof VirtualFile) {
+                    return (VirtualFile) result;
+                }
+            } catch (Exception ex) {
+                LOG.warn("Could not get project base directory using any method", ex);
+            }
+            
+            return null;
+        }
     }
     
     /**
