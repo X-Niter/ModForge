@@ -447,7 +447,7 @@ public final class CompatibilityUtil {
      * @return The result
      */
     public static <T> T runReadAction(@NotNull Supplier<T> supplier) {
-        return ReadAction.compute(supplier::get);
+        return ApplicationManager.getApplication().runReadAction(supplier);
     }
     
     /**
@@ -456,7 +456,7 @@ public final class CompatibilityUtil {
      * @param runnable The runnable
      */
     public static void runWriteAction(@NotNull Runnable runnable) {
-        WriteAction.run(runnable::run);
+        ApplicationManager.getApplication().runWriteAction(runnable);
     }
     
     /**

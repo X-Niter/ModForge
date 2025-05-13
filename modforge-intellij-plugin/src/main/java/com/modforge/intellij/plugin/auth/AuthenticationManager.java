@@ -204,7 +204,7 @@ public class AuthenticationManager {
             // Already logged out
             settings.setAuthenticated(false);
             settings.setAccessToken("");
-            settings.setUserId("");
+            settings.setUserId(0);
             return true;
         }
         
@@ -215,7 +215,7 @@ public class AuthenticationManager {
         // Clear authentication state regardless of response
         settings.setAuthenticated(false);
         settings.setAccessToken("");
-        settings.setUserId("");
+        settings.setUserId(0);
         
         if (!success) {
             LOG.warn("Failed to logout from ModForge server");
