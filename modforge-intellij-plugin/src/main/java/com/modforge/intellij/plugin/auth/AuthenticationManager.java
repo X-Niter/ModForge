@@ -4,6 +4,7 @@ import com.intellij.openapi.diagnostic.Logger;
 import com.modforge.intellij.plugin.settings.ModForgeSettings;
 import com.modforge.intellij.plugin.utils.TokenAuthConnectionUtil;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -224,5 +225,57 @@ public class AuthenticationManager {
         }
         
         return success;
+    }
+    
+    /**
+     * Get the username.
+     * @return The username
+     */
+    @NotNull
+    public String getUsername() {
+        return username != null ? username : "";
+    }
+    
+    /**
+     * Get the authentication token.
+     * @return The authentication token
+     */
+    @NotNull
+    public String getToken() {
+        ModForgeSettings settings = ModForgeSettings.getInstance();
+        return settings.getAccessToken();
+    }
+    
+    /**
+     * Get the server URL.
+     * @return The server URL
+     */
+    @NotNull
+    public String getServerUrl() {
+        ModForgeSettings settings = ModForgeSettings.getInstance();
+        return settings.getServerUrl();
+    }
+    
+    /**
+     * Get the GitHub token.
+     * @return The GitHub token, or null if not available
+     */
+    @Nullable
+    public String getGitHubToken() {
+        ModForgeSettings settings = ModForgeSettings.getInstance();
+        return settings.getGitHubToken();
+    }
+    
+    /**
+     * Login with the given credentials.
+     * This is an alias for setCredentials() + authenticate() for API compatibility.
+     * 
+     * @param username The username
+     * @param password The password
+     * @return Whether login was successful
+     */
+    public boolean login(@NotNull String username, @NotNull String password) {
+        setCredentials(username, password);
+        return authenticate();
     }
 }
