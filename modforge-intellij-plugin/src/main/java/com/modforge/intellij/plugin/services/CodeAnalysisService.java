@@ -320,7 +320,7 @@ public final class CodeAnalysisService {
                 LOG.error("Error finding references to class: " + qualifiedName, e);
                 return new ArrayList<>();
             }
-        }, AppExecutorUtil.getAppExecutorService());
+        }, CompatibilityUtil.getCompatibleAppExecutorService());
     }
     
     /**
@@ -375,7 +375,7 @@ public final class CodeAnalysisService {
                 LOG.error("Error finding references to method: " + qualifiedClassName + "." + methodName, e);
                 return new ArrayList<>();
             }
-        }, AppExecutorUtil.getAppExecutorService());
+        }, CompatibilityUtil.getCompatibleAppExecutorService());
     }
     
     /**
