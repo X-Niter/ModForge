@@ -413,7 +413,7 @@ public class ModForgeToolWindowFactory implements ToolWindowFactory {
     private com.intellij.openapi.actionSystem.AnActionEvent createEmptyActionEvent(@NotNull Project project) {
         return new com.intellij.openapi.actionSystem.AnActionEvent(
                 null,
-                com.intellij.openapi.actionSystem.DataManager.getInstance().getDataContext(),
+                com.modforge.intellij.plugin.utils.CompatibilityUtil.getCompatibleDataContext(),
                 "",
                 new com.intellij.openapi.actionSystem.Presentation(),
                 com.intellij.openapi.actionSystem.ActionManager.getInstance(),

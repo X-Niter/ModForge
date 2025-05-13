@@ -1497,4 +1497,49 @@ public final class CompatibilityUtil {
             });
         }
     }
+    
+    /**
+     * Gets a compatible DataContext for IntelliJ IDEA 2025.1.1.1.
+     * This method provides a compatibility layer for the DataManager.getDataContext() method
+     * which may have changed in IntelliJ IDEA 2025.1.1.1.
+     * 
+     * @return The data context
+     */
+    @NotNull
+    public static com.intellij.openapi.actionSystem.DataContext getCompatibleDataContext() {
+        try {
+            // Try to use the DataManager method
+            java.lang.reflect.Method method = 
+                com.intellij.openapi.actionSystem.DataManager.class.getMethod("getDataContext");
+            return (com.intellij.openapi.actionSystem.DataContext) method.invoke(
+                com.intellij.openapi.actionSystem.DataManager.getInstance());
+        } catch (Exception e) {
+            // Fall back to our own implementation of an empty DataContext
+            LOG.warn("Failed to get data context, creating compatible alternative", e);
+            return dataId -> null;
+        }
+    }
+    
+    /**
+     * Gets a compatible DataContext from a MouseEvent for IntelliJ IDEA 2025.1.1.1.
+     * This method provides a compatibility layer for getting DataContext from MouseEvent
+     * which may have changed in IntelliJ IDEA 2025.1.1.1.
+     * 
+     * @param mouseEvent The mouse event to get the data context from
+     * @return The data context
+     */
+    @NotNull
+    public static com.intellij.openapi.actionSystem.DataContext getCompatibleDataContext(@NotNull java.awt.event.MouseEvent mouseEvent) {
+        try {
+            // Try to use the MouseEvent-aware method if available
+            java.lang.reflect.Method method = 
+                com.intellij.openapi.actionSystem.DataManager.class.getMethod("getDataContext", java.awt.Component.class);
+            return (com.intellij.openapi.actionSystem.DataContext) method.invoke(
+                com.intellij.openapi.actionSystem.DataManager.getInstance(), mouseEvent.getComponent());
+        } catch (Exception e) {
+            LOG.warn("Failed to get data context from MouseEvent, creating compatible alternative", e);
+            // Fall back to our basic implementation
+            return dataId -> null;
+        }
+    }
 }

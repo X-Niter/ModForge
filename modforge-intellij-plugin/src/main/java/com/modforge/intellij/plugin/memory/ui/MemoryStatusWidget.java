@@ -219,7 +219,7 @@ public class MemoryStatusWidget implements StatusBarWidget, StatusBarWidget.Icon
                     showSettingsAction,
                     mouseEvent,
                     ActionPlaces.UNKNOWN,
-                    e.getDataContext()
+                    com.modforge.intellij.plugin.utils.CompatibilityUtil.getCompatibleDataContext(mouseEvent)
                 );
                 
                 // Add the specific settings page ID to navigate directly to memory settings
