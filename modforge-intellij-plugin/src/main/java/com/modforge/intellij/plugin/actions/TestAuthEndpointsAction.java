@@ -67,7 +67,7 @@ public class TestAuthEndpointsAction extends AnAction {
                     results.toString()
             );
         } else {
-            CompatibilityUtil.showInfoDialog(project, results.toString(), "Authentication Test Results");
+            com.modforge.intellij.plugin.utils.CompatibilityUtil.showInfoDialog(project, results.toString(), "Authentication Test Results");
         }
         
         LOG.info("Completed testing authentication endpoints");
