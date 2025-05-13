@@ -248,4 +248,39 @@ public final class AIServiceManager {
     private String getOpenAiUrl(@NotNull String endpoint) {
         return "https://api.openai.com/v1/" + endpoint;
     }
+    
+    /**
+     * Executes an AI request with pattern matching optimization.
+     * This is a compatibility method that forwards to the service implementation.
+     * 
+     * @param project The project
+     * @param input The input prompt
+     * @param category The pattern category
+     * @param fallbackFunction The function to call if no pattern match is found
+     * @return The AI response or null if there's an error
+     */
+    @Nullable
+    public String executeWithPatternMatching(
+            com.intellij.openapi.project.Project project,
+            @NotNull String input,
+            @NotNull PatternCategory category,
+            @NotNull java.util.function.Function<String, String> fallbackFunction
+    ) {
+        // Forward to the service implementation
+        try {
+            // Get service manager from services package
+            com.modforge.intellij.plugin.services.AIServiceManager serviceManager = 
+                com.modforge.intellij.plugin.services.AIServiceManager.getInstance();
+            
+            return serviceManager.executeWithPatternMatching(
+                project,
+                input,
+                category.toServiceCategory(),
+                fallbackFunction
+            );
+        } catch (Exception e) {
+            LOG.error("Error forwarding to pattern matching service", e);
+            return null;
+        }
+    }
 }
