@@ -55,12 +55,25 @@ public final class AIServiceManager {
         }
     }
     
+
     /**
-     * Gets the AIServiceManager instance.
-     * @return The AIServiceManager instance
+     * Gets the instance of AIServiceManager from the services package.
+     * This method avoids conflict with the similarly named method in 
+     * com.modforge.intellij.plugin.ai.AIServiceManager
+     * 
+     * @return The AI service manager from the services package
+     */
+    public static AIServiceManager getServiceInstance() {
+        return ServiceManager.getService(AIServiceManager.class);
+    }
+    
+    /**
+     * Compatibility method to avoid conflicts between different implementations
+     * 
+     * @return The AI service manager from the services package
      */
     public static AIServiceManager getInstance() {
-        return ServiceManager.getService(AIServiceManager.class);
+        return getServiceInstance();
     }
     
     /**

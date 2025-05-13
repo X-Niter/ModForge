@@ -25,12 +25,25 @@ public final class AIServiceManager {
     private static final Logger LOG = Logger.getInstance(AIServiceManager.class);
     private static final String OPENAI_API_URL = "https://api.openai.com/v1/chat/completions";
     
+
     /**
-     * Gets the instance of the service.
+     * Gets the instance of AIServiceManager from the AI package.
+     * This method avoids conflict with the similarly named method in 
+     * com.modforge.intellij.plugin.services.AIServiceManager
+     * 
+     * @return The AI service manager from the AI package
+     */
+    public static AIServiceManager getAIInstance() {
+        return ApplicationManager.getApplication().getService(AIServiceManager.class);
+    }
+    
+    /**
+     * Compatibility method to avoid conflicts between different implementations
+     * 
      * @return The AI service manager
      */
     public static AIServiceManager getInstance() {
-        return ApplicationManager.getApplication().getService(AIServiceManager.class);
+        return getAIInstance();
     }
     
     /**
