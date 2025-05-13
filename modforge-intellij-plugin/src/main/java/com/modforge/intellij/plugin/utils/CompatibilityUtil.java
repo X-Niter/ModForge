@@ -809,6 +809,18 @@ public final class CompatibilityUtil {
     }
     
     /**
+     * Finds a virtual file by path.
+     * This method provides compatibility with different IntelliJ IDEA versions.
+     *
+     * @param path The path to find
+     * @return The virtual file, or null if not found
+     */
+    @Nullable
+    public static VirtualFile findFileByPath(@NotNull String path) {
+        return com.intellij.openapi.vfs.LocalFileSystem.getInstance().findFileByPath(path);
+    }
+    
+    /**
      * Finds a file by its path.
      *
      * @param path The path to the file
