@@ -154,9 +154,10 @@ public class PushToGitHubAction extends AnAction {
                             
                             if (result.isSuccess()) {
                                 if (notificationService != null) {
+                                    // Fix parameter order for showInfoMessage
                                     notificationService.showInfoMessage(
-                                            project,
-                                            "Push Successful", 
+                                            project, // First parameter is Project
+                                            "Push Successful", // Second parameter is title
                                             result.getMessage() + 
                                             (result.getRepositoryUrl() != null ? "\nRepository URL: " + result.getRepositoryUrl() : "")
                                     );

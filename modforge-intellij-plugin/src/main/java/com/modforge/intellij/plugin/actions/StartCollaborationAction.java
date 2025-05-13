@@ -37,8 +37,8 @@ public class StartCollaborationAction extends AnAction {
             return;
         }
         
-        // Get collaboration service
-        CollaborationService collaborationService = CollaborationService.getInstance(project);
+        // Get collaboration service - using the proper getInstance method
+        CollaborationService collaborationService = project.getService(CollaborationService.class);
         
         // Check if already connected
         if (collaborationService.isConnected()) {
