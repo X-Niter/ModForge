@@ -130,6 +130,18 @@ public final class CollaborationService {
     }
     
     /**
+     * Legacy removeParticipant method that doesn't return a value.
+     * This is kept for compatibility with existing code.
+     * 
+     * @param userId The ID of the participant to remove
+     * @deprecated Use {@link #removeParticipant(String)} which returns a boolean result
+     */
+    @Deprecated
+    public void removeParticipantVoid(String userId) {
+        removeParticipant(userId);
+    }
+    
+    /**
      * Gets a map of all participants.
      * 
      * @return Map of participants (user ID to participant info)
