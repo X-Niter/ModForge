@@ -94,7 +94,7 @@ public final class CodeAnalysisService {
                 LOG.error("Error analyzing file: " + file.getPath(), e);
                 return new AnalysisResult(file.getPath(), file.getTimeStamp());
             }
-        }, AppExecutorUtil.getAppExecutorService());
+        }, CompatibilityUtil.getCompatibleAppExecutorService());
     }
     
     /**
