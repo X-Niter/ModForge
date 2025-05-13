@@ -263,23 +263,19 @@ public final class ModForgeSettings implements PersistentStateComponent<ModForge
      * Gets the server URL.
      *
      * @return The server URL.
-     * @deprecated Use {@link #getServerUrlLegacy()} instead to avoid duplicate method issues
      */
-    @Deprecated
     @NotNull
     public String getServerUrl() {
-        return getServerUrlLegacy();
+        return serverUrl;
     }
 
     /**
      * Sets the server URL.
      *
      * @param serverUrl The server URL.
-     * @deprecated Use {@link #setServerUrlLegacy(String)} instead to avoid duplicate method issues
      */
-    @Deprecated
     public void setServerUrl(@NotNull String serverUrl) {
-        setServerUrlLegacy(serverUrl);
+        this.serverUrl = serverUrl;
     }
 
     /**
@@ -420,7 +416,14 @@ public final class ModForgeSettings implements PersistentStateComponent<ModForge
         temperature = 0.7;
         
         githubUsername = "";
+        githubRepository = "";
         githubToken = "";
+        enableGitHubIntegration = false;
+        autoMonitorRepository = false;
+        autoRespondToIssues = false;
+        
+        useDarkMode = true;
+        maxApiRequestsPerDay = 100;
     }
     
     /**
