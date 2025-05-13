@@ -1,5 +1,6 @@
 package com.modforge.intellij.plugin.utils;
 
+import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.application.WriteAction;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.fileEditor.FileDocumentManager;
@@ -74,8 +75,14 @@ public final class VirtualFileUtil {
     @Nullable
     public static VirtualFile createDirectory(@NotNull VirtualFile parent, @NotNull String name) {
         try {
-            return WriteAction.compute(() -> parent.createChildDirectory(VirtualFileUtil.class, name));
-        } catch (IOException e) {
+            return ApplicationManager.getApplication().runWriteAction(() -> {
+                try {
+                    return parent.createChildDirectory(VirtualFileUtil.class, name);
+                } catch (IOException e) {
+                    throw new RuntimeException(e);
+                }
+            });
+        } catch (Exception e) {
             LOG.error("Failed to create directory: " + name, e);
             return null;
         }
@@ -96,12 +103,16 @@ public final class VirtualFileUtil {
             @NotNull String content) {
         
         try {
-            return WriteAction.compute(() -> {
-                VirtualFile file = parent.createChildData(VirtualFileUtil.class, name);
-                file.setBinaryContent(content.getBytes(StandardCharsets.UTF_8));
-                return file;
+            return ApplicationManager.getApplication().runWriteAction(() -> {
+                try {
+                    VirtualFile file = parent.createChildData(VirtualFileUtil.class, name);
+                    file.setBinaryContent(content.getBytes(StandardCharsets.UTF_8));
+                    return file;
+                } catch (IOException e) {
+                    throw new RuntimeException(e);
+                }
             });
-        } catch (IOException e) {
+        } catch (Exception e) {
             LOG.error("Failed to create file: " + name, e);
             return null;
         }
@@ -142,12 +153,15 @@ public final class VirtualFileUtil {
      */
     public static boolean writeToFile(@NotNull VirtualFile file, @NotNull String content) {
         try {
-            WriteAction.compute(() -> {
-                file.setBinaryContent(content.getBytes(StandardCharsets.UTF_8));
-                return file;
+            ApplicationManager.getApplication().runWriteAction(() -> {
+                try {
+                    file.setBinaryContent(content.getBytes(StandardCharsets.UTF_8));
+                } catch (IOException e) {
+                    throw new RuntimeException(e);
+                }
             });
             return true;
-        } catch (IOException e) {
+        } catch (Exception e) {
             LOG.error("Failed to write to file: " + file.getPath(), e);
             return false;
         }
@@ -217,12 +231,15 @@ public final class VirtualFileUtil {
      */
     public static boolean delete(@NotNull VirtualFile file) {
         try {
-            WriteAction.compute(() -> {
-                file.delete(VirtualFileUtil.class);
-                return null;
+            ApplicationManager.getApplication().runWriteAction(() -> {
+                try {
+                    file.delete(VirtualFileUtil.class);
+                } catch (IOException e) {
+                    throw new RuntimeException(e);
+                }
             });
             return true;
-        } catch (IOException e) {
+        } catch (Exception e) {
             LOG.error("Failed to delete: " + file.getPath(), e);
             return false;
         }
