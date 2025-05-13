@@ -55,7 +55,7 @@ public class ModForgeToolWindowFactory implements ToolWindowFactory {
         BorderLayoutPanel panel = new BorderLayoutPanel();
         panel.add(createContent(project), BorderLayout.CENTER);
         
-        Content content = ContentFactory.getInstance()
+        Content content = com.modforge.intellij.plugin.utils.CompatibilityUtil.getCompatibleContentFactory()
                 .createContent(panel, "ModForge", false);
         toolWindow.getContentManager().addContent(content);
         

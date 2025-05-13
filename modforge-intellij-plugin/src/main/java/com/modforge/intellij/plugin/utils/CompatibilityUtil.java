@@ -1542,4 +1542,78 @@ public final class CompatibilityUtil {
             return dataId -> null;
         }
     }
+    
+    /**
+     * Gets a compatible ContentFactory instance for IntelliJ IDEA 2025.1.1.1.
+     * This method provides a compatibility layer for ContentFactory.getInstance()
+     * which may have changed in IntelliJ IDEA 2025.1.1.1.
+     * 
+     * @return ContentFactory instance
+     */
+    @NotNull
+    public static com.intellij.ui.content.ContentFactory getCompatibleContentFactory() {
+        try {
+            // Try to use ContentFactory.getInstance() directly
+            java.lang.reflect.Method method = 
+                com.intellij.ui.content.ContentFactory.class.getMethod("getInstance");
+            return (com.intellij.ui.content.ContentFactory) method.invoke(null);
+        } catch (Exception e) {
+            // Fall back to ServiceManager method if available
+            LOG.warn("Failed to get ContentFactory directly, trying through ServiceManager", e);
+            try {
+                Class<?> serviceManagerClass = Class.forName("com.intellij.openapi.components.ServiceManager");
+                java.lang.reflect.Method getServiceMethod = 
+                    serviceManagerClass.getMethod("getService", Class.class);
+                
+                return (com.intellij.ui.content.ContentFactory) getServiceMethod.invoke(
+                    null, com.intellij.ui.content.ContentFactory.class);
+            } catch (Exception e2) {
+                LOG.error("Failed to get ContentFactory through ServiceManager", e2);
+                throw new RuntimeException("Cannot get ContentFactory instance", e2);
+            }
+        }
+    }
+    
+    /**
+     * Creates a compatible AnActionEvent for IntelliJ IDEA 2025.1.1.1.
+     * This method provides a compatibility layer for AnActionEvent.createFromAnAction
+     * which may have changed in IntelliJ IDEA 2025.1.1.1.
+     *
+     * @param action the action
+     * @param inputEvent the input event
+     * @param place the place
+     * @param dataContext the data context
+     * @return a new AnActionEvent
+     */
+    @NotNull
+    public static com.intellij.openapi.actionSystem.AnActionEvent createCompatibleActionEvent(
+            @NotNull com.intellij.openapi.actionSystem.AnAction action,
+            @Nullable java.awt.event.InputEvent inputEvent,
+            @NotNull @com.intellij.openapi.util.NlsSafe String place,
+            @NotNull com.intellij.openapi.actionSystem.DataContext dataContext) {
+        try {
+            // Try to use the createFromAnAction method
+            java.lang.reflect.Method method = 
+                com.intellij.openapi.actionSystem.AnActionEvent.class.getMethod(
+                    "createFromAnAction", 
+                    com.intellij.openapi.actionSystem.AnAction.class,
+                    java.awt.event.InputEvent.class,
+                    String.class,
+                    com.intellij.openapi.actionSystem.DataContext.class);
+            
+            return (com.intellij.openapi.actionSystem.AnActionEvent) 
+                method.invoke(null, action, inputEvent, place, dataContext);
+        } catch (Exception e) {
+            // Fall back to constructor
+            LOG.warn("Failed to create action event with createFromAnAction, using constructor", e);
+            return new com.intellij.openapi.actionSystem.AnActionEvent(
+                inputEvent,
+                dataContext,
+                place,
+                action.getTemplatePresentation().clone(),
+                com.intellij.openapi.actionSystem.ActionManager.getInstance(),
+                0
+            );
+        }
+    }
 }

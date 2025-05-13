@@ -215,7 +215,7 @@ public class MemoryStatusWidget implements StatusBarWidget, StatusBarWidget.Icon
                 AnAction showSettingsAction = ActionManager.getInstance().getAction("ShowSettings");
                 
                 // Create an action event with the memory settings ID
-                AnActionEvent settingsEvent = AnActionEvent.createFromAnAction(
+                AnActionEvent settingsEvent = com.modforge.intellij.plugin.utils.CompatibilityUtil.createCompatibleActionEvent(
                     showSettingsAction,
                     mouseEvent,
                     ActionPlaces.UNKNOWN,
