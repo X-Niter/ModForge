@@ -7,8 +7,7 @@ import com.intellij.openapi.project.Project;
 import com.intellij.openapi.project.ProjectManager;
 import com.intellij.openapi.project.ProjectManagerListener;
 import com.intellij.openapi.vfs.VirtualFile;
-import com.intellij.problems.Problem;
-import com.intellij.problems.WolfTheProblemSolver;
+import com.intellij.codeInsight.daemon.DaemonCodeAnalyzer;
 import com.intellij.psi.PsiFile;
 import com.intellij.psi.PsiManager;
 import com.intellij.util.concurrency.AppExecutorUtil;
@@ -175,14 +174,14 @@ public final class ContinuousDevelopmentService {
             // Update last scan time
             lastScanTime = System.currentTimeMillis();
             
-            // Get all files with problems
-            WolfTheProblemSolver problemSolver = WolfTheProblemSolver.getInstance(project);
-            if (problemSolver == null) {
+            // Get all files with problems using DaemonCodeAnalyzer
+            DaemonCodeAnalyzer codeAnalyzer = DaemonCodeAnalyzer.getInstance(project);
+            if (codeAnalyzer == null) {
                 return;
             }
             
             // Check if there are problems
-            if (!problemSolver.hasProblemFilesBeneath(psiElement -> true)) {
+            if (!CompatibilityUtil.hasProblems(project)) {
                 LOG.info("No problems found in project " + project.getName());
                 
                 // Record successful scan
@@ -253,7 +252,7 @@ public final class ContinuousDevelopmentService {
                 
                 // Get problems for file using compatibility helper
                 @SuppressWarnings("unchecked")
-                Collection<Problem> problems = (Collection<Problem>)(Collection<?>) CompatibilityUtil.getProblemsForFile(project, file);
+                Collection<CompatibilityUtil.Problem> problems = (Collection<CompatibilityUtil.Problem>)(Collection<?>) CompatibilityUtil.getProblemsForFile(project, file);
                 
                 if (problems.isEmpty()) {
                     continue;
