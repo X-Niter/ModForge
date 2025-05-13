@@ -11,6 +11,7 @@ import com.modforge.intellij.plugin.services.ModForgeNotificationService;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
@@ -274,5 +275,29 @@ public final class PatternRecognitionService {
      */
     public void resetStatistics() {
         patternLearningSystem.resetStatistics();
+    }
+    
+    /**
+     * Get detailed metrics about pattern recognition system.
+     * This provides metrics in a format compatible with the UI display requirements.
+     * 
+     * @return Detailed metrics about pattern recognition
+     */
+    @NotNull
+    public Map<String, Object> getDetailedMetrics() {
+        Map<String, Object> stats = patternLearningSystem.getStatistics();
+        Map<String, Object> metrics = new HashMap<>();
+        
+        // Copy basic stats
+        metrics.put("totalRequests", stats.getOrDefault("totalRequests", 0));
+        metrics.put("patternMatches", stats.getOrDefault("patternMatches", 0));
+        metrics.put("apiCalls", stats.getOrDefault("apiCalls", 0));
+        metrics.put("estimatedTokensSaved", stats.getOrDefault("estimatedTokensSaved", 0));
+        metrics.put("estimatedCostSaved", stats.getOrDefault("estimatedCostSavedCents", 0.0));
+        
+        // Add enabled status
+        metrics.put("enabled", enabled.get());
+        
+        return metrics;
     }
 }
