@@ -1,36 +1,56 @@
 package com.modforge.intellij.plugin.ai;
 
-import org.jetbrains.annotations.NotNull;
-
 /**
- * Pattern categories used for AI pattern matching.
- * This is a compatibility enum for the AIServiceManager in the ai package.
+ * Enum for pattern categories.
+ * These categories help organize and match AI patterns for different types of requests.
  */
 public enum PatternCategory {
+    /**
+     * Code generation patterns.
+     */
     CODE_GENERATION,
-    ERROR_RESOLUTION,
-    FEATURE_SUGGESTION,
-    CLASS_STRUCTURE,
-    METHOD_IMPLEMENTATION,
-    ARCHITECTURY_LOADER;
     
     /**
-     * Convert to the service package's PatternCategory enum.
-     * @return The corresponding PatternCategory in the services package
+     * Code fixing patterns.
      */
-    @NotNull
-    public com.modforge.intellij.plugin.services.PatternRecognitionService.PatternCategory toServiceCategory() {
-        return com.modforge.intellij.plugin.services.PatternRecognitionService.PatternCategory.valueOf(this.name());
-    }
+    CODE_FIXING,
     
     /**
-     * Create from the service package's PatternCategory enum.
-     * @param category The category from the services package
-     * @return The corresponding PatternCategory in this package
+     * Code enhancement patterns.
      */
-    @NotNull
-    public static PatternCategory fromServiceCategory(
-            @NotNull com.modforge.intellij.plugin.services.PatternRecognitionService.PatternCategory category) {
-        return PatternCategory.valueOf(category.name());
+    CODE_ENHANCEMENT,
+    
+    /**
+     * Documentation generation patterns.
+     */
+    DOCUMENTATION,
+    
+    /**
+     * Feature addition patterns.
+     */
+    FEATURE_ADDITION;
+    
+    /**
+     * Converts this enum to the service category enum.
+     * This is used for compatibility with the services package.
+     * 
+     * @return The service category
+     */
+    public com.modforge.intellij.plugin.services.PatternCategory toServiceCategory() {
+        switch (this) {
+            case CODE_GENERATION:
+                return com.modforge.intellij.plugin.services.PatternCategory.CODE_GENERATION;
+            case CODE_FIXING:
+                return com.modforge.intellij.plugin.services.PatternCategory.CODE_FIXING;
+            case CODE_ENHANCEMENT:
+                return com.modforge.intellij.plugin.services.PatternCategory.CODE_ENHANCEMENT;
+            case DOCUMENTATION:
+                return com.modforge.intellij.plugin.services.PatternCategory.DOCUMENTATION;
+            case FEATURE_ADDITION:
+                return com.modforge.intellij.plugin.services.PatternCategory.FEATURE_ADDITION;
+            default:
+                // Default to code generation
+                return com.modforge.intellij.plugin.services.PatternCategory.CODE_GENERATION;
+        }
     }
 }

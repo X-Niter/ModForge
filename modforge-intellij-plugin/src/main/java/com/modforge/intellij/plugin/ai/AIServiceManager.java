@@ -123,6 +123,30 @@ public final class AIServiceManager {
     }
     
     /**
+     * Explains an error message.
+     * @param errorMessage The error message to explain
+     * @return The explanation
+     * @throws IOException If an IO error occurs
+     */
+    @NotNull
+    public String explainError(@NotNull String errorMessage) throws IOException {
+        // Create system prompt for error explanation
+        String systemPrompt = "You are an expert developer who excels at understanding and fixing code errors. " +
+                "You provide clear explanations of error messages and suggest solutions. " +
+                "Format your response as follows:\n" +
+                "1. Error Analysis: Brief explanation of what the error means\n" +
+                "2. Likely Cause: Most common reasons for this error\n" +
+                "3. How to Fix: Specific steps to resolve the issue";
+        
+        // Create full prompt
+        StringBuilder fullPrompt = new StringBuilder("Explain the following error and how to fix it:\n\n");
+        fullPrompt.append(errorMessage);
+        
+        // Make API request
+        return makeAiRequest(systemPrompt, fullPrompt.toString());
+    }
+    
+    /**
      * Explains code.
      * @param code The code to explain
      * @param options Additional options
@@ -335,5 +359,68 @@ public final class AIServiceManager {
             LOG.error("Error downloading latest patterns", e);
             return new ArrayList<>();
         }
+    }
+    
+    /**
+     * Generates code based on a code generation request.
+     * 
+     * @param request The code generation request
+     * @return The generated code
+     * @throws IOException If an IO error occurs
+     */
+    @NotNull
+    public String generateCode(@NotNull CodeGenerationRequest request) throws IOException {
+        // Build system prompt using mod loader and Minecraft version
+        StringBuilder systemPromptBuilder = new StringBuilder();
+        systemPromptBuilder.append("You are an expert Minecraft mod developer. ");
+        
+        if (request.getModLoaderType() != ModLoaderType.UNKNOWN) {
+            systemPromptBuilder.append("You specialize in ").append(request.getModLoaderType().getDisplayName())
+                              .append(" mods. ");
+        }
+        
+        if (!request.getMinecraftVersion().isEmpty()) {
+            systemPromptBuilder.append("You're writing code for Minecraft version ")
+                              .append(request.getMinecraftVersion()).append(". ");
+        }
+        
+        systemPromptBuilder.append("You write clean, efficient, and well-documented code. ")
+                          .append("Only respond with code without explanation unless explanation was explicitly requested.");
+        
+        // Build user prompt
+        StringBuilder userPromptBuilder = new StringBuilder();
+        userPromptBuilder.append("Generate ").append(request.getLanguage()).append(" code for a ")
+                        .append(request.getModLoaderType().getDisplayName())
+                        .append(" mod with the following request: ").append(request.getPrompt());
+        
+        // Add code context if available
+        if (!request.getCodeContext().isEmpty()) {
+            userPromptBuilder.append("\n\nHere is some context about the existing code:\n```\n")
+                            .append(request.getCodeContext()).append("\n```");
+        }
+        
+        if (request.isUsePatternMatching()) {
+            // Try pattern matching first
+            String result = executeWithPatternMatching(
+                null, // No project needed for this
+                userPromptBuilder.toString(),
+                PatternCategory.CODE_GENERATION,
+                prompt -> {
+                    try {
+                        return makeAiRequest(systemPromptBuilder.toString(), prompt);
+                    } catch (IOException e) {
+                        LOG.error("Error making AI request", e);
+                        return null;
+                    }
+                }
+            );
+            
+            if (result != null) {
+                return result;
+            }
+        }
+        
+        // Fall back to direct API call
+        return makeAiRequest(systemPromptBuilder.toString(), userPromptBuilder.toString());
     }
 }
