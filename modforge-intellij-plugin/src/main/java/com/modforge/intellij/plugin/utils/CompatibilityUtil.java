@@ -467,7 +467,7 @@ public final class CompatibilityUtil {
      * @return The result
      */
     public static <T> T computeInWriteAction(@NotNull Supplier<T> supplier) {
-        return WriteAction.compute(supplier::get);
+        return ApplicationManager.getApplication().runWriteAction(supplier);
     }
     
     /**
