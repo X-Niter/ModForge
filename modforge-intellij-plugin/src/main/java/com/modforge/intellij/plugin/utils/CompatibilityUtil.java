@@ -1,6 +1,9 @@
 package com.modforge.intellij.plugin.utils;
 
 import com.intellij.openapi.diagnostic.Logger;
+import com.intellij.openapi.project.Project;
+import com.intellij.openapi.vfs.VirtualFile;
+import com.intellij.codeInsight.daemon.impl.WolfTheProblemSolver;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -20,11 +23,182 @@ import java.util.regex.Pattern;
 public final class CompatibilityUtil {
     private static final Logger LOG = Logger.getInstance(CompatibilityUtil.class);
     
+    // Dialog result constants
+    public static final int DIALOG_YES = 0;
+    public static final int DIALOG_NO = 1;
+    public static final int DIALOG_CANCEL = 2;
+    
     /**
      * Private constructor to prevent instantiation.
      */
     private CompatibilityUtil() {
         // Utility class
+    }
+    
+    /**
+     * Shows an error dialog with the given message.
+     *
+     * @param project The project
+     * @param message The message
+     * @param title The title
+     */
+    public static void showErrorDialog(Project project, String message, String title) {
+        com.intellij.openapi.ui.Messages.showErrorDialog(project, message, title);
+    }
+    
+    /**
+     * Shows a warning dialog with the given message.
+     *
+     * @param project The project
+     * @param message The message
+     * @param title The title
+     */
+    public static void showWarningDialog(Project project, String message, String title) {
+        com.intellij.openapi.ui.Messages.showWarningDialog(project, message, title);
+    }
+    
+    /**
+     * Shows an information dialog with the given message.
+     *
+     * @param project The project
+     * @param message The message
+     * @param title The title
+     */
+    public static void showInfoDialog(Project project, String message, String title) {
+        com.intellij.openapi.ui.Messages.showInfoMessage(project, message, title);
+    }
+    
+    /**
+     * Shows a yes/no dialog with the given message.
+     *
+     * @param project The project
+     * @param message The message
+     * @param title The title
+     * @return The user's choice (DIALOG_YES or DIALOG_NO)
+     */
+    public static int showYesNoDialog(Project project, String message, String title) {
+        int result = com.intellij.openapi.ui.Messages.showYesNoDialog(project, message, title, null);
+        return result == com.intellij.openapi.ui.Messages.YES ? DIALOG_YES : DIALOG_NO;
+    }
+    
+    /**
+     * Shows a dialog with the given options and returns the selected option index.
+     *
+     * @param project The project
+     * @param message The message
+     * @param title The title
+     * @param options The options
+     * @param defaultOption The default option
+     * @return The selected option index
+     */
+    public static int showChooseDialog(Project project, String message, String title, String[] options, String defaultOption) {
+        return com.intellij.openapi.ui.Messages.showChooseDialog(project, message, title, options, defaultOption, null);
+    }
+    
+    /**
+     * Gets the base directory of the project.
+     *
+     * @param project The project
+     * @return The base directory, or null if not found
+     */
+    @Nullable
+    public static VirtualFile getProjectBaseDir(@Nullable Project project) {
+        if (project == null) {
+            return null;
+        }
+        return project.getBaseDir();
+    }
+    
+    /**
+     * Checks if the file has problems.
+     *
+     * @param problemSolver The problem solver
+     * @param file The file
+     * @return True if the file has problems, false otherwise
+     */
+    public static boolean hasProblemsIn(WolfTheProblemSolver problemSolver, @NotNull VirtualFile file) {
+        return problemSolver != null && problemSolver.hasProblemFilesBeneath(element -> {
+            if (element instanceof VirtualFile) {
+                return ((VirtualFile) element).equals(file);
+            }
+            return false;
+        });
+    }
+    
+    /**
+     * Gets the description of a problem.
+     *
+     * @param problem The problem
+     * @return The description
+     */
+    public static String getProblemDescription(Object problem) {
+        if (problem == null) {
+            return "Unknown problem";
+        }
+        
+        try {
+            // Different versions of IntelliJ might have different problem classes
+            // Try to use reflection to get the description
+            Class<?> problemClass = problem.getClass();
+            java.lang.reflect.Method getDescriptionMethod = problemClass.getMethod("getDescription");
+            
+            if (getDescriptionMethod != null) {
+                Object result = getDescriptionMethod.invoke(problem);
+                if (result instanceof String) {
+                    return (String) result;
+                }
+            }
+        } catch (Exception e) {
+            LOG.warn("Failed to get problem description", e);
+        }
+        
+        // Fallback to toString if reflection fails
+        return problem.toString();
+    }
+    
+    /**
+     * A radio button component compatible with JetBrains UI components.
+     * This is a wrapper around JRadioButton to ensure compatibility with different IntelliJ versions.
+     */
+    public static class JBRadioButton extends javax.swing.JRadioButton {
+        /**
+         * Creates a new radio button with no text.
+         */
+        public JBRadioButton() {
+            super();
+            setup();
+        }
+        
+        /**
+         * Creates a new radio button with the specified text.
+         *
+         * @param text The text
+         */
+        public JBRadioButton(String text) {
+            super(text);
+            setup();
+        }
+        
+        /**
+         * Creates a new radio button with the specified text and selection state.
+         *
+         * @param text The text
+         * @param selected Whether the radio button is selected
+         */
+        public JBRadioButton(String text, boolean selected) {
+            super(text, selected);
+            setup();
+        }
+        
+        /**
+         * Sets up the radio button with JetBrains UI components look and feel.
+         */
+        private void setup() {
+            setOpaque(false);
+            setFocusable(true);
+            putClientProperty("JButton.backgroundColor", null);
+            putClientProperty("JButton.borderColor", null);
+        }
     }
     
     /**

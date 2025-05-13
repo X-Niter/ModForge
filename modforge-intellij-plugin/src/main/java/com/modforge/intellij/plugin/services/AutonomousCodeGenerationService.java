@@ -145,14 +145,14 @@ public final class AutonomousCodeGenerationService {
     }
     
     /**
-     * Generates code from a description.
+     * Generates code from a description with target package and module type.
      *
      * @param description   The code description.
      * @param targetPackage The target package as a VirtualFile.
      * @param moduleType    The module type.
      * @return A CompletableFuture that completes with the generated code.
      */
-    public CompletableFuture<String> generateCode(
+    public CompletableFuture<String> generateModuleCode(
             @NotNull String description,
             @Nullable VirtualFile targetPackage,
             @NotNull String moduleType) {
