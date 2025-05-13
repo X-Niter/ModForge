@@ -48,6 +48,169 @@ public final class AutonomousCodeGenerationService {
     private final AtomicBoolean isGeneratingCode = new AtomicBoolean(false);
     private final AtomicBoolean isRunningContinuously = new AtomicBoolean(false);
     private final AtomicInteger continuousDevelopmentTaskId = new AtomicInteger(0);
+
+    /**
+     * Enum defining class types for code generation.
+     */
+    public enum ClassType {
+        /** Regular class */
+        CLASS,
+        /** Interface */
+        INTERFACE,
+        /** Enum */
+        ENUM,
+        /** Record (Java 14+) */
+        RECORD,
+        /** Annotation */
+        ANNOTATION
+    }
+    
+    /**
+     * Class for defining method parameters.
+     */
+    public static class ParameterDefinition {
+        private final String name;
+        private final String type;
+        private final String description;
+        
+        /**
+         * Creates a new parameter definition.
+         *
+         * @param name The parameter name
+         * @param type The parameter type
+         * @param description The parameter description
+         */
+        public ParameterDefinition(String name, String type, String description) {
+            this.name = name;
+            this.type = type;
+            this.description = description;
+        }
+        
+        /**
+         * Gets the parameter name.
+         *
+         * @return The parameter name
+         */
+        public String getName() {
+            return name;
+        }
+        
+        /**
+         * Gets the parameter type.
+         *
+         * @return The parameter type
+         */
+        public String getType() {
+            return type;
+        }
+        
+        /**
+         * Gets the parameter description.
+         *
+         * @return The parameter description
+         */
+        public String getDescription() {
+            return description;
+        }
+    }
+    
+    /**
+     * Class for defining methods.
+     */
+    public static class MethodDefinition {
+        private final String name;
+        private final String returnType;
+        private final List<ParameterDefinition> parameters;
+        private final boolean isStatic;
+        private final boolean isAbstract;
+        private final boolean isPrivate;
+        private final String description;
+        
+        /**
+         * Creates a new method definition.
+         *
+         * @param name The method name
+         * @param returnType The return type
+         * @param parameters The method parameters
+         * @param isStatic Whether the method is static
+         * @param isAbstract Whether the method is abstract
+         * @param isPrivate Whether the method is private
+         * @param description The method description
+         */
+        public MethodDefinition(String name, String returnType, List<ParameterDefinition> parameters,
+                                boolean isStatic, boolean isAbstract, boolean isPrivate, String description) {
+            this.name = name;
+            this.returnType = returnType;
+            this.parameters = parameters;
+            this.isStatic = isStatic;
+            this.isAbstract = isAbstract;
+            this.isPrivate = isPrivate;
+            this.description = description;
+        }
+        
+        /**
+         * Gets the method name.
+         *
+         * @return The method name
+         */
+        public String getName() {
+            return name;
+        }
+        
+        /**
+         * Gets the return type.
+         *
+         * @return The return type
+         */
+        public String getReturnType() {
+            return returnType;
+        }
+        
+        /**
+         * Gets the method parameters.
+         *
+         * @return The method parameters
+         */
+        public List<ParameterDefinition> getParameters() {
+            return parameters;
+        }
+        
+        /**
+         * Checks if the method is static.
+         *
+         * @return Whether the method is static
+         */
+        public boolean isStatic() {
+            return isStatic;
+        }
+        
+        /**
+         * Checks if the method is abstract.
+         *
+         * @return Whether the method is abstract
+         */
+        public boolean isAbstract() {
+            return isAbstract;
+        }
+        
+        /**
+         * Checks if the method is private.
+         *
+         * @return Whether the method is private
+         */
+        public boolean isPrivate() {
+            return isPrivate;
+        }
+        
+        /**
+         * Gets the method description.
+         *
+         * @return The method description
+         */
+        public String getDescription() {
+            return description;
+        }
+    }
     
     // Performance tracking
     private final ConcurrentHashMap<String, Integer> patternHits = new ConcurrentHashMap<>();

@@ -218,9 +218,9 @@ public class LibraryAnalyzer {
     private LibraryMethodData analyzeMethod(PsiMethod method) {
         LibraryMethodData methodData = new LibraryMethodData();
         methodData.setName(method.getName());
-        methodData.setReturnType(method.getReturnType() != null ? method.getReturnType().getPresentableText() : "void");
+        methodData.setReturnType(method.getReturnType() != null ? getTypeText(method.getReturnType()) : "void");
         methodData.setParameters(Arrays.stream(method.getParameters())
-                .map(p -> p.getType().getPresentableText() + " " + p.getName())
+                .map(p -> getTypeText(p.getType()) + " " + p.getName())
                 .toArray(String[]::new));
         methodData.setDocComment(method.getDocComment() != null ? method.getDocComment().getText() : "");
         methodData.setCode(method.getText());
@@ -270,5 +270,39 @@ public class LibraryAnalyzer {
         void onLibrarySkipped(String libraryName, String reason);
         void onLibraryError(String libraryName, String errorMessage);
         void onAnalysisCompleted(int librariesAnalyzed, int classesAnalyzed, int methodsAnalyzed);
+    }
+    
+    /**
+     * Gets a string representation of a type, compatible with different IntelliJ versions.
+     * This works around API changes in newer versions where getPresentableText() might not exist.
+     *
+     * @param type The JVM type
+     * @return A string representation of the type
+     */
+    private String getTypeText(PsiType type) {
+        if (type == null) {
+            return "void";
+        }
+        
+        try {
+            // First try to use getPresentableText() directly
+            java.lang.reflect.Method getPresentableTextMethod = type.getClass().getMethod("getPresentableText");
+            Object result = getPresentableTextMethod.invoke(type);
+            if (result instanceof String) {
+                return (String) result;
+            }
+        } catch (Exception ignored) {
+            // Method not found or invocation failed, try alternative approaches
+        }
+        
+        try {
+            // Try using getCanonicalText() as fallback
+            return type.getCanonicalText();
+        } catch (Exception ignored) {
+            // This shouldn't happen, but just in case
+        }
+        
+        // Last resort: toString()
+        return type.toString();
     }
 }
