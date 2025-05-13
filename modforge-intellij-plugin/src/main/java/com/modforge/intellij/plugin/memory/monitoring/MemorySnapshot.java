@@ -97,6 +97,42 @@ public class MemorySnapshot {
     }
     
     /**
+     * Get the percentage of used memory 
+     *
+     * @return The percentage of used memory
+     */
+    public double getUsedMemoryPercent() {
+        return (double) usedMemory / totalMemory * 100.0;
+    }
+    
+    /**
+     * Get the used memory in megabytes
+     *
+     * @return Used memory in MB
+     */
+    public double getUsedMemoryMB() {
+        return usedMemory / (1024.0 * 1024.0);
+    }
+    
+    /**
+     * Get the available (free) memory in megabytes
+     *
+     * @return Available memory in MB
+     */
+    public double getAvailableMemoryMB() {
+        return freeMemory / (1024.0 * 1024.0);
+    }
+    
+    /**
+     * Get the total memory in megabytes
+     *
+     * @return Total memory in MB
+     */
+    public double getTotalMemoryMB() {
+        return totalMemory / (1024.0 * 1024.0);
+    }
+    
+    /**
      * Get the percentage of memory allocation (total / max)
      *
      * @return The percentage of memory allocation

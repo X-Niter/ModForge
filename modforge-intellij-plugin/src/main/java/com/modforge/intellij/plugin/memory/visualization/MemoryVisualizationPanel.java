@@ -1,5 +1,6 @@
 package com.modforge.intellij.plugin.memory.visualization;
 
+import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.ComboBox;
@@ -16,6 +17,8 @@ import org.jetbrains.annotations.NotNull;
 
 import javax.swing.*;
 import java.awt.*;
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
 import java.awt.event.ComponentAdapter;
 import java.awt.event.ComponentEvent;
 import java.awt.geom.Path2D;
@@ -45,12 +48,12 @@ public class MemoryVisualizationPanel extends JBPanel<MemoryVisualizationPanel> 
     private final List<MemorySnapshot> memoryHistory = new CopyOnWriteArrayList<>();
     private final MemoryChartPanel chartPanel;
     private final JBLabel statusLabel;
-    private final JComboBox<String> timeRangeComboBox;
-    private final JComboBox<String> metricTypeComboBox;
-    private final JCheckBox showPredictionCheckBox;
-    private final JButton refreshButton;
-    private final JButton exportButton;
-    private final JButton resetButton;
+    private JComboBox<String> timeRangeComboBox;
+    private JComboBox<String> metricTypeComboBox;
+    private JCheckBox showPredictionCheckBox;
+    private JButton refreshButton;
+    private JButton exportButton;
+    private JButton resetButton;
     
     private Timer updateTimer;
     private int timeRangeMinutes = DEFAULT_TIME_RANGE_MINUTES;
