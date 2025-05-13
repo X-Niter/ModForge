@@ -198,7 +198,7 @@ public final class ContinuousDevelopmentService {
             }
             
             // Get all problem files using compatibility helper
-            Collection<VirtualFile> problemFiles = CompatibilityUtil.getProblemFiles(problemSolver);
+            Collection<VirtualFile> problemFiles = CompatibilityUtil.getProblemFiles(project);
             
             LOG.info("Found " + problemFiles.size() + " problem files in project " + project.getName());
             
@@ -252,7 +252,8 @@ public final class ContinuousDevelopmentService {
                 }
                 
                 // Get problems for file using compatibility helper
-                Collection<Problem> problems = CompatibilityUtil.getProblemsForFile(problemSolver, file);
+                @SuppressWarnings("unchecked")
+                Collection<Problem> problems = (Collection<Problem>)(Collection<?>) CompatibilityUtil.getProblemsForFile(project, file);
                 
                 if (problems.isEmpty()) {
                     continue;
