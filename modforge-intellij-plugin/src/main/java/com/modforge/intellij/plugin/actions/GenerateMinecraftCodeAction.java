@@ -77,7 +77,7 @@ public class GenerateMinecraftCodeAction extends AnAction {
         }
         
         // Generate the code
-        codeGenerator.generateCode(description, targetDirectory, loaderHint)
+        codeGenerator.generateModuleCode(description, targetDirectory, loaderHint)
             .thenAccept(generatedCode -> {
                 // Show success notification
                 SwingUtilities.invokeLater(() -> {

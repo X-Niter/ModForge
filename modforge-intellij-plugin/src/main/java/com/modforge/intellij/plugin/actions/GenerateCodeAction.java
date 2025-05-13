@@ -52,7 +52,7 @@ public class GenerateCodeAction extends AnAction {
             VirtualFile packageVirtualFile = CompatibilityUtil.getModFileByRelativePath(project, 
                     "src/main/java/" + targetPackage.replace('.', '/'));
             
-            codeGenerationService.generateCode(description, packageVirtualFile, moduleType)
+            codeGenerationService.generateModuleCode(description, packageVirtualFile, moduleType)
                     .thenAccept(generatedCode -> {
                         if (generatedCode != null && !generatedCode.isEmpty()) {
                             CompatibilityUtil.runOnUiThread(() -> {

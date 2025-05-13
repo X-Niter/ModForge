@@ -202,6 +202,48 @@ public final class CompatibilityUtil {
     }
     
     /**
+     * Opens a file in the editor.
+     *
+     * @param project The project
+     * @param file The file to open
+     * @param requestFocus Whether to request focus
+     */
+    public static void openFileInEditor(@NotNull Project project, @NotNull VirtualFile file, boolean requestFocus) {
+        com.intellij.openapi.fileEditor.OpenFileDescriptor descriptor = new com.intellij.openapi.fileEditor.OpenFileDescriptor(project, file);
+        com.intellij.openapi.fileEditor.FileEditorManager.getInstance(project).openEditor(descriptor, requestFocus);
+    }
+    
+    /**
+     * Gets a mod file by its relative path.
+     *
+     * @param project The project
+     * @param relativePath The relative path from the project base directory
+     * @return The virtual file, or null if not found
+     */
+    @Nullable
+    public static VirtualFile getModFileByRelativePath(@NotNull Project project, @NotNull String relativePath) {
+        VirtualFile baseDir = getProjectBaseDir(project);
+        if (baseDir == null) {
+            return null;
+        }
+        
+        return baseDir.findFileByRelativePath(relativePath);
+    }
+    
+    /**
+     * Runs a task on the UI thread.
+     *
+     * @param runnable The runnable to run
+     */
+    public static void runOnUiThread(@NotNull Runnable runnable) {
+        if (com.intellij.openapi.application.ApplicationManager.getApplication().isDispatchThread()) {
+            runnable.run();
+        } else {
+            com.intellij.openapi.application.ApplicationManager.getApplication().invokeLater(runnable);
+        }
+    }
+    
+    /**
      * Checks if a file exists at the given path.
      *
      * @param pathStr The path to check
