@@ -447,8 +447,10 @@ public final class CompatibilityUtil {
      * @param <T> The result type
      * @return The result
      */
-    public static <T> T runReadAction(@NotNull Supplier<T> supplier) {
-        return ApplicationManager.getApplication().runReadAction(supplier);
+    public static <T> T runReadAction(@NotNull java.util.function.Supplier<T> supplier) {
+        return ApplicationManager.getApplication().runReadAction(
+            (com.intellij.openapi.util.Computable<T>) supplier::get
+        );
     }
     
     /**
@@ -467,8 +469,10 @@ public final class CompatibilityUtil {
      * @param <T> The result type
      * @return The result
      */
-    public static <T> T computeInWriteAction(@NotNull Supplier<T> supplier) {
-        return ApplicationManager.getApplication().runWriteAction(supplier);
+    public static <T> T computeInWriteAction(@NotNull java.util.function.Supplier<T> supplier) {
+        return ApplicationManager.getApplication().runWriteAction(
+            (com.intellij.openapi.util.Computable<T>) supplier::get
+        );
     }
     
     /**
