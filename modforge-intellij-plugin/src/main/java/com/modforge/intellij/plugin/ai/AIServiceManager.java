@@ -296,4 +296,44 @@ public final class AIServiceManager {
             return null;
         }
     }
+    
+    /**
+     * Uploads patterns to the pattern server
+     * This is a compatibility method that forwards to the service implementation
+     * 
+     * @param patterns The patterns to upload
+     * @return True if successful, false otherwise
+     */
+    public boolean uploadPatterns(@NotNull List<Map<String, Object>> patterns) {
+        try {
+            // Get service manager from services package
+            com.modforge.intellij.plugin.services.AIServiceManager serviceManager = 
+                com.modforge.intellij.plugin.services.AIServiceManager.getInstance();
+            
+            return serviceManager.uploadPatterns(patterns);
+        } catch (Exception e) {
+            LOG.error("Error uploading patterns", e);
+            return false;
+        }
+    }
+    
+    /**
+     * Downloads the latest patterns from the pattern server
+     * This is a compatibility method that forwards to the service implementation
+     * 
+     * @return The downloaded patterns or an empty list if there's an error
+     */
+    @NotNull
+    public List<Map<String, Object>> downloadLatestPatterns() {
+        try {
+            // Get service manager from services package
+            com.modforge.intellij.plugin.services.AIServiceManager serviceManager = 
+                com.modforge.intellij.plugin.services.AIServiceManager.getInstance();
+            
+            return serviceManager.downloadLatestPatterns();
+        } catch (Exception e) {
+            LOG.error("Error downloading latest patterns", e);
+            return new ArrayList<>();
+        }
+    }
 }
