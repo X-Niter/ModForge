@@ -453,22 +453,48 @@ public final class PatternRecognitionService {
      * @return Map with metrics
      */
     @Deprecated
-    public Map<String, Integer> getMetricsInt() {
+    public Map<String, Integer> getMetrics() {
         Map<String, Integer> metrics = new HashMap<>();
         metrics.put("patternCount", patterns.size());
         metrics.put("patternMatchCount", patternMatchCount.get());
         metrics.put("patternMissCount", patternMissCount.get());
         
+        return metrics;
     }
         
     /**
-     * Gets metrics about pattern recognition system.
-     * This provides a comprehensive view of how the system is performing.
-     *
-     * @return Map of metrics with various types of values
+     * Gets pattern counts by category.
+     * @return Map of pattern counts by category
      */
     @NotNull
-    public Map<String, Object> getMetrics() {
+    private Map<String, Integer> getPatternCountsByCategory() {
+        Map<String, Integer> categoryCounts = new HashMap<>();
+        
+        // Count patterns by category
+        for (PatternEntry entry : patterns.values()) {
+            String categoryName = entry.category.name();
+            categoryCounts.merge(categoryName, 1, Integer::sum);
+        }
+        
+        return categoryCounts;
+    }
+    
+    /**
+     * Gets estimated tokens saved by this pattern recognition service.
+     * @return Estimated number of tokens saved
+     */
+    public int getEstimatedTokensSaved() {
+        return patternMatchCount.get() * 1000; // Assume 1000 tokens saved per match
+    }
+
+    /**
+     * Gets detailed metrics about pattern recognition system.
+     * This provides a comprehensive view of how the system is performing.
+     *
+     * @return Map of detailed metrics with various types of values
+     */
+    @NotNull
+    public Map<String, Object> getDetailedMetrics() {
         Map<String, Object> metrics = new HashMap<>();
         
         // Basic counts
@@ -486,7 +512,7 @@ public final class PatternRecognitionService {
         metrics.put("apiCalls", patternMissCount.get());
         
         // Calculate tokens saved (estimated)
-        int estimatedTokensSaved = patternMatchCount.get() * 1000; // Assume 1000 tokens saved per match
+        int estimatedTokensSaved = getEstimatedTokensSaved();
         metrics.put("estimatedTokensSaved", (double)estimatedTokensSaved);
         
         // Calculate cost saved (estimated at $0.002 per 1K tokens)

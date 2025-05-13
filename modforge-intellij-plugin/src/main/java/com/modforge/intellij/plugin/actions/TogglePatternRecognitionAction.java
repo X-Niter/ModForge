@@ -161,7 +161,7 @@ public class TogglePatternRecognitionAction extends AnAction {
             return;
         }
         
-        Map<String, Object> metrics = service.getMetrics();
+        Map<String, Object> metrics = service.getDetailedMetrics();
         
         boolean enabled = (boolean) metrics.get("enabled");
         int totalRequests = (int) metrics.get("totalRequests");
