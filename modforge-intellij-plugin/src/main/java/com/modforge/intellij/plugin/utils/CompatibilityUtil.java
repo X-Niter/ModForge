@@ -603,21 +603,23 @@ public final class CompatibilityUtil {
     @NotNull
     public static Collection<VirtualFile> getProblemFiles(@NotNull Object problemSolver) {
         try {
-            // Try the method available in IntelliJ IDEA 2025.1.1.1
-            java.lang.reflect.Method getFilesMethod = problemSolver.getClass().getMethod("getProblemFileSet");
-            Set<VirtualFile> files = (Set<VirtualFile>) getFilesMethod.invoke(problemSolver);
-            return files != null ? files : Collections.emptySet();
+            // Try various methods available in different IntelliJ versions
+            try {
+                java.lang.reflect.Method getFilesMethod = problemSolver.getClass().getMethod("getProblemFileSet");
+                Set<VirtualFile> files = (Set<VirtualFile>) getFilesMethod.invoke(problemSolver);
+                return files != null ? files : Collections.emptySet();
+            } catch (NoSuchMethodException methodEx) {
+                // Try alternate method name for 2025.1.1.1
+                java.lang.reflect.Method getFilesMethod = problemSolver.getClass().getMethod("getProblemFiles");
+                Collection<VirtualFile> files = (Collection<VirtualFile>) getFilesMethod.invoke(problemSolver);
+                return files != null ? files : Collections.emptySet();
+            }
         } catch (Exception e) {
             LOG.warn("Failed to get problem files using getProblemFileSet", e);
             
-            try {
-                // Try the older method
-                java.lang.reflect.Method getFilesMethod = problemSolver.getClass().getMethod("getProblemFiles");
-                return (Collection<VirtualFile>) getFilesMethod.invoke(problemSolver);
-            } catch (Exception ex) {
-                LOG.error("Failed to get problem files from WolfTheProblemSolver", ex);
-                return Collections.emptySet();
-            }
+            // Already tried both methods, it's a more serious issue
+            LOG.error("Failed to get problem files from WolfTheProblemSolver using any known method", e);
+            return Collections.emptySet();
         }
     }
     
