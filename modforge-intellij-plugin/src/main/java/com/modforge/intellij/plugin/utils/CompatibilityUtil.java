@@ -1,13 +1,23 @@
 package com.modforge.intellij.plugin.utils;
 
+import com.intellij.openapi.application.ApplicationManager;
+import com.intellij.openapi.application.ReadAction;
+import com.intellij.openapi.application.WriteAction;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.codeInsight.daemon.impl.WolfTheProblemSolver;
+import com.intellij.psi.PsiFile;
+import com.intellij.psi.PsiManager;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.io.IOException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.function.Consumer;
+import java.util.function.Supplier;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -157,6 +167,69 @@ public final class CompatibilityUtil {
     }
     
     /**
+     * Gets the virtual file from a problem.
+     *
+     * @param problem The problem
+     * @return The virtual file, or null if not found
+     */
+    @Nullable
+    public static VirtualFile getProblemVirtualFile(Object problem) {
+        if (problem == null) {
+            return null;
+        }
+        
+        try {
+            // Different versions of IntelliJ might have different problem classes
+            // Try to use reflection to get the file
+            Class<?> problemClass = problem.getClass();
+            
+            // Try to get the file directly
+            try {
+                java.lang.reflect.Method getFileMethod = problemClass.getMethod("getFile");
+                if (getFileMethod != null) {
+                    Object result = getFileMethod.invoke(problem);
+                    if (result instanceof VirtualFile) {
+                        return (VirtualFile) result;
+                    }
+                }
+            } catch (NoSuchMethodException e) {
+                // Ignore, try other methods
+            }
+            
+            // Try to get the PSI element and then the file
+            try {
+                java.lang.reflect.Method getPsiElementMethod = problemClass.getMethod("getPsiElement");
+                if (getPsiElementMethod != null) {
+                    Object psiElement = getPsiElementMethod.invoke(problem);
+                    if (psiElement != null) {
+                        Class<?> psiElementClass = psiElement.getClass();
+                        java.lang.reflect.Method getContainingFileMethod = psiElementClass.getMethod("getContainingFile");
+                        if (getContainingFileMethod != null) {
+                            Object psiFile = getContainingFileMethod.invoke(psiElement);
+                            if (psiFile != null) {
+                                Class<?> psiFileClass = psiFile.getClass();
+                                java.lang.reflect.Method getVirtualFileMethod = psiFileClass.getMethod("getVirtualFile");
+                                if (getVirtualFileMethod != null) {
+                                    Object vFile = getVirtualFileMethod.invoke(psiFile);
+                                    if (vFile instanceof VirtualFile) {
+                                        return (VirtualFile) vFile;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            } catch (Exception e) {
+                // Ignore, fall through to return null
+            }
+        } catch (Exception e) {
+            LOG.warn("Failed to get problem virtual file", e);
+        }
+        
+        return null;
+    }
+    
+    /**
      * A radio button component compatible with JetBrains UI components.
      * This is a wrapper around JRadioButton to ensure compatibility with different IntelliJ versions.
      */
@@ -236,11 +309,85 @@ public final class CompatibilityUtil {
      * @param runnable The runnable to run
      */
     public static void runOnUiThread(@NotNull Runnable runnable) {
-        if (com.intellij.openapi.application.ApplicationManager.getApplication().isDispatchThread()) {
+        if (ApplicationManager.getApplication().isDispatchThread()) {
             runnable.run();
         } else {
-            com.intellij.openapi.application.ApplicationManager.getApplication().invokeLater(runnable);
+            ApplicationManager.getApplication().invokeLater(runnable);
         }
+    }
+    
+    /**
+     * Returns a PSI file from a virtual file.
+     *
+     * @param project The project
+     * @param file The virtual file
+     * @return The PSI file, or null if not found
+     */
+    @Nullable
+    public static PsiFile getPsiFile(@NotNull Project project, @NotNull VirtualFile file) {
+        return PsiManager.getInstance(project).findFile(file);
+    }
+    
+    /**
+     * Gets the project base path as a string.
+     *
+     * @param project The project
+     * @return The project base path, or null if not found
+     */
+    @Nullable
+    public static String getProjectBasePath(@NotNull Project project) {
+        VirtualFile baseDir = getProjectBaseDir(project);
+        return baseDir != null ? baseDir.getPath() : null;
+    }
+    
+    /**
+     * Gets a compatible application executor service.
+     *
+     * @return The executor service
+     */
+    @NotNull
+    public static ExecutorService getCompatibleAppExecutorService() {
+        return Executors.newCachedThreadPool();
+    }
+    
+    /**
+     * Gets a compatible application scheduled executor service.
+     *
+     * @return The scheduled executor service
+     */
+    @NotNull
+    public static ScheduledExecutorService getCompatibleAppScheduledExecutorService() {
+        return Executors.newScheduledThreadPool(1);
+    }
+    
+    /**
+     * Handles project opening events.
+     *
+     * @param project The project
+     * @param callback The callback to run when the project is opened
+     */
+    public static void handleProjectOpened(@NotNull Project project, @NotNull Consumer<Project> callback) {
+        callback.accept(project);
+    }
+    
+    /**
+     * Runs an action in read mode.
+     *
+     * @param supplier The supplier
+     * @param <T> The result type
+     * @return The result
+     */
+    public static <T> T runReadAction(@NotNull Supplier<T> supplier) {
+        return ReadAction.compute(supplier::get);
+    }
+    
+    /**
+     * Runs an action in write mode.
+     *
+     * @param runnable The runnable
+     */
+    public static void runWriteAction(@NotNull Runnable runnable) {
+        WriteAction.run(runnable::run);
     }
     
     /**
