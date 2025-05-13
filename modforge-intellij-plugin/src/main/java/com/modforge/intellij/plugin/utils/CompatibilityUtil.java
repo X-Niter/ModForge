@@ -143,6 +143,21 @@ public final class CompatibilityUtil {
     }
     
     /**
+     * Checks if the project has any problems.
+     *
+     * @param project The project
+     * @return True if the project has problems, false otherwise
+     */
+    public static boolean hasProblems(@Nullable Project project) {
+        if (project == null) {
+            return false;
+        }
+        
+        Collection<VirtualFile> problemFiles = getProblemFiles(project);
+        return !problemFiles.isEmpty();
+    }
+    
+    /**
      * Checks if the file has problems.
      *
      * @param project The project

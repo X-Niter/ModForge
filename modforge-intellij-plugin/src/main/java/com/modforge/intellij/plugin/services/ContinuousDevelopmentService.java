@@ -241,7 +241,7 @@ public final class ContinuousDevelopmentService {
             
             // Fix problems in each file
             PsiManager psiManager = PsiManager.getInstance(project);
-            WolfTheProblemSolver problemSolver = WolfTheProblemSolver.getInstance(project);
+            DaemonCodeAnalyzer codeAnalyzer = DaemonCodeAnalyzer.getInstance(project);
             
             fixCount.incrementAndGet();
             for (VirtualFile file : problemFiles) {
