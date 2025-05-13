@@ -5,7 +5,7 @@ import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.search.FilenameIndex;
 import com.intellij.psi.search.GlobalSearchScope;
-import com.modforge.intellij.plugin.models.ModLoaderType;
+import com.modforge.intellij.plugin.model.ModLoaderType;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.Collection;

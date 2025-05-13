@@ -29,6 +29,16 @@ public enum ModLoaderType {
     ARCHITECTURY("Architectury", "architectury", "build.gradle", "architectury-plugin"),
     
     /**
+     * NeoForge mod loader.
+     */
+    NEOFORGE("NeoForge", "neoforge", "build.gradle", "neoforge"),
+    
+    /**
+     * Bukkit/Spigot server plugin.
+     */
+    BUKKIT("Bukkit/Spigot", "bukkit", "pom.xml", "spigot-api"),
+    
+    /**
      * Unknown mod loader.
      */
     UNKNOWN("Unknown", "", "", "");
