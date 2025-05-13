@@ -1069,12 +1069,14 @@ public final class CompatibilityUtil {
     public static void showInfoDialog(Project project, String message, String title) {
         ApplicationManager.getApplication().invokeLater(() -> {
             try {
-                // Try the method with project parameter first (newer versions in 2025.1.1.1)
-                Messages.showInfoMessage(project, message, title);
+                // Use icon-based method signature compatible with 2025.1.1.1
+                Messages.showDialog(project, message, title, new String[]{"OK"}, 0, 
+                        Messages.getInformationIcon());
             } catch (Exception e) {
                 try {
                     // Fall back to version without project parameter
-                    Messages.showInfoMessage(message, title);
+                    Messages.showDialog(message, title, new String[]{"OK"}, 0, 
+                            Messages.getInformationIcon());
                 } catch (Exception ex) {
                     LOG.error("Failed to show info dialog", ex);
                     // Last resort - use notification service
@@ -1125,12 +1127,27 @@ public final class CompatibilityUtil {
         final int[] result = new int[1];
         runOnUiThreadAndWait(() -> {
             try {
-                // Try the method with project parameter first (newer versions in 2025.1.1.1)
-                result[0] = Messages.showYesNoDialog(project, message, title, Messages.getQuestionIcon());
+                // Use a more compatible method signature for 2025.1.1.1
+                result[0] = Messages.showDialog(
+                    project, 
+                    message, 
+                    title, 
+                    new String[]{"Yes", "No"}, 
+                    0, 
+                    Messages.getQuestionIcon());
+                // Convert the result (0=yes, 1=no) to DIALOG_YES/DIALOG_NO constants
+                result[0] = (result[0] == 0) ? DIALOG_YES : DIALOG_NO;
             } catch (Exception e) {
                 try {
                     // Fall back to version without project parameter
-                    result[0] = Messages.showYesNoDialog(message, title, Messages.getQuestionIcon());
+                    result[0] = Messages.showDialog(
+                        message, 
+                        title, 
+                        new String[]{"Yes", "No"}, 
+                        0, 
+                        Messages.getQuestionIcon());
+                    // Convert the result (0=yes, 1=no) to DIALOG_YES/DIALOG_NO constants
+                    result[0] = (result[0] == 0) ? DIALOG_YES : DIALOG_NO;
                 } catch (Exception ex) {
                     LOG.error("Failed to show yes/no dialog", ex);
                     // Last resort - default to NO and show error
@@ -1164,20 +1181,31 @@ public final class CompatibilityUtil {
         
         runOnUiThreadAndWait(() -> {
             try {
-                // Swap title and message to match Messages.showYesNoDialog parameter order
-                result[0] = Messages.showYesNoDialog(
+                // Use more compatible method signature for 2025.1.1.1
+                result[0] = Messages.showDialog(
                     project, 
-                    message,  // IntelliJ API expects message first, then title
+                    message,
                     title, 
-                    yesText, 
-                    noText, 
+                    new String[]{yesText, noText}, 
+                    0, 
                     icon != null ? icon : Messages.getQuestionIcon()
                 );
+                // Convert the result (0=yes, 1=no) to DIALOG_YES/DIALOG_NO constants
+                result[0] = (result[0] == 0) ? DIALOG_YES : DIALOG_NO;
             } catch (Exception ex) {
                 LOG.error("Failed to show custom Yes/No dialog with project parameter", ex);
                 try {
                     // Fall back to standard Yes/No dialog
-                    result[0] = Messages.showYesNoDialog(project, message, title, Messages.getQuestionIcon());
+                    // Use simple dialog method
+                    result[0] = Messages.showDialog(
+                        project, 
+                        message, 
+                        title, 
+                        new String[]{"Yes", "No"}, 
+                        0, 
+                        Messages.getQuestionIcon());
+                    // Convert the result (0=yes, 1=no) to DIALOG_YES/DIALOG_NO constants  
+                    result[0] = (result[0] == 0) ? DIALOG_YES : DIALOG_NO;
                 } catch (Exception e) {
                     LOG.error("Failed to show Yes/No dialog", e);
                     result[0] = DIALOG_NO;
@@ -1278,7 +1306,8 @@ public final class CompatibilityUtil {
         runOnUiThreadAndWait(() -> {
             try {
                 if (project == null || !project.isDisposed()) {
-                    Messages.showInfoMessage(project, message, title);
+                    Messages.showDialog(project, message, title, new String[]{"OK"}, 0, 
+                            Messages.getInformationIcon());
                 }
             } catch (Exception ex) {
                 LOG.error("Failed to show info dialog", ex);
