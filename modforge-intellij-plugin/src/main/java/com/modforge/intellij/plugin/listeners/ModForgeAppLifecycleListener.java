@@ -76,7 +76,7 @@ public class ModForgeAppLifecycleListener implements AppLifecycleListener {
         LOG.info("Scheduling ModForge update checks");
         
         // Schedule update checks (once a day)
-        updateCheckTask = AppExecutorUtil.getAppScheduledExecutorService().scheduleWithFixedDelay(
+        updateCheckTask = CompatibilityUtil.getCompatibleAppScheduledExecutorService().scheduleWithFixedDelay(
                 this::checkForUpdates,
                 1, 24, TimeUnit.HOURS
         );

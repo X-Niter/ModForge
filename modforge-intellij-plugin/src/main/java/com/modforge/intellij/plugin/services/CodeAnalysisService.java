@@ -40,7 +40,7 @@ public final class CodeAnalysisService {
         this.project = project;
         
         // Schedule periodic cache cleanup
-        AppExecutorUtil.getAppScheduledExecutorService().scheduleWithFixedDelay(
+        CompatibilityUtil.getCompatibleAppScheduledExecutorService().scheduleWithFixedDelay(
                 this::cleanupCache, 30, 30, TimeUnit.MINUTES);
         
         LOG.info("CodeAnalysisService initialized");

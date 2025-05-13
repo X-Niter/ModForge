@@ -1451,4 +1451,50 @@ public final class CompatibilityUtil {
             }
         }
     }
+    
+    /**
+     * Gets a compatible app executor service.
+     * This method provides a compatibility layer for the AppExecutorUtil.getAppExecutorService()
+     * method which may have changed in IntelliJ IDEA 2025.1.1.1.
+     * 
+     * @return The executor service
+     */
+    @NotNull
+    public static ExecutorService getCompatibleAppExecutorService() {
+        try {
+            // Try to use the AppExecutorUtil method
+            java.lang.reflect.Method method = 
+                com.intellij.util.concurrency.AppExecutorUtil.class.getMethod("getAppExecutorService");
+            return (ExecutorService) method.invoke(null);
+        } catch (Exception e) {
+            // Fall back to our own implementation
+            LOG.warn("Failed to get app executor service, creating compatible alternative", e);
+            return getCompatibleExecutorService();
+        }
+    }
+    
+    /**
+     * Gets a compatible app scheduled executor service.
+     * This method provides a compatibility layer for the AppExecutorUtil.getAppScheduledExecutorService()
+     * method which may have changed in IntelliJ IDEA 2025.1.1.1.
+     * 
+     * @return The scheduled executor service
+     */
+    @NotNull
+    public static ScheduledExecutorService getCompatibleAppScheduledExecutorService() {
+        try {
+            // Try to use the AppExecutorUtil method
+            java.lang.reflect.Method method = 
+                com.intellij.util.concurrency.AppExecutorUtil.class.getMethod("getAppScheduledExecutorService");
+            return (ScheduledExecutorService) method.invoke(null);
+        } catch (Exception e) {
+            // Fall back to our own implementation
+            LOG.warn("Failed to get app scheduled executor service, creating compatible alternative", e);
+            return Executors.newScheduledThreadPool(2, r -> {
+                Thread thread = new Thread(r, "ModForge-ScheduledExecutor");
+                thread.setDaemon(true);
+                return thread;
+            });
+        }
+    }
 }

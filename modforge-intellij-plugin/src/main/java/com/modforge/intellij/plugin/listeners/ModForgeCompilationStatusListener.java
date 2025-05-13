@@ -176,7 +176,7 @@ public class ModForgeCompilationStatusListener implements CompilationStatusListe
                         Thread.sleep(500);
                         
                         // Trigger recompilation
-                        AppExecutorUtil.getAppExecutorService().execute(() -> {
+                        CompatibilityUtil.getCompatibleAppExecutorService().execute(() -> {
                             com.intellij.openapi.compiler.CompilerManager.getInstance(project)
                                     .make(null);
                         });
