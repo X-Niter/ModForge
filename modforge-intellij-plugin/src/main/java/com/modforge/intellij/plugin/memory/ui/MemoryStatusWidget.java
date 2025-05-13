@@ -236,7 +236,7 @@ public class MemoryStatusWidget implements StatusBarWidget, StatusBarWidget.Icon
         ListPopup popup = JBPopupFactory.getInstance().createActionGroupPopup(
                 "Memory Management",
                 group,
-                mouseEvent.getComponent().getGraphicsConfiguration().createCompatibleImage(1, 1).getGraphics(),
+                com.modforge.intellij.plugin.utils.CompatibilityUtil.getCompatibleDataContext(mouseEvent),
                 JBPopupFactory.ActionSelectionAid.SPEEDSEARCH,
                 true
         );
