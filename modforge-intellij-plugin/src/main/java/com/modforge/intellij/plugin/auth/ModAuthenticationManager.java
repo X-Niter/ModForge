@@ -421,4 +421,25 @@ public final class ModAuthenticationManager implements PersistentStateComponent<
         String username = getGitHubUsername();
         return username != null && !username.isEmpty();
     }
+    
+    /**
+     * Logs out the current user
+     * Clears all tokens and credentials
+     * Compatible with IntelliJ IDEA 2025.1.1.1
+     * 
+     * @return true if logout was successful, false otherwise
+     */
+    public boolean logout() {
+        try {
+            clearGitHubToken();
+            clearOpenAIApiKey();
+            gitHubTokenValid = false;
+            openAIKeyValid = false;
+            LOG.info("User logged out successfully");
+            return true;
+        } catch (Exception e) {
+            LOG.error("Logout failed", e);
+            return false;
+        }
+    }
 }
