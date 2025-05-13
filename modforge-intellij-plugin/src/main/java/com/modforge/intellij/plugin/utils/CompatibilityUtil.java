@@ -13,11 +13,15 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Collection;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -37,6 +41,7 @@ public final class CompatibilityUtil {
     public static final int DIALOG_YES = 0;
     public static final int DIALOG_NO = 1;
     public static final int DIALOG_CANCEL = 2;
+    public static final int DIALOG_OK = 0;
     
     /**
      * Private constructor to prevent instantiation.
@@ -388,6 +393,112 @@ public final class CompatibilityUtil {
      */
     public static void runWriteAction(@NotNull Runnable runnable) {
         WriteAction.run(runnable::run);
+    }
+    
+    /**
+     * Computes a value in write action.
+     *
+     * @param supplier The supplier
+     * @param <T> The result type
+     * @return The result
+     */
+    public static <T> T computeInWriteAction(@NotNull Supplier<T> supplier) {
+        return WriteAction.compute(supplier::get);
+    }
+    
+    /**
+     * Shows an input dialog with a project.
+     *
+     * @param project The project
+     * @param message The message
+     * @param title The title
+     * @param initialValue The initial value
+     * @return The user's input, or null if canceled
+     */
+    @Nullable
+    public static String showInputDialogWithProject(
+            @Nullable Project project,
+            @NotNull String message,
+            @NotNull String title,
+            @Nullable String initialValue) {
+        return com.intellij.openapi.ui.Messages.showInputDialog(project, message, title, null, initialValue, null);
+    }
+    
+    /**
+     * Shows an input dialog.
+     *
+     * @param project The project
+     * @param message The message
+     * @param title The title
+     * @param initialValue The initial value
+     * @return The user's input, or null if canceled
+     */
+    @Nullable
+    public static String showInputDialog(
+            @Nullable Project project,
+            @NotNull String message,
+            @NotNull String title,
+            @Nullable String initialValue) {
+        return com.intellij.openapi.ui.Messages.showInputDialog(project, message, title, null, initialValue, null);
+    }
+    
+    /**
+     * Gets all problem files.
+     *
+     * @param problemSolver The problem solver
+     * @return The problem files
+     */
+    @NotNull
+    public static Collection<VirtualFile> getProblemFiles(WolfTheProblemSolver problemSolver) {
+        Collection<VirtualFile> result = new ArrayList<>();
+        if (problemSolver != null) {
+            problemSolver.computeProblemFiles(result::add);
+        }
+        return result;
+    }
+    
+    /**
+     * Gets problems for a file.
+     *
+     * @param problemSolver The problem solver
+     * @param file The file
+     * @return The problems
+     */
+    @NotNull
+    public static Collection<Object> getProblemsForFile(WolfTheProblemSolver problemSolver, VirtualFile file) {
+        Collection<Object> result = new ArrayList<>();
+        if (problemSolver != null && file != null) {
+            problemSolver.processProblems(file, (problem, state) -> {
+                result.add(problem);
+                return true;
+            });
+        }
+        return result;
+    }
+    
+    /**
+     * Extracts a version from a file content.
+     *
+     * @param content The file content
+     * @param versionKey The version key to look for
+     * @return The extracted version, or null if not found
+     */
+    @Nullable
+    public static String extractVersionFromFile(String content, String versionKey) {
+        if (content == null || versionKey == null) {
+            return null;
+        }
+        
+        // Look for patterns like: minecraft_version = "1.16.5" or "minecraft_version": "1.16.5"
+        Pattern pattern = Pattern.compile(
+                versionKey + "\\s*[=:]\\s*[\"']([^\"']+)[\"']", 
+                Pattern.MULTILINE);
+        Matcher matcher = pattern.matcher(content);
+        if (matcher.find()) {
+            return matcher.group(1);
+        }
+        
+        return null;
     }
     
     /**

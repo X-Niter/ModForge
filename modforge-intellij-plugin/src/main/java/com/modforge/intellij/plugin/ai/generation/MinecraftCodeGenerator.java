@@ -126,14 +126,14 @@ public final class MinecraftCodeGenerator {
     }
     
     /**
-     * Generate code based on a description
+     * Generates module code from the given description.
      * 
      * @param description The description of the code to generate
      * @param targetDirectory The directory where the code should be created
      * @param loaderHint Optional hint about the mod loader to use
      * @return CompletableFuture that resolves to the generated file
      */
-    public CompletableFuture<GeneratedCode> generateCode(
+    public CompletableFuture<GeneratedCode> generateModuleCode(
             String description, 
             String targetDirectory,
             @Nullable String loaderHint) {
