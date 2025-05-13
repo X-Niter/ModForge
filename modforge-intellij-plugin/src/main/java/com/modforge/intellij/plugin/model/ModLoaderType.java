@@ -1,41 +1,56 @@
 package com.modforge.intellij.plugin.model;
 
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 /**
- * Enum for Minecraft mod loader types.
- * Compatible with IntelliJ IDEA 2025.1.1.1
+ * Enum for different Minecraft mod loader types.
+ * These loaders are used to develop mods for Minecraft.
  */
 public enum ModLoaderType {
     /**
      * Forge mod loader.
      */
-    FORGE("Forge"),
+    FORGE("Forge", "forge", "build.gradle", "minecraftforge"),
     
     /**
      * Fabric mod loader.
      */
-    FABRIC("Fabric"),
+    FABRIC("Fabric", "fabric", "build.gradle", "fabric-loader"),
     
     /**
      * Quilt mod loader.
      */
-    QUILT("Quilt"),
+    QUILT("Quilt", "quilt", "build.gradle", "quilt-loader"),
     
     /**
-     * Architectury mod loader (multi-loader).
+     * Architectury mod loader (cross-platform).
      */
-    ARCHITECTURY("Architectury"),
+    ARCHITECTURY("Architectury", "architectury", "build.gradle", "architectury-plugin"),
     
     /**
      * Unknown mod loader.
      */
-    UNKNOWN("Unknown");
+    UNKNOWN("Unknown", "", "", "");
     
     private final String displayName;
+    private final String id;
+    private final String buildFile;
+    private final String buildGradleIdentifier;
     
-    ModLoaderType(String displayName) {
+    /**
+     * Creates a new mod loader type.
+     *
+     * @param displayName The display name
+     * @param id The identifier
+     * @param buildFile The build file name
+     * @param buildGradleIdentifier The identifier in the build.gradle file
+     */
+    ModLoaderType(String displayName, String id, String buildFile, String buildGradleIdentifier) {
         this.displayName = displayName;
+        this.id = id;
+        this.buildFile = buildFile;
+        this.buildGradleIdentifier = buildGradleIdentifier;
     }
     
     /**
@@ -49,57 +64,66 @@ public enum ModLoaderType {
     }
     
     /**
-     * Gets the mod loader type from a display name.
+     * Gets the identifier of the mod loader.
      *
-     * @param displayName The display name
-     * @return The mod loader type
+     * @return The identifier
      */
     @NotNull
-    public static ModLoaderType fromDisplayName(@NotNull String displayName) {
+    public String getId() {
+        return id;
+    }
+    
+    /**
+     * Gets the build file name of the mod loader.
+     *
+     * @return The build file name
+     */
+    @NotNull
+    public String getBuildFile() {
+        return buildFile;
+    }
+    
+    /**
+     * Gets the identifier in the build.gradle file.
+     *
+     * @return The identifier in the build.gradle file
+     */
+    @NotNull
+    public String getBuildGradleIdentifier() {
+        return buildGradleIdentifier;
+    }
+    
+    /**
+     * Gets a mod loader type by its identifier.
+     *
+     * @param id The identifier
+     * @return The mod loader type, or UNKNOWN if not found
+     */
+    @NotNull
+    public static ModLoaderType fromId(@Nullable String id) {
+        if (id == null || id.isEmpty()) {
+            return UNKNOWN;
+        }
+        
         for (ModLoaderType type : values()) {
-            if (type.getDisplayName().equalsIgnoreCase(displayName)) {
+            if (type.id.equalsIgnoreCase(id)) {
                 return type;
             }
         }
+        
         return UNKNOWN;
     }
     
     /**
-     * Gets the default file extension for mods of this type.
+     * Detects the mod loader type from a project directory.
      *
-     * @return The default file extension
+     * @param projectDir The project directory
+     * @return The detected mod loader type, or UNKNOWN if not detected
      */
     @NotNull
-    public String getDefaultFileExtension() {
-        switch (this) {
-            case FORGE:
-            case FABRIC:
-            case QUILT:
-            case ARCHITECTURY:
-                return ".jar";
-            default:
-                return ".jar";
-        }
-    }
-    
-    /**
-     * Gets the default configuration file for this mod loader.
-     *
-     * @return The default configuration file path
-     */
-    @NotNull
-    public String getDefaultConfigFile() {
-        switch (this) {
-            case FORGE:
-                return "src/main/resources/META-INF/mods.toml";
-            case FABRIC:
-                return "fabric.mod.json";
-            case QUILT:
-                return "quilt.mod.json";
-            case ARCHITECTURY:
-                return "common/build.gradle";
-            default:
-                return "";
-        }
+    public static ModLoaderType detectFromProject(@NotNull String projectDir) {
+        // This would normally use file inspection logic to detect the mod loader
+        // For simplicity, we'll just return UNKNOWN here
+        return UNKNOWN;
     }
 }

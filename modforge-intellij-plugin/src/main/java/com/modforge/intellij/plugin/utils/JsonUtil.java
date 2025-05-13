@@ -7,102 +7,105 @@ import com.intellij.openapi.diagnostic.Logger;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
-import java.io.Reader;
-import java.nio.charset.StandardCharsets;
+import java.lang.reflect.Type;
 import java.util.Map;
 
 /**
- * Utility class for JSON operations.
- * This class provides methods for serializing and deserializing JSON data.
+ * Utility for JSON operations.
+ * This class provides utility methods for working with JSON data.
  */
 public final class JsonUtil {
     private static final Logger LOG = Logger.getInstance(JsonUtil.class);
-    private static final Gson GSON = new GsonBuilder().disableHtmlEscaping().create();
-
+    private static final Gson GSON = new GsonBuilder().disableHtmlEscaping().setPrettyPrinting().create();
+    
+    /**
+     * Private constructor to prevent instantiation.
+     */
     private JsonUtil() {
-        // Private constructor to prevent instantiation
+        // Utility class
     }
-
+    
     /**
      * Writes an object to a JSON string.
-     * 
-     * @param object The object to serialize
+     *
+     * @param obj The object to write
      * @return The JSON string
      */
     @NotNull
-    public static String writeToString(@NotNull Object object) {
-        return GSON.toJson(object);
+    public static String writeToString(@NotNull Object obj) {
+        return GSON.toJson(obj);
     }
-
+    
     /**
-     * Reads a JSON string into an object.
-     * 
+     * Reads a JSON string to an object.
+     *
      * @param json The JSON string
-     * @param classOfT The class of T
-     * @param <T> The type to deserialize to
-     * @return The deserialized object
+     * @param clazz The class of the object
+     * @param <T> The type of the object
+     * @return The object, or null if an error occurs
      */
     @Nullable
-    public static <T> T readFromString(@NotNull String json, @NotNull Class<T> classOfT) {
+    public static <T> T readFromString(@NotNull String json, @NotNull Class<T> clazz) {
         try {
-            return GSON.fromJson(json, classOfT);
+            return GSON.fromJson(json, clazz);
         } catch (Exception e) {
-            LOG.warn("Failed to parse JSON: " + e.getMessage(), e);
+            LOG.warn("Failed to read JSON string to object of class " + clazz.getName(), e);
             return null;
         }
     }
-
+    
     /**
-     * Reads a JSON string into a map.
-     * 
+     * Reads a JSON string to a map.
+     *
      * @param json The JSON string
-     * @return The deserialized map
+     * @return The map, or null if an error occurs
      */
     @Nullable
     public static Map<String, Object> readMapFromString(@NotNull String json) {
         try {
-            return GSON.fromJson(json, new TypeToken<Map<String, Object>>() {}.getType());
+            Type type = new TypeToken<Map<String, Object>>() {}.getType();
+            return GSON.fromJson(json, type);
         } catch (Exception e) {
-            LOG.warn("Failed to parse JSON to map: " + e.getMessage(), e);
+            LOG.warn("Failed to read JSON string to map", e);
             return null;
         }
     }
-
+    
     /**
-     * Reads a JSON input stream into an object.
-     * 
-     * @param inputStream The input stream
-     * @param classOfT The class of T
-     * @param <T> The type to deserialize to
-     * @return The deserialized object
-     * @throws IOException If an IO error occurs
+     * Reads a JSON stream to a map.
+     *
+     * @param stream The input stream
+     * @return The map, or null if an error occurs
      */
     @Nullable
-    public static <T> T readFromStream(@NotNull InputStream inputStream, @NotNull Class<T> classOfT) throws IOException {
-        try (Reader reader = new InputStreamReader(inputStream, StandardCharsets.UTF_8)) {
-            return GSON.fromJson(reader, classOfT);
-        } catch (Exception e) {
-            LOG.warn("Failed to parse JSON from stream: " + e.getMessage(), e);
+    public static Map<String, Object> readMapFromStream(@NotNull InputStream stream) {
+        try (BufferedReader reader = new BufferedReader(new InputStreamReader(stream))) {
+            Type type = new TypeToken<Map<String, Object>>() {}.getType();
+            return GSON.fromJson(reader, type);
+        } catch (IOException e) {
+            LOG.warn("Failed to read JSON stream to map", e);
             return null;
         }
     }
-
+    
     /**
-     * Reads a JSON input stream into a map.
-     * 
-     * @param inputStream The input stream
-     * @return The deserialized map
-     * @throws IOException If an IO error occurs
+     * Reads a JSON string to an array.
+     *
+     * @param json The JSON string
+     * @param clazz The class of the array elements
+     * @param <T> The type of the array elements
+     * @return The array, or null if an error occurs
      */
     @Nullable
-    public static Map<String, Object> readMapFromStream(@NotNull InputStream inputStream) throws IOException {
-        try (Reader reader = new InputStreamReader(inputStream, StandardCharsets.UTF_8)) {
-            return GSON.fromJson(reader, new TypeToken<Map<String, Object>>() {}.getType());
+    public static <T> T[] readArrayFromString(@NotNull String json, @NotNull Class<T[]> clazz) {
+        try {
+            return GSON.fromJson(json, clazz);
         } catch (Exception e) {
-            LOG.warn("Failed to parse JSON from stream to map: " + e.getMessage(), e);
+            LOG.warn("Failed to read JSON string to array of class " + clazz.getComponentType().getName(), e);
             return null;
         }
     }
