@@ -10,11 +10,11 @@ public class ParticipantInfo {
     private final String username;
     private long lastActiveTimestamp;
     private boolean active;
-    
+
     /**
      * Creates a new participant info object.
      * 
-     * @param userId The user ID
+     * @param userId   The user ID
      * @param username The username
      */
     public ParticipantInfo(@NotNull String userId, @NotNull String username) {
@@ -23,7 +23,7 @@ public class ParticipantInfo {
         this.lastActiveTimestamp = System.currentTimeMillis();
         this.active = true;
     }
-    
+
     /**
      * Gets the user ID.
      * 
@@ -33,7 +33,7 @@ public class ParticipantInfo {
     public String getUserId() {
         return userId;
     }
-    
+
     /**
      * Gets the username.
      * 
@@ -43,7 +43,7 @@ public class ParticipantInfo {
     public String getUsername() {
         return username;
     }
-    
+
     /**
      * Gets the last active timestamp.
      * 
@@ -52,7 +52,7 @@ public class ParticipantInfo {
     public long getLastActiveTimestamp() {
         return lastActiveTimestamp;
     }
-    
+
     /**
      * Sets the last active timestamp to the current time.
      */
@@ -60,7 +60,7 @@ public class ParticipantInfo {
         this.lastActiveTimestamp = System.currentTimeMillis();
         this.active = true;
     }
-    
+
     /**
      * Sets the active status.
      * 
@@ -69,7 +69,7 @@ public class ParticipantInfo {
     public void setActive(boolean active) {
         this.active = active;
     }
-    
+
     /**
      * Gets whether the participant is active.
      * 
@@ -77,5 +77,15 @@ public class ParticipantInfo {
      */
     public boolean isActive() {
         return active;
+    }
+
+    /**
+     * Checks if the participant is the host.
+     * 
+     * @return True if the participant is the host, false otherwise
+     */
+    public boolean isHost() {
+        // Placeholder implementation
+        return false;
     }
 }

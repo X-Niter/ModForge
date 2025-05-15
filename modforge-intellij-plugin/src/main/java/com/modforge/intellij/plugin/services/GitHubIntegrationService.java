@@ -6,6 +6,9 @@ import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.project.Project;
 import com.modforge.intellij.plugin.settings.ModForgeSettings;
 import com.modforge.intellij.plugin.utils.ThreadUtils;
+import okhttp3.OkHttpClient;
+import okhttp3.Request;
+import okhttp3.Response;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -31,22 +34,21 @@ import java.util.regex.Pattern;
 @Service
 public final class GitHubIntegrationService {
     private static final Logger LOG = Logger.getInstance(GitHubIntegrationService.class);
-    
+
     // GitHub API base URL
     private static final String GITHUB_API_URL = "https://api.github.com";
-    
+
     // GitHub specific headers
     private static final String GITHUB_VERSION_HEADER = "2022-11-28";
     private static final String ACCEPT_HEADER = "application/vnd.github+json";
-    
+
     // Settings
     private final ModForgeSettings settings;
-    
+
     // State tracking
     private final AtomicBoolean isCommitting = new AtomicBoolean(false);
     private final AtomicBoolean isPushing = new AtomicBoolean(false);
-    private final AtomicBoolean isFetching = new AtomicBoolean(false);
-    
+
     /**
      * Constructor.
      */
@@ -74,22 +76,22 @@ public final class GitHubIntegrationService {
             LOG.warn("Not authenticated. Cannot get repositories.");
             return CompletableFuture.completedFuture(List.of());
         }
-        
+
         return ThreadUtils.supplyAsyncVirtual(() -> {
             try {
                 String url = GITHUB_API_URL + "/user/repos?per_page=100";
                 String response = sendGitHubRequest(url, "GET", null);
-                
+
                 // Extract repository names with simple regex for now
                 // In a real implementation, use a proper JSON parser
                 List<String> repos = new ArrayList<>();
                 Pattern pattern = Pattern.compile("\"full_name\"\\s*:\\s*\"([^\"]+)\"");
                 Matcher matcher = pattern.matcher(response);
-                
+
                 while (matcher.find()) {
                     repos.add(matcher.group(1));
                 }
-                
+
                 return repos;
             } catch (Exception e) {
                 LOG.error("Failed to get repositories", e);
@@ -97,7 +99,7 @@ public final class GitHubIntegrationService {
             }
         });
     }
-    
+
     /**
      * Creates a new repository.
      *
@@ -110,30 +112,29 @@ public final class GitHubIntegrationService {
             @NotNull String name,
             @Nullable String description,
             boolean isPrivate) {
-        
+
         if (!isAuthenticated()) {
             LOG.warn("Not authenticated. Cannot create repository.");
             return CompletableFuture.completedFuture("");
         }
-        
+
         return ThreadUtils.supplyAsyncVirtual(() -> {
             try {
                 String url = GITHUB_API_URL + "/user/repos";
-                
+
                 // Create JSON payload
                 String payload = String.format(
                         "{\"name\":\"%s\",\"description\":\"%s\",\"private\":%b,\"auto_init\":true}",
                         name,
                         description != null ? description : "",
-                        isPrivate
-                );
-                
+                        isPrivate);
+
                 String response = sendGitHubRequest(url, "POST", payload);
-                
+
                 // Extract HTML URL with simple regex for now
                 Pattern pattern = Pattern.compile("\"html_url\"\\s*:\\s*\"([^\"]+)\"");
                 Matcher matcher = pattern.matcher(response);
-                
+
                 if (matcher.find()) {
                     return matcher.group(1);
                 } else {
@@ -146,7 +147,7 @@ public final class GitHubIntegrationService {
             }
         });
     }
-    
+
     /**
      * Creates an issue in a repository.
      *
@@ -159,29 +160,28 @@ public final class GitHubIntegrationService {
             @NotNull String repoFullName,
             @NotNull String title,
             @NotNull String body) {
-        
+
         if (!isAuthenticated()) {
             LOG.warn("Not authenticated. Cannot create issue.");
             return CompletableFuture.completedFuture("");
         }
-        
+
         return ThreadUtils.supplyAsyncVirtual(() -> {
             try {
                 String url = GITHUB_API_URL + "/repos/" + repoFullName + "/issues";
-                
+
                 // Create JSON payload
                 String payload = String.format(
                         "{\"title\":\"%s\",\"body\":\"%s\"}",
                         title,
-                        body.replace("\"", "\\\"").replace("\n", "\\n")
-                );
-                
+                        body.replace("\"", "\\\"").replace("\n", "\\n"));
+
                 String response = sendGitHubRequest(url, "POST", payload);
-                
+
                 // Extract HTML URL with simple regex for now
                 Pattern pattern = Pattern.compile("\"html_url\"\\s*:\\s*\"([^\"]+)\"");
                 Matcher matcher = pattern.matcher(response);
-                
+
                 if (matcher.find()) {
                     return matcher.group(1);
                 } else {
@@ -194,7 +194,7 @@ public final class GitHubIntegrationService {
             }
         });
     }
-    
+
     /**
      * Creates a pull request in a repository.
      *
@@ -211,31 +211,30 @@ public final class GitHubIntegrationService {
             @NotNull String body,
             @NotNull String head,
             @NotNull String base) {
-        
+
         if (!isAuthenticated()) {
             LOG.warn("Not authenticated. Cannot create pull request.");
             return CompletableFuture.completedFuture("");
         }
-        
+
         return ThreadUtils.supplyAsyncVirtual(() -> {
             try {
                 String url = GITHUB_API_URL + "/repos/" + repoFullName + "/pulls";
-                
+
                 // Create JSON payload
                 String payload = String.format(
                         "{\"title\":\"%s\",\"body\":\"%s\",\"head\":\"%s\",\"base\":\"%s\"}",
                         title,
                         body.replace("\"", "\\\"").replace("\n", "\\n"),
                         head,
-                        base
-                );
-                
+                        base);
+
                 String response = sendGitHubRequest(url, "POST", payload);
-                
+
                 // Extract HTML URL with simple regex for now
                 Pattern pattern = Pattern.compile("\"html_url\"\\s*:\\s*\"([^\"]+)\"");
                 Matcher matcher = pattern.matcher(response);
-                
+
                 if (matcher.find()) {
                     return matcher.group(1);
                 } else {
@@ -248,7 +247,7 @@ public final class GitHubIntegrationService {
             }
         });
     }
-    
+
     /**
      * Creates a workflow file in a repository.
      *
@@ -263,12 +262,12 @@ public final class GitHubIntegrationService {
             @NotNull String path,
             @NotNull String content,
             @NotNull String message) {
-        
+
         if (!isAuthenticated()) {
             LOG.warn("Not authenticated. Cannot create workflow file.");
             return CompletableFuture.completedFuture("");
         }
-        
+
         return ThreadUtils.supplyAsyncVirtual(() -> {
             try {
                 // Ensure the path starts with .github/workflows
@@ -276,30 +275,30 @@ public final class GitHubIntegrationService {
                 if (!normalizedPath.startsWith(".github/workflows/")) {
                     normalizedPath = ".github/workflows/" + normalizedPath;
                 }
-                
+
                 // Ensure the path ends with .yml or .yaml
                 if (!normalizedPath.endsWith(".yml") && !normalizedPath.endsWith(".yaml")) {
                     normalizedPath += ".yml";
                 }
-                
+
                 String url = GITHUB_API_URL + "/repos/" + repoFullName + "/contents/" + normalizedPath;
-                
+
                 // Base64 encode the content
-                String encodedContent = java.util.Base64.getEncoder().encodeToString(content.getBytes(StandardCharsets.UTF_8));
-                
+                String encodedContent = java.util.Base64.getEncoder()
+                        .encodeToString(content.getBytes(StandardCharsets.UTF_8));
+
                 // Create JSON payload
                 String payload = String.format(
                         "{\"message\":\"%s\",\"content\":\"%s\"}",
                         message,
-                        encodedContent
-                );
-                
+                        encodedContent);
+
                 String response = sendGitHubRequest(url, "PUT", payload);
-                
+
                 // Extract HTML URL with simple regex for now
                 Pattern pattern = Pattern.compile("\"html_url\"\\s*:\\s*\"([^\"]+)\"");
                 Matcher matcher = pattern.matcher(response);
-                
+
                 if (matcher.find()) {
                     return matcher.group(1);
                 } else {
@@ -312,7 +311,7 @@ public final class GitHubIntegrationService {
             }
         });
     }
-    
+
     /**
      * Checks if the user is authenticated.
      *
@@ -321,10 +320,10 @@ public final class GitHubIntegrationService {
     public boolean isAuthenticated() {
         String username = settings.getGitHubUsername();
         String token = settings.getAccessToken();
-        
+
         return username != null && !username.isEmpty() && token != null && !token.isEmpty();
     }
-    
+
     /**
      * Validates credentials with GitHub.
      *
@@ -334,11 +333,11 @@ public final class GitHubIntegrationService {
         if (!isAuthenticated()) {
             return false;
         }
-        
+
         try {
             String url = GITHUB_API_URL + "/user";
             String response = sendGitHubRequest(url, "GET", null);
-            
+
             // Check if response contains the username
             return response.contains("\"login\"") && response.contains(settings.getGitHubUsername());
         } catch (Exception e) {
@@ -346,41 +345,41 @@ public final class GitHubIntegrationService {
             return false;
         }
     }
-    
+
     /**
      * Commits and pushes changes to a GitHub repository.
      *
-     * @param project   The project.
-     * @param repoPath  The repository path.
-     * @param message   The commit message.
+     * @param project  The project.
+     * @param repoPath The repository path.
+     * @param message  The commit message.
      * @return A CompletableFuture with whether the operation was successful.
      */
     public CompletableFuture<Boolean> commitAndPushChanges(
             @NotNull Project project,
             @NotNull String repoPath,
             @NotNull String message) {
-        
+
         if (!isAuthenticated()) {
             LOG.warn("Not authenticated. Cannot commit and push changes.");
             return CompletableFuture.completedFuture(false);
         }
-        
+
         if (isCommitting.get() || isPushing.get()) {
             LOG.warn("Already committing or pushing. Please wait for the operation to complete.");
             return CompletableFuture.completedFuture(false);
         }
-        
+
         isCommitting.set(true);
-        
+
         return ThreadUtils.supplyAsyncVirtual(() -> {
             try {
                 // This is a mock implementation
                 // In real code, use Git integration API to commit and push
                 LOG.info("Committing and pushing changes to: " + repoPath + " with message: " + message);
-                
+
                 // Simulate some work
                 ThreadUtils.sleep(2000);
-                
+
                 return true;
             } catch (Exception e) {
                 LOG.error("Failed to commit and push changes", e);
@@ -390,7 +389,7 @@ public final class GitHubIntegrationService {
             }
         });
     }
-    
+
     /**
      * Creates an autonomous workflow in a GitHub repository.
      *
@@ -401,66 +400,66 @@ public final class GitHubIntegrationService {
     public CompletableFuture<String> createAutonomousWorkflow(
             @NotNull String repoFullName,
             @NotNull String branch) {
-        
+
         if (!isAuthenticated()) {
             LOG.warn("Not authenticated. Cannot create autonomous workflow.");
             return CompletableFuture.completedFuture("");
         }
-        
+
         return ThreadUtils.supplyAsyncVirtual(() -> {
             try {
                 String workflowContent = """
-                    name: ModForge Autonomous Development
-                    
-                    on:
-                      push:
-                        branches: [ %s ]
-                      schedule:
-                        - cron: '0 */4 * * *'  # Run every 4 hours
-                    
-                    jobs:
-                      autonomous-development:
-                        runs-on: ubuntu-latest
-                        steps:
-                          - uses: actions/checkout@v3
-                          - uses: actions/setup-java@v3
-                            with:
-                              distribution: 'temurin'
-                              java-version: '21'
-                          - name: Analyze and Improve Code
-                            run: |
-                              echo "ModForge autonomous development workflow started"
-                              # API calls to ModForge service will be here
-                              # Analyze code, suggest improvements, etc.
-                          - name: Create Pull Request
-                            uses: peter-evans/create-pull-request@v4
-                            with:
-                              token: ${{ secrets.GITHUB_TOKEN }}
-                              commit-message: "Auto-improvement: Code enhancements"
-                              title: "Auto-improvement: Code enhancements"
-                              body: |
-                                This pull request was automatically created by the ModForge autonomous development workflow.
-                                
-                                Changes include:
-                                - Code optimizations
-                                - Bug fixes
-                                - Documentation improvements
-                              branch: autonomous-improvements
-                    """.formatted(branch);
-                
+                        name: ModForge Autonomous Development
+
+                        on:
+                          push:
+                            branches: [ %s ]
+                          schedule:
+                            - cron: '0 */4 * * *'  # Run every 4 hours
+
+                        jobs:
+                          autonomous-development:
+                            runs-on: ubuntu-latest
+                            steps:
+                              - uses: actions/checkout@v3
+                              - uses: actions/setup-java@v3
+                                with:
+                                  distribution: 'temurin'
+                                  java-version: '21'
+                              - name: Analyze and Improve Code
+                                run: |
+                                  echo "ModForge autonomous development workflow started"
+                                  # API calls to ModForge service will be here
+                                  # Analyze code, suggest improvements, etc.
+                              - name: Create Pull Request
+                                uses: peter-evans/create-pull-request@v4
+                                with:
+                                  token: ${{ secrets.GITHUB_TOKEN }}
+                                  commit-message: "Auto-improvement: Code enhancements"
+                                  title: "Auto-improvement: Code enhancements"
+                                  body: |
+                                    This pull request was automatically created by the ModForge autonomous development workflow.
+
+                                    Changes include:
+                                    - Code optimizations
+                                    - Bug fixes
+                                    - Documentation improvements
+                                  branch: autonomous-improvements
+                        """
+                        .formatted(branch);
+
                 return createWorkflowFile(
                         repoFullName,
                         "modforge-autonomous.yml",
                         workflowContent,
-                        "Add ModForge autonomous development workflow"
-                );
+                        "Add ModForge autonomous development workflow").join();
             } catch (Exception e) {
                 LOG.error("Failed to create autonomous workflow", e);
                 return "";
             }
         });
     }
-    
+
     /**
      * Helper method for sending requests to the GitHub API.
      *
@@ -474,34 +473,55 @@ public final class GitHubIntegrationService {
             @NotNull String urlString,
             @NotNull String method,
             @Nullable String payload) throws IOException {
-        
+
         URL url = new URL(urlString);
         HttpURLConnection connection = (HttpURLConnection) url.openConnection();
-        
+
         try {
             connection.setRequestMethod(method);
             connection.setRequestProperty("Accept", ACCEPT_HEADER);
             connection.setRequestProperty("X-GitHub-Api-Version", GITHUB_VERSION_HEADER);
-            
+
             // Set authentication
             String auth = settings.getGitHubUsername() + ":" + settings.getAccessToken();
             String encodedAuth = java.util.Base64.getEncoder().encodeToString(auth.getBytes(StandardCharsets.UTF_8));
             connection.setRequestProperty("Authorization", "Basic " + encodedAuth);
-            
+
             // Set content type if sending payload
             if (payload != null) {
                 connection.setRequestProperty("Content-Type", "application/json");
                 connection.setDoOutput(true);
-                
+
                 try (OutputStream os = connection.getOutputStream()) {
                     byte[] input = payload.getBytes(StandardCharsets.UTF_8);
                     os.write(input, 0, input.length);
                 }
             }
-            
+
+            OkHttpClient client = new OkHttpClient();
+            Request request = new Request.Builder()
+                    .url(connection.getURL().toString())
+                    .build();
+
+            try (Response response = client.newCall(request).execute()) {
+                int status = response.code();
+
+                if (status >= 200 && status < 300) {
+                    // Success
+                    if (response.body() != null) {
+                        return response.body().string();
+                    }
+                } else {
+                    // Error
+                    if (response.body() != null) {
+                        return "Error: " + response.body().string();
+                    }
+                }
+            }
+
             // Get response
             int status = connection.getResponseCode();
-            
+
             if (status >= 200 && status < 300) {
                 // Success
                 try (BufferedReader br = new BufferedReader(new InputStreamReader(
@@ -525,7 +545,7 @@ public final class GitHubIntegrationService {
                     }
                     errorDetails = response.toString();
                 }
-                
+
                 throw new IOException("HTTP error " + status + ": " + errorDetails);
             }
         } finally {

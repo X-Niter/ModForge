@@ -14,7 +14,8 @@ import com.intellij.psi.PsiDocumentManager;
 import com.intellij.psi.PsiManager;
 import com.intellij.psi.impl.PsiManagerImpl;
 import com.intellij.util.ui.UIUtil;
-import com.modforge.intellij.plugin.utils.CompatibilityUtil;
+import com.modforge.intellij.plugin.memory.recovery.MemoryRecoveryManager;
+
 import org.jetbrains.annotations.NotNull;
 
 import java.util.ArrayList;
@@ -22,25 +23,26 @@ import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
- * MemoryOptimizer is responsible for performing memory optimizations at different levels
+ * MemoryOptimizer is responsible for performing memory optimizations at
+ * different levels
  */
 public class MemoryOptimizer implements Disposable {
     private static final Logger LOG = Logger.getInstance(MemoryOptimizer.class);
-    
+
     private final Project project;
     private final AtomicBoolean optimizing = new AtomicBoolean(false);
     private final List<OptimizationListener> listeners = new ArrayList<>();
-    
+
     /**
      * Optimization levels for memory optimization
      */
     public enum OptimizationLevel {
-        MINIMAL,       // Basic cleanup with minimal impact
-        CONSERVATIVE,  // Standard cleanup with low impact
-        NORMAL,        // Balanced cleanup with moderate impact
-        AGGRESSIVE     // Deep cleanup with higher impact
+        MINIMAL, // Basic cleanup with minimal impact
+        CONSERVATIVE, // Standard cleanup with low impact
+        NORMAL, // Balanced cleanup with moderate impact
+        AGGRESSIVE // Deep cleanup with higher impact
     }
-    
+
     /**
      * Constructor
      * 
@@ -49,7 +51,7 @@ public class MemoryOptimizer implements Disposable {
     public MemoryOptimizer(Project project) {
         this.project = project;
     }
-    
+
     /**
      * Optimize memory at the specified level
      * 
@@ -60,11 +62,11 @@ public class MemoryOptimizer implements Disposable {
             LOG.warn("Cannot optimize: project is disposed");
             return;
         }
-        
+
         if (optimizing.compareAndSet(false, true)) {
             LOG.info("Starting memory optimization at level " + level);
             notifyOptimizationStarted(level);
-            
+
             ProgressManager.getInstance().run(new Task.Backgroundable(project, "Memory Optimization", true) {
                 @Override
                 public void run(@NotNull ProgressIndicator indicator) {
@@ -72,42 +74,42 @@ public class MemoryOptimizer implements Disposable {
                         indicator.setIndeterminate(false);
                         indicator.setText("Preparing optimization...");
                         indicator.setFraction(0.0);
-                        
+
                         long beforeMemory = MemoryUtils.getUsedMemory();
                         LOG.info("Memory before optimization: " + MemoryUtils.formatMemorySize(beforeMemory));
-                        
+
                         // Always perform minimal optimizations
                         performMinimalOptimizations(indicator);
-                        
+
                         // Perform higher level optimizations based on the specified level
                         if (level.ordinal() >= OptimizationLevel.CONSERVATIVE.ordinal()) {
                             performConservativeOptimizations(indicator);
                         }
-                        
+
                         if (level.ordinal() >= OptimizationLevel.NORMAL.ordinal()) {
                             performNormalOptimizations(indicator);
                         }
-                        
+
                         if (level.ordinal() >= OptimizationLevel.AGGRESSIVE.ordinal()) {
                             performAggressiveOptimizations(indicator);
                         }
-                        
+
                         // Final steps
                         indicator.setText("Requesting garbage collection...");
                         indicator.setFraction(0.95);
                         MemoryUtils.requestGarbageCollection();
-                        
+
                         indicator.setText("Optimization complete");
                         indicator.setFraction(1.0);
-                        
+
                         long afterMemory = MemoryUtils.getUsedMemory();
                         long memoryReduction = beforeMemory - afterMemory;
                         double percentReduction = beforeMemory > 0 ? (memoryReduction * 100.0 / beforeMemory) : 0.0;
-                        
+
                         LOG.info("Memory after optimization: " + MemoryUtils.formatMemorySize(afterMemory));
-                        LOG.info("Memory reduction: " + MemoryUtils.formatMemorySize(memoryReduction) + 
+                        LOG.info("Memory reduction: " + MemoryUtils.formatMemorySize(memoryReduction) +
                                 " (" + String.format("%.2f", percentReduction) + "%)");
-                        
+
                         notifyOptimizationCompleted(level, beforeMemory, afterMemory);
                     } catch (Exception e) {
                         LOG.error("Error during memory optimization", e);
@@ -121,7 +123,7 @@ public class MemoryOptimizer implements Disposable {
             LOG.warn("Memory optimization already in progress");
         }
     }
-    
+
     /**
      * Perform minimal optimizations (level 0) - lowest impact
      * 
@@ -130,26 +132,26 @@ public class MemoryOptimizer implements Disposable {
     private void performMinimalOptimizations(ProgressIndicator indicator) {
         indicator.setText("Performing minimal optimizations...");
         indicator.setFraction(0.1);
-        
+
         LOG.info("Performing minimal optimizations");
-        
+
         // Process pending UI events
         UIUtil.dispatchAllInvocationEvents();
         indicator.setFraction(0.15);
-        
+
         // Clear editor caches
         ApplicationManager.getApplication().invokeLater(() -> {
             EditorFactory.getInstance().refreshAllEditors();
         });
         indicator.setFraction(0.2);
-        
+
         // Commit documents
         ApplicationManager.getApplication().invokeLater(() -> {
             PsiDocumentManager.getInstance(project).commitAllDocuments();
         });
         indicator.setFraction(0.25);
     }
-    
+
     /**
      * Perform conservative optimizations (level 1) - low impact
      * 
@@ -158,9 +160,9 @@ public class MemoryOptimizer implements Disposable {
     private void performConservativeOptimizations(ProgressIndicator indicator) {
         indicator.setText("Performing conservative optimizations...");
         indicator.setFraction(0.3);
-        
+
         LOG.info("Performing conservative optimizations");
-        
+
         // Clear PSI caches
         ApplicationManager.getApplication().invokeLater(() -> {
             PsiManager psiManager = PsiManager.getInstance(project);
@@ -169,12 +171,12 @@ public class MemoryOptimizer implements Disposable {
             }
         });
         indicator.setFraction(0.35);
-        
+
         // Process pending UI events again
         UIUtil.dispatchAllInvocationEvents();
         indicator.setFraction(0.4);
     }
-    
+
     /**
      * Perform normal optimizations (level 2) - moderate impact
      * 
@@ -183,24 +185,24 @@ public class MemoryOptimizer implements Disposable {
     private void performNormalOptimizations(ProgressIndicator indicator) {
         indicator.setText("Performing normal optimizations...");
         indicator.setFraction(0.5);
-        
+
         LOG.info("Performing normal optimizations");
-        
+
         // Clear inspector caches
         ApplicationManager.getApplication().invokeLater(() -> {
             DaemonCodeAnalyzer.getInstance(project).restart();
         });
         indicator.setFraction(0.6);
-        
+
         // Clear event queue
         IdeEventQueue.getInstance().flushQueue();
         indicator.setFraction(0.65);
-        
+
         // Process pending UI events again
         UIUtil.dispatchAllInvocationEvents();
         indicator.setFraction(0.7);
     }
-    
+
     /**
      * Perform aggressive optimizations (level 3) - higher impact
      * 
@@ -209,24 +211,27 @@ public class MemoryOptimizer implements Disposable {
     private void performAggressiveOptimizations(ProgressIndicator indicator) {
         indicator.setText("Performing aggressive optimizations...");
         indicator.setFraction(0.75);
-        
+
         LOG.info("Performing aggressive optimizations");
-        
+
         // Update all caches - using compatible approach for IntelliJ 2025.1.1.1
         ApplicationManager.getApplication().invokeLater(() -> {
             // Clear file type manager cache
-            CompatibilityUtil.clearCaches(project);
-            
+            MemoryRecoveryManager recoveryManager = MemoryRecoveryManager.getInstance();
+            if (recoveryManager != null) {
+                recoveryManager.clearIDECaches();
+            }
+
             // Reset daemon code analyzer (more thorough than restart)
             DaemonCodeAnalyzer.getInstance(project).restart();
         });
         indicator.setFraction(0.85);
-        
+
         // Process pending UI events again
         UIUtil.dispatchAllInvocationEvents();
         indicator.setFraction(0.9);
     }
-    
+
     /**
      * Check if optimization is in progress
      * 
@@ -235,7 +240,7 @@ public class MemoryOptimizer implements Disposable {
     public boolean isOptimizing() {
         return optimizing.get();
     }
-    
+
     /**
      * Add an optimization listener
      * 
@@ -246,7 +251,7 @@ public class MemoryOptimizer implements Disposable {
             listeners.add(listener);
         }
     }
-    
+
     /**
      * Remove an optimization listener
      * 
@@ -257,7 +262,7 @@ public class MemoryOptimizer implements Disposable {
             listeners.remove(listener);
         }
     }
-    
+
     /**
      * Notify listeners that optimization has started
      * 
@@ -268,7 +273,7 @@ public class MemoryOptimizer implements Disposable {
         synchronized (listeners) {
             listenersCopy = new ArrayList<>(listeners);
         }
-        
+
         for (OptimizationListener listener : listenersCopy) {
             try {
                 listener.optimizationStarted(level);
@@ -277,20 +282,20 @@ public class MemoryOptimizer implements Disposable {
             }
         }
     }
-    
+
     /**
      * Notify listeners that optimization has completed
      * 
-     * @param level The optimization level
+     * @param level        The optimization level
      * @param beforeMemory Memory usage before optimization
-     * @param afterMemory Memory usage after optimization
+     * @param afterMemory  Memory usage after optimization
      */
     private void notifyOptimizationCompleted(OptimizationLevel level, long beforeMemory, long afterMemory) {
         List<OptimizationListener> listenersCopy;
         synchronized (listeners) {
             listenersCopy = new ArrayList<>(listeners);
         }
-        
+
         for (OptimizationListener listener : listenersCopy) {
             try {
                 listener.optimizationCompleted(level, beforeMemory, afterMemory);
@@ -299,7 +304,7 @@ public class MemoryOptimizer implements Disposable {
             }
         }
     }
-    
+
     /**
      * Notify listeners that optimization has failed
      * 
@@ -311,7 +316,7 @@ public class MemoryOptimizer implements Disposable {
         synchronized (listeners) {
             listenersCopy = new ArrayList<>(listeners);
         }
-        
+
         for (OptimizationListener listener : listenersCopy) {
             try {
                 listener.optimizationFailed(level, error);
@@ -320,17 +325,17 @@ public class MemoryOptimizer implements Disposable {
             }
         }
     }
-    
+
     /**
      * Reset the optimizer state and perform a quick optimization
      * This is useful when recovering from memory issues
      */
     public void reset() {
         LOG.info("Resetting memory optimizer");
-        
+
         // Reset optimization state
         optimizing.set(false);
-        
+
         // Perform a minimal optimization in the background
         if (!project.isDisposed()) {
             ApplicationManager.getApplication().executeOnPooledThread(() -> {
@@ -346,26 +351,29 @@ public class MemoryOptimizer implements Disposable {
             });
         }
     }
-    
+
     /**
      * Cancel any running background tasks that might be consuming memory
      */
     private void cancelRunningTasks() {
         LOG.info("Canceling running tasks to free memory");
-        
+
         try {
             // Cancel any running background tasks
-            ProgressManager.getInstance().cancelAllTasksExceptWriteAccessPreventingOnes();
+            MemoryRecoveryManager recoveryManager = MemoryRecoveryManager.getInstance();
+            if (recoveryManager != null) {
+                recoveryManager.stopBackgroundTasks();
+            }
         } catch (Exception e) {
             LOG.warn("Error canceling running tasks", e);
         }
     }
-    
+
     @Override
     public void dispose() {
         listeners.clear();
     }
-    
+
     /**
      * Interface for optimization listeners
      */
@@ -375,23 +383,26 @@ public class MemoryOptimizer implements Disposable {
          * 
          * @param level The optimization level
          */
-        default void optimizationStarted(OptimizationLevel level) {}
-        
+        default void optimizationStarted(OptimizationLevel level) {
+        }
+
         /**
          * Called when optimization completes successfully
          * 
-         * @param level The optimization level
+         * @param level        The optimization level
          * @param beforeMemory Memory usage before optimization
-         * @param afterMemory Memory usage after optimization
+         * @param afterMemory  Memory usage after optimization
          */
-        default void optimizationCompleted(OptimizationLevel level, long beforeMemory, long afterMemory) {}
-        
+        default void optimizationCompleted(OptimizationLevel level, long beforeMemory, long afterMemory) {
+        }
+
         /**
          * Called when optimization fails
          * 
          * @param level The optimization level
          * @param error The error that occurred
          */
-        default void optimizationFailed(OptimizationLevel level, Exception error) {}
+        default void optimizationFailed(OptimizationLevel level, Exception error) {
+        }
     }
 }

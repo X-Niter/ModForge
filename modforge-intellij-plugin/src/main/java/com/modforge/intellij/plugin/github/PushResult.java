@@ -39,7 +39,7 @@ public class PushResult {
      * @param message The message
      * @param repositoryUrl The repository URL, or null if the push failed
      */
-    private PushResult(boolean success, @NotNull String message, @Nullable String repositoryUrl) {
+    PushResult(boolean success, @NotNull String message, @Nullable String repositoryUrl) {
         this.success = success;
         this.message = message;
         this.repositoryUrl = repositoryUrl;

@@ -19,53 +19,54 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * Manager for memory recovery operations.
- * Provides automated recovery actions when memory pressure reaches critical levels.
+ * Provides automated recovery actions when memory pressure reaches critical
+ * levels.
  */
 public class MemoryRecoveryManager {
     private static final Logger LOG = Logger.getInstance(MemoryRecoveryManager.class);
-    
+
     // Singleton instance
     private static MemoryRecoveryManager instance;
-    
+
     // Thresholds for auto-recovery
     private static final int DEFAULT_RECOVERY_THRESHOLD_PERCENT = 80;
     private static final int EMERGENCY_RECOVERY_THRESHOLD_PERCENT = 90;
-    
+
     // Recovery count to track number of recovery actions
     private final AtomicInteger recoveryCount = new AtomicInteger(0);
     private final AtomicBoolean recovering = new AtomicBoolean(false);
-    
+
     // Recovery actions to perform
     private final List<MemoryRecoveryAction> recoveryActions = new ArrayList<>();
-    
+
     // Recovery listeners
     private final List<RecoveryListener> recoveryListeners = new ArrayList<>();
-    
+
     // Scheduled executor for recovery monitoring
     private final ScheduledExecutorService executor;
     private ScheduledFuture<?> monitoringTask;
-    
+
     /**
      * Enum for recovery action priorities
      */
     public enum RecoveryPriority {
         LOW, MEDIUM, HIGH, CRITICAL
     }
-    
+
     /**
      * Private constructor for singleton pattern
      */
     private MemoryRecoveryManager() {
         executor = AppExecutorUtil.createBoundedScheduledExecutorService(
                 "MemoryRecoveryManager", 1);
-        
+
         // Register standard recovery actions
         registerStandardRecoveryActions();
-        
+
         // Start monitoring for recovery
         startMonitoring();
     }
-    
+
     /**
      * Get the singleton instance
      *
@@ -77,82 +78,75 @@ public class MemoryRecoveryManager {
         }
         return instance;
     }
-    
+
     /**
      * Initialize the memory recovery manager
      * Sets up the recovery systems and prepares for operation
      */
     public void initialize() {
         LOG.info("Initializing memory recovery manager");
-        
+
         try {
             // Check if monitoring is active and start if needed
             if (monitoringTask == null || monitoringTask.isDone() || monitoringTask.isCancelled()) {
                 startMonitoring();
             }
-            
+
             // Ensure standard recovery actions are registered
             if (recoveryActions.isEmpty()) {
                 registerStandardRecoveryActions();
             }
-            
+
             LOG.info("Memory recovery manager initialized successfully");
         } catch (Exception e) {
             LOG.error("Error initializing memory recovery manager", e);
         }
     }
-    
+
     private void registerStandardRecoveryActions() {
         // Clear caches (Low priority)
         recoveryActions.add(new MemoryRecoveryAction(
                 "Clear IDE Caches",
                 RecoveryPriority.LOW,
-                this::clearIDECaches
-        ));
-        
+                this::clearIDECaches));
+
         // Run garbage collection (Low priority)
         recoveryActions.add(new MemoryRecoveryAction(
                 "Run Garbage Collection",
                 RecoveryPriority.LOW,
-                this::runGarbageCollection
-        ));
-        
+                this::runGarbageCollection));
+
         // Optimize memory usage (Medium priority)
         recoveryActions.add(new MemoryRecoveryAction(
                 "Optimize Memory Usage",
                 RecoveryPriority.MEDIUM,
-                this::optimizeMemoryUsage
-        ));
-        
+                this::optimizeMemoryUsage));
+
         // Close unused editors (Medium priority)
         recoveryActions.add(new MemoryRecoveryAction(
                 "Close Unused Editors",
                 RecoveryPriority.MEDIUM,
-                this::closeUnusedEditors
-        ));
-        
+                this::closeUnusedEditors));
+
         // Reduce feature set (High priority)
         recoveryActions.add(new MemoryRecoveryAction(
                 "Reduce Feature Set",
                 RecoveryPriority.HIGH,
-                this::reduceFeatureSet
-        ));
-        
+                this::reduceFeatureSet));
+
         // Stop background tasks (High priority)
         recoveryActions.add(new MemoryRecoveryAction(
                 "Stop Background Tasks",
                 RecoveryPriority.HIGH,
-                this::stopBackgroundTasks
-        ));
-        
+                this::stopBackgroundTasks));
+
         // Emergency recovery (Critical priority)
         recoveryActions.add(new MemoryRecoveryAction(
                 "Emergency Recovery",
                 RecoveryPriority.CRITICAL,
-                this::performEmergencyRecovery
-        ));
+                this::performEmergencyRecovery));
     }
-    
+
     /**
      * Start monitoring memory for recovery
      */
@@ -160,18 +154,17 @@ public class MemoryRecoveryManager {
         if (monitoringTask != null && !monitoringTask.isDone()) {
             monitoringTask.cancel(false);
         }
-        
+
         // Monitor memory every 10 seconds for recovery purposes
         monitoringTask = executor.scheduleWithFixedDelay(
                 this::checkMemoryForRecovery,
                 10,
                 10,
-                TimeUnit.SECONDS
-        );
-        
+                TimeUnit.SECONDS);
+
         LOG.info("Memory recovery monitoring started");
     }
-    
+
     /**
      * Check memory status and trigger recovery if needed
      */
@@ -179,20 +172,20 @@ public class MemoryRecoveryManager {
         try {
             // Get memory pressure level
             MemoryUtils.MemoryPressureLevel pressureLevel = MemoryUtils.getMemoryPressureLevel();
-            
+
             // Check if automatic recovery is enabled
             MemoryManagementSettings settings = MemoryManagementSettings.getInstance();
             if (!settings.isAutomaticRecoveryEnabled()) {
                 return;
             }
-            
+
             double memoryUsagePercent = MemoryUtils.getMemoryUsagePercentage();
-            
+
             // Trigger recovery based on thresholds
-            if (pressureLevel == MemoryUtils.MemoryPressureLevel.EMERGENCY && 
+            if (pressureLevel == MemoryUtils.MemoryPressureLevel.EMERGENCY &&
                     memoryUsagePercent >= EMERGENCY_RECOVERY_THRESHOLD_PERCENT) {
                 performRecovery(RecoveryPriority.CRITICAL);
-            } else if (pressureLevel == MemoryUtils.MemoryPressureLevel.CRITICAL && 
+            } else if (pressureLevel == MemoryUtils.MemoryPressureLevel.CRITICAL &&
                     memoryUsagePercent >= DEFAULT_RECOVERY_THRESHOLD_PERCENT) {
                 performRecovery(RecoveryPriority.HIGH);
             } else if (pressureLevel == MemoryUtils.MemoryPressureLevel.WARNING) {
@@ -205,7 +198,7 @@ public class MemoryRecoveryManager {
             LOG.error("Error checking memory for recovery", e);
         }
     }
-    
+
     /**
      * Add a recovery listener
      *
@@ -217,7 +210,7 @@ public class MemoryRecoveryManager {
             LOG.debug("Added recovery listener: " + listener.getClass().getSimpleName());
         }
     }
-    
+
     /**
      * Remove a recovery listener
      *
@@ -229,7 +222,7 @@ public class MemoryRecoveryManager {
             LOG.debug("Removed recovery listener: " + listener.getClass().getSimpleName());
         }
     }
-    
+
     /**
      * Notify all recovery listeners that recovery has started
      *
@@ -240,7 +233,7 @@ public class MemoryRecoveryManager {
         synchronized (recoveryListeners) {
             listeners = new ArrayList<>(recoveryListeners);
         }
-        
+
         for (RecoveryListener listener : listeners) {
             try {
                 listener.onRecoveryStarted(priority);
@@ -249,7 +242,7 @@ public class MemoryRecoveryManager {
             }
         }
     }
-    
+
     /**
      * Notify all recovery listeners that recovery has completed
      *
@@ -260,7 +253,7 @@ public class MemoryRecoveryManager {
         synchronized (recoveryListeners) {
             listeners = new ArrayList<>(recoveryListeners);
         }
-        
+
         for (RecoveryListener listener : listeners) {
             try {
                 listener.onRecoveryCompleted(priority);
@@ -269,19 +262,19 @@ public class MemoryRecoveryManager {
             }
         }
     }
-    
+
     /**
      * Notify all recovery listeners that recovery has failed
      *
      * @param priority The priority of the recovery
-     * @param error The error that occurred
+     * @param error    The error that occurred
      */
     private void notifyRecoveryFailed(@NotNull RecoveryPriority priority, @NotNull Exception error) {
         List<RecoveryListener> listeners;
         synchronized (recoveryListeners) {
             listeners = new ArrayList<>(recoveryListeners);
         }
-        
+
         for (RecoveryListener listener : listeners) {
             try {
                 listener.onRecoveryFailed(priority, error);
@@ -290,7 +283,7 @@ public class MemoryRecoveryManager {
             }
         }
     }
-    
+
     /**
      * Perform memory recovery up to the specified priority level
      *
@@ -302,33 +295,33 @@ public class MemoryRecoveryManager {
             LOG.info("Skipping recovery because recovery is already in progress");
             return false;
         }
-        
+
         try {
             recovering.set(true);
             int count = recoveryCount.incrementAndGet();
-            
-            LOG.info("Performing memory recovery (priority: " + maxPriority + 
+
+            LOG.info("Performing memory recovery (priority: " + maxPriority +
                     ", count: " + count + ")");
-            
+
             // Notify listeners that recovery has started
             notifyRecoveryStarted(maxPriority);
-            
+
             MemoryUtils.logMemoryStats();
-            
+
             // Sort actions by priority
             List<MemoryRecoveryAction> sortedActions = new ArrayList<>(recoveryActions);
             sortedActions.sort((a1, a2) -> a1.getPriority().compareTo(a2.getPriority()));
-            
+
             boolean anyPerformed = false;
-            
+
             try {
                 // Execute actions up to the maximum priority
                 for (MemoryRecoveryAction action : sortedActions) {
                     if (action.getPriority().compareTo(maxPriority) <= 0) {
                         try {
-                            LOG.info("Executing recovery action: " + action.getName() + 
+                            LOG.info("Executing recovery action: " + action.getName() +
                                     " (priority: " + action.getPriority() + ")");
-                            
+
                             boolean success = action.execute();
                             if (success) {
                                 LOG.info("Recovery action completed successfully: " + action.getName());
@@ -341,12 +334,12 @@ public class MemoryRecoveryManager {
                         }
                     }
                 }
-                
+
                 MemoryUtils.logMemoryStats();
-                
+
                 // Notify listeners that recovery has completed
                 notifyRecoveryCompleted(maxPriority);
-                
+
                 return anyPerformed;
             } catch (Exception e) {
                 // Notify listeners that recovery has failed
@@ -358,7 +351,7 @@ public class MemoryRecoveryManager {
             recovering.set(false);
         }
     }
-    
+
     /**
      * Clear IDE caches
      *
@@ -366,22 +359,18 @@ public class MemoryRecoveryManager {
      */
     private boolean clearIDECaches() {
         try {
-            // Request cache invalidation
-            com.intellij.ide.caches.CachesInvalidator.invalidateCaches();
-            
-            // Additional cache clearing for specific caches
+            // Alternative cache invalidation
             com.intellij.openapi.application.ApplicationManager.getApplication().invokeAndWait(() -> {
-                com.intellij.psi.impl.PsiManagerImpl.cleanupApplicationCaches();
                 com.intellij.util.indexing.FileBasedIndex.getInstance().invalidateCaches();
             });
-            
+
             return true;
         } catch (Exception e) {
             LOG.error("Error clearing IDE caches", e);
             return false;
         }
     }
-    
+
     /**
      * Run garbage collection
      *
@@ -396,7 +385,7 @@ public class MemoryRecoveryManager {
             return false;
         }
     }
-    
+
     /**
      * Optimize memory usage
      *
@@ -406,21 +395,22 @@ public class MemoryRecoveryManager {
         try {
             Project[] projects = ProjectManager.getInstance().getOpenProjects();
             for (Project project : projects) {
-                if (project.isDisposed()) continue;
-                
+                if (project.isDisposed())
+                    continue;
+
                 MemoryOptimizer optimizer = project.getService(MemoryOptimizer.class);
                 if (optimizer != null) {
                     optimizer.optimize(MemoryOptimizer.OptimizationLevel.AGGRESSIVE);
                 }
             }
-            
+
             return true;
         } catch (Exception e) {
             LOG.error("Error optimizing memory usage", e);
             return false;
         }
     }
-    
+
     /**
      * Close unused editors
      *
@@ -430,24 +420,24 @@ public class MemoryRecoveryManager {
         try {
             Project[] projects = ProjectManager.getInstance().getOpenProjects();
             for (Project project : projects) {
-                if (project.isDisposed()) continue;
-                
+                if (project.isDisposed())
+                    continue;
+
                 com.intellij.openapi.application.ApplicationManager.getApplication().invokeAndWait(() -> {
-                    com.intellij.openapi.fileEditor.impl.FileEditorManagerImpl editorManager = 
-                            (com.intellij.openapi.fileEditor.impl.FileEditorManagerImpl) 
-                            com.intellij.openapi.fileEditor.FileEditorManager.getInstance(project);
-                    
+                    com.intellij.openapi.fileEditor.impl.FileEditorManagerImpl editorManager = (com.intellij.openapi.fileEditor.impl.FileEditorManagerImpl) com.intellij.openapi.fileEditor.FileEditorManager
+                            .getInstance(project);
+
                     editorManager.closeAllFiles();
                 });
             }
-            
+
             return true;
         } catch (Exception e) {
             LOG.error("Error closing unused editors", e);
             return false;
         }
     }
-    
+
     /**
      * Reduce feature set by disabling non-essential features
      *
@@ -455,67 +445,71 @@ public class MemoryRecoveryManager {
      */
     private boolean reduceFeatureSet() {
         try {
-            // Get memory-aware continuous service for all projects and set to reduced features mode
+            // Get memory-aware continuous service for all projects and set to reduced
+            // features mode
             Project[] projects = ProjectManager.getInstance().getOpenProjects();
             for (Project project : projects) {
-                if (project.isDisposed()) continue;
-                
-                com.modforge.intellij.plugin.services.MemoryAwareContinuousService maService = 
-                        com.modforge.intellij.plugin.utils.ServiceUtil.getServiceFromProject(
-                                project, 
+                if (project.isDisposed())
+                    continue;
+
+                com.modforge.intellij.plugin.services.MemoryAwareContinuousService maService = com.modforge.intellij.plugin.utils.ServiceUtil
+                        .getServiceFromProject(
+                                project,
                                 com.modforge.intellij.plugin.services.MemoryAwareContinuousService.class);
-                
+
                 if (maService != null) {
+                    // Use the delegation method in MemoryAwareContinuousService
                     maService.setReducedFeaturesMode(true);
                 }
             }
-            
+
             return true;
         } catch (Exception e) {
             LOG.error("Error reducing feature set", e);
             return false;
         }
     }
-    
+
     /**
      * Stop background tasks
      *
      * @return True if the action was successful
      */
-    private boolean stopBackgroundTasks() {
+    public boolean stopBackgroundTasks() {
         try {
             // Stop continuous development service
             Project[] projects = ProjectManager.getInstance().getOpenProjects();
             for (Project project : projects) {
-                if (project.isDisposed()) continue;
-                
-                com.modforge.intellij.plugin.services.ContinuousDevelopmentService cdService = 
-                        com.modforge.intellij.plugin.utils.ServiceUtil.getServiceFromProject(
-                                project, 
+                if (project.isDisposed())
+                    continue;
+
+                com.modforge.intellij.plugin.services.ContinuousDevelopmentService cdService = com.modforge.intellij.plugin.utils.ServiceUtil
+                        .getServiceFromProject(
+                                project,
                                 com.modforge.intellij.plugin.services.ContinuousDevelopmentService.class);
-                
+
                 if (cdService != null && cdService.isRunning()) {
                     cdService.stop();
                 }
-                
+
                 // Stop other background tasks
-                com.modforge.intellij.plugin.services.MemoryAwareContinuousService maService = 
-                        com.modforge.intellij.plugin.utils.ServiceUtil.getServiceFromProject(
-                                project, 
+                com.modforge.intellij.plugin.services.MemoryAwareContinuousService maService = com.modforge.intellij.plugin.utils.ServiceUtil
+                        .getServiceFromProject(
+                                project,
                                 com.modforge.intellij.plugin.services.MemoryAwareContinuousService.class);
-                
+
                 if (maService != null) {
                     maService.pauseBackgroundTasks();
                 }
             }
-            
+
             return true;
         } catch (Exception e) {
             LOG.error("Error stopping background tasks", e);
             return false;
         }
     }
-    
+
     /**
      * Perform emergency recovery
      *
@@ -530,75 +524,77 @@ public class MemoryRecoveryManager {
             closeUnusedEditors();
             reduceFeatureSet();
             stopBackgroundTasks();
-            
-            // Additional emergency actions
-            
-            // Close modal dialogs
+
+            // Custom approach to close modal dialogs
             com.intellij.openapi.application.ApplicationManager.getApplication().invokeAndWait(() -> {
-                com.intellij.openapi.ui.DialogWrapper.closeAllDialogs();
+                java.awt.Window[] windows = java.awt.Window.getWindows();
+                for (java.awt.Window window : windows) {
+                    if (window instanceof javax.swing.JDialog) {
+                        ((javax.swing.JDialog) window).dispose();
+                    }
+                }
             });
-            
+
             // Force full garbage collection
-            // Note: System.runFinalization() has been removed as it's deprecated in Java 21
             System.gc();
-            
+
             // Allow a brief pause for GC to complete
             try {
                 Thread.sleep(100);
             } catch (InterruptedException ie) {
                 Thread.currentThread().interrupt();
             }
-            
+
             // Second GC pass
             System.gc();
-            
+
             return true;
         } catch (Exception e) {
             LOG.error("Error performing emergency recovery", e);
             return false;
         }
     }
-    
+
     /**
      * Reset the recovery manager
      */
     public void reset() {
         LOG.info("Resetting memory recovery manager");
-        
+
         // Stop monitoring
         if (monitoringTask != null && !monitoringTask.isDone()) {
             monitoringTask.cancel(false);
             monitoringTask = null;
         }
-        
+
         // Reset state
         recoveryCount.set(0);
         recovering.set(false);
-        
+
         // Store current recovery listeners to re-register
         List<RecoveryListener> currentListeners;
         synchronized (recoveryListeners) {
             currentListeners = new ArrayList<>(recoveryListeners);
             recoveryListeners.clear();
         }
-        
+
         // Reset recovery actions
         synchronized (recoveryActions) {
             recoveryActions.clear();
             registerStandardRecoveryActions();
         }
-        
+
         // Re-register recovery listeners
         for (RecoveryListener listener : currentListeners) {
             addRecoveryListener(listener);
         }
-        
+
         // Restart monitoring
         startMonitoring();
-        
+
         LOG.info("Memory recovery manager reset completed");
     }
-    
+
     /**
      * Check if recovery is in progress
      *
@@ -607,7 +603,7 @@ public class MemoryRecoveryManager {
     public boolean isRecovering() {
         return recovering.get();
     }
-    
+
     /**
      * Get the number of recovery actions performed
      *
@@ -616,7 +612,7 @@ public class MemoryRecoveryManager {
     public int getRecoveryCount() {
         return recoveryCount.get();
     }
-    
+
     /**
      * Add a custom recovery action
      *
@@ -624,12 +620,12 @@ public class MemoryRecoveryManager {
      * @param priority The priority of the action
      * @param action   The action to perform
      */
-    public void addRecoveryAction(@NotNull String name, @NotNull RecoveryPriority priority, 
-                                 @NotNull RecoveryActionExecutor action) {
+    public void addRecoveryAction(@NotNull String name, @NotNull RecoveryPriority priority,
+            @NotNull RecoveryActionExecutor action) {
         recoveryActions.add(new MemoryRecoveryAction(name, priority, action));
         LOG.info("Added custom recovery action: " + name + " (priority: " + priority + ")");
     }
-    
+
     /**
      * Reset the recovery count
      */
@@ -637,14 +633,14 @@ public class MemoryRecoveryManager {
         recoveryCount.set(0);
         LOG.info("Reset recovery count to 0");
     }
-    
+
     /**
      * Interface for recovery action execution
      */
     public interface RecoveryActionExecutor {
         boolean execute();
     }
-    
+
     /**
      * Interface for listening to recovery events
      */
@@ -654,24 +650,27 @@ public class MemoryRecoveryManager {
          *
          * @param priority The priority of the recovery
          */
-        default void onRecoveryStarted(RecoveryPriority priority) {}
-        
+        default void onRecoveryStarted(RecoveryPriority priority) {
+        }
+
         /**
          * Called when a recovery process is completed
          *
          * @param priority The priority of the recovery
          */
-        default void onRecoveryCompleted(RecoveryPriority priority) {}
-        
+        default void onRecoveryCompleted(RecoveryPriority priority) {
+        }
+
         /**
          * Called when a recovery process fails
          *
          * @param priority The priority of the recovery
-         * @param error The error that occurred
+         * @param error    The error that occurred
          */
-        default void onRecoveryFailed(RecoveryPriority priority, Exception error) {}
+        default void onRecoveryFailed(RecoveryPriority priority, Exception error) {
+        }
     }
-    
+
     /**
      * Class representing a memory recovery action
      */
@@ -679,7 +678,7 @@ public class MemoryRecoveryManager {
         private final String name;
         private final RecoveryPriority priority;
         private final RecoveryActionExecutor action;
-        
+
         /**
          * Constructor
          *
@@ -687,13 +686,13 @@ public class MemoryRecoveryManager {
          * @param priority The priority of the action
          * @param action   The action to perform
          */
-        public MemoryRecoveryAction(@NotNull String name, @NotNull RecoveryPriority priority, 
-                                   @NotNull RecoveryActionExecutor action) {
+        public MemoryRecoveryAction(@NotNull String name, @NotNull RecoveryPriority priority,
+                @NotNull RecoveryActionExecutor action) {
             this.name = name;
             this.priority = priority;
             this.action = action;
         }
-        
+
         /**
          * Get the name of the action
          *
@@ -702,7 +701,7 @@ public class MemoryRecoveryManager {
         public String getName() {
             return name;
         }
-        
+
         /**
          * Get the priority of the action
          *
@@ -711,7 +710,7 @@ public class MemoryRecoveryManager {
         public RecoveryPriority getPriority() {
             return priority;
         }
-        
+
         /**
          * Execute the action
          *

@@ -19,8 +19,6 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.io.File;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -40,10 +38,10 @@ import java.util.regex.Pattern;
 @Service
 public final class AutonomousCodeGenerationService {
     private static final Logger LOG = Logger.getInstance(AutonomousCodeGenerationService.class);
-    
+
     // Settings
     private final ModForgeSettings settings;
-    
+
     // State tracking
     private final AtomicBoolean isGeneratingCode = new AtomicBoolean(false);
     private final AtomicBoolean isRunningContinuously = new AtomicBoolean(false);
@@ -64,7 +62,7 @@ public final class AutonomousCodeGenerationService {
         /** Annotation */
         ANNOTATION
     }
-    
+
     /**
      * Class for defining method parameters.
      */
@@ -72,12 +70,12 @@ public final class AutonomousCodeGenerationService {
         private final String name;
         private final String type;
         private final String description;
-        
+
         /**
          * Creates a new parameter definition.
          *
-         * @param name The parameter name
-         * @param type The parameter type
+         * @param name        The parameter name
+         * @param type        The parameter type
          * @param description The parameter description
          */
         public ParameterDefinition(String name, String type, String description) {
@@ -85,7 +83,7 @@ public final class AutonomousCodeGenerationService {
             this.type = type;
             this.description = description;
         }
-        
+
         /**
          * Gets the parameter name.
          *
@@ -94,7 +92,7 @@ public final class AutonomousCodeGenerationService {
         public String getName() {
             return name;
         }
-        
+
         /**
          * Gets the parameter type.
          *
@@ -103,7 +101,7 @@ public final class AutonomousCodeGenerationService {
         public String getType() {
             return type;
         }
-        
+
         /**
          * Gets the parameter description.
          *
@@ -113,7 +111,7 @@ public final class AutonomousCodeGenerationService {
             return description;
         }
     }
-    
+
     /**
      * Class for defining methods.
      */
@@ -125,20 +123,20 @@ public final class AutonomousCodeGenerationService {
         private final boolean isAbstract;
         private final boolean isPrivate;
         private final String description;
-        
+
         /**
          * Creates a new method definition.
          *
-         * @param name The method name
-         * @param returnType The return type
-         * @param parameters The method parameters
-         * @param isStatic Whether the method is static
-         * @param isAbstract Whether the method is abstract
-         * @param isPrivate Whether the method is private
+         * @param name        The method name
+         * @param returnType  The return type
+         * @param parameters  The method parameters
+         * @param isStatic    Whether the method is static
+         * @param isAbstract  Whether the method is abstract
+         * @param isPrivate   Whether the method is private
          * @param description The method description
          */
         public MethodDefinition(String name, String returnType, List<ParameterDefinition> parameters,
-                                boolean isStatic, boolean isAbstract, boolean isPrivate, String description) {
+                boolean isStatic, boolean isAbstract, boolean isPrivate, String description) {
             this.name = name;
             this.returnType = returnType;
             this.parameters = parameters;
@@ -147,7 +145,7 @@ public final class AutonomousCodeGenerationService {
             this.isPrivate = isPrivate;
             this.description = description;
         }
-        
+
         /**
          * Gets the method name.
          *
@@ -156,7 +154,7 @@ public final class AutonomousCodeGenerationService {
         public String getName() {
             return name;
         }
-        
+
         /**
          * Gets the return type.
          *
@@ -165,7 +163,7 @@ public final class AutonomousCodeGenerationService {
         public String getReturnType() {
             return returnType;
         }
-        
+
         /**
          * Gets the method parameters.
          *
@@ -174,7 +172,7 @@ public final class AutonomousCodeGenerationService {
         public List<ParameterDefinition> getParameters() {
             return parameters;
         }
-        
+
         /**
          * Checks if the method is static.
          *
@@ -183,7 +181,7 @@ public final class AutonomousCodeGenerationService {
         public boolean isStatic() {
             return isStatic;
         }
-        
+
         /**
          * Checks if the method is abstract.
          *
@@ -192,7 +190,7 @@ public final class AutonomousCodeGenerationService {
         public boolean isAbstract() {
             return isAbstract;
         }
-        
+
         /**
          * Checks if the method is private.
          *
@@ -201,7 +199,7 @@ public final class AutonomousCodeGenerationService {
         public boolean isPrivate() {
             return isPrivate;
         }
-        
+
         /**
          * Gets the method description.
          *
@@ -211,11 +209,48 @@ public final class AutonomousCodeGenerationService {
             return description;
         }
     }
-    
+
+    /**
+     * Class for defining fields.
+     */
+    public static class FieldDefinition {
+        private final String name;
+        private final String type;
+
+        /**
+         * Creates a new field definition.
+         *
+         * @param name The field name
+         * @param type The field type
+         */
+        public FieldDefinition(String name, String type) {
+            this.name = name;
+            this.type = type;
+        }
+
+        /**
+         * Gets the field name.
+         *
+         * @return The field name
+         */
+        public String getName() {
+            return name;
+        }
+
+        /**
+         * Gets the field type.
+         *
+         * @return The field type
+         */
+        public String getType() {
+            return type;
+        }
+    }
+
     // Performance tracking
     private final ConcurrentHashMap<String, Integer> patternHits = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, String> patternCache = new ConcurrentHashMap<>();
-    
+
     /**
      * Constructor.
      */
@@ -232,7 +267,7 @@ public final class AutonomousCodeGenerationService {
     public static AutonomousCodeGenerationService getInstance() {
         return ApplicationManager.getApplication().getService(AutonomousCodeGenerationService.class);
     }
-    
+
     /**
      * Gets the instance of the service for a specific project.
      *
@@ -242,7 +277,7 @@ public final class AutonomousCodeGenerationService {
     public static AutonomousCodeGenerationService getInstance(@NotNull Project project) {
         return getInstance();
     }
-    
+
     /**
      * Generates code based on a prompt and context file.
      * This method signature is for compatibility with IntelliJ IDEA 2025.1.1.1
@@ -256,16 +291,16 @@ public final class AutonomousCodeGenerationService {
             @NotNull String prompt,
             @Nullable VirtualFile contextFile,
             @NotNull String language) {
-        
+
         if (isGeneratingCode.getAndSet(true)) {
             LOG.warn("Code generation already in progress");
             return CompletableFuture.completedFuture(null);
         }
-        
+
         return ThreadUtils.supplyAsyncVirtual(() -> {
             try {
                 LOG.info("Generating code with prompt in language: " + language);
-                
+
                 // Additional context from file if provided
                 String contextContent = "";
                 if (contextFile != null && contextFile.exists()) {
@@ -275,7 +310,7 @@ public final class AutonomousCodeGenerationService {
                         LOG.warn("Failed to read context file: " + e.getMessage());
                     }
                 }
-                
+
                 // Check pattern cache first
                 String cacheKey = prompt + "|" + contextContent + "|" + language;
                 if (patternCache.containsKey(cacheKey)) {
@@ -284,19 +319,19 @@ public final class AutonomousCodeGenerationService {
                     LOG.info("Using cached result for prompt (hit count: " + patternHits.get(cacheKey) + ")");
                     return cachedResult;
                 }
-                
+
                 // Mock generation for now
                 // TODO: Replace with actual API call
-                String generatedCode = generateMockCode(prompt + 
-                    (contextContent.isEmpty() ? "" : "\nContext: " + contextContent) + 
-                    "\nLanguage: " + language);
-                
+                String generatedCode = generateMockCode(prompt +
+                        (contextContent.isEmpty() ? "" : "\nContext: " + contextContent) +
+                        "\nLanguage: " + language);
+
                 // Cache the result if pattern learning is enabled
                 if (settings.isPatternRecognition()) {
                     patternCache.put(cacheKey, generatedCode);
                     patternHits.put(cacheKey, 1);
                 }
-                
+
                 return generatedCode;
             } catch (Exception e) {
                 LOG.error("Error generating code", e);
@@ -306,7 +341,7 @@ public final class AutonomousCodeGenerationService {
             }
         });
     }
-    
+
     /**
      * Generates code from a description with target package and module type.
      *
@@ -319,16 +354,16 @@ public final class AutonomousCodeGenerationService {
             @NotNull String description,
             @Nullable VirtualFile targetPackage,
             @NotNull String moduleType) {
-        
+
         if (isGeneratingCode.getAndSet(true)) {
             LOG.warn("Code generation already in progress");
             return CompletableFuture.completedFuture(null);
         }
-        
+
         return ThreadUtils.supplyAsyncVirtual(() -> {
             try {
                 LOG.info("Generating code with description: " + description);
-                
+
                 // Check pattern cache first
                 String cacheKey = description + "|" + targetPackage + "|" + moduleType;
                 if (patternCache.containsKey(cacheKey)) {
@@ -337,17 +372,18 @@ public final class AutonomousCodeGenerationService {
                     LOG.info("Using cached result for description (hit count: " + patternHits.get(cacheKey) + ")");
                     return cachedResult;
                 }
-                
+
                 // Mock generation for now
                 // TODO: Replace with actual API call
-                String generatedCode = generateMockCode(description + " in " + moduleType + " for package " + targetPackage);
-                
+                String generatedCode = generateMockCode(
+                        description + " in " + moduleType + " for package " + targetPackage);
+
                 // Cache the result if pattern learning is enabled
                 if (settings.isPatternRecognition()) {
                     patternCache.put(cacheKey, generatedCode);
                     patternHits.put(cacheKey, 1);
                 }
-                
+
                 return generatedCode;
             } catch (Exception e) {
                 LOG.error("Error generating code", e);
@@ -361,25 +397,25 @@ public final class AutonomousCodeGenerationService {
     /**
      * Generates mod code.
      *
-     * @param project       The project.
-     * @param prompt        The prompt.
-     * @param outputPath    The output path.
+     * @param project    The project.
+     * @param prompt     The prompt.
+     * @param outputPath The output path.
      * @return A CompletableFuture that completes when the code is generated.
      */
     public CompletableFuture<List<String>> generateModCode(
             @NotNull Project project,
             @NotNull String prompt,
             @NotNull String outputPath) {
-        
+
         if (isGeneratingCode.getAndSet(true)) {
             LOG.warn("Code generation already in progress");
             return CompletableFuture.completedFuture(List.of("Code generation already in progress"));
         }
-        
+
         return ThreadUtils.supplyAsyncVirtual(() -> {
             try {
                 LOG.info("Generating mod code with prompt: " + prompt);
-                
+
                 // Check pattern cache first
                 String cacheKey = prompt + "|" + outputPath;
                 if (patternCache.containsKey(cacheKey)) {
@@ -388,36 +424,36 @@ public final class AutonomousCodeGenerationService {
                     LOG.info("Using cached result for prompt (hit count: " + patternHits.get(cacheKey) + ")");
                     return List.of(cachedResult);
                 }
-                
+
                 // Mock generation for now
                 // TODO: Replace with actual API call
                 String generatedCode = generateMockCode(prompt);
-                
+
                 // Cache the result if pattern learning is enabled
                 if (settings.isPatternRecognition()) {
                     patternCache.put(cacheKey, generatedCode);
                     patternHits.put(cacheKey, 1);
                 }
-                
+
                 // Create the output directory if it doesn't exist
                 Path outputDir = Paths.get(outputPath).getParent();
                 if (outputDir != null && !Files.exists(outputDir)) {
                     Files.createDirectories(outputDir);
                 }
-                
+
                 // Write the file
                 File outputFile = new File(outputPath);
                 FileUtil.writeToFile(outputFile, generatedCode);
-                
+
                 // Refresh the file in the IDE
                 VirtualFile vFile = LocalFileSystem.getInstance().refreshAndFindFileByIoFile(outputFile);
                 if (vFile != null) {
                     vFile.refresh(false, false);
-                    
+
                     // Open the file in the editor
                     CompatibilityUtil.openFileInEditor(project, vFile, true);
                 }
-                
+
                 return List.of(generatedCode);
             } catch (Exception e) {
                 LOG.error("Error generating mod code", e);
@@ -427,49 +463,49 @@ public final class AutonomousCodeGenerationService {
             }
         });
     }
-    
+
     /**
      * Fixes compilation errors.
      *
-     * @param project       The project.
-     * @param filePath      The file path.
-     * @param errors        The compilation errors.
+     * @param project  The project.
+     * @param filePath The file path.
+     * @param errors   The compilation errors.
      * @return A CompletableFuture that completes when the errors are fixed.
      */
     public CompletableFuture<Boolean> fixCompilationErrors(
             @NotNull Project project,
             @NotNull String filePath,
             @NotNull List<String> errors) {
-        
+
         if (isGeneratingCode.getAndSet(true)) {
             LOG.warn("Code generation already in progress");
             return CompletableFuture.completedFuture(false);
         }
-        
+
         return ThreadUtils.supplyAsyncVirtual(() -> {
             try {
                 LOG.info("Fixing compilation errors in file: " + filePath);
-                
+
                 // Get the file
                 VirtualFile vFile = CompatibilityUtil.getModFileByRelativePath(project, filePath);
                 if (vFile == null) {
                     LOG.error("File not found: " + filePath);
                     return false;
                 }
-                
+
                 // Read the file content
                 String fileContent = new String(vFile.contentsToByteArray());
-                
+
                 // Mock fix for now
                 // TODO: Replace with actual API call
                 String fixedContent = mockFixErrors(fileContent, errors);
-                
+
                 // Write the fixed content
                 VfsUtil.saveText(vFile, fixedContent);
-                
+
                 // Refresh the file
                 vFile.refresh(false, false);
-                
+
                 return true;
             } catch (Exception e) {
                 LOG.error("Error fixing compilation errors", e);
@@ -479,7 +515,7 @@ public final class AutonomousCodeGenerationService {
             }
         });
     }
-    
+
     /**
      * Adds features to existing code.
      *
@@ -492,36 +528,36 @@ public final class AutonomousCodeGenerationService {
             @NotNull Project project,
             @NotNull String filePath,
             @NotNull String featurePrompt) {
-        
+
         if (isGeneratingCode.getAndSet(true)) {
             LOG.warn("Code generation already in progress");
             return CompletableFuture.completedFuture(false);
         }
-        
+
         return ThreadUtils.supplyAsyncVirtual(() -> {
             try {
                 LOG.info("Adding features to file: " + filePath + " with prompt: " + featurePrompt);
-                
+
                 // Get the file
                 VirtualFile vFile = CompatibilityUtil.getModFileByRelativePath(project, filePath);
                 if (vFile == null) {
                     LOG.error("File not found: " + filePath);
                     return false;
                 }
-                
+
                 // Read the file content
                 String fileContent = new String(vFile.contentsToByteArray());
-                
+
                 // Mock feature addition for now
                 // TODO: Replace with actual API call
                 String enhancedContent = mockAddFeature(fileContent, featurePrompt);
-                
+
                 // Write the enhanced content
                 VfsUtil.saveText(vFile, enhancedContent);
-                
+
                 // Refresh the file
                 vFile.refresh(false, false);
-                
+
                 return true;
             } catch (Exception e) {
                 LOG.error("Error adding features", e);
@@ -531,7 +567,7 @@ public final class AutonomousCodeGenerationService {
             }
         });
     }
-    
+
     /**
      * Starts continuous development mode.
      *
@@ -543,19 +579,19 @@ public final class AutonomousCodeGenerationService {
             LOG.warn("Continuous development already running");
             return false;
         }
-        
+
         int taskId = continuousDevelopmentTaskId.incrementAndGet();
         LOG.info("Starting continuous development (task ID: " + taskId + ")");
-        
+
         ThreadUtils.runAsyncVirtual(() -> {
             try {
-                while (isRunningContinuously.get() && 
-                       continuousDevelopmentTaskId.get() == taskId && 
-                       !project.isDisposed()) {
-                    
+                while (isRunningContinuously.get() &&
+                        continuousDevelopmentTaskId.get() == taskId &&
+                        !project.isDisposed()) {
+
                     // TODO: Implement continuous development logic
                     LOG.info("Continuous development tick (task ID: " + taskId + ")");
-                    
+
                     // Sleep for a while
                     Thread.sleep(60000);
                 }
@@ -568,10 +604,10 @@ public final class AutonomousCodeGenerationService {
                 LOG.info("Stopping continuous development (task ID: " + taskId + ")");
             }
         });
-        
+
         return true;
     }
-    
+
     /**
      * Stops continuous development mode.
      */
@@ -581,7 +617,7 @@ public final class AutonomousCodeGenerationService {
             continuousDevelopmentTaskId.incrementAndGet();
         }
     }
-    
+
     /**
      * Checks if continuous development is enabled.
      *
@@ -590,7 +626,7 @@ public final class AutonomousCodeGenerationService {
     public boolean isContinuousDevelopmentEnabled() {
         return settings.isEnableContinuousDevelopment();
     }
-    
+
     /**
      * Checks if code is being generated.
      *
@@ -599,7 +635,7 @@ public final class AutonomousCodeGenerationService {
     public boolean isGeneratingCode() {
         return isGeneratingCode.get();
     }
-    
+
     /**
      * Checks if continuous development is running.
      *
@@ -608,7 +644,7 @@ public final class AutonomousCodeGenerationService {
     public boolean isRunningContinuously() {
         return isRunningContinuously.get();
     }
-    
+
     /**
      * Gets pattern learning statistics.
      *
@@ -617,12 +653,12 @@ public final class AutonomousCodeGenerationService {
     public String getPatternLearningStats() {
         int totalPatterns = patternCache.size();
         int totalHits = patternHits.values().stream().mapToInt(Integer::intValue).sum();
-        
+
         return "Pattern learning stats:\n" +
-               "- Total patterns: " + totalPatterns + "\n" +
-               "- Total cache hits: " + totalHits;
+                "- Total patterns: " + totalPatterns + "\n" +
+                "- Total cache hits: " + totalHits;
     }
-    
+
     /**
      * Clears the pattern cache.
      */
@@ -631,36 +667,36 @@ public final class AutonomousCodeGenerationService {
         patternCache.clear();
         patternHits.clear();
     }
-    
+
     /**
      * Explains code using AI analysis.
      *
-     * @param code The code to explain.
+     * @param code    The code to explain.
      * @param context Optional additional context, can be null.
      * @return A CompletableFuture that completes with the explanation.
      */
     public CompletableFuture<String> explainCode(
             @NotNull String code,
             @Nullable String context) {
-        
+
         if (isGeneratingCode.getAndSet(true)) {
             LOG.warn("Code explanation already in progress");
             return CompletableFuture.completedFuture(null);
         }
-        
+
         return ThreadUtils.supplyAsyncVirtual(() -> {
             try {
                 LOG.info("Explaining code of length: " + code.length());
-                
+
                 // If the context is not null, use it to enhance the explanation
                 String codeToExplain = code;
                 if (context != null && !context.isEmpty()) {
                     codeToExplain = "Context: " + context + "\n\nCode to explain:\n" + code;
                 }
-                
+
                 // Cache key for pattern learning - use a hash of the code
                 String cacheKey = "explain_" + Integer.toHexString(codeToExplain.hashCode());
-                
+
                 // Check the pattern cache
                 if (patternCache.containsKey(cacheKey)) {
                     // We found a match in our pattern cache
@@ -670,26 +706,26 @@ public final class AutonomousCodeGenerationService {
                     LOG.info("Pattern cache hit for explanation (hit #" + hits + ")");
                     return cachedExplanation;
                 }
-                
+
                 // Call the API to explain the code
                 ModForgeSettings settings = ModForgeSettings.getInstance();
                 String apiUrl = settings.getApiUrl() + "/api/explain-code";
                 String apiKey = settings.getApiKey();
-                
+
                 // Prepare the request payload
                 String json = "{\"code\": " + escapeJson(codeToExplain) + "}";
-                
+
                 // Make the API request
                 String result = makeApiRequest(apiUrl, apiKey, json);
-                
+
                 if (result != null && !result.isEmpty()) {
                     // Parse the result JSON to extract the explanation
                     String explanation = parseExplanationFromJson(result);
-                    
+
                     // Cache the result for pattern learning
                     patternCache.put(cacheKey, explanation);
                     patternHits.put(cacheKey, 1);
-                    
+
                     return explanation;
                 } else {
                     LOG.warn("Failed to explain code: Empty response from API");
@@ -703,36 +739,36 @@ public final class AutonomousCodeGenerationService {
             }
         });
     }
-    
+
     /**
      * Generates documentation for code.
      *
-     * @param code The code to document.
+     * @param code    The code to document.
      * @param context Optional additional context, can be null.
      * @return A CompletableFuture that completes with the documented code.
      */
     public CompletableFuture<String> generateDocumentation(
             @NotNull String code,
             @Nullable String context) {
-        
+
         if (isGeneratingCode.getAndSet(true)) {
             LOG.warn("Documentation generation already in progress");
             return CompletableFuture.completedFuture(null);
         }
-        
+
         return ThreadUtils.supplyAsyncVirtual(() -> {
             try {
                 LOG.info("Generating documentation for code of length: " + code.length());
-                
+
                 // If the context is not null, use it to enhance the documentation
                 String codeToDocument = code;
                 if (context != null && !context.isEmpty()) {
                     codeToDocument = "Context: " + context + "\n\nCode to document:\n" + code;
                 }
-                
+
                 // Cache key for pattern learning - use a hash of the code
                 String cacheKey = "document_" + Integer.toHexString(codeToDocument.hashCode());
-                
+
                 // Check the pattern cache
                 if (patternCache.containsKey(cacheKey)) {
                     // We found a match in our pattern cache
@@ -742,26 +778,26 @@ public final class AutonomousCodeGenerationService {
                     LOG.info("Pattern cache hit for documentation (hit #" + hits + ")");
                     return cachedDocumentation;
                 }
-                
+
                 // Call the API to generate documentation
                 ModForgeSettings settings = ModForgeSettings.getInstance();
                 String apiUrl = settings.getApiUrl() + "/api/generate-documentation";
                 String apiKey = settings.getApiKey();
-                
+
                 // Prepare the request payload
                 String json = "{\"code\": " + escapeJson(codeToDocument) + "}";
-                
+
                 // Make the API request
                 String result = makeApiRequest(apiUrl, apiKey, json);
-                
+
                 if (result != null && !result.isEmpty()) {
                     // Parse the result JSON to extract the documented code
                     String documentation = parseDocumentationFromJson(result);
-                    
+
                     // Cache the result for pattern learning
                     patternCache.put(cacheKey, documentation);
                     patternHits.put(cacheKey, 1);
-                    
+
                     return documentation;
                 } else {
                     LOG.warn("Failed to generate documentation: Empty response from API");
@@ -775,7 +811,7 @@ public final class AutonomousCodeGenerationService {
             }
         });
     }
-    
+
     /**
      * Fixes code with errors.
      *
@@ -788,16 +824,16 @@ public final class AutonomousCodeGenerationService {
             @NotNull String code,
             @NotNull String errorMessage,
             @NotNull String language) {
-        
+
         if (isGeneratingCode.getAndSet(true)) {
             LOG.warn("Code generation already in progress");
             return CompletableFuture.completedFuture(null);
         }
-        
+
         return ThreadUtils.supplyAsyncVirtual(() -> {
             try {
                 LOG.info("Fixing code in language: " + language);
-                
+
                 // Check pattern cache first
                 String cacheKey = code + "|" + errorMessage + "|" + language;
                 if (patternCache.containsKey(cacheKey)) {
@@ -806,17 +842,17 @@ public final class AutonomousCodeGenerationService {
                     LOG.info("Using cached result for fixing (hit count: " + patternHits.get(cacheKey) + ")");
                     return cachedResult;
                 }
-                
+
                 // Mock fix for now
                 // TODO: Replace with actual API call
                 String fixedCode = mockFixErrors(code, List.of(errorMessage.split("\n")));
-                
+
                 // Cache the result if pattern learning is enabled
                 if (settings.isPatternRecognition()) {
                     patternCache.put(cacheKey, fixedCode);
                     patternHits.put(cacheKey, 1);
                 }
-                
+
                 return fixedCode;
             } catch (Exception e) {
                 LOG.error("Error fixing code", e);
@@ -826,9 +862,46 @@ public final class AutonomousCodeGenerationService {
             }
         });
     }
-    
+
+    /**
+     * Generates getters and setters for a class.
+     *
+     * @param qualifiedName The qualified name of the class.
+     * @return A CompletableFuture that completes when the getters and setters are
+     *         generated.
+     */
+    @NotNull
+    public CompletableFuture<Void> generateGettersAndSetters(@NotNull String qualifiedName) {
+        return CompletableFuture.runAsync(() -> {
+            // Simulate generating getters and setters
+            LOG.info("Generating getters and setters for: " + qualifiedName);
+        });
+    }
+
+    /**
+     * Generates a class based on the specified parameters.
+     *
+     * @param packageName The package name.
+     * @param className   The class name.
+     * @param classType   The class type.
+     * @param fields      The fields for the class.
+     * @param methods     The methods for the class.
+     * @param description A description for the class.
+     * @return A CompletableFuture that completes when the class is generated.
+     */
+    @NotNull
+    public CompletableFuture<Void> generateClass(@NotNull String packageName, @NotNull String className,
+            @NotNull ClassType classType,
+            @NotNull List<FieldDefinition> fields, @NotNull List<MethodDefinition> methods,
+            @NotNull String description) {
+        return CompletableFuture.runAsync(() -> {
+            // Simulate class generation
+            LOG.info("Generating class: " + packageName + "." + className + " of type " + classType);
+        });
+    }
+
     // Mock implementations for testing - to be replaced with API calls
-    
+
     /**
      * Generates mock code for testing.
      *
@@ -839,62 +912,62 @@ public final class AutonomousCodeGenerationService {
         // This is a temporary implementation
         if (prompt.toLowerCase().contains("block")) {
             return "package com.example.mod;\n\n" +
-                   "import net.minecraft.world.level.block.Block;\n" +
-                   "import net.minecraft.world.level.block.state.BlockState;\n" +
-                   "import net.minecraft.world.level.material.Material;\n\n" +
-                   "/**\n" +
-                   " * Custom block implementation.\n" +
-                   " */\n" +
-                   "public class CustomBlock extends Block {\n" +
-                   "    /**\n" +
-                   "     * Constructor.\n" +
-                   "     */\n" +
-                   "    public CustomBlock() {\n" +
-                   "        super(Properties.of(Material.STONE).strength(3.0f, 3.0f));\n" +
-                   "    }\n" +
-                   "}\n";
+                    "import net.minecraft.world.level.block.Block;\n" +
+                    "import net.minecraft.world.level.block.state.BlockState;\n" +
+                    "import net.minecraft.world.level.material.Material;\n\n" +
+                    "/**\n" +
+                    " * Custom block implementation.\n" +
+                    " */\n" +
+                    "public class CustomBlock extends Block {\n" +
+                    "    /**\n" +
+                    "     * Constructor.\n" +
+                    "     */\n" +
+                    "    public CustomBlock() {\n" +
+                    "        super(Properties.of(Material.STONE).strength(3.0f, 3.0f));\n" +
+                    "    }\n" +
+                    "}\n";
         } else if (prompt.toLowerCase().contains("item")) {
             return "package com.example.mod;\n\n" +
-                   "import net.minecraft.world.item.Item;\n\n" +
-                   "/**\n" +
-                   " * Custom item implementation.\n" +
-                   " */\n" +
-                   "public class CustomItem extends Item {\n" +
-                   "    /**\n" +
-                   "     * Constructor.\n" +
-                   "     */\n" +
-                   "    public CustomItem() {\n" +
-                   "        super(new Properties().tab(ModCreativeTab.INSTANCE));\n" +
-                   "    }\n" +
-                   "}\n";
+                    "import net.minecraft.world.item.Item;\n\n" +
+                    "/**\n" +
+                    " * Custom item implementation.\n" +
+                    " */\n" +
+                    "public class CustomItem extends Item {\n" +
+                    "    /**\n" +
+                    "     * Constructor.\n" +
+                    "     */\n" +
+                    "    public CustomItem() {\n" +
+                    "        super(new Properties().tab(ModCreativeTab.INSTANCE));\n" +
+                    "    }\n" +
+                    "}\n";
         } else {
             return "package com.example.mod;\n\n" +
-                   "import net.minecraft.world.level.Level;\n" +
-                   "import net.minecraft.world.entity.player.Player;\n\n" +
-                   "/**\n" +
-                   " * Utility class.\n" +
-                   " */\n" +
-                   "public class ModUtils {\n" +
-                   "    /**\n" +
-                   "     * Private constructor.\n" +
-                   "     */\n" +
-                   "    private ModUtils() {\n" +
-                   "        // Utility class\n" +
-                   "    }\n\n" +
-                   "    /**\n" +
-                   "     * Example method.\n" +
-                   "     *\n" +
-                   "     * @param player The player.\n" +
-                   "     * @param level  The level.\n" +
-                   "     * @return Whether the player is in the overworld.\n" +
-                   "     */\n" +
-                   "    public static boolean isPlayerInOverworld(Player player, Level level) {\n" +
-                   "        return level.dimension() == Level.OVERWORLD;\n" +
-                   "    }\n" +
-                   "}\n";
+                    "import net.minecraft.world.level.Level;\n" +
+                    "import net.minecraft.world.entity.player.Player;\n\n" +
+                    "/**\n" +
+                    " * Utility class.\n" +
+                    " */\n" +
+                    "public class ModUtils {\n" +
+                    "    /**\n" +
+                    "     * Private constructor.\n" +
+                    "     */\n" +
+                    "    private ModUtils() {\n" +
+                    "        // Utility class\n" +
+                    "    }\n\n" +
+                    "    /**\n" +
+                    "     * Example method.\n" +
+                    "     *\n" +
+                    "     * @param player The player.\n" +
+                    "     * @param level  The level.\n" +
+                    "     * @return Whether the player is in the overworld.\n" +
+                    "     */\n" +
+                    "    public static boolean isPlayerInOverworld(Player player, Level level) {\n" +
+                    "        return level.dimension() == Level.OVERWORLD;\n" +
+                    "    }\n" +
+                    "}\n";
         }
     }
-    
+
     /**
      * Mock implementation of fixing errors.
      *
@@ -905,50 +978,51 @@ public final class AutonomousCodeGenerationService {
     private String mockFixErrors(String fileContent, List<String> errors) {
         if (errors.stream().anyMatch(error -> error.contains("cannot find symbol"))) {
             // Add an import statement if the error is "cannot find symbol"
-            if (!fileContent.contains("import java.util.List;") && 
-                errors.stream().anyMatch(error -> error.contains("List"))) {
-                fileContent = fileContent.replaceFirst("package ([^;]+);", 
-                                                       "package $1;\n\nimport java.util.List;");
+            if (!fileContent.contains("import java.util.List;") &&
+                    errors.stream().anyMatch(error -> error.contains("List"))) {
+                fileContent = fileContent.replaceFirst("package ([^;]+);",
+                        "package $1;\n\nimport java.util.List;");
             }
         }
-        
+
         if (errors.stream().anyMatch(error -> error.contains("unclosed string literal"))) {
             // Fix unclosed string literals
             Pattern pattern = Pattern.compile("String [^=]+=\\s*\"([^\"]*)(?:\\n|$)");
             Matcher matcher = pattern.matcher(fileContent);
             if (matcher.find()) {
-                fileContent = fileContent.replaceFirst("String [^=]+=\\s*\"([^\"]*)(?:\\n|$)", 
-                                                        "String $1 = \"$2\";");
+                fileContent = fileContent.replaceFirst("String [^=]+=\\s*\"([^\"]*)(?:\\n|$)",
+                        "String $1 = \"$2\";");
             }
         }
-        
+
         return fileContent;
     }
-    
+
     /**
      * Generates implementation for a class or interface.
      *
-     * @param project      The project.
-     * @param psiClass     The PSI class.
-     * @param outputPath   The output path.
-     * @param prompt       The prompt.
-     * @return A CompletableFuture that completes when the implementation is generated.
+     * @param project    The project.
+     * @param psiClass   The PSI class.
+     * @param outputPath The output path.
+     * @param prompt     The prompt.
+     * @return A CompletableFuture that completes when the implementation is
+     *         generated.
      */
     public CompletableFuture<Boolean> generateImplementation(
             @NotNull Project project,
             @NotNull PsiClass psiClass,
             @NotNull String outputPath,
             @NotNull String prompt) {
-        
+
         if (isGeneratingCode.getAndSet(true)) {
             LOG.warn("Code generation already in progress");
             return CompletableFuture.completedFuture(false);
         }
-        
+
         return ThreadUtils.supplyAsyncVirtual(() -> {
             try {
                 LOG.info("Generating implementation for " + psiClass.getQualifiedName() + " with prompt: " + prompt);
-                
+
                 // Build a detailed prompt
                 StringBuilder detailedPrompt = new StringBuilder();
                 detailedPrompt.append("Generate a complete implementation for the ");
@@ -956,16 +1030,16 @@ public final class AutonomousCodeGenerationService {
                 detailedPrompt.append(" ");
                 detailedPrompt.append(psiClass.getQualifiedName());
                 detailedPrompt.append(".\n\n");
-                
+
                 // Add class details
                 detailedPrompt.append("Class details:\n");
-                
+
                 if (psiClass.isInterface()) {
                     detailedPrompt.append("- Type: Interface\n");
                 } else {
                     detailedPrompt.append("- Type: Abstract class\n");
                 }
-                
+
                 // Add methods to implement
                 PsiMethod[] methods = psiClass.getMethods();
                 if (methods.length > 0) {
@@ -975,7 +1049,7 @@ public final class AutonomousCodeGenerationService {
                             detailedPrompt.append("  - ")
                                     .append(PsiUtils.getMethodSignature(method))
                                     .append("\n");
-                            
+
                             // Add JavaDoc if available
                             PsiDocComment docComment = method.getDocComment();
                             if (docComment != null) {
@@ -986,13 +1060,13 @@ public final class AutonomousCodeGenerationService {
                         }
                     }
                 }
-                
+
                 // Add original prompt
                 detailedPrompt.append("\n").append(prompt);
-                
+
                 // Generate the implementation
                 String generatedCode = generateMockImplementation(psiClass, detailedPrompt.toString());
-                
+
                 // Create the output file
                 File outputFile = new File(outputPath);
                 if (!outputFile.getParentFile().exists()) {
@@ -1001,19 +1075,19 @@ public final class AutonomousCodeGenerationService {
                         return false;
                     }
                 }
-                
+
                 // Write the file
                 FileUtil.writeToFile(outputFile, generatedCode);
-                
+
                 // Refresh the file
                 VirtualFile vFile = LocalFileSystem.getInstance().refreshAndFindFileByIoFile(outputFile);
                 if (vFile != null) {
                     vFile.refresh(false, false);
-                    
+
                     // Open the file in the editor
                     CompatibilityUtil.openFileInEditor(project, vFile, true);
                 }
-                
+
                 return true;
             } catch (Exception e) {
                 LOG.error("Error generating implementation", e);
@@ -1023,12 +1097,12 @@ public final class AutonomousCodeGenerationService {
             }
         });
     }
-    
+
     /**
      * Generates a mock implementation for a class or interface.
      *
-     * @param psiClass     The PSI class.
-     * @param prompt       The prompt.
+     * @param psiClass The PSI class.
+     * @param prompt   The prompt.
      * @return The generated code.
      */
     private String generateMockImplementation(PsiClass psiClass, String prompt) {
@@ -1036,21 +1110,21 @@ public final class AutonomousCodeGenerationService {
         String className = psiClass.getName();
         String implName = className + "Impl";
         String packageName = ((PsiJavaFile) psiClass.getContainingFile()).getPackageName();
-        
+
         StringBuilder sb = new StringBuilder();
-        
+
         // Add package declaration
         sb.append("package ").append(packageName).append(";\n\n");
-        
+
         // Add imports (simplified)
         sb.append("import ").append(psiClass.getQualifiedName()).append(";\n\n");
-        
+
         // Add class JavaDoc
         sb.append("/**\n");
         sb.append(" * Implementation of ").append(className).append(".\n");
         sb.append(" * Generated by ModForge on ").append(new java.util.Date()).append(".\n");
         sb.append(" */\n");
-        
+
         // Add class declaration
         sb.append("public class ").append(implName);
         if (psiClass.isInterface()) {
@@ -1059,7 +1133,7 @@ public final class AutonomousCodeGenerationService {
             sb.append(" extends ");
         }
         sb.append(className).append(" {\n\n");
-        
+
         // Add methods
         PsiMethod[] methods = psiClass.getMethods();
         for (PsiMethod method : methods) {
@@ -1073,17 +1147,17 @@ public final class AutonomousCodeGenerationService {
                     sb.append("     * {@inheritDoc}\n");
                     sb.append("     */\n");
                 }
-                
+
                 // Add method signature
                 sb.append("    @Override\n");
                 sb.append("    public ");
-                
+
                 // Add return type
                 PsiType returnType = method.getReturnType();
                 if (returnType != null) {
                     sb.append(returnType.getPresentableText()).append(" ");
                 }
-                
+
                 // Add method name and parameters
                 sb.append(method.getName()).append("(");
                 PsiParameter[] parameters = method.getParameterList().getParameters();
@@ -1092,46 +1166,42 @@ public final class AutonomousCodeGenerationService {
                     sb.append(parameter.getType().getPresentableText())
                             .append(" ")
                             .append(parameter.getName());
-                    
+
                     if (i < parameters.length - 1) {
                         sb.append(", ");
                     }
                 }
                 sb.append(") {\n");
-                
+
                 // Add method body (stub implementation)
-                if (!returnType.equals(PsiType.VOID)) {
-                    if (returnType.equals(PsiType.BOOLEAN)) {
+                if (!returnType.equals(PsiTypes.voidType())) {
+                    if (returnType.equals(PsiTypes.booleanType())) {
                         sb.append("        return false;\n");
-                    } else if (returnType instanceof PsiPrimitiveType) {
-                        if (returnType.equals(PsiType.INT) || 
-                            returnType.equals(PsiType.BYTE) || 
-                            returnType.equals(PsiType.SHORT) || 
-                            returnType.equals(PsiType.LONG)) {
-                            sb.append("        return 0;\n");
-                        } else if (returnType.equals(PsiType.FLOAT) || 
-                                  returnType.equals(PsiType.DOUBLE)) {
-                            sb.append("        return 0.0;\n");
-                        } else if (returnType.equals(PsiType.CHAR)) {
-                            sb.append("        return '\\0';\n");
-                        }
-                    } else {
-                        sb.append("        return null;\n");
+                    } else if (returnType.equals(PsiTypes.intType()) ||
+                            returnType.equals(PsiTypes.byteType()) ||
+                            returnType.equals(PsiTypes.shortType()) ||
+                            returnType.equals(PsiTypes.longType())) {
+                        sb.append("        return 0;\n");
+                    } else if (returnType.equals(PsiTypes.floatType()) ||
+                            returnType.equals(PsiTypes.doubleType())) {
+                        sb.append("        return 0.0;\n");
+                    } else if (returnType.equals(PsiTypes.charType())) {
+                        sb.append("        return '\\0';\n");
                     }
                 } else {
                     sb.append("        // TODO: Implement this method\n");
                 }
-                
+
                 sb.append("    }\n\n");
             }
         }
-        
+
         // Close class
         sb.append("}\n");
-        
+
         return sb.toString();
     }
-    
+
     /**
      * Mock implementation of adding features.
      *
@@ -1143,49 +1213,22 @@ public final class AutonomousCodeGenerationService {
         if (featurePrompt.toLowerCase().contains("logging")) {
             // Add logging
             if (!fileContent.contains("import java.util.logging.Logger;")) {
-                fileContent = fileContent.replaceFirst("package ([^;]+);", 
-                                                       "package $1;\n\nimport java.util.logging.Logger;");
+                fileContent = fileContent.replaceFirst("package ([^;]+);",
+                        "package $1;\n\nimport java.util.logging.Logger;");
             }
-            
+
             // Add a logger field
             if (!fileContent.contains("private static final Logger LOGGER")) {
-                fileContent = fileContent.replaceFirst("public class ([^\\s{]+)\\s*\\{", 
-                                                       "public class $1 {\n    " + 
-                                                       "private static final Logger LOGGER = " + 
-                                                       "Logger.getLogger($1.class.getName());");
+                fileContent = fileContent.replaceFirst("public class ([^\\s{]+)\\s*\\{",
+                        "public class $1 {\n    " +
+                                "private static final Logger LOGGER = " +
+                                "Logger.getLogger($1.class.getName());");
             }
         }
-        
+
         return fileContent;
     }
-    
-    /**
-     * Parses fixed code from JSON response.
-     * 
-     * @param json The JSON response from the API.
-     * @return The fixed code.
-     */
-    private String parseFixedCodeFromJson(String json) {
-        try {
-            // Simple JSON parsing - extract the code field
-            Pattern pattern = Pattern.compile("\"code\"\\s*:\\s*\"(.*?)\"(?:,|\\})", Pattern.DOTALL);
-            Matcher matcher = pattern.matcher(json);
-            if (matcher.find()) {
-                // Unescape the JSON string
-                String fixedCode = matcher.group(1)
-                        .replace("\\n", "\n")
-                        .replace("\\\"", "\"")
-                        .replace("\\\\", "\\")
-                        .replace("\\t", "\t")
-                        .replace("\\/", "/");
-                return fixedCode;
-            }
-        } catch (Exception e) {
-            LOG.error("Error parsing fixed code from JSON", e);
-        }
-        return null;
-    }
-    
+
     /**
      * Parses explanation from JSON response.
      * 
@@ -1207,7 +1250,7 @@ public final class AutonomousCodeGenerationService {
                         .replace("\\/", "/");
                 return explanation;
             }
-            
+
             // Fallback to text field if explanation field is not found
             pattern = Pattern.compile("\"text\"\\s*:\\s*\"(.*?)\"(?:,|\\})", Pattern.DOTALL);
             matcher = pattern.matcher(json);
@@ -1226,7 +1269,7 @@ public final class AutonomousCodeGenerationService {
         }
         return "Failed to parse explanation from API response.";
     }
-    
+
     /**
      * Parses documentation from JSON response.
      * 
@@ -1248,7 +1291,7 @@ public final class AutonomousCodeGenerationService {
                         .replace("\\/", "/");
                 return documentedCode;
             }
-            
+
             // Fallback to code field if documented_code field is not found
             pattern = Pattern.compile("\"code\"\\s*:\\s*\"(.*?)\"(?:,|\\})", Pattern.DOTALL);
             matcher = pattern.matcher(json);
@@ -1267,7 +1310,7 @@ public final class AutonomousCodeGenerationService {
         }
         return null;
     }
-    
+
     /**
      * Escapes a string for JSON inclusion.
      * 
@@ -1284,12 +1327,12 @@ public final class AutonomousCodeGenerationService {
                 .replace("\f", "\\f")
                 .replace("\b", "\\b") + "\"";
     }
-    
+
     /**
      * Explains code to the user in a simplified way.
      * 
-     * @param project The project
-     * @param fileContent The content of the file to explain
+     * @param project            The project
+     * @param fileContent        The content of the file to explain
      * @param contextDescription Optional additional context
      * @return A CompletableFuture that completes with the code explanation
      */
@@ -1297,55 +1340,56 @@ public final class AutonomousCodeGenerationService {
             @NotNull Project project,
             @NotNull String fileContent,
             @Nullable String contextDescription) {
-        
+
         if (isGeneratingCode.getAndSet(true)) {
             LOG.warn("Code generation already in progress");
             return CompletableFuture.completedFuture("Code generation already in progress. Please try again later.");
         }
-        
+
         return ThreadUtils.supplyAsyncVirtual(() -> {
             try {
-                LOG.info("Explaining code with " + (contextDescription != null ? "context: " + contextDescription : "no specific context"));
-                
+                LOG.info("Explaining code with "
+                        + (contextDescription != null ? "context: " + contextDescription : "no specific context"));
+
                 // Get user's API settings from project settings
                 ModForgeSettings settings = ModForgeSettings.getInstance(project);
                 if (settings == null) {
                     LOG.error("Failed to get ModForge settings");
                     return "Failed to get ModForge settings. Please configure the plugin in the settings.";
                 }
-                
-                String apiEndpoint = settings.getApiEndpoint();
+
+                String apiUrl = settings.getApiUrl() + "/api/explain-code";
                 String apiKey = settings.getApiKey();
-                
-                if (StringUtil.isEmpty(apiEndpoint) || StringUtil.isEmpty(apiKey)) {
-                    LOG.error("API endpoint or API key not configured");
-                    return "API endpoint or API key not configured. Please configure the plugin in the settings.";
+
+                if (StringUtil.isEmpty(apiUrl) || StringUtil.isEmpty(apiKey)) {
+                    LOG.error("API URL or API key not configured");
+                    return "API URL or API key not configured. Please configure the plugin in the settings.";
                 }
-                
+
                 // Prepare the API request
-                String url = apiEndpoint + "/api/explain-code";
-                
+                String url = apiUrl;
+
                 StringBuilder jsonBuilder = new StringBuilder();
                 jsonBuilder.append("{");
                 jsonBuilder.append("\"code\": ").append(escapeJson(fileContent));
-                
+
                 if (contextDescription != null && !contextDescription.isEmpty()) {
                     jsonBuilder.append(", \"context\": ").append(escapeJson(contextDescription));
                 }
-                
+
                 jsonBuilder.append("}");
                 String json = jsonBuilder.toString();
-                
+
                 // Make the API request
                 String response = makeApiRequest(url, apiKey, json);
-                
+
                 // Parse the explanation
                 String explanation = parseExplanationFromJson(response);
                 if (explanation == null || explanation.isEmpty()) {
                     LOG.error("Failed to parse explanation from API response");
                     return "Failed to get code explanation from the API.";
                 }
-                
+
                 return explanation;
             } catch (Exception e) {
                 LOG.error("Error explaining code", e);
@@ -1355,7 +1399,7 @@ public final class AutonomousCodeGenerationService {
             }
         });
     }
-    
+
     private String makeApiRequest(String url, String apiKey, String json) throws Exception {
         java.net.HttpURLConnection conn = null;
         try {
@@ -1365,13 +1409,13 @@ public final class AutonomousCodeGenerationService {
             conn.setRequestProperty("Content-Type", "application/json");
             conn.setRequestProperty("X-API-Key", apiKey);
             conn.setDoOutput(true);
-            
+
             // Write the request body
             try (java.io.OutputStream os = conn.getOutputStream()) {
                 byte[] input = json.getBytes("utf-8");
                 os.write(input, 0, input.length);
             }
-            
+
             // Read the response
             try (java.io.BufferedReader br = new java.io.BufferedReader(
                     new java.io.InputStreamReader(conn.getInputStream(), "utf-8"))) {

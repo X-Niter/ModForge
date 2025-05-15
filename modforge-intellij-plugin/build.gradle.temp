@@ -1,0 +1,246 @@
+plugins {
+    id 'java'
+    // Use JetBrains' new IntelliJ Platform Gradle plugin instead
+    id 'org.jetbrains.intellij' version '1.17.2'
+    id 'org.jetbrains.kotlin.jvm' version '2.0.0' apply false // For Kotlin support
+}
+
+group 'com.modforge'
+version '2.1.0'
+
+repositories {
+    mavenCentral()
+    maven { 
+        url 'https://www.jetbrains.com/intellij-repository/releases'
+        metadataSources {
+            mavenPom()
+            artifact()
+        }
+    }
+    maven { 
+        url 'https://cache-redirector.jetbrains.com/intellij-dependencies'
+        metadataSources {
+            mavenPom()
+            artifact()
+        }
+    }
+    maven { url 'https://plugins.gradle.org/m2/' }
+    maven { url 'https://download.jetbrains.com/teamcity-repository' }
+}
+
+dependencies {
+    implementation 'org.kohsuke:github-api:1.321'
+    implementation 'org.apache.commons:commons-lang3:3.14.0'
+    implementation 'com.google.code.gson:gson:2.10.1'
+    implementation 'com.squareup.okhttp3:okhttp:4.12.0'
+    implementation 'commons-io:commons-io:2.15.1'
+    implementation 'org.zeroturnaround:zt-zip:1.16'
+    implementation 'com.googlecode.json-simple:json-simple:1.1.1'
+    implementation 'org.java-websocket:Java-WebSocket:1.5.4'
+    implementation 'org.jetbrains:annotations:24.0.1'
+    testImplementation 'org.junit.jupiter:junit-jupiter-api:5.10.2'
+    testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine:5.10.2'
+    testImplementation 'org.mockito:mockito-core:5.10.0'
+}
+
+// Configure Gradle IntelliJ Plugin
+intellij {
+    // IMPORTANT: Best practice for targeting IntelliJ IDEA 2025.1.1.1
+    // - Use stable 2023.3.6 for build compatibility
+    // - Set XML compatibility for 251.25410.129
+    // - Use localPath for direct 2025.1.1.1 testing
+    
+    // Target version approach depends on your needs:
+    // Option 1: Repository build (easier, more compatible, recommended for CI)
+    version = '2023.3.6' 
+    type = 'IC' // Community Edition
+    
+    // Alternative Option: Local build for exact version testing
+    // - Comment out the version line above
+    // - Uncomment the localPath line below with your IntelliJ path
+    // localPath = 'C:/Program Files/JetBrains/IntelliJ IDEA Community Edition 2025.1.1.1'
+    
+    // Essential configuration
+    downloadSources = true
+    updateSinceUntilBuild = false
+    
+    // Important: Use only the Java plugin dependency, platform dependencies are implicit
+    // Making platform modules as dependencies causes problems - platform is always included
+    plugins = ['com.intellij.java']
+    
+    // Ensure these are properly resolved for your plugin
+    instrumentCode = true
+    sandboxDir = project.rootDir.canonicalPath + "/.sandbox"
+    
+    // Access multiple repositories for better dependency resolution
+    intellijRepository = 'https://www.jetbrains.com/intellij-repository/releases'
+}
+
+// Configure Java sourceSets - using standard Gradle setup
+sourceSets {
+    main {
+        java {
+            srcDirs = ['src/main/java']
+        }
+        resources {
+            srcDirs = ['src/main/resources']
+        }
+    }
+    test {
+        java {
+            srcDirs = ['src/test/java']
+        }
+        resources {
+            srcDirs = ['src/test/resources']
+        }
+    }
+}
+
+// Set Java compatibility version to match IntelliJ IDEA 2023.3.6 runtime
+// This is required for build compatibility, even though we'll run on 2025.1
+java {
+    sourceCompatibility = JavaVersion.VERSION_17 // IntelliJ 2023.3 requires Java 17
+    targetCompatibility = JavaVersion.VERSION_17 // IntelliJ 2023.3 requires Java 17
+}
+
+// Ensure gradlew works on all environments
+wrapper {
+    gradleVersion = '8.5'
+    distributionType = Wrapper.DistributionType.ALL
+}
+
+// Additional IntelliJ plugin configuration
+// Use toolchain for Java 21 during development, while maintaining Java 17 compatibility for builds
+java {
+    toolchain {
+        languageVersion.set(JavaLanguageVersion.of(21))
+    }
+    // The sourceCompatibility and targetCompatibility are already set to VERSION_17 above
+}
+
+tasks {
+    // Set compatibility specifically for IntelliJ IDEA 2025.1.1.1 (Build: 251.25410.129) 
+    // Use custom preprocessed plugin.xml file to ensure correct name tag
+    processResources {
+        from('/home/runner/workspace/plugin-preprocessed.xml') {
+            into('META-INF')
+            rename('plugin-preprocessed.xml', 'plugin.xml')
+        }
+    }
+    
+    patchPluginXml {
+        sinceBuild.set("233") // Support from 2023.3
+        untilBuild.set("251.25410.129") // Support specifically for 2025.1.1.1
+        changeNotes.set("""
+            <h2>Version 2.1.0 - May 11, 2025</h2>
+            <ul>
+                <li><b>Added:</b> Full compatibility with IntelliJ IDEA 2025.1.1.1 (Build: 251.25410.129)</li>
+                <li><b>Added:</b> Java 21 virtual thread optimization</li>
+                <li><b>Added:</b> Environment validation and compatibility checking</li>
+                <li><b>Added:</b> Improved error handling and recovery mechanisms</li>
+                <li><b>Added:</b> Optional plugin dependencies with fallbacks for better compatibility</li>
+                <li><b>Updated:</b> GitHub workflow generation to use JDK 21</li>
+                <li><b>Updated:</b> Connection utilities to use modern retry logic</li>
+                <li><b>Fixed:</b> Multiple compatibility issues with IntelliJ IDEA 2025.1.1.1</li>
+                <li><b>Improved:</b> Plugin activation and IDE integration</li>
+                <li><b>Improved:</b> Build system with specific version targeting</li>
+            </ul>
+        """)
+    }
+    
+    // Verify plugin structure before building
+    verifyPlugin {
+        ignoreWarnings.set(true) // Set to false for stricter validation
+    }
+
+    runIde {
+        // Enhanced IDE run configuration for testing with IntelliJ 2025.1.1.1 compatibility
+        jvmArgs = [
+            '-Xmx2g',
+            '--add-opens=java.base/java.util=ALL-UNNAMED',
+            '--add-opens=java.base/java.lang=ALL-UNNAMED',
+            '--add-opens=java.base/java.io=ALL-UNNAMED',
+            '--add-opens=java.base/java.net=ALL-UNNAMED',
+            '--add-opens=java.base/java.nio=ALL-UNNAMED',
+            '--add-opens=java.base/java.util.concurrent=ALL-UNNAMED',
+            '--add-opens=java.desktop/java.awt=ALL-UNNAMED',
+            '--add-opens=java.desktop/sun.awt=ALL-UNNAMED',
+            '--add-opens=java.desktop/javax.swing=ALL-UNNAMED',
+            '--add-opens=jdk.internal.jvmstat/sun.jvmstat.monitor=ALL-UNNAMED',
+            '-Djava.system.class.loader=com.intellij.util.lang.PathClassLoader',
+            '-Didea.auto.reload.plugins=true',
+            '-Didea.initially.ask.config=false',
+            '-Didea.is.internal=true', // Enable internal mode for development
+            '-Didea.diagnostic.opentelemetry.enabled=false' // Disable telemetry for faster startup
+        ]
+        // Autoload changes without restarts
+        autoReloadPlugins.set(true)
+    }
+
+    // JUnit 5 integration
+    test {
+        useJUnitPlatform()
+    }
+
+    // Generate JAR with sources for debugging
+    jar {
+        from sourceSets.main.allSource
+        manifest {
+            attributes(
+                'Implementation-Title': 'ModForge IntelliJ Plugin',
+                'Implementation-Version': version,
+                'Built-By': System.getProperty('user.name'),
+                'Build-Timestamp': new java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSZ").format(new Date()),
+                'Created-By': "Gradle ${gradle.gradleVersion}",
+                'Build-Jdk': "${System.getProperty('java.version')} (${System.getProperty('java.vendor')} ${System.getProperty('java.vm.version')})",
+                'Build-OS': "${System.getProperty('os.name')} ${System.getProperty('os.arch')} ${System.getProperty('os.version')}"
+            )
+        }
+    }
+}
+
+tasks.withType(JavaCompile) {
+    options.compilerArgs << "-Xmaxerrs" << "1000" << "-Xmaxwarns" << "1000"
+}
+
+
+// Add verification tasks - fixed for Gradle configuration cache compatibility
+tasks.register('validatePluginForProduction') {
+    group = 'verification'
+    description = 'Validates that the plugin is ready for production deployment'
+    
+    // Store project version as a property during configuration time
+    def pluginVersion = project.version
+    def sinceBuildValue = tasks.patchPluginXml.sinceBuild.get()
+    def untilBuildValue = tasks.patchPluginXml.untilBuild.get()
+
+    doLast {
+        println "Validating plugin for production deployment..."
+        
+        // Check Java version - we need at least Java 17 to build
+        def javaVersion = System.getProperty('java.version')
+        def javaVersionMajor = javaVersion.split('\\.')[0].toInteger()
+        if (javaVersionMajor < 17) {
+            throw new GradleException("Invalid Java version: $javaVersion. Java 17 or higher is required.")
+        }
+        println "✓ Java version check passed: $javaVersion"
+        
+        // Check plugin version - using the captured property instead of project.version
+        if (pluginVersion == '1.0-SNAPSHOT') {
+            throw new GradleException("Plugin version is still set to development snapshot. Set a proper release version.")
+        }
+        println "✓ Plugin version check passed: $pluginVersion"
+        
+        // Validate build number format - using captured properties
+        if (!untilBuildValue.matches(/^\d+\.\d+\.\d+\.\d+$/) && !untilBuildValue.endsWith(".*")) {
+            throw new GradleException("untilBuild should either be a specific build number (e.g., 251.25410.129) or end with '.*' to support minor IDE updates")
+        }
+        println "✓ Plugin build range check passed: $sinceBuildValue - $untilBuildValue"
+        
+        println "✓ Plugin validation completed successfully"
+    }
+}
+
+// Link validation to build
+tasks.buildPlugin.dependsOn(validatePluginForProduction)
+

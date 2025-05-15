@@ -61,14 +61,14 @@ public final class CollaborationService {
      */
     public CompletableFuture<String> startSession(@NotNull String username) {
         LOG.info("Starting new collaboration session as: " + username);
-        
+
         // Clean up any existing session
         cleanupExistingSession();
-        
+
         // Create a new session ID
         currentSessionId = generateSessionId();
         this.username = username;
-        
+
         // Connect to the collaboration server
         return connectToServer(currentSessionId, username, true)
                 .thenApply(success -> {
@@ -87,19 +87,19 @@ public final class CollaborationService {
      * Joins an existing collaboration session.
      *
      * @param sessionId The ID of the session to join.
-     * @param username The username to use for the session.
+     * @param username  The username to use for the session.
      * @return A CompletableFuture that completes with a boolean indicating success.
      */
     public CompletableFuture<Boolean> joinSession(@NotNull String sessionId, @NotNull String username) {
         LOG.info("Joining session: " + sessionId + " as: " + username);
-        
+
         // Clean up any existing session
         cleanupExistingSession();
-        
+
         // Set the session info
         currentSessionId = sessionId;
         this.username = username;
-        
+
         // Connect to the server
         return connectToServer(sessionId, username, false);
     }
@@ -111,18 +111,18 @@ public final class CollaborationService {
      */
     public CompletableFuture<Boolean> leaveSession() {
         LOG.info("Leaving current session");
-        
+
         if (!isConnected()) {
             LOG.info("Not in a session, nothing to leave");
             return CompletableFuture.completedFuture(true);
         }
-        
+
         return CompletableFuture.supplyAsync(() -> {
             try {
                 if (webSocketClient != null) {
                     webSocketClient.close();
                 }
-                
+
                 cleanupExistingSession();
                 return true;
             } catch (Exception e) {
@@ -136,24 +136,24 @@ public final class CollaborationService {
      * Connects to the collaboration server.
      *
      * @param sessionId The session ID.
-     * @param username The username.
-     * @param isHost Whether this client is the host.
+     * @param username  The username.
+     * @param isHost    Whether this client is the host.
      * @return A CompletableFuture that completes with a boolean indicating success.
      */
     private CompletableFuture<Boolean> connectToServer(
             @NotNull String sessionId,
             @NotNull String username,
             boolean isHost) {
-        
+
         return CompletableFuture.supplyAsync(() -> {
             try {
                 // Create a new websocket client
                 webSocketClient = new ModForgeWebSocketClient(project, sessionId, username, isHost);
-                
+
                 // Connect to the server
                 boolean success = webSocketClient.connect();
                 connected.set(success);
-                
+
                 return success;
             } catch (Exception e) {
                 LOG.error("Error connecting to collaboration server", e);
@@ -176,7 +176,7 @@ public final class CollaborationService {
                 webSocketClient = null;
             }
         }
-        
+
         currentSessionId = null;
         username = null;
         connected.set(false);
@@ -190,5 +190,24 @@ public final class CollaborationService {
     private String generateSessionId() {
         // Generate a short, readable session ID
         return UUID.randomUUID().toString().substring(0, 8);
+    }
+
+    /**
+     * Gets the current username.
+     * 
+     * @return The username, or null if not in a session
+     */
+    @Nullable
+    public String getUsername() {
+        return isConnected() ? username : null;
+    }
+
+    /**
+     * Sets the username.
+     * 
+     * @param username The username
+     */
+    public void setUsername(@NotNull String username) {
+        this.username = username;
     }
 }

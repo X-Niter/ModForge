@@ -52,7 +52,7 @@ intellij {
     
     // Target version approach depends on your needs:
     // Option 1: Repository build (easier, more compatible, recommended for CI)
-    version = '2023.3.6' 
+    version = '2023.1' // Update to the latest IntelliJ SDK version
     type = 'IC' // Community Edition
     
     // Alternative Option: Local build for exact version testing
@@ -199,6 +199,11 @@ tasks {
     }
 }
 
+tasks.withType(JavaCompile) {
+    options.compilerArgs << "-Xmaxerrs" << "1000" << "-Xmaxwarns" << "1000"
+}
+
+
 // Add verification tasks - fixed for Gradle configuration cache compatibility
 tasks.register('validatePluginForProduction') {
     group = 'verification'
@@ -238,3 +243,4 @@ tasks.register('validatePluginForProduction') {
 
 // Link validation to build
 tasks.buildPlugin.dependsOn(validatePluginForProduction)
+

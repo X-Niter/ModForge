@@ -69,23 +69,23 @@ if !ERRORLEVEL! equ 0 (
     goto BUILD_DONE
 ) else (
     echo Build failed. Analyzing errors...
-    
+
     REM If this is the last attempt, perform comprehensive error analysis
     if %BUILD_ATTEMPT% equ %MAX_BUILD_ATTEMPTS% (
         call :PERFORM_ERROR_ANALYSIS
     )
-    
+
     REM Increment attempt counter
     set /a BUILD_ATTEMPT+=1
-    
+
     REM If we've reached max attempts, stop trying
     if %BUILD_ATTEMPT% GTR %MAX_BUILD_ATTEMPTS% (
         goto BUILD_DONE
     )
-    
+
     REM Try again with different settings
     echo Retrying build with different configuration...
-    
+
     REM Adjust Gradle properties for next attempt
     echo org.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8 > gradle.properties
     echo org.gradle.parallel=true >> gradle.properties
@@ -93,6 +93,13 @@ if !ERRORLEVEL! equ 0 (
 )
 goto BUILD_LOOP
 
+REM Restore gradle files if they were patched
+if exist "build.gradle.kts.bak" (
+    move /Y "build.gradle.kts.bak" "build.gradle.kts" >nul
+)
+if exist "build.gradle.bak" (
+    move /Y "build.gradle.bak" "build.gradle" >nul
+)
 :BUILD_DONE
 echo.
 if %BUILD_SUCCESS% equ 1 (
@@ -268,13 +275,13 @@ if %TOTAL_FILES% equ 0 (
 
 for /f "delims=" %%f in (%TEMP_DIR%\java_files.txt) do (
     set /a PROCESSED+=1
-    
+
     REM Progress indicator
     set /a MOD=!PROCESSED! %% 10
     if !MOD! equ 0 (
         echo Processed !PROCESSED! of %TOTAL_FILES% files...
     )
-    
+
     REM Check for key patterns
     for %%p in (getBaseDir CacheUpdater CacheUpdaterFacade runReadAction runWriteAction getSelectedTextEditor ApplicationComponent ProjectComponent ModuleComponent createXmlTag) do (
         findstr /c:"%%p" "%%f" >nul 2>&1
@@ -283,7 +290,7 @@ for /f "delims=" %%f in (%TEMP_DIR%\java_files.txt) do (
             echo 1 > "%TEMP_DIR%\found_file.tmp"
         )
     )
-    
+
     if exist "%TEMP_DIR%\found_file.tmp" (
         set /a AFFECTED_FILES+=1
         del "%TEMP_DIR%\found_file.tmp" 2>nul
@@ -311,10 +318,10 @@ if exist "%TEMP_DIR%\matches.txt" (
         echo ### Issue in %%a >> "%COMPATIBILITY_REPORT%"
         echo. >> "%COMPATIBILITY_REPORT%"
         echo * Potential problem: %%b >> "%COMPATIBILITY_REPORT%"
-        
+
         REM Add pattern-specific suggestions
         call :ADD_COMPATIBILITY_SUGGESTION "%%b" "%COMPATIBILITY_REPORT%"
-        
+
         echo. >> "%COMPATIBILITY_REPORT%"
     )
 ) else (
@@ -476,10 +483,10 @@ for %%m in (getBaseDir findFileByPath getInstanceEx getFileSystem resolveFile) d
         type "%TEMP_DIR%\problem_api_%%m.txt" >> "%RESOLUTION_ERRORS_REPORT%"
         echo --- End Code --- >> "%RESOLUTION_ERRORS_REPORT%"
         echo. >> "%RESOLUTION_ERRORS_REPORT%"
-        
+
         REM Add API-specific suggestions
         call :ADD_API_SUGGESTION "%%m" "%RESOLUTION_ERRORS_REPORT%"
-        
+
         echo. >> "%RESOLUTION_ERRORS_REPORT%"
     )
 )

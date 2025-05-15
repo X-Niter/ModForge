@@ -2,29 +2,34 @@ package com.modforge.intellij.plugin.utils;
 
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.util.io.HttpRequests;
-import com.intellij.util.io.RequestBuilder;
 import com.modforge.intellij.plugin.settings.ModForgeSettings;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.io.IOException;
 import java.net.HttpURLConnection;
-import java.util.Map;
+import java.nio.charset.StandardCharsets;
+import okhttp3.MediaType;
+import okhttp3.OkHttpClient;
+import okhttp3.Request;
+import okhttp3.RequestBody;
+import okhttp3.Response;
 
 /**
  * Utility for token authentication connections.
- * This class provides utility methods for making authenticated HTTP requests with tokens.
+ * This class provides utility methods for making authenticated HTTP requests
+ * with tokens.
  */
 public final class TokenAuthConnectionUtil {
     private static final Logger LOG = Logger.getInstance(TokenAuthConnectionUtil.class);
-    
+
     /**
      * Private constructor to prevent instantiation.
      */
     private TokenAuthConnectionUtil() {
         // Utility class
     }
-    
+
     /**
      * Tests if token authentication works using server URL and token from settings.
      *
@@ -35,15 +40,15 @@ public final class TokenAuthConnectionUtil {
         if (settings == null) {
             return false;
         }
-        
+
         return testTokenAuthentication(settings.getServerUrl(), settings.getAccessToken());
     }
-    
+
     /**
      * Tests if token authentication works with the given server URL and token.
      *
      * @param serverUrl The server URL
-     * @param token The authentication token
+     * @param token     The authentication token
      * @return True if authentication works, false otherwise
      */
     public static boolean testTokenAuthentication(@NotNull String serverUrl, @NotNull String token) {
@@ -53,40 +58,27 @@ public final class TokenAuthConnectionUtil {
                 url += "/";
             }
             url += "api/auth/verify";
-            
-            RequestBuilder request = HttpRequests.post(url, "application/json")
-                    .accept("application/json")
-                    .productNameAsUserAgent()
-                    .tuner(connection -> connection.setRequestProperty("Authorization", "Bearer " + token));
-            
-            String response = request.connect(connection -> {
-                int responseCode = connection.getResponseCode();
-                if (responseCode != HttpURLConnection.HTTP_OK) {
-                    return null;
-                }
-                
-                // Read response
-                Map<String, Object> responseMap = JsonUtil.readMapFromStream(connection.getInputStream());
-                if (responseMap == null) {
-                    return null;
-                }
-                
-                return (String) responseMap.get("status");
-            });
-            
-            return "success".equals(response);
+
+            OkHttpClient client = new OkHttpClient();
+            Request request = new Request.Builder()
+                    .url(url)
+                    .addHeader("Authorization", "Bearer " + token)
+                    .build();
+            try (Response response = client.newCall(request).execute()) {
+                return response.code() == HttpURLConnection.HTTP_OK;
+            }
         } catch (IOException e) {
             LOG.warn("Failed to test token authentication", e);
             return false;
         }
     }
-    
+
     /**
      * Executes a GET request with token authentication.
      *
      * @param serverUrl The server URL
-     * @param endpoint The endpoint
-     * @param token The authentication token
+     * @param endpoint  The endpoint
+     * @param token     The authentication token
      * @return The response, or null if an error occurs
      */
     @Nullable
@@ -97,109 +89,147 @@ public final class TokenAuthConnectionUtil {
                 url += "/";
             }
             url += endpoint;
-            
-            RequestBuilder request = HttpRequests.request(url)
+
+            return HttpRequests.request(url)
                     .accept("application/json")
                     .productNameAsUserAgent()
-                    .tuner(connection -> connection.setRequestProperty("Authorization", "Bearer " + token));
-            
-            return request.connect(connection -> {
-                int responseCode = connection.getResponseCode();
-                if (responseCode != HttpURLConnection.HTTP_OK) {
-                    LOG.warn("Failed to execute GET request, response code: " + responseCode);
-                    return null;
-                }
-                
-                // Read response
-                return new String(connection.getInputStream().readAllBytes());
-            });
+                    .tuner(connection -> connection.setRequestProperty("Authorization", "Bearer " + token))
+                    .connect(request -> {
+                        if (request.getConnection() instanceof HttpURLConnection) {
+                            HttpURLConnection connection = (HttpURLConnection) request.getConnection();
+
+                            if (connection.getResponseCode() == HttpURLConnection.HTTP_OK) {
+                                // Read response
+                                return request.readString();
+                            }
+                        }
+                        return null;
+                    });
         } catch (IOException e) {
             LOG.warn("Failed to execute GET request", e);
             return null;
         }
     }
-    
+
     /**
      * Executes a POST request with token authentication.
      *
      * @param serverUrl The server URL
-     * @param endpoint The endpoint
-     * @param token The authentication token
-     * @param body The request body
+     * @param endpoint  The endpoint
+     * @param token     The authentication token
+     * @param body      The request body
      * @return The response, or null if an error occurs
      */
     @Nullable
-    public static String executePost(@NotNull String serverUrl, @NotNull String endpoint, 
-                                   @NotNull String token, @Nullable Object body) {
+    public static String executePost(@NotNull String serverUrl, @NotNull String endpoint,
+            @NotNull String token, @Nullable String body) {
         try {
             String url = serverUrl;
             if (!url.endsWith("/") && !endpoint.startsWith("/")) {
                 url += "/";
             }
             url += endpoint;
-            
-            RequestBuilder request = HttpRequests.post(url, "application/json")
-                    .accept("application/json")
-                    .productNameAsUserAgent()
-                    .tuner(connection -> connection.setRequestProperty("Authorization", "Bearer " + token));
-            
-            return request.connect(connection -> {
-                // Write request body
-                if (body != null) {
-                    connection.write(JsonUtil.writeToString(body));
+
+            OkHttpClient client = new OkHttpClient();
+            RequestBody requestBody = body != null
+                    ? RequestBody.create(body, MediaType.get("application/json"))
+                    : RequestBody.create(new byte[0], MediaType.get("application/json"));
+
+            Request request = new Request.Builder()
+                    .url(url)
+                    .addHeader("Authorization", "Bearer " + token)
+                    .post(requestBody)
+                    .build();
+
+            try (Response response = client.newCall(request).execute()) {
+                if (response.isSuccessful()) {
+                    return response.body() != null ? response.body().string() : null;
                 }
-                
-                int responseCode = connection.getResponseCode();
-                if (responseCode != HttpURLConnection.HTTP_OK && responseCode != HttpURLConnection.HTTP_CREATED) {
-                    LOG.warn("Failed to execute POST request, response code: " + responseCode);
-                    return null;
-                }
-                
-                // Read response
-                return new String(connection.getInputStream().readAllBytes());
-            });
+            }
         } catch (IOException e) {
             LOG.warn("Failed to execute POST request", e);
-            return null;
         }
+        return null;
     }
-    
+
     /**
-     * Gets the response code from an HTTP connection.
-     * This method allows compatibility with different IntelliJ IDEA API versions.
+     * Makes an authenticated GET request.
      *
-     * @param connection The HTTP connection
-     * @return The response code
-     * @throws IOException If an I/O error occurs
+     * @param url The URL to request
+     * @return The response body
      */
-    private static int getResponseCode(HttpRequests.Request connection) throws IOException {
-        try {
-            // First try to use reflection to call getResponseCode
-            java.lang.reflect.Method getResponseCodeMethod = connection.getClass().getMethod("getResponseCode");
-            Object result = getResponseCodeMethod.invoke(connection);
-            if (result instanceof Integer) {
-                return (Integer) result;
-            }
-        } catch (Exception ignored) {
-            // Method not found or invocation failed, try alternative approaches
-        }
-        
-        try {
-            // Try to get the underlying HTTP connection
-            java.lang.reflect.Field httpConnectionField = connection.getClass().getDeclaredField("myConnection");
-            httpConnectionField.setAccessible(true);
-            Object httpConnection = httpConnectionField.get(connection);
-            
-            if (httpConnection instanceof HttpURLConnection) {
-                return ((HttpURLConnection) httpConnection).getResponseCode();
-            }
-        } catch (Exception ignored) {
-            // Field not found or access failed
-        }
-        
-        // Default to OK if we can't get the actual response code
-        // This is not ideal but should prevent compilation errors
-        LOG.warn("Could not determine HTTP response code, assuming 200 OK");
-        return HttpURLConnection.HTTP_OK;
+    @Nullable
+    public static String makeAuthenticatedGetRequest(@NotNull String url) throws IOException {
+        ModForgeSettings settings = ModForgeSettings.getInstance();
+        String token = settings.getToken();
+
+        return makeRequest(url, token, null, "GET");
+    }
+
+    /**
+     * Makes an authenticated POST request.
+     *
+     * @param url  The URL to request
+     * @param body The request body
+     * @return The response body
+     */
+    @Nullable
+    public static String makeAuthenticatedPostRequest(@NotNull String url, @Nullable String body) throws IOException {
+        ModForgeSettings settings = ModForgeSettings.getInstance();
+        String token = settings.getToken();
+
+        return makeRequest(url, token, body, "POST");
+    }
+
+    /**
+     * Makes an authenticated PUT request.
+     *
+     * @param url  The URL to request
+     * @param body The request body
+     * @return The response body
+     */
+    @Nullable
+    public static String makeAuthenticatedPutRequest(@NotNull String url, @Nullable String body) throws IOException {
+        ModForgeSettings settings = ModForgeSettings.getInstance();
+        String token = settings.getToken();
+
+        return makeRequest(url, token, body, "PUT");
+    }
+
+    /**
+     * Makes an authenticated DELETE request.
+     *
+     * @param url The URL to request
+     * @return The response body
+     */
+    @Nullable
+    public static String makeAuthenticatedDeleteRequest(@NotNull String url) throws IOException {
+        ModForgeSettings settings = ModForgeSettings.getInstance();
+        String token = settings.getToken();
+
+        return makeRequest(url, token, null, "DELETE");
+    }
+
+    @Nullable
+    private static String makeRequest(String url, String token, @Nullable String body, String method)
+            throws IOException {
+        return HttpRequests.request(url)
+                .tuner(connection -> {
+                    if (connection instanceof HttpURLConnection) {
+                        HttpURLConnection httpConnection = (HttpURLConnection) connection;
+                        httpConnection.setRequestMethod(method);
+                        httpConnection.setRequestProperty("Authorization", "Bearer " + token);
+                        httpConnection.setRequestProperty("Content-Type", "application/json");
+
+                        if (body != null && !body.isEmpty() && (method.equals("POST") || method.equals("PUT"))) {
+                            httpConnection.setDoOutput(true);
+                            httpConnection.getOutputStream().write(body.getBytes(StandardCharsets.UTF_8));
+                        }
+                    }
+                })
+                .accept("application/json")
+                .connectTimeout(30000)
+                .readTimeout(30000)
+                .readString();
     }
 }

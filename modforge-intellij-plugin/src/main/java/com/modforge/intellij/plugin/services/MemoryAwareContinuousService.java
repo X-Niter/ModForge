@@ -21,7 +21,7 @@ import java.util.concurrent.atomic.AtomicInteger;
  */
 public class MemoryAwareContinuousService implements Disposable, MemoryManager.MemoryPressureListener {
     private static final Logger LOG = Logger.getInstance(MemoryAwareContinuousService.class);
-    
+
     private final Project project;
     private final AtomicBoolean running = new AtomicBoolean(false);
     private final AtomicInteger consecutiveHighPressureCount = new AtomicInteger(0);
@@ -30,7 +30,7 @@ public class MemoryAwareContinuousService implements Disposable, MemoryManager.M
     private ScheduledFuture<?> currentTask;
     private MemoryUtils.MemoryPressureLevel currentPressureLevel = MemoryUtils.MemoryPressureLevel.NORMAL;
     private final ModForgeNotificationService notificationService;
-    
+
     /**
      * Constructor
      * 
@@ -39,14 +39,14 @@ public class MemoryAwareContinuousService implements Disposable, MemoryManager.M
     public MemoryAwareContinuousService(Project project) {
         this.project = project;
         this.notificationService = ModForgeNotificationService.getInstance();
-        
+
         // Register as a memory pressure listener
         MemoryManager memoryManager = MemoryManager.getInstance();
         if (memoryManager != null) {
             memoryManager.addMemoryPressureListener(this);
         }
     }
-    
+
     /**
      * Start the continuous service
      */
@@ -56,7 +56,7 @@ public class MemoryAwareContinuousService implements Disposable, MemoryManager.M
             schedule();
         }
     }
-    
+
     /**
      * Stop the continuous service
      */
@@ -69,36 +69,37 @@ public class MemoryAwareContinuousService implements Disposable, MemoryManager.M
             }
         }
     }
-    
+
     /**
      * Reset the continuous service to its initial state
-     * This stops the service, resets all counters and state variables, and optionally restarts
+     * This stops the service, resets all counters and state variables, and
+     * optionally restarts
      * 
      * @param autoRestart Whether to automatically restart the service after reset
      */
     public void reset(boolean autoRestart) {
         LOG.info("Resetting memory-aware continuous service");
-        
+
         // Stop the service if it's running
         stop();
-        
+
         // Reset internal state
         consecutiveHighPressureCount.set(0);
         currentPressureLevel = MemoryUtils.MemoryPressureLevel.NORMAL;
-        
+
         // Cancel any pending tasks
         if (currentTask != null) {
             currentTask.cancel(false);
             currentTask = null;
         }
-        
+
         // Refresh our memory manager listener registration
         MemoryManager memoryManager = MemoryManager.getInstance();
         if (memoryManager != null) {
             memoryManager.removeMemoryPressureListener(this);
             memoryManager.addMemoryPressureListener(this);
         }
-        
+
         // Get continuous service and reset its state
         try {
             ContinuousDevelopmentService continuousService = project.getService(ContinuousDevelopmentService.class);
@@ -108,16 +109,16 @@ public class MemoryAwareContinuousService implements Disposable, MemoryManager.M
         } catch (Exception e) {
             LOG.warn("Error resetting continuous development service state", e);
         }
-        
+
         LOG.info("Memory-aware continuous service reset completed");
-        
+
         // Restart if requested and not disposed
         if (autoRestart && !project.isDisposed()) {
             LOG.info("Auto-restarting memory-aware continuous service after reset");
             start();
         }
     }
-    
+
     /**
      * Check if the service is running
      * 
@@ -126,35 +127,37 @@ public class MemoryAwareContinuousService implements Disposable, MemoryManager.M
     public boolean isRunning() {
         return running.get();
     }
-    
+
     /**
      * Pause all background tasks to conserve memory during high pressure situations
-     * This is called by the memory recovery system when critical memory conditions are detected
+     * This is called by the memory recovery system when critical memory conditions
+     * are detected
      * 
      * @return True if background tasks were paused successfully
      */
     public boolean pauseBackgroundTasks() {
         LOG.info("Pausing background tasks due to memory pressure");
-        
+
         try {
             // Stop the service temporarily if it's running
             boolean wasRunning = running.get();
             if (wasRunning) {
                 stop();
             }
-            
+
             // Cancel any pending tasks
             if (currentTask != null && !currentTask.isDone()) {
                 currentTask.cancel(false);
                 currentTask = null;
             }
-            
-            // Clear any scheduled tasks in the executor
-            executor.purge();
-            
+
+            // Cancel all tasks and reset the executor
+            executor.shutdownNow();
+            LOG.info("All tasks in the executor have been canceled and the executor has been reset.");
+
             // Mark that background tasks are paused
             consecutiveHighPressureCount.incrementAndGet();
-            
+
             LOG.info("Background tasks paused successfully");
             return true;
         } catch (Exception e) {
@@ -162,7 +165,7 @@ public class MemoryAwareContinuousService implements Disposable, MemoryManager.M
             return false;
         }
     }
-    
+
     /**
      * Schedule the next execution of the service
      */
@@ -170,20 +173,20 @@ public class MemoryAwareContinuousService implements Disposable, MemoryManager.M
         if (!running.get() || project.isDisposed()) {
             return;
         }
-        
+
         if (currentTask != null && !currentTask.isDone() && !currentTask.isCancelled()) {
             currentTask.cancel(false);
         }
-        
+
         // Determine the interval based on memory pressure
         int intervalMinutes = getIntervalForCurrentPressure();
-        
-        LOG.info("Scheduling next memory-aware continuous service execution in " + 
+
+        LOG.info("Scheduling next memory-aware continuous service execution in " +
                 intervalMinutes + " minutes (pressure level: " + currentPressureLevel + ")");
-        
+
         currentTask = executor.schedule(this::execute, intervalMinutes, TimeUnit.MINUTES);
     }
-    
+
     /**
      * Execute the continuous service task
      */
@@ -191,103 +194,104 @@ public class MemoryAwareContinuousService implements Disposable, MemoryManager.M
         if (!running.get() || project.isDisposed()) {
             return;
         }
-        
+
         LOG.info("Executing memory-aware continuous service");
-        
+
         try {
             // Check if memory optimization is needed before execution
             MemoryManagementSettings settings = MemoryManagementSettings.getInstance();
-            if (settings.isOptimizeBeforeLongRunningTasks() && 
+            if (settings.isOptimizeBeforeLongRunningTasks() &&
                     MemoryUtils.isMemoryOptimizationNeeded()) {
-                
+
                 LOG.info("Performing pre-execution memory optimization");
                 MemoryOptimizer optimizer = project.getService(MemoryOptimizer.class);
                 if (optimizer != null) {
                     optimizer.optimize(MemoryUtils.getOptimizationLevelForCurrentPressure());
                 }
             }
-            
+
             // Execute the actual continuous service logic
             performContinuousServiceTask();
-            
+
         } catch (Exception e) {
             LOG.error("Error executing memory-aware continuous service", e);
-            
+
             if (notificationService != null) {
                 notificationService.showErrorNotification(
+                        project,
                         "Memory-Aware Continuous Service Error",
-                        "An error occurred while executing the memory-aware continuous service: " + e.getMessage()
-                );
+                        "An error occurred while executing the memory-aware continuous service: " + e.getMessage());
             }
         } finally {
             // Schedule the next execution
             schedule();
         }
     }
-    
+
     /**
      * Perform the actual continuous service task
      * This is where the main work of the service is done
      */
     private void performContinuousServiceTask() {
         LOG.info("Performing continuous service task");
-        
+
         // Get the main continuous development service
         ContinuousDevelopmentService continuousService = project.getService(ContinuousDevelopmentService.class);
         if (continuousService == null) {
             LOG.warn("Continuous development service not available");
             return;
         }
-        
+
         if (!continuousService.isEnabled()) {
             LOG.info("Continuous development service is not enabled, skipping development cycle");
             return;
         }
-        
+
         // Execute a development cycle with memory awareness
         boolean useReducedFeatures = currentPressureLevel != MemoryUtils.MemoryPressureLevel.NORMAL;
-        
+
         try {
             LOG.info("Executing memory-aware development cycle (reduced features: " + useReducedFeatures + ")");
-            
+
             // Set memory-aware options in the continuous service
             if (useReducedFeatures) {
                 LOG.info("Using reduced features due to memory pressure: " + currentPressureLevel);
-                
+
                 // Check severe memory pressure, apply circuit breaker if needed
-                if (currentPressureLevel == MemoryUtils.MemoryPressureLevel.CRITICAL || 
+                if (currentPressureLevel == MemoryUtils.MemoryPressureLevel.CRITICAL ||
                         currentPressureLevel == MemoryUtils.MemoryPressureLevel.EMERGENCY) {
-                    
+
                     // If we're under severe memory pressure, only perform minimal tasks
                     LOG.warn("Severe memory pressure detected, performing minimal continuous development");
-                    
-                    // For critical memory situations, just do essential maintenance and defer intensive tasks
+
+                    // For critical memory situations, just do essential maintenance and defer
+                    // intensive tasks
                     continuousService.performLightweightCycle();
-                    
+
                     LOG.info("Lightweight memory-aware development cycle complete");
                     return;
                 }
-                
+
                 // Otherwise use reduced features mode for moderate memory pressure
                 continuousService.setReducedFeaturesMode(true);
             } else {
                 // Normal memory conditions, use full features
                 continuousService.setReducedFeaturesMode(false);
             }
-            
+
             // Execute the development cycle with current memory constraints
             continuousService.executeDevelopmentCycle();
-            
+
             LOG.info("Memory-aware development cycle complete");
-            
+
         } catch (Exception e) {
             LOG.error("Error in memory-aware development cycle", e);
-            
+
             if (notificationService != null) {
                 notificationService.showErrorNotification(
+                        project,
                         "Development Cycle Error",
-                        "An error occurred during the memory-aware development cycle: " + e.getMessage()
-                );
+                        "An error occurred during the memory-aware development cycle: " + e.getMessage());
             }
         } finally {
             // Reset any temporary settings
@@ -300,7 +304,7 @@ public class MemoryAwareContinuousService implements Disposable, MemoryManager.M
             }
         }
     }
-    
+
     /**
      * Get the appropriate interval for the current memory pressure level
      * 
@@ -308,7 +312,7 @@ public class MemoryAwareContinuousService implements Disposable, MemoryManager.M
      */
     private int getIntervalForCurrentPressure() {
         MemoryManagementSettings settings = MemoryManagementSettings.getInstance();
-        
+
         switch (currentPressureLevel) {
             case EMERGENCY:
                 return settings.getContinuousServiceMinimumIntervalMinutes();
@@ -320,39 +324,39 @@ public class MemoryAwareContinuousService implements Disposable, MemoryManager.M
                 return settings.getContinuousServiceDefaultIntervalMinutes();
         }
     }
-    
+
     @Override
     public void onMemoryPressureChanged(MemoryUtils.MemoryPressureLevel pressureLevel) {
         MemoryUtils.MemoryPressureLevel previousLevel = currentPressureLevel;
         currentPressureLevel = pressureLevel;
-        
+
         // If pressure increased, reschedule with a longer interval
         if (pressureLevel.ordinal() > previousLevel.ordinal()) {
-            LOG.info("Memory pressure increased from " + previousLevel + 
+            LOG.info("Memory pressure increased from " + previousLevel +
                     " to " + pressureLevel + ", adjusting continuous service schedule");
-            
+
             // Keep track of consecutive high pressure events
-            if (pressureLevel == MemoryUtils.MemoryPressureLevel.CRITICAL || 
+            if (pressureLevel == MemoryUtils.MemoryPressureLevel.CRITICAL ||
                     pressureLevel == MemoryUtils.MemoryPressureLevel.EMERGENCY) {
-                
+
                 int count = consecutiveHighPressureCount.incrementAndGet();
-                
+
                 // If too many consecutive high pressure events, consider pausing
                 if (count >= 3) {
                     LOG.warn("Detected " + count + " consecutive high memory pressure events, " +
                             "temporarily pausing continuous service");
-                    
+
                     // Notify the user
                     if (notificationService != null) {
                         notificationService.showWarningNotification(
+                                project,
                                 "Memory Pressure Warning",
                                 "High memory pressure detected. Memory-aware continuous service " +
-                                "is temporarily using extended intervals to prevent memory issues."
-                        );
+                                        "is temporarily using extended intervals to prevent memory issues.");
                     }
                 }
             }
-            
+
             // Reschedule if already running
             if (isRunning()) {
                 schedule();
@@ -360,24 +364,38 @@ public class MemoryAwareContinuousService implements Disposable, MemoryManager.M
         } else if (pressureLevel.ordinal() < previousLevel.ordinal()) {
             // Reset the consecutive count if pressure decreased
             consecutiveHighPressureCount.set(0);
-            
-            LOG.info("Memory pressure decreased from " + previousLevel + 
+
+            LOG.info("Memory pressure decreased from " + previousLevel +
                     " to " + pressureLevel + ", continuous service will use normal intervals");
-            
+
             // No need to reschedule immediately when pressure decreases,
             // the next execution will use the new interval
         }
     }
-    
+
     @Override
     public void dispose() {
         stop();
-        
+
         MemoryManager memoryManager = MemoryManager.getInstance();
         if (memoryManager != null) {
             memoryManager.removeMemoryPressureListener(this);
         }
-        
+
         executor.shutdownNow();
+    }
+
+    /**
+     * Set reduced features mode for the continuous development service.
+     *
+     * @param enabled True to enable reduced features mode, false to disable.
+     */
+    public void setReducedFeaturesMode(boolean enabled) {
+        ContinuousDevelopmentService continuousService = project.getService(ContinuousDevelopmentService.class);
+        if (continuousService != null) {
+            continuousService.setReducedFeaturesMode(enabled);
+        } else {
+            LOG.warn("Continuous development service not available to set reduced features mode");
+        }
     }
 }

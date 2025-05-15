@@ -155,8 +155,7 @@ public class WebSocketMessage {
      * @return The join message
      */
     @NotNull
-    public static WebSocketMessage createJoinMessage(@NotNull String userId, @NotNull String sessionId, 
-                                                   @NotNull String username) {
+    public static WebSocketMessage createJoinMessage(@NotNull String userId, @NotNull String sessionId, @NotNull String username) {
         Map<String, Object> data = new HashMap<>();
         data.put("sessionId", sessionId);
         data.put("username", username);
@@ -172,8 +171,7 @@ public class WebSocketMessage {
      * @return The leave message
      */
     @NotNull
-    public static WebSocketMessage createLeaveMessage(@NotNull String userId, @NotNull String sessionId, 
-                                                    @NotNull String username) {
+    public static WebSocketMessage createLeaveMessage(@NotNull String userId, @NotNull String sessionId,@NotNull String username) {
         Map<String, Object> data = new HashMap<>();
         data.put("sessionId", sessionId);
         data.put("username", username);
@@ -207,8 +205,7 @@ public class WebSocketMessage {
      * @return The file content message
      */
     @NotNull
-    public static WebSocketMessage createFileContentMessage(@NotNull String userId, @NotNull String filePath, 
-                                                          @NotNull String fileName, @NotNull String content) {
+    public static WebSocketMessage createFileContentMessage(@NotNull String userId, @NotNull String filePath, @NotNull String fileName, @NotNull String content) {
         Map<String, Object> data = new HashMap<>();
         data.put("filePath", filePath);
         data.put("fileName", fileName);
@@ -225,8 +222,7 @@ public class WebSocketMessage {
      * @return The file sync message
      */
     @NotNull
-    public static WebSocketMessage createFileSyncMessage(@NotNull String userId, @NotNull String filePath, 
-                                                       @NotNull String fileName) {
+    public static WebSocketMessage createFileSyncMessage(@NotNull String userId, @NotNull String filePath, @NotNull String fileName) {
         Map<String, Object> data = new HashMap<>();
         data.put("filePath", filePath);
         data.put("fileName", fileName);

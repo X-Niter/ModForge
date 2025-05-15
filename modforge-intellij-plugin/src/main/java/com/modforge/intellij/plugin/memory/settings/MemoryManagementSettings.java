@@ -12,30 +12,27 @@ import org.jetbrains.annotations.Nullable;
  * Persistent settings for memory management
  */
 @Service
-@State(
-    name = "com.modforge.intellij.plugin.memory.settings.MemoryManagementSettings",
-    storages = @Storage("ModForgeMemorySettings.xml")
-)
+@State(name = "com.modforge.intellij.plugin.memory.settings.MemoryManagementSettings", storages = @Storage("ModForgeMemorySettings.xml"))
 public final class MemoryManagementSettings implements PersistentStateComponent<MemoryManagementSettings.State> {
     private State myState = new State();
-    
+
     /**
      * Get the settings instance
      */
     public static MemoryManagementSettings getInstance() {
         return ApplicationManager.getApplication().getService(MemoryManagementSettings.class);
     }
-    
+
     @Override
     public @Nullable State getState() {
         return myState;
     }
-    
+
     @Override
     public void loadState(@NotNull State state) {
         myState = state;
     }
-    
+
     /**
      * State class for memory management settings
      * Contains all persistent settings
@@ -44,24 +41,24 @@ public final class MemoryManagementSettings implements PersistentStateComponent<
         // General settings
         public boolean enableAutomaticOptimization = true;
         public boolean showMemoryWidget = true;
-        
+
         // Thresholds
         public int warningThresholdPercent = 75;
         public int criticalThresholdPercent = 85;
         public int emergencyThresholdPercent = 95;
-        
+
         // Automatic optimization
         public int optimizationIntervalMinutes = 30;
         public boolean optimizeOnLowMemory = true;
         public boolean optimizeBeforeLongRunningTasks = true;
-        
+
         // Continuous development settings
         public boolean enableMemoryAwareContinuousService = true;
         public int continuousServiceDefaultIntervalMinutes = 5;
         public int continuousServiceReducedIntervalMinutes = 15;
         public int continuousServiceMinimumIntervalMinutes = 30;
     }
-    
+
     /**
      * Check if automatic optimization is enabled
      * 
@@ -70,7 +67,7 @@ public final class MemoryManagementSettings implements PersistentStateComponent<
     public boolean isAutomaticOptimizationEnabled() {
         return myState.enableAutomaticOptimization;
     }
-    
+
     /**
      * Set whether automatic optimization is enabled
      * 
@@ -79,7 +76,7 @@ public final class MemoryManagementSettings implements PersistentStateComponent<
     public void setAutomaticOptimizationEnabled(boolean enabled) {
         myState.enableAutomaticOptimization = enabled;
     }
-    
+
     /**
      * Check if the memory widget should be shown
      * 
@@ -88,7 +85,7 @@ public final class MemoryManagementSettings implements PersistentStateComponent<
     public boolean isShowMemoryWidget() {
         return myState.showMemoryWidget;
     }
-    
+
     /**
      * Set whether the memory widget should be shown
      * 
@@ -97,7 +94,7 @@ public final class MemoryManagementSettings implements PersistentStateComponent<
     public void setShowMemoryWidget(boolean show) {
         myState.showMemoryWidget = show;
     }
-    
+
     /**
      * Get the warning threshold percentage
      * 
@@ -106,7 +103,7 @@ public final class MemoryManagementSettings implements PersistentStateComponent<
     public int getWarningThresholdPercent() {
         return myState.warningThresholdPercent;
     }
-    
+
     /**
      * Set the warning threshold percentage
      * 
@@ -115,7 +112,7 @@ public final class MemoryManagementSettings implements PersistentStateComponent<
     public void setWarningThresholdPercent(int percent) {
         myState.warningThresholdPercent = percent;
     }
-    
+
     /**
      * Get the critical threshold percentage
      * 
@@ -124,7 +121,7 @@ public final class MemoryManagementSettings implements PersistentStateComponent<
     public int getCriticalThresholdPercent() {
         return myState.criticalThresholdPercent;
     }
-    
+
     /**
      * Set the critical threshold percentage
      * 
@@ -133,7 +130,7 @@ public final class MemoryManagementSettings implements PersistentStateComponent<
     public void setCriticalThresholdPercent(int percent) {
         myState.criticalThresholdPercent = percent;
     }
-    
+
     /**
      * Get the emergency threshold percentage
      * 
@@ -142,7 +139,7 @@ public final class MemoryManagementSettings implements PersistentStateComponent<
     public int getEmergencyThresholdPercent() {
         return myState.emergencyThresholdPercent;
     }
-    
+
     /**
      * Set the emergency threshold percentage
      * 
@@ -151,7 +148,7 @@ public final class MemoryManagementSettings implements PersistentStateComponent<
     public void setEmergencyThresholdPercent(int percent) {
         myState.emergencyThresholdPercent = percent;
     }
-    
+
     /**
      * Get the optimization interval in minutes
      * 
@@ -160,7 +157,7 @@ public final class MemoryManagementSettings implements PersistentStateComponent<
     public int getOptimizationIntervalMinutes() {
         return myState.optimizationIntervalMinutes;
     }
-    
+
     /**
      * Set the optimization interval in minutes
      * 
@@ -169,7 +166,7 @@ public final class MemoryManagementSettings implements PersistentStateComponent<
     public void setOptimizationIntervalMinutes(int minutes) {
         myState.optimizationIntervalMinutes = minutes;
     }
-    
+
     /**
      * Check if optimization should be performed on low memory
      * 
@@ -178,7 +175,7 @@ public final class MemoryManagementSettings implements PersistentStateComponent<
     public boolean isOptimizeOnLowMemory() {
         return myState.optimizeOnLowMemory;
     }
-    
+
     /**
      * Set whether optimization should be performed on low memory
      * 
@@ -187,7 +184,7 @@ public final class MemoryManagementSettings implements PersistentStateComponent<
     public void setOptimizeOnLowMemory(boolean optimize) {
         myState.optimizeOnLowMemory = optimize;
     }
-    
+
     /**
      * Check if optimization should be performed before long-running tasks
      * 
@@ -196,16 +193,17 @@ public final class MemoryManagementSettings implements PersistentStateComponent<
     public boolean isOptimizeBeforeLongRunningTasks() {
         return myState.optimizeBeforeLongRunningTasks;
     }
-    
+
     /**
      * Set whether optimization should be performed before long-running tasks
      * 
-     * @param optimize Whether optimization should be performed before long-running tasks
+     * @param optimize Whether optimization should be performed before long-running
+     *                 tasks
      */
     public void setOptimizeBeforeLongRunningTasks(boolean optimize) {
         myState.optimizeBeforeLongRunningTasks = optimize;
     }
-    
+
     /**
      * Check if memory-aware continuous service is enabled
      * 
@@ -214,7 +212,7 @@ public final class MemoryManagementSettings implements PersistentStateComponent<
     public boolean isMemoryAwareContinuousServiceEnabled() {
         return myState.enableMemoryAwareContinuousService;
     }
-    
+
     /**
      * Set whether memory-aware continuous service is enabled
      * 
@@ -223,7 +221,7 @@ public final class MemoryManagementSettings implements PersistentStateComponent<
     public void setMemoryAwareContinuousServiceEnabled(boolean enabled) {
         myState.enableMemoryAwareContinuousService = enabled;
     }
-    
+
     /**
      * Get the continuous service default interval in minutes
      * 
@@ -232,7 +230,7 @@ public final class MemoryManagementSettings implements PersistentStateComponent<
     public int getContinuousServiceDefaultIntervalMinutes() {
         return myState.continuousServiceDefaultIntervalMinutes;
     }
-    
+
     /**
      * Set the continuous service default interval in minutes
      * 
@@ -241,7 +239,7 @@ public final class MemoryManagementSettings implements PersistentStateComponent<
     public void setContinuousServiceDefaultIntervalMinutes(int minutes) {
         myState.continuousServiceDefaultIntervalMinutes = minutes;
     }
-    
+
     /**
      * Get the continuous service reduced interval in minutes
      * 
@@ -250,7 +248,7 @@ public final class MemoryManagementSettings implements PersistentStateComponent<
     public int getContinuousServiceReducedIntervalMinutes() {
         return myState.continuousServiceReducedIntervalMinutes;
     }
-    
+
     /**
      * Set the continuous service reduced interval in minutes
      * 
@@ -259,7 +257,7 @@ public final class MemoryManagementSettings implements PersistentStateComponent<
     public void setContinuousServiceReducedIntervalMinutes(int minutes) {
         myState.continuousServiceReducedIntervalMinutes = minutes;
     }
-    
+
     /**
      * Get the continuous service minimum interval in minutes
      * 
@@ -268,7 +266,7 @@ public final class MemoryManagementSettings implements PersistentStateComponent<
     public int getContinuousServiceMinimumIntervalMinutes() {
         return myState.continuousServiceMinimumIntervalMinutes;
     }
-    
+
     /**
      * Set the continuous service minimum interval in minutes
      * 
@@ -276,5 +274,14 @@ public final class MemoryManagementSettings implements PersistentStateComponent<
      */
     public void setContinuousServiceMinimumIntervalMinutes(int minutes) {
         myState.continuousServiceMinimumIntervalMinutes = minutes;
+    }
+
+    /**
+     * Check if automatic recovery is enabled.
+     *
+     * @return true if automatic recovery is enabled, false otherwise.
+     */
+    public boolean isAutomaticRecoveryEnabled() {
+        return myState.enableAutomaticOptimization;
     }
 }

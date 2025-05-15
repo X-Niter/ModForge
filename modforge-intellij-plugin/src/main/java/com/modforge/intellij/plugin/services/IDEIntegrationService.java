@@ -29,72 +29,78 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
 
 /**
  * Service for integrating with IDE-specific functionality.
- * This service provides methods for interacting with the IDE's project structure,
+ * This service provides methods for interacting with the IDE's project
+ * structure,
  * file system, and editor functionality.
  */
 @Service(Service.Level.PROJECT)
 public final class IDEIntegrationService {
     private static final Logger LOG = Logger.getInstance(IDEIntegrationService.class);
-    
+
     private final Project project;
     private final MessageBusConnection messageBusConnection;
-    
+
     /**
      * Creates a new IDEIntegrationService.
+     * 
      * @param project The project
      */
     public IDEIntegrationService(@NotNull Project project) {
         this.project = project;
         this.messageBusConnection = project.getMessageBus().connect();
-        
+
         LOG.info("IDEIntegrationService initialized for project: " + project.getName());
-        
+
         // Register for file editor events
         registerFileEditorListeners();
     }
-    
+
     /**
      * Gets the IDEIntegrationService instance.
+     * 
      * @param project The project
      * @return The IDEIntegrationService instance
      */
     public static IDEIntegrationService getInstance(@NotNull Project project) {
         return project.getService(IDEIntegrationService.class);
     }
-    
+
     /**
      * Registers for file editor events.
      */
     private void registerFileEditorListeners() {
-        messageBusConnection.subscribe(FileEditorManagerListener.FILE_EDITOR_MANAGER, 
+        messageBusConnection.subscribe(FileEditorManagerListener.FILE_EDITOR_MANAGER,
                 new FileEditorManagerListener() {
                     @Override
                     public void fileOpened(@NotNull FileEditorManager source, @NotNull VirtualFile file) {
                         // Handle file opened event
                     }
-                    
+
                     @Override
                     public void fileClosed(@NotNull FileEditorManager source, @NotNull VirtualFile file) {
                         // Handle file closed event
                     }
                 });
     }
-    
+
     /**
      * Gets the current editor.
+     * 
      * @return The current editor, or null if no editor is open
      */
     @Nullable
     public Editor getCurrentEditor() {
         return FileEditorManager.getInstance(project).getSelectedTextEditor();
     }
-    
+
     /**
      * Gets the current file.
+     * 
      * @return The current file, or null if no file is open
      */
     @Nullable
@@ -102,9 +108,10 @@ public final class IDEIntegrationService {
         VirtualFile[] files = FileEditorManager.getInstance(project).getSelectedFiles();
         return files.length > 0 ? files[0] : null;
     }
-    
+
     /**
      * Gets the document for a file.
+     * 
      * @param file The file
      * @return The document, or null if the file doesn't have a document
      */
@@ -113,9 +120,10 @@ public final class IDEIntegrationService {
         return PsiDocumentManager.getInstance(project).getDocument(
                 PsiManager.getInstance(project).findFile(file));
     }
-    
+
     /**
      * Gets the PSI file for a file.
+     * 
      * @param file The file
      * @return The PSI file, or null if the file doesn't have a PSI file
      */
@@ -123,24 +131,26 @@ public final class IDEIntegrationService {
     public PsiFile getPsiFile(@NotNull VirtualFile file) {
         return PsiManager.getInstance(project).findFile(file);
     }
-    
+
     /**
      * Creates a new file.
+     * 
      * @param directory The directory to create the file in
-     * @param fileName The file name
-     * @param content The file content
+     * @param fileName  The file name
+     * @param content   The file content
      * @return The created file, or null if the file couldn't be created
      */
     @Nullable
-    public VirtualFile createFile(@NotNull VirtualFile directory, @NotNull String fileName, 
-                                 @NotNull String content) {
+    public VirtualFile createFile(@NotNull VirtualFile directory, @NotNull String fileName,
+            @NotNull String content) {
         try {
             VirtualFile file = directory.findChild(fileName);
             if (file == null) {
                 file = directory.createChildData(this, fileName);
             }
-            
-            // Using CompatibilityUtil for better compatibility with IntelliJ IDEA 2025.1.1.1
+
+            // Using CompatibilityUtil for better compatibility with IntelliJ IDEA
+            // 2025.1.1.1
             CompatibilityUtil.runWriteAction(() -> {
                 try {
                     file.setBinaryContent(content.getBytes(StandardCharsets.UTF_8));
@@ -148,16 +158,17 @@ public final class IDEIntegrationService {
                     LOG.error("Error writing to file: " + file.getPath(), e);
                 }
             });
-            
+
             return file;
         } catch (IOException e) {
             LOG.error("Error creating file: " + fileName, e);
             return null;
         }
     }
-    
+
     /**
      * Opens a file in the editor.
+     * 
      * @param file The file to open
      * @return Whether the file was opened successfully
      */
@@ -165,21 +176,22 @@ public final class IDEIntegrationService {
         OpenFileDescriptor descriptor = new OpenFileDescriptor(project, file);
         return !descriptor.canNavigate() || descriptor.navigate(true);
     }
-    
+
     /**
      * Gets all source files in the project.
+     * 
      * @return The source files
      */
     @NotNull
     public List<VirtualFile> getSourceFiles() {
         List<VirtualFile> result = new ArrayList<>();
-        
+
         // Get Java source files from all modules
         Module[] modules = ModuleManager.getInstance(project).getModules();
         for (Module module : modules) {
             ModuleRootManager rootManager = ModuleRootManager.getInstance(module);
             VirtualFile[] sourceRoots = rootManager.getSourceRoots(false);
-            
+
             for (VirtualFile sourceRoot : sourceRoots) {
                 collectFilesRecursively(sourceRoot, file -> {
                     if (!file.isDirectory() && "java".equals(file.getExtension())) {
@@ -188,12 +200,13 @@ public final class IDEIntegrationService {
                 });
             }
         }
-        
+
         return result;
     }
-    
+
     /**
      * Gets all Java files in the project.
+     * 
      * @return The Java files
      */
     @NotNull
@@ -202,35 +215,37 @@ public final class IDEIntegrationService {
                 JavaFileType.INSTANCE, GlobalSearchScope.projectScope(project));
         return new ArrayList<>(files);
     }
-    
+
     /**
      * Gets all classes in the project.
+     * 
      * @return The classes
      */
     @NotNull
     public List<PsiClass> getClasses() {
         List<PsiClass> result = new ArrayList<>();
-        
+
         // Get Java source files
         List<VirtualFile> javaFiles = getJavaFiles();
-        
+
         // Get classes from Java files
         for (VirtualFile file : javaFiles) {
             PsiFile psiFile = PsiManager.getInstance(project).findFile(file);
             if (psiFile instanceof PsiJavaFile) {
                 PsiJavaFile javaFile = (PsiJavaFile) psiFile;
-                
+
                 for (PsiClass psiClass : javaFile.getClasses()) {
                     result.add(psiClass);
                 }
             }
         }
-        
+
         return result;
     }
-    
+
     /**
      * Gets all methods in a class.
+     * 
      * @param psiClass The class
      * @return The methods
      */
@@ -238,16 +253,17 @@ public final class IDEIntegrationService {
     public List<PsiMethod> getMethods(@NotNull PsiClass psiClass) {
         PsiMethod[] methods = psiClass.getMethods();
         List<PsiMethod> result = new ArrayList<>(methods.length);
-        
+
         for (PsiMethod method : methods) {
             result.add(method);
         }
-        
+
         return result;
     }
-    
+
     /**
      * Gets all fields in a class.
+     * 
      * @param psiClass The class
      * @return The fields
      */
@@ -255,16 +271,17 @@ public final class IDEIntegrationService {
     public List<PsiField> getFields(@NotNull PsiClass psiClass) {
         PsiField[] fields = psiClass.getFields();
         List<PsiField> result = new ArrayList<>(fields.length);
-        
+
         for (PsiField field : fields) {
             result.add(field);
         }
-        
+
         return result;
     }
-    
+
     /**
      * Gets the source root for a file.
+     * 
      * @param file The file
      * @return The source root, or null if the file doesn't have a source root
      */
@@ -272,9 +289,10 @@ public final class IDEIntegrationService {
     public VirtualFile getSourceRoot(@NotNull VirtualFile file) {
         return ProjectRootManager.getInstance(project).getFileIndex().getSourceRootForFile(file);
     }
-    
+
     /**
      * Gets the module for a file.
+     * 
      * @param file The file
      * @return The module, or null if the file doesn't have a module
      */
@@ -282,9 +300,10 @@ public final class IDEIntegrationService {
     public Module getModule(@NotNull VirtualFile file) {
         return ProjectRootManager.getInstance(project).getFileIndex().getModuleForFile(file);
     }
-    
+
     /**
      * Gets the package for a file.
+     * 
      * @param file The file
      * @return The package, or an empty string if the file doesn't have a package
      */
@@ -295,19 +314,20 @@ public final class IDEIntegrationService {
             PsiJavaFile javaFile = (PsiJavaFile) psiFile;
             return javaFile.getPackageName();
         }
-        
+
         return "";
     }
-    
+
     /**
      * Collects files recursively.
+     * 
      * @param directory The directory to collect files from
-     * @param consumer The consumer to process each file
+     * @param consumer  The consumer to process each file
      */
     private void collectFilesRecursively(@NotNull VirtualFile directory, @NotNull Consumer<VirtualFile> consumer) {
         // Process the directory itself
         consumer.accept(directory);
-        
+
         // Process children
         VirtualFile[] children = directory.getChildren();
         for (VirtualFile child : children) {
@@ -318,18 +338,20 @@ public final class IDEIntegrationService {
             }
         }
     }
-    
+
     /**
      * Gets the project base directory.
+     * 
      * @return The project base directory
      */
     @Nullable
     public VirtualFile getProjectBaseDir() {
         return ProjectUtil.guessProjectDir(project);
     }
-    
+
     /**
      * Detects the mod loader for a project.
+     * 
      * @return The detected mod loader, or null if no mod loader was detected
      */
     @Nullable
@@ -339,13 +361,13 @@ public final class IDEIntegrationService {
         if (baseDir == null) {
             return null;
         }
-        
+
         // Check for build.gradle
         VirtualFile buildGradle = baseDir.findChild("build.gradle");
         if (buildGradle != null) {
             try {
                 String content = new String(buildGradle.contentsToByteArray(), StandardCharsets.UTF_8);
-                
+
                 if (content.contains("net.minecraftforge") || content.contains("fg.deobf")) {
                     return "Forge";
                 } else if (content.contains("fabric-loom") || content.contains("net.fabricmc")) {
@@ -359,18 +381,18 @@ public final class IDEIntegrationService {
                 LOG.error("Error reading build.gradle", e);
             }
         }
-        
+
         // Check for mod loader specific dependencies in Java files
         List<PsiClass> classes = getClasses();
         for (PsiClass psiClass : classes) {
             PsiFile containingFile = psiClass.getContainingFile();
             if (containingFile instanceof PsiJavaFile) {
                 PsiJavaFile javaFile = (PsiJavaFile) containingFile;
-                
+
                 // Check imports
                 for (PsiImportStatement importStatement : javaFile.getImportList().getImportStatements()) {
                     String importText = importStatement.getQualifiedName();
-                    
+
                     if (importText != null) {
                         if (importText.startsWith("net.minecraftforge")) {
                             return "Forge";
@@ -383,13 +405,13 @@ public final class IDEIntegrationService {
                         }
                     }
                 }
-                
+
                 // Check annotations
                 PsiModifierList modifierList = psiClass.getModifierList();
                 if (modifierList != null) {
                     for (PsiAnnotation annotation : modifierList.getAnnotations()) {
                         String qualifiedName = annotation.getQualifiedName();
-                        
+
                         if (qualifiedName != null) {
                             if (qualifiedName.startsWith("net.minecraftforge")) {
                                 return "Forge";
@@ -405,30 +427,32 @@ public final class IDEIntegrationService {
                 }
             }
         }
-        
+
         return null;
     }
-    
+
     /**
      * Finds Minecraft mod classes in the project.
+     * 
      * @return The mod classes
      */
     @NotNull
     public List<PsiClass> findModClasses() {
         List<PsiClass> allClasses = getClasses();
         List<PsiClass> modClasses = new ArrayList<>();
-        
+
         for (PsiClass psiClass : allClasses) {
             if (isMinecraftModClass(psiClass)) {
                 modClasses.add(psiClass);
             }
         }
-        
+
         return modClasses;
     }
-    
+
     /**
      * Checks if a class is a Minecraft mod class.
+     * 
      * @param psiClass The class to check
      * @return Whether the class is a Minecraft mod class
      */
@@ -438,42 +462,99 @@ public final class IDEIntegrationService {
         if (modifierList != null) {
             for (PsiAnnotation annotation : modifierList.getAnnotations()) {
                 String qualifiedName = annotation.getQualifiedName();
-                
+
                 if (qualifiedName != null) {
-                    if (qualifiedName.contains("Mod") || 
-                            qualifiedName.contains("Plugin") || 
+                    if (qualifiedName.contains("Mod") ||
+                            qualifiedName.contains("Plugin") ||
                             qualifiedName.contains("ModInitializer")) {
                         return true;
                     }
                 }
             }
         }
-        
+
         // Check for mod interfaces
         for (PsiClassType implementsType : psiClass.getImplementsListTypes()) {
             String implementsName = implementsType.getClassName();
-            
+
             if (implementsName != null) {
-                if (implementsName.contains("ModInitializer") || 
-                        implementsName.contains("ClientModInitializer") || 
+                if (implementsName.contains("ModInitializer") ||
+                        implementsName.contains("ClientModInitializer") ||
                         implementsName.contains("DedicatedServerModInitializer")) {
                     return true;
                 }
             }
         }
-        
+
         // Check for mod base classes
         PsiClassType extendsType = psiClass.getExtendsListType();
         if (extendsType != null) {
             String extendsName = extendsType.getClassName();
-            
+
             if (extendsName != null) {
                 if (extendsName.contains("Mod") || extendsName.contains("Plugin")) {
                     return true;
                 }
             }
         }
-        
+
         return false;
+    }
+
+    public static class ProjectStructure {
+        private final List<ClassInfo> classes;
+
+        public ProjectStructure(List<ClassInfo> classes) {
+            this.classes = classes;
+        }
+
+        public List<ClassInfo> getClasses() {
+            return classes;
+        }
+    }
+
+    public static class ClassInfo {
+        private final String filePath;
+        private final String qualifiedName;
+
+        public ClassInfo(String filePath, String qualifiedName) {
+            this.filePath = filePath;
+            this.qualifiedName = qualifiedName;
+        }
+
+        public String getFilePath() {
+            return filePath;
+        }
+
+        public String getQualifiedName() {
+            return qualifiedName;
+        }
+    }
+
+    /**
+     * Analyzes the project structure and returns information about the classes in
+     * the project.
+     * 
+     * @return A CompletableFuture that will complete with the project structure
+     *         information
+     */
+    @NotNull
+    public CompletableFuture<ProjectStructure> analyzeProjectStructure() {
+        return CompletableFuture.supplyAsync(() -> {
+            List<ClassInfo> classInfos = new ArrayList<>();
+            List<PsiClass> classes = getClasses();
+
+            for (PsiClass psiClass : classes) {
+                PsiFile containingFile = psiClass.getContainingFile();
+                if (containingFile != null) {
+                    VirtualFile virtualFile = containingFile.getVirtualFile();
+                    if (virtualFile != null) {
+                        classInfos.add(new ClassInfo(virtualFile.getPath(), psiClass.getQualifiedName()));
+                    }
+                }
+            }
+
+            return new ProjectStructure(classInfos);
+        });
     }
 }
