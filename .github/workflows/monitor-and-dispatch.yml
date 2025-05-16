@@ -32,10 +32,10 @@ jobs:
           if [ -n "$RUNNING_WORKFLOWS" ]; then
             echo "Found running workflows:"
             echo "$RUNNING_WORKFLOWS"
-            echo "::set-output name=should_proceed::false"
+            echo "should_proceed=false" >> $GITHUB_OUTPUT
           else
             echo "No workflows currently running. We can proceed."
-            echo "::set-output name=should_proceed::true"
+            echo "should_proceed=true" >> $GITHUB_OUTPUT
           fi
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -75,8 +75,8 @@ jobs:
           fi
           
           # Set outputs for the next step
-          echo "::set-output name=workflow::$WORKFLOW_TO_RUN"
-          echo "::set-output name=reason::$REASON"
+          echo "workflow=$WORKFLOW_TO_RUN" >> $GITHUB_OUTPUT
+          echo "reason=$REASON" >> $GITHUB_OUTPUT
           echo "Selected workflow to run: $WORKFLOW_TO_RUN"
           echo "Reason: $REASON"
         env:
