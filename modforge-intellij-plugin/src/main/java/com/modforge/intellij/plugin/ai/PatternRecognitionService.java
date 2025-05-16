@@ -295,4 +295,14 @@ public final class PatternRecognitionService {
 
         return metrics;
     }
+
+    /**
+     * Gets the PatternRecognitionService instance for the given project.
+     * 
+     * @param project The project
+     * @return The PatternRecognitionService instance
+     */
+    public static PatternRecognitionService getInstance(@NotNull Project project) {
+        return project.getService(PatternRecognitionService.class);
+    }
 }

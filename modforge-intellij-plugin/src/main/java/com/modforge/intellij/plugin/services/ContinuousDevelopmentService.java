@@ -16,13 +16,10 @@ import com.modforge.intellij.plugin.settings.ModForgeSettings;
 import com.modforge.intellij.plugin.utils.CompatibilityUtil;
 import org.jetbrains.annotations.NotNull;
 
-import java.text.SimpleDateFormat;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.locks.ReadWriteLock;
-import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 /**
  * Service for continuous development.
@@ -39,8 +36,6 @@ public final class ContinuousDevelopmentService {
     private final AtomicInteger fixCount = new AtomicInteger(0);
     private final AtomicInteger errorCount = new AtomicInteger(0);
     private final AtomicInteger successCount = new AtomicInteger(0);
-    private final ConcurrentHashMap<String, String> lastActions = new ConcurrentHashMap<>();
-    private final ReadWriteLock statsLock = new ReentrantReadWriteLock();
     private final List<ContinuousDevelopmentListener> listeners = new CopyOnWriteArrayList<>();
     private final AtomicBoolean reducedFeaturesMode = new AtomicBoolean(false);
 
@@ -291,5 +286,9 @@ public final class ContinuousDevelopmentService {
         stats.put("successCount", successCount.get());
         stats.put("reducedFeaturesMode", reducedFeaturesMode.get());
         return stats;
+    }
+
+    public static ContinuousDevelopmentService getInstance(@NotNull Project project) {
+        return project.getService(ContinuousDevelopmentService.class);
     }
 }

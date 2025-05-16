@@ -68,6 +68,56 @@ public final class ModForgeSettings implements PersistentStateComponent<ModForge
     @Attribute("userId")
     private String userId = "";
 
+    // Notification settings
+    @Attribute("enableNotifications")
+    private boolean enableNotifications = true;
+
+    // Additional settings fields
+    @Attribute("useDarkMode")
+    private boolean useDarkMode = false;
+
+    @Attribute("enableGitHubIntegration")
+    private boolean enableGitHubIntegration = false;
+
+    @Attribute("autoMonitorRepository")
+    private boolean autoMonitorRepository = false;
+
+    @Attribute("autoRespondToIssues")
+    private boolean autoRespondToIssues = false;
+
+    @Attribute("maxApiRequestsPerDay")
+    private int maxApiRequestsPerDay = 100;
+
+    @Attribute("forgeSupported")
+    private boolean forgeSupported = true;
+
+    @Attribute("fabricSupported")
+    private boolean fabricSupported = false;
+
+    @Attribute("quiltSupported")
+    private boolean quiltSupported = false;
+
+    @Attribute("checkIntervalMs")
+    private long checkIntervalMs = 60000;
+
+    @Attribute("updateFrequencyMinutes")
+    private int updateFrequencyMinutes = 10;
+
+    @Attribute("githubToken")
+    private String githubToken = "";
+
+    @Attribute("githubRepository")
+    private String githubRepository = "";
+
+    @Attribute("enableAIAssist")
+    private boolean enableAIAssist = false;
+
+    @Attribute("usePatternRecognition")
+    private boolean usePatternRecognition = false;
+
+    @Attribute("rememberCredentials")
+    private boolean rememberCredentials = false;
+
     public static ModForgeSettings getInstance() {
         return ApplicationManager.getApplication().getService(ModForgeSettings.class);
     }
@@ -235,6 +285,134 @@ public final class ModForgeSettings implements PersistentStateComponent<ModForge
         this.userId = userId;
     }
 
+    public boolean isEnableNotifications() {
+        return enableNotifications;
+    }
+
+    public void setEnableNotifications(boolean enableNotifications) {
+        this.enableNotifications = enableNotifications;
+    }
+
+    public boolean isUseDarkMode() {
+        return useDarkMode;
+    }
+
+    public void setUseDarkMode(boolean useDarkMode) {
+        this.useDarkMode = useDarkMode;
+    }
+
+    public boolean isEnableGitHubIntegration() {
+        return enableGitHubIntegration;
+    }
+
+    public void setEnableGitHubIntegration(boolean enableGitHubIntegration) {
+        this.enableGitHubIntegration = enableGitHubIntegration;
+    }
+
+    public boolean isAutoMonitorRepository() {
+        return autoMonitorRepository;
+    }
+
+    public void setAutoMonitorRepository(boolean autoMonitorRepository) {
+        this.autoMonitorRepository = autoMonitorRepository;
+    }
+
+    public boolean isAutoRespondToIssues() {
+        return autoRespondToIssues;
+    }
+
+    public void setAutoRespondToIssues(boolean autoRespondToIssues) {
+        this.autoRespondToIssues = autoRespondToIssues;
+    }
+
+    public int getMaxApiRequestsPerDay() {
+        return maxApiRequestsPerDay;
+    }
+
+    public void setMaxApiRequestsPerDay(int maxApiRequestsPerDay) {
+        this.maxApiRequestsPerDay = maxApiRequestsPerDay;
+    }
+
+    public boolean isForgeSupported() {
+        return forgeSupported;
+    }
+
+    public void setForgeSupported(boolean forgeSupported) {
+        this.forgeSupported = forgeSupported;
+    }
+
+    public boolean isFabricSupported() {
+        return fabricSupported;
+    }
+
+    public void setFabricSupported(boolean fabricSupported) {
+        this.fabricSupported = fabricSupported;
+    }
+
+    public boolean isQuiltSupported() {
+        return quiltSupported;
+    }
+
+    public void setQuiltSupported(boolean quiltSupported) {
+        this.quiltSupported = quiltSupported;
+    }
+
+    public long getCheckIntervalMs() {
+        return checkIntervalMs;
+    }
+
+    public void setCheckIntervalMs(long checkIntervalMs) {
+        this.checkIntervalMs = checkIntervalMs;
+    }
+
+    public int getUpdateFrequencyMinutes() {
+        return updateFrequencyMinutes;
+    }
+
+    public void setUpdateFrequencyMinutes(int updateFrequencyMinutes) {
+        this.updateFrequencyMinutes = updateFrequencyMinutes;
+    }
+
+    public String getGithubToken() {
+        return githubToken;
+    }
+
+    public void setGithubToken(String githubToken) {
+        this.githubToken = githubToken;
+    }
+
+    public String getGitHubRepository() {
+        return githubRepository;
+    }
+
+    public void setGitHubRepository(String githubRepository) {
+        this.githubRepository = githubRepository;
+    }
+
+    public boolean isEnableAIAssist() {
+        return enableAIAssist;
+    }
+
+    public void setEnableAIAssist(boolean enableAIAssist) {
+        this.enableAIAssist = enableAIAssist;
+    }
+
+    public boolean isUsePatternRecognition() {
+        return usePatternRecognition;
+    }
+
+    public void setUsePatternRecognition(boolean usePatternRecognition) {
+        this.usePatternRecognition = usePatternRecognition;
+    }
+
+    public boolean isRememberCredentials() {
+        return rememberCredentials;
+    }
+
+    public void setRememberCredentials(boolean rememberCredentials) {
+        this.rememberCredentials = rememberCredentials;
+    }
+
     /**
      * Shows the settings dialog.
      *
@@ -263,5 +441,88 @@ public final class ModForgeSettings implements PersistentStateComponent<ModForge
     public String getCollaborationServerUrl() {
         // If you have a dedicated field, return it. Otherwise, return apiUrl.
         return apiUrl;
+    }
+
+    // Aliases for compatibility with usages across the codebase
+    public boolean isEnablePatternRecognition() {
+        return isPatternRecognition();
+    }
+
+    public boolean isContinuousDevelopmentEnabled() {
+        return isEnableContinuousDevelopment();
+    }
+
+    public void setContinuousDevelopmentEnabled(boolean enabled) {
+        setEnableContinuousDevelopment(enabled);
+    }
+
+    public boolean isPatternRecognitionEnabled() {
+        return isPatternRecognition();
+    }
+
+    public void setPatternRecognitionEnabled(boolean enabled) {
+        setPatternRecognition(enabled);
+    }
+
+    // Reset all settings to their default values
+    public void resetToDefaults() {
+        apiUrl = "https://modforge.ai/api";
+        token = "";
+        patternRecognition = true;
+        enableContinuousDevelopment = false;
+        continuousDevelopmentScanInterval = 60000;
+        apiKey = "";
+        username = "";
+        gitHubUsername = "";
+        password = "";
+        openAiApiKey = "";
+        openAiModel = "gpt-4-turbo";
+        maxTokens = 4096;
+        temperature = 0.7;
+        authenticated = false;
+        userId = "";
+        enableNotifications = true;
+        useDarkMode = false;
+        enableGitHubIntegration = false;
+        autoMonitorRepository = false;
+        autoRespondToIssues = false;
+        maxApiRequestsPerDay = 100;
+        forgeSupported = true;
+        fabricSupported = false;
+        quiltSupported = false;
+        checkIntervalMs = 60000;
+        updateFrequencyMinutes = 10;
+        githubToken = "";
+        githubRepository = "";
+        enableAIAssist = false;
+        usePatternRecognition = false;
+        rememberCredentials = false;
+    }
+
+    public void setGitHubToken(String token) {
+        this.githubToken = token;
+    }
+
+    public void setAccessToken(String token) {
+        this.token = token;
+    }
+
+    public void setCollaborationServerUrl(String url) {
+        /* compatibility stub */ }
+
+    public String getGitExecutablePath() {
+        return "git";
+    }
+
+    public boolean isContinuousDevelopment() {
+        return enableContinuousDevelopment;
+    }
+
+    public double getPatternMatchingThreshold() {
+        return 0.8;
+    }
+
+    public java.util.List<Object> getMemoryHistory() {
+        return java.util.Collections.emptyList();
     }
 }

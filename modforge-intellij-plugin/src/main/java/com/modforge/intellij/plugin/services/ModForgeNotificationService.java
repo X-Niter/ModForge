@@ -21,16 +21,16 @@ import java.util.concurrent.atomic.AtomicInteger;
 @Service
 public final class ModForgeNotificationService {
     private static final Logger LOG = Logger.getInstance(ModForgeNotificationService.class);
-    
-    private static final NotificationGroup NOTIFICATION_GROUP = 
-            NotificationGroupManager.getInstance().getNotificationGroup("ModForge Notifications");
-    
+
+    private static final NotificationGroup NOTIFICATION_GROUP = NotificationGroupManager.getInstance()
+            .getNotificationGroup("ModForge Notifications");
+
     // Constants for dialog return values
     public static final int YES = CompatibilityUtil.DIALOG_YES;
     public static final int NO = CompatibilityUtil.DIALOG_NO;
     public static final int OK = CompatibilityUtil.DIALOG_OK;
     public static final int CANCEL = CompatibilityUtil.DIALOG_CANCEL;
-    
+
     /**
      * Gets the instance of the service.
      *
@@ -39,7 +39,7 @@ public final class ModForgeNotificationService {
     public static ModForgeNotificationService getInstance() {
         return ApplicationManager.getApplication().getService(ModForgeNotificationService.class);
     }
-    
+
     /**
      * Gets the instance of the service.
      *
@@ -49,7 +49,7 @@ public final class ModForgeNotificationService {
     public static ModForgeNotificationService getInstance(@Nullable Project project) {
         return getInstance();
     }
-    
+
     /**
      * Shows an information notification.
      *
@@ -60,7 +60,7 @@ public final class ModForgeNotificationService {
     public void showInfoNotification(@Nullable Project project, @NotNull String title, @NotNull String content) {
         showNotification(project, title, content, NotificationType.INFORMATION);
     }
-    
+
     /**
      * Shows an information notification.
      * Simplified method without project parameter for backwards compatibility.
@@ -71,7 +71,7 @@ public final class ModForgeNotificationService {
     public void showInfo(@NotNull String title, @NotNull String content) {
         showInfoNotification(null, title, content);
     }
-    
+
     /**
      * Shows an information notification.
      *
@@ -82,7 +82,7 @@ public final class ModForgeNotificationService {
     public void showInfo(@Nullable Project project, @NotNull String title, @NotNull String content) {
         showInfoNotification(project, title, content);
     }
-    
+
     /**
      * Shows a warning notification.
      *
@@ -93,7 +93,7 @@ public final class ModForgeNotificationService {
     public void showWarningNotification(@Nullable Project project, @NotNull String title, @NotNull String content) {
         showNotification(project, title, content, NotificationType.WARNING);
     }
-    
+
     /**
      * Shows an error notification.
      *
@@ -104,7 +104,7 @@ public final class ModForgeNotificationService {
     public void showErrorNotification(@Nullable Project project, @NotNull String title, @NotNull String content) {
         showNotification(project, title, content, NotificationType.ERROR);
     }
-    
+
     /**
      * Shows an error notification.
      * Simplified method without project parameter for backwards compatibility.
@@ -115,7 +115,7 @@ public final class ModForgeNotificationService {
     public void showError(@NotNull String title, @NotNull String content) {
         showErrorNotification(null, title, content);
     }
-    
+
     /**
      * Shows an error notification.
      *
@@ -126,7 +126,7 @@ public final class ModForgeNotificationService {
     public void showError(@Nullable Project project, @NotNull String title, @NotNull String content) {
         showErrorNotification(project, title, content);
     }
-    
+
     /**
      * Shows a sticky notification that requires user action to dismiss.
      *
@@ -140,18 +140,18 @@ public final class ModForgeNotificationService {
             @NotNull String title,
             @NotNull String content,
             @NotNull NotificationType type) {
-        
+
         // Check if notifications are enabled in settings
         if (!com.modforge.intellij.plugin.settings.ModForgeSettings.getInstance().isEnableNotifications()) {
             LOG.info("Notifications are disabled in settings, not showing sticky notification: " + title);
             return;
         }
-        
+
         Notification notification = NOTIFICATION_GROUP.createNotification(title, content, type);
         notification.setImportant(true);
         notification.notify(project);
     }
-    
+
     /**
      * Shows an important notification.
      *
@@ -162,7 +162,7 @@ public final class ModForgeNotificationService {
     public void showImportantNotification(@Nullable Project project, @NotNull String title, @NotNull String content) {
         showStickyNotification(project, title, content, NotificationType.WARNING);
     }
-    
+
     /**
      * Shows an important notification.
      * Simplified method without project parameter for backwards compatibility.
@@ -173,7 +173,7 @@ public final class ModForgeNotificationService {
     public void showImportantNotification(@NotNull String title, @NotNull String content) {
         showImportantNotification(null, title, content);
     }
-    
+
     /**
      * Shows a notification with an action.
      *
@@ -191,15 +191,15 @@ public final class ModForgeNotificationService {
             @NotNull NotificationType type,
             @NotNull String actionText,
             @NotNull Runnable actionRunner) {
-        
+
         // Check if notifications are enabled in settings
         if (!com.modforge.intellij.plugin.settings.ModForgeSettings.getInstance().isEnableNotifications()) {
             LOG.info("Notifications are disabled in settings, not showing notification with action: " + title);
             return;
         }
-        
+
         Notification notification = NOTIFICATION_GROUP.createNotification(title, content, type);
-        
+
         notification.addAction(NotificationAction.createSimple(actionText, () -> {
             try {
                 actionRunner.run();
@@ -209,14 +209,13 @@ public final class ModForgeNotificationService {
                 showErrorNotification(
                         project,
                         "Action Error",
-                        "Failed to execute action: " + e.getMessage()
-                );
+                        "Failed to execute action: " + e.getMessage());
             }
         }));
-        
+
         notification.notify(project);
     }
-    
+
     /**
      * Shows a notification.
      *
@@ -230,18 +229,27 @@ public final class ModForgeNotificationService {
             @NotNull String title,
             @NotNull String content,
             @NotNull NotificationType type) {
-        
+
         // Check if notifications are enabled in settings
         if (!com.modforge.intellij.plugin.settings.ModForgeSettings.getInstance().isEnableNotifications()) {
             LOG.info("Notifications are disabled in settings, not showing notification: " + title);
             return;
         }
-        
+
         NOTIFICATION_GROUP
                 .createNotification(title, content, type)
                 .notify(project);
     }
-    
+
+    /**
+     * Compatibility stub: allows calling showNotification without specifying
+     * project.
+     */
+    public void showNotification(@NotNull String title, @NotNull String content,
+            @NotNull com.intellij.notification.NotificationType type) {
+        showNotification(null, title, content, type);
+    }
+
     /**
      * Shows a dialog with Yes/No options.
      * Compatible with IntelliJ IDEA 2025.1.1.1
@@ -253,7 +261,7 @@ public final class ModForgeNotificationService {
     public int showYesNoDialog(@NotNull String message, @NotNull String title) {
         return showYesNoDialog(null, message, title, "Yes", "No", null);
     }
-    
+
     /**
      * Shows a dialog with Yes/No options.
      * Compatible with IntelliJ IDEA 2025.1.1.1
@@ -266,15 +274,15 @@ public final class ModForgeNotificationService {
     public int showYesNoDialog(@Nullable Project project, @NotNull String message, @NotNull String title) {
         return showYesNoDialog(project, message, title, "Yes", "No", null);
     }
-    
+
     /**
      * Shows a Yes/No dialog with custom button text.
      * 
-     * @param project The project
-     * @param message The message
-     * @param title The title
+     * @param project       The project
+     * @param message       The message
+     * @param title         The title
      * @param yesButtonText Custom text for Yes button
-     * @param noButtonText Custom text for No button
+     * @param noButtonText  Custom text for No button
      * @return The result (YES or NO)
      */
     public int showYesNoDialog(
@@ -285,16 +293,16 @@ public final class ModForgeNotificationService {
             @NotNull String noButtonText) {
         return showYesNoDialog(project, message, title, yesButtonText, noButtonText, null);
     }
-    
+
     /**
      * Shows a Yes/No dialog with custom button text.
      * This method handles parameters in the reversed order for compatibility.
      * 
-     * @param project The project
-     * @param title The title
-     * @param message The message
+     * @param project       The project
+     * @param title         The title
+     * @param message       The message
      * @param yesButtonText Custom text for Yes button
-     * @param noButtonText Custom text for No button
+     * @param noButtonText  Custom text for No button
      * @return The result (YES or NO)
      */
     public int showYesNoDialogReversed(
@@ -305,17 +313,17 @@ public final class ModForgeNotificationService {
             @NotNull String noButtonText) {
         return showYesNoDialog(project, message, title, yesButtonText, noButtonText, null);
     }
-    
+
     /**
      * Shows a dialog with Yes/No options.
      * Compatible with IntelliJ IDEA 2025.1.1.1
      *
-     * @param project   The project
-     * @param message   The message to display
-     * @param title     The dialog title
-     * @param yesText   Text for the Yes button
-     * @param noText    Text for the No button
-     * @param icon      Optional icon
+     * @param project The project
+     * @param message The message to display
+     * @param title   The dialog title
+     * @param yesText Text for the Yes button
+     * @param noText  Text for the No button
+     * @param icon    Optional icon
      * @return YES or NO constant
      */
     public int showYesNoDialog(
@@ -325,10 +333,10 @@ public final class ModForgeNotificationService {
             @NotNull String yesText,
             @NotNull String noText,
             @Nullable Icon icon) {
-        
+
         // Use application thread to show dialog
         AtomicInteger result = new AtomicInteger(NO);
-        
+
         ApplicationManager.getApplication().invokeAndWait(() -> {
             try {
                 int dialogResult = Messages.showYesNoDialog(
@@ -337,20 +345,20 @@ public final class ModForgeNotificationService {
                         title,
                         yesText,
                         noText,
-                        icon != null ? icon : UIUtil.getQuestionIcon()
-                );
+                        icon != null ? icon : UIUtil.getQuestionIcon());
                 result.set(dialogResult);
             } catch (Exception e) {
                 LOG.warn("Failed to show custom Yes/No dialog with IntelliJ API, falling back to standard Yes/No", e);
                 // Fall back to standard Yes/No dialog
-                int dialogResult = com.modforge.intellij.plugin.utils.CompatibilityUtil.showYesNoDialog(project, message, title);
+                int dialogResult = com.modforge.intellij.plugin.utils.CompatibilityUtil.showYesNoDialog(project,
+                        message, title);
                 result.set(dialogResult);
             }
         });
-        
+
         return result.get();
     }
-    
+
     /**
      * Shows an error dialog.
      * Compatible with IntelliJ IDEA 2025.1.1.1
@@ -365,7 +373,7 @@ public final class ModForgeNotificationService {
             com.modforge.intellij.plugin.utils.CompatibilityUtil.showErrorDialog(project, message, title);
         });
     }
-    
+
     /**
      * Shows an error dialog.
      * Compatible with IntelliJ IDEA 2025.1.1.1
@@ -376,7 +384,7 @@ public final class ModForgeNotificationService {
     public void showErrorDialog(@NotNull String title, @NotNull String message) {
         showErrorDialog(null, title, message);
     }
-    
+
     /**
      * Shows an information dialog.
      * Compatible with IntelliJ IDEA 2025.1.1.1
@@ -390,7 +398,7 @@ public final class ModForgeNotificationService {
             Messages.showInfoMessage(project, message, title);
         });
     }
-    
+
     /**
      * Shows an information dialog.
      * Compatible with IntelliJ IDEA 2025.1.1.1
@@ -401,7 +409,7 @@ public final class ModForgeNotificationService {
     public void showInfoDialog(@NotNull String title, @NotNull String message) {
         showInfoDialog(null, title, message);
     }
-    
+
     /**
      * Shows a warning dialog.
      * Compatible with IntelliJ IDEA 2025.1.1.1
@@ -416,7 +424,7 @@ public final class ModForgeNotificationService {
             com.modforge.intellij.plugin.utils.CompatibilityUtil.showWarningDialog(project, message, title);
         });
     }
-    
+
     /**
      * Shows a warning dialog.
      * Compatible with IntelliJ IDEA 2025.1.1.1
@@ -427,7 +435,7 @@ public final class ModForgeNotificationService {
     public void showWarningDialog(@NotNull String title, @NotNull String message) {
         showWarningDialog(null, title, message);
     }
-    
+
     /**
      * Shows a dialog with OK button.
      * Compatible with IntelliJ IDEA 2025.1.1.1
@@ -441,7 +449,7 @@ public final class ModForgeNotificationService {
             Messages.showInfoMessage(project, message, title);
         });
     }
-    
+
     /**
      * Shows a dialog with OK button.
      * Compatible with IntelliJ IDEA 2025.1.1.1
@@ -469,10 +477,10 @@ public final class ModForgeNotificationService {
             @NotNull String message,
             @NotNull String title,
             @Nullable String initialValue) {
-        
+
         // Use application thread to show dialog
         final String[] result = new String[1];
-        
+
         ApplicationManager.getApplication().invokeAndWait(() -> {
             try {
                 result[0] = CompatibilityUtil.showInputDialog(project, message, title, initialValue);
@@ -486,10 +494,10 @@ public final class ModForgeNotificationService {
                 }
             }
         });
-        
+
         return result[0];
     }
-    
+
     /**
      * Shows a dialog with an input field.
      * Compatible with IntelliJ IDEA 2025.1.1.1
@@ -506,7 +514,7 @@ public final class ModForgeNotificationService {
             @Nullable String initialValue) {
         return showInputDialog(null, message, title, initialValue);
     }
-    
+
     /**
      * Shows a dialog with a dropdown selector.
      * Compatible with IntelliJ IDEA 2025.1.1.1
@@ -524,10 +532,10 @@ public final class ModForgeNotificationService {
             @NotNull String title,
             @NotNull String[] options,
             @NotNull String initialValue) {
-        
+
         // Use application thread to show dialog
         final int[] result = new int[1];
-        
+
         ApplicationManager.getApplication().invokeAndWait(() -> {
             try {
                 result[0] = Messages.showChooseDialog(project, message, title, options, initialValue, null);
@@ -541,10 +549,10 @@ public final class ModForgeNotificationService {
                 }
             }
         });
-        
+
         return result[0];
     }
-    
+
     /**
      * Shows a dialog with a dropdown selector.
      * Compatible with IntelliJ IDEA 2025.1.1.1
@@ -562,7 +570,7 @@ public final class ModForgeNotificationService {
             @NotNull String initialValue) {
         return showChooseDialog(null, message, title, options, initialValue);
     }
-    
+
     /**
      * Shows an information message as a notification (not a dialog).
      * Added for compatibility with code that expects this method.
@@ -574,7 +582,7 @@ public final class ModForgeNotificationService {
     public void showInfoMessage(@Nullable Project project, @NotNull String title, @NotNull String message) {
         showInfoNotification(project, title, message);
     }
-    
+
     /**
      * Shows an information message as a notification (not a dialog).
      * Added for compatibility with code that expects this method.

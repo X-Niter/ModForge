@@ -42,7 +42,7 @@ public class MemoryVisualizationPanel extends JBPanel<MemoryVisualizationPanel> 
     private static final int POINT_RADIUS = 2;
     private static final DecimalFormat MEMORY_FORMAT = new DecimalFormat("#,##0.00");
     private static final DateTimeFormatter TIME_FORMATTER = DateTimeFormatter.ofPattern("HH:mm:ss");
-    
+
     private final Project project;
     private final MemoryHealthMonitor healthMonitor;
     private final List<MemorySnapshot> memoryHistory = new CopyOnWriteArrayList<>();
@@ -54,12 +54,12 @@ public class MemoryVisualizationPanel extends JBPanel<MemoryVisualizationPanel> 
     private JButton refreshButton;
     private JButton exportButton;
     private JButton resetButton;
-    
+
     private Timer updateTimer;
     private int timeRangeMinutes = DEFAULT_TIME_RANGE_MINUTES;
     private boolean showPrediction = true;
     private String selectedMetric = "Used Memory (%)";
-    
+
     /**
      * Create a memory visualization panel
      * 
@@ -69,30 +69,30 @@ public class MemoryVisualizationPanel extends JBPanel<MemoryVisualizationPanel> 
         super(new BorderLayout());
         this.project = project;
         this.healthMonitor = MemoryHealthMonitor.getInstance();
-        
+
         // Chart panel
         chartPanel = new MemoryChartPanel();
         chartPanel.setBackground(UIUtil.getPanelBackground());
-        
+
         // Controls panel
         JPanel controlsPanel = createControlsPanel();
-        
+
         // Status label
         statusLabel = new JBLabel("Initializing memory visualization...");
         statusLabel.setBorder(JBUI.Borders.empty(5, 10));
-        
+
         // Layout components
         add(controlsPanel, BorderLayout.NORTH);
         add(chartPanel, BorderLayout.CENTER);
         add(statusLabel, BorderLayout.SOUTH);
-        
+
         // Initialize the timer to update data periodically
         initializeUpdateTimer();
-        
+
         // Update the visualization initially
         updateVisualization();
     }
-    
+
     /**
      * Create the controls panel
      * 
@@ -101,10 +101,11 @@ public class MemoryVisualizationPanel extends JBPanel<MemoryVisualizationPanel> 
     private JPanel createControlsPanel() {
         JPanel panel = new JPanel(new FlowLayout(FlowLayout.LEFT));
         panel.setBorder(JBUI.Borders.empty(5));
-        
+
         // Time range combo box
         panel.add(new JBLabel("Time Range:"));
-        timeRangeComboBox = new ComboBox<>(new String[]{"5 min", "15 min", "30 min", "1 hour", "3 hours", "6 hours", "12 hours", "24 hours"});
+        timeRangeComboBox = new ComboBox<>(
+                new String[] { "5 min", "15 min", "30 min", "1 hour", "3 hours", "6 hours", "12 hours", "24 hours" });
         timeRangeComboBox.setSelectedIndex(2); // Default: 30 min
         timeRangeComboBox.addActionListener(e -> {
             String selected = (String) timeRangeComboBox.getSelectedItem();
@@ -119,16 +120,17 @@ public class MemoryVisualizationPanel extends JBPanel<MemoryVisualizationPanel> 
             }
         });
         panel.add(timeRangeComboBox);
-        
+
         // Metric type combo box
         panel.add(new JBLabel("  Metric:"));
-        metricTypeComboBox = new ComboBox<>(new String[]{"Used Memory (%)", "Used Memory (MB)", "Available Memory (MB)", "Total Memory (MB)"});
+        metricTypeComboBox = new ComboBox<>(
+                new String[] { "Used Memory (%)", "Used Memory (MB)", "Available Memory (MB)", "Total Memory (MB)" });
         metricTypeComboBox.addActionListener(e -> {
             selectedMetric = (String) metricTypeComboBox.getSelectedItem();
             updateVisualization();
         });
         panel.add(metricTypeComboBox);
-        
+
         // Show prediction checkbox
         showPredictionCheckBox = new JCheckBox("Show Prediction", true);
         showPredictionCheckBox.addActionListener(e -> {
@@ -136,26 +138,26 @@ public class MemoryVisualizationPanel extends JBPanel<MemoryVisualizationPanel> 
             updateVisualization();
         });
         panel.add(showPredictionCheckBox);
-        
+
         // Refresh button
         refreshButton = new JButton("Refresh");
         refreshButton.addActionListener(e -> updateVisualization());
         panel.add(refreshButton);
-        
+
         // Export button
         exportButton = new JButton("Export Data");
         exportButton.addActionListener(e -> exportMemoryData());
         panel.add(exportButton);
-        
+
         // Reset button with icon
         resetButton = new JButton("Reset Memory System");
         resetButton.setIcon(com.intellij.openapi.util.IconLoader.getIcon("/icons/reset_memory.svg", getClass()));
         resetButton.addActionListener(e -> resetMemorySystem());
         panel.add(resetButton);
-        
+
         return panel;
     }
-    
+
     /**
      * Initialize the update timer
      */
@@ -164,7 +166,7 @@ public class MemoryVisualizationPanel extends JBPanel<MemoryVisualizationPanel> 
         updateTimer.setRepeats(true);
         updateTimer.start();
     }
-    
+
     /**
      * Update the visualization with current memory data
      */
@@ -177,35 +179,35 @@ public class MemoryVisualizationPanel extends JBPanel<MemoryVisualizationPanel> 
                 updateVisualizationLegacy();
                 return;
             }
-            
+
             // Get latest snapshot from manager (it will create one if needed)
             MemorySnapshot currentSnapshot = snapshotManager.getLatestSnapshot();
             if (currentSnapshot == null) {
                 LOG.warn("Failed to get current memory snapshot, skipping visualization update");
                 return;
             }
-            
+
             // Get all snapshots from the manager
             List<MemorySnapshot> allSnapshots = snapshotManager.getSnapshots();
-            
+
             // Thread-safe update of local memory history
             synchronized (memoryHistory) {
                 // Replace our local history with the manager's history
                 memoryHistory.clear();
                 memoryHistory.addAll(allSnapshots);
-                
+
                 // Make a thread-safe copy for filtering and display
                 final List<MemorySnapshot> memoryCopy = new ArrayList<>(memoryHistory);
                 final int currentTimeRange = timeRangeMinutes;
                 final boolean currentShowPrediction = showPrediction;
                 final String currentMetric = selectedMetric;
-                
+
                 // Filter data based on time range
                 List<MemorySnapshot> filteredData = filterDataByTimeRange(memoryCopy, currentTimeRange);
-                
+
                 // Update chart in a thread-safe manner
                 chartPanel.updateData(filteredData, currentShowPrediction, currentMetric);
-                
+
                 // Update status label in the EDT
                 final MemorySnapshot finalSnapshot = currentSnapshot;
                 SwingUtilities.invokeLater(() -> {
@@ -221,7 +223,7 @@ public class MemoryVisualizationPanel extends JBPanel<MemoryVisualizationPanel> 
             SwingUtilities.invokeLater(() -> {
                 statusLabel.setText("Error updating visualization: " + ex.getMessage());
             });
-            
+
             // Try legacy fallback method
             try {
                 updateVisualizationLegacy();
@@ -230,7 +232,7 @@ public class MemoryVisualizationPanel extends JBPanel<MemoryVisualizationPanel> 
             }
         }
     }
-    
+
     /**
      * Legacy update method that doesn't rely on the snapshot manager
      * Used as a fallback if the snapshot manager is not available
@@ -243,43 +245,43 @@ public class MemoryVisualizationPanel extends JBPanel<MemoryVisualizationPanel> 
                 LOG.warn("Memory manager is not available, skipping visualization update");
                 return;
             }
-            
+
             // Get current memory snapshot
             MemorySnapshot currentSnapshot = memoryManager.getCurrentMemorySnapshot();
             if (currentSnapshot == null) {
                 LOG.warn("Current memory snapshot is null, skipping visualization update");
                 return;
             }
-            
+
             // Thread-safe update of memory history using synchronization
             synchronized (memoryHistory) {
                 // Add to history if it's a new snapshot
                 if (!memoryHistory.isEmpty()) {
                     MemorySnapshot lastSnapshot = memoryHistory.get(memoryHistory.size() - 1);
-                    if (currentSnapshot.getTimestamp().isAfter(lastSnapshot.getTimestamp())) {
+                    if (currentSnapshot.getTimestampDateTime().isAfter(lastSnapshot.getTimestampDateTime())) {
                         memoryHistory.add(currentSnapshot);
                     }
                 } else {
                     memoryHistory.add(currentSnapshot);
                 }
-                
+
                 // Limit history size
                 if (memoryHistory.size() > MAX_DATA_POINTS) {
                     memoryHistory.subList(0, memoryHistory.size() - MAX_DATA_POINTS).clear();
                 }
-                
+
                 // Make a thread-safe copy of the current state for filtering and display
                 final List<MemorySnapshot> memoryCopy = new ArrayList<>(memoryHistory);
                 final int currentTimeRange = timeRangeMinutes;
                 final boolean currentShowPrediction = showPrediction;
                 final String currentMetric = selectedMetric;
-                
+
                 // Filter data based on time range
                 List<MemorySnapshot> filteredData = filterDataByTimeRange(memoryCopy, currentTimeRange);
-                
+
                 // Update chart in a thread-safe manner
                 chartPanel.updateData(filteredData, currentShowPrediction, currentMetric);
-                
+
                 // Update status label in the EDT
                 final MemorySnapshot finalSnapshot = currentSnapshot;
                 SwingUtilities.invokeLater(() -> {
@@ -297,7 +299,7 @@ public class MemoryVisualizationPanel extends JBPanel<MemoryVisualizationPanel> 
             });
         }
     }
-    
+
     /**
      * Update the status label with current memory information
      * 
@@ -308,30 +310,30 @@ public class MemoryVisualizationPanel extends JBPanel<MemoryVisualizationPanel> 
         double usedMemoryMB = snapshot.getUsedMemoryMB();
         double availableMemoryMB = snapshot.getAvailableMemoryMB();
         double totalMemoryMB = snapshot.getTotalMemoryMB();
-        
+
         StringBuilder status = new StringBuilder();
         status.append("Current Memory: ")
-              .append(MEMORY_FORMAT.format(usedMemoryMB))
-              .append(" MB used (")
-              .append(MEMORY_FORMAT.format(usedMemoryPercent))
-              .append("%), ")
-              .append(MEMORY_FORMAT.format(availableMemoryMB))
-              .append(" MB available of ")
-              .append(MEMORY_FORMAT.format(totalMemoryMB))
-              .append(" MB total");
-        
+                .append(MEMORY_FORMAT.format(usedMemoryMB))
+                .append(" MB used (")
+                .append(MEMORY_FORMAT.format(usedMemoryPercent))
+                .append("%), ")
+                .append(MEMORY_FORMAT.format(availableMemoryMB))
+                .append(" MB available of ")
+                .append(MEMORY_FORMAT.format(totalMemoryMB))
+                .append(" MB total");
+
         if (healthMonitor != null) {
             MemoryHealthMonitor.MemoryHealthStatus healthStatus = healthMonitor.getCurrentHealthStatus();
             status.append(" | Health Status: ").append(healthStatus.name());
         }
-        
+
         statusLabel.setText(status.toString());
     }
-    
+
     /**
      * Filter data by time range
      * 
-     * @param data The full data history
+     * @param data         The full data history
      * @param rangeMinutes The time range in minutes
      * @return The filtered data
      */
@@ -339,41 +341,41 @@ public class MemoryVisualizationPanel extends JBPanel<MemoryVisualizationPanel> 
         if (data == null || data.isEmpty()) {
             return Collections.emptyList();
         }
-        
+
         try {
             // Ensure range is positive
             int sanitizedRange = Math.max(1, rangeMinutes);
-            
+
             // Get current time and calculate cutoff
             LocalDateTime now = LocalDateTime.now();
             LocalDateTime cutoffTime = now.minusMinutes(sanitizedRange);
-            
+
             // Filter data
             return data.stream()
-                    .filter(snapshot -> snapshot != null && snapshot.getTimestamp() != null)
+                    .filter(snapshot -> snapshot != null && snapshot.getTimestampDateTime() != null)
                     .filter(snapshot -> {
                         try {
-                            return snapshot.getTimestamp().isAfter(cutoffTime);
+                            return snapshot.getTimestampDateTime().isAfter(cutoffTime);
                         } catch (Exception ex) {
                             LOG.debug("Error comparing timestamps in filter", ex);
                             return false;
                         }
                     })
                     .toList();
-                    
+
         } catch (Exception ex) {
             LOG.error("Error filtering data by time range", ex);
             return Collections.emptyList();
         }
     }
-    
+
     /**
      * Reset the entire memory management system
      * This is triggered by the reset button in the UI
      */
     private void resetMemorySystem() {
         LOG.info("Resetting memory management system from visualization panel");
-        
+
         try {
             // Show confirmation dialog
             int result = JOptionPane.showConfirmDialog(
@@ -381,45 +383,43 @@ public class MemoryVisualizationPanel extends JBPanel<MemoryVisualizationPanel> 
                     "This will reset the entire memory management system.\nAll components will be reinitialized.\nContinue?",
                     "Reset Memory System",
                     JOptionPane.YES_NO_OPTION,
-                    JOptionPane.WARNING_MESSAGE
-            );
-            
+                    JOptionPane.WARNING_MESSAGE);
+
             if (result != JOptionPane.YES_OPTION) {
                 LOG.info("Memory system reset cancelled by user");
                 return;
             }
-            
+
             // First reset our visualization
             resetVisualization();
-            
+
             // Then trigger the memory manager reset
             com.intellij.openapi.application.ApplicationManager.getApplication().executeOnPooledThread(() -> {
                 try {
                     // Update status
                     SwingUtilities.invokeLater(() -> statusLabel.setText("Resetting memory management system..."));
-                    
+
                     // Get the memory manager and reset
-                    com.modforge.intellij.plugin.memory.MemoryManager memoryManager = 
-                            com.modforge.intellij.plugin.memory.MemoryManager.getInstance();
-                    
+                    com.modforge.intellij.plugin.memory.MemoryManager memoryManager = com.modforge.intellij.plugin.memory.MemoryManager
+                            .getInstance();
+
                     if (memoryManager != null) {
                         memoryManager.resetMemorySystem();
-                        
+
                         // Show success notification
                         com.intellij.notification.Notification notification = new com.intellij.notification.Notification(
                                 "ModForge",
                                 "Memory System Reset",
                                 "Memory management system has been successfully reset",
-                                com.intellij.notification.NotificationType.INFORMATION
-                        );
+                                com.intellij.notification.NotificationType.INFORMATION);
                         com.intellij.notification.Notifications.Bus.notify(notification, project);
-                        
+
                         // Update UI
                         SwingUtilities.invokeLater(() -> {
                             statusLabel.setText("Memory management system reset completed successfully");
                             updateVisualization(); // Refresh data after reset
                         });
-                        
+
                         LOG.info("Memory management system reset completed from visualization panel");
                     } else {
                         // Show error notification
@@ -427,31 +427,28 @@ public class MemoryVisualizationPanel extends JBPanel<MemoryVisualizationPanel> 
                                 "ModForge",
                                 "Memory System Reset",
                                 "Failed to reset memory management system: Memory manager is not available",
-                                com.intellij.notification.NotificationType.ERROR
-                        );
+                                com.intellij.notification.NotificationType.ERROR);
                         com.intellij.notification.Notifications.Bus.notify(notification, project);
-                        
+
                         // Update UI
-                        SwingUtilities.invokeLater(() -> 
-                                statusLabel.setText("Error: Memory manager not available"));
-                        
+                        SwingUtilities.invokeLater(() -> statusLabel.setText("Error: Memory manager not available"));
+
                         LOG.error("Memory system reset failed: Memory manager is not available");
                     }
                 } catch (Exception e) {
                     LOG.error("Error during memory system reset", e);
-                    
+
                     // Show error notification
                     com.intellij.notification.Notification notification = new com.intellij.notification.Notification(
                             "ModForge",
                             "Memory System Reset",
                             "Error during memory system reset: " + e.getMessage(),
-                            com.intellij.notification.NotificationType.ERROR
-                    );
+                            com.intellij.notification.NotificationType.ERROR);
                     com.intellij.notification.Notifications.Bus.notify(notification, project);
-                    
+
                     // Update UI
-                    SwingUtilities.invokeLater(() -> 
-                            statusLabel.setText("Error during memory system reset: " + e.getMessage()));
+                    SwingUtilities.invokeLater(
+                            () -> statusLabel.setText("Error during memory system reset: " + e.getMessage()));
                 }
             });
         } catch (Exception e) {
@@ -459,7 +456,7 @@ public class MemoryVisualizationPanel extends JBPanel<MemoryVisualizationPanel> 
             statusLabel.setText("Error initializing memory system reset: " + e.getMessage());
         }
     }
-    
+
     /**
      * Export memory data to a CSV file
      */
@@ -471,15 +468,15 @@ public class MemoryVisualizationPanel extends JBPanel<MemoryVisualizationPanel> 
                 exportMemoryDataWithManager(snapshotManager);
                 return;
             }
-            
+
             // Fall back to local memory history if manager not available
             exportMemoryDataLegacy();
-            
+
         } catch (Exception ex) {
             LOG.error("Error during memory data export initialization", ex);
             SwingUtilities.invokeLater(() -> {
                 statusLabel.setText("Error preparing memory data export: " + ex.getMessage());
-                
+
                 // Show error notification
                 JOptionPane.showMessageDialog(this,
                         "Failed to prepare memory data export:\n" + ex.getMessage(),
@@ -488,7 +485,7 @@ public class MemoryVisualizationPanel extends JBPanel<MemoryVisualizationPanel> 
             });
         }
     }
-    
+
     /**
      * Export memory data using the snapshot manager
      * 
@@ -497,39 +494,39 @@ public class MemoryVisualizationPanel extends JBPanel<MemoryVisualizationPanel> 
     private void exportMemoryDataWithManager(MemorySnapshotManager snapshotManager) {
         // Check if the manager has data
         List<MemorySnapshot> managerData = snapshotManager.getSnapshots();
-        
+
         if (managerData.isEmpty()) {
             LOG.info("No memory data available in snapshot manager, falling back to local history");
             exportMemoryDataLegacy();
             return;
         }
-        
+
         try {
             // Create file chooser and get save location
             JFileChooser fileChooser = new JFileChooser();
             fileChooser.setDialogTitle("Save Memory Data");
             fileChooser.setFileSelectionMode(JFileChooser.FILES_ONLY);
-            
+
             // Set default filename with timestamp
-            String defaultFilename = "memory_data_" + 
+            String defaultFilename = "memory_data_" +
                     LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss")) + ".csv";
             fileChooser.setSelectedFile(new java.io.File(defaultFilename));
-            
+
             // Show save dialog
             int result = fileChooser.showSaveDialog(this);
             if (result != JFileChooser.APPROVE_OPTION) {
                 LOG.info("User canceled memory data export");
                 return;
             }
-            
+
             // Get selected file
             java.io.File file = fileChooser.getSelectedFile();
-            
+
             // Add .csv extension if missing
             if (!file.getName().toLowerCase().endsWith(".csv")) {
                 file = new java.io.File(file.getAbsolutePath() + ".csv");
             }
-            
+
             // Check if file already exists
             if (file.exists()) {
                 int overwrite = JOptionPane.showConfirmDialog(this,
@@ -537,52 +534,52 @@ public class MemoryVisualizationPanel extends JBPanel<MemoryVisualizationPanel> 
                         "Confirm Overwrite",
                         JOptionPane.YES_NO_OPTION,
                         JOptionPane.WARNING_MESSAGE);
-                        
+
                 if (overwrite != JOptionPane.YES_OPTION) {
                     LOG.info("User canceled overwriting existing file: " + file.getAbsolutePath());
                     return;
                 }
             }
-            
+
             // Use the manager to export data
             boolean success = snapshotManager.exportSnapshotsToCSV(file);
-            
+
             if (success) {
                 final String finalPath = file.getAbsolutePath();
                 SwingUtilities.invokeLater(() -> {
                     statusLabel.setText("Memory data exported to " + finalPath);
-                    
+
                     // Show success notification
                     JOptionPane.showMessageDialog(this,
                             "Memory data successfully exported to:\n" + finalPath,
                             "Export Complete",
                             JOptionPane.INFORMATION_MESSAGE);
                 });
-                
-                LOG.info("Memory data exported to " + file.getAbsolutePath() + 
+
+                LOG.info("Memory data exported to " + file.getAbsolutePath() +
                         " using snapshot manager");
             } else {
                 LOG.warn("Export failed with manager, falling back to legacy export");
                 exportMemoryDataLegacy();
             }
-            
+
         } catch (Exception ex) {
             LOG.error("Error exporting memory data with manager", ex);
             SwingUtilities.invokeLater(() -> {
                 statusLabel.setText("Error exporting memory data: " + ex.getMessage());
-                
+
                 // Show error notification
                 JOptionPane.showMessageDialog(this,
                         "Failed to export memory data with manager:\n" + ex.getMessage(),
                         "Export Error",
                         JOptionPane.ERROR_MESSAGE);
             });
-            
+
             // Try legacy fallback
             exportMemoryDataLegacy();
         }
     }
-    
+
     /**
      * Legacy export method that uses the local memory history
      * Used as a fallback if the snapshot manager export fails
@@ -595,39 +592,39 @@ public class MemoryVisualizationPanel extends JBPanel<MemoryVisualizationPanel> 
             });
             return;
         }
-        
+
         try {
             // Take a thread-safe snapshot of the data
             final List<MemorySnapshot> dataToExport;
             synchronized (memoryHistory) {
                 dataToExport = new ArrayList<>(memoryHistory);
             }
-            
+
             // Create file chooser and get save location
             JFileChooser fileChooser = new JFileChooser();
             fileChooser.setDialogTitle("Save Memory Data (Legacy Export)");
             fileChooser.setFileSelectionMode(JFileChooser.FILES_ONLY);
-            
+
             // Set default filename with timestamp
-            String defaultFilename = "memory_data_legacy_" + 
+            String defaultFilename = "memory_data_legacy_" +
                     LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss")) + ".csv";
             fileChooser.setSelectedFile(new java.io.File(defaultFilename));
-            
+
             // Show save dialog
             int result = fileChooser.showSaveDialog(this);
             if (result != JFileChooser.APPROVE_OPTION) {
                 LOG.info("User canceled legacy memory data export");
                 return;
             }
-            
+
             // Get selected file
             java.io.File file = fileChooser.getSelectedFile();
-            
+
             // Add .csv extension if missing
             if (!file.getName().toLowerCase().endsWith(".csv")) {
                 file = new java.io.File(file.getAbsolutePath() + ".csv");
             }
-            
+
             // Check if file already exists
             if (file.exists()) {
                 int overwrite = JOptionPane.showConfirmDialog(this,
@@ -635,32 +632,31 @@ public class MemoryVisualizationPanel extends JBPanel<MemoryVisualizationPanel> 
                         "Confirm Overwrite",
                         JOptionPane.YES_NO_OPTION,
                         JOptionPane.WARNING_MESSAGE);
-                        
+
                 if (overwrite != JOptionPane.YES_OPTION) {
                     LOG.info("User canceled overwriting existing file: " + file.getAbsolutePath());
                     return;
                 }
             }
-            
+
             // Write data to file
             try (java.io.PrintWriter writer = new java.io.PrintWriter(file)) {
                 // Write header
                 writer.println("Timestamp,Used Memory (%),Used Memory (MB),Available Memory (MB),Total Memory (MB)");
-                
+
                 // Create date-time formatter for consistent output
                 DateTimeFormatter dtf = DateTimeFormatter.ISO_LOCAL_DATE_TIME;
-                
+
                 // Write data
                 for (MemorySnapshot snapshot : dataToExport) {
-                    if (snapshot != null && snapshot.getTimestamp() != null) {
+                    if (snapshot != null && snapshot.getTimestampDateTime() != null) {
                         try {
                             writer.println(
-                                    snapshot.getTimestamp().format(dtf) + "," +
-                                    String.format("%.2f", snapshot.getUsedMemoryPercent()) + "," +
-                                    String.format("%.2f", snapshot.getUsedMemoryMB()) + "," +
-                                    String.format("%.2f", snapshot.getAvailableMemoryMB()) + "," +
-                                    String.format("%.2f", snapshot.getTotalMemoryMB())
-                            );
+                                    snapshot.getTimestampDateTime().format(dtf) + "," +
+                                            String.format("%.2f", snapshot.getUsedMemoryPercent()) + "," +
+                                            String.format("%.2f", snapshot.getUsedMemoryMB()) + "," +
+                                            String.format("%.2f", snapshot.getAvailableMemoryMB()) + "," +
+                                            String.format("%.2f", snapshot.getTotalMemoryMB()));
                         } catch (Exception ex) {
                             LOG.warn("Error writing snapshot to CSV: " + ex.getMessage());
                             // Continue with next snapshot
@@ -668,26 +664,26 @@ public class MemoryVisualizationPanel extends JBPanel<MemoryVisualizationPanel> 
                     }
                 }
             }
-            
+
             final String finalPath = file.getAbsolutePath();
             SwingUtilities.invokeLater(() -> {
                 statusLabel.setText("Memory data exported to " + finalPath);
-                
+
                 // Show success notification
                 JOptionPane.showMessageDialog(this,
                         "Memory data successfully exported to:\n" + finalPath,
                         "Export Complete",
                         JOptionPane.INFORMATION_MESSAGE);
             });
-            
-            LOG.info("Memory data exported to " + file.getAbsolutePath() + 
+
+            LOG.info("Memory data exported to " + file.getAbsolutePath() +
                     " using legacy method (" + dataToExport.size() + " records)");
-            
+
         } catch (Exception ex) {
             LOG.error("Error exporting memory data using legacy method", ex);
             SwingUtilities.invokeLater(() -> {
                 statusLabel.setText("Error exporting memory data: " + ex.getMessage());
-                
+
                 // Show error notification
                 JOptionPane.showMessageDialog(this,
                         "Failed to export memory data using legacy method:\n" + ex.getMessage(),
@@ -696,7 +692,7 @@ public class MemoryVisualizationPanel extends JBPanel<MemoryVisualizationPanel> 
             });
         }
     }
-    
+
     /**
      * Dispose the panel and release resources
      */
@@ -706,43 +702,43 @@ public class MemoryVisualizationPanel extends JBPanel<MemoryVisualizationPanel> 
                 updateTimer.stop();
                 updateTimer = null;
             }
-            
+
             // Clear data structures
             if (memoryHistory != null) {
                 memoryHistory.clear();
             }
-            
+
             // Remove listeners from components
             if (timeRangeComboBox != null) {
                 for (ActionListener listener : timeRangeComboBox.getActionListeners()) {
                     timeRangeComboBox.removeActionListener(listener);
                 }
             }
-            
+
             if (metricTypeComboBox != null) {
                 for (ActionListener listener : metricTypeComboBox.getActionListeners()) {
                     metricTypeComboBox.removeActionListener(listener);
                 }
             }
-            
+
             if (showPredictionCheckBox != null) {
                 for (ActionListener listener : showPredictionCheckBox.getActionListeners()) {
                     showPredictionCheckBox.removeActionListener(listener);
                 }
             }
-            
+
             if (refreshButton != null) {
                 for (ActionListener listener : refreshButton.getActionListeners()) {
                     refreshButton.removeActionListener(listener);
                 }
             }
-            
+
             if (exportButton != null) {
                 for (ActionListener listener : exportButton.getActionListeners()) {
                     exportButton.removeActionListener(listener);
                 }
             }
-            
+
             if (resetButton != null) {
                 for (ActionListener listener : resetButton.getActionListeners()) {
                     resetButton.removeActionListener(listener);
@@ -752,14 +748,14 @@ public class MemoryVisualizationPanel extends JBPanel<MemoryVisualizationPanel> 
             LOG.error("Error disposing memory visualization panel", ex);
         }
     }
-    
+
     /**
      * Reset the visualization panel
      * Clears current data and fetches fresh data
      */
     public void resetVisualization() {
         LOG.info("Resetting memory visualization panel");
-        
+
         try {
             SwingUtilities.invokeLater(() -> {
                 try {
@@ -767,13 +763,13 @@ public class MemoryVisualizationPanel extends JBPanel<MemoryVisualizationPanel> 
                     synchronized (memoryHistory) {
                         memoryHistory.clear();
                     }
-                    
+
                     // Reset chart
                     chartPanel.clearData();
-                    
+
                     // Reset UI state
                     statusLabel.setText("Resetting memory visualization...");
-                    
+
                     // Reset to default settings
                     timeRangeMinutes = DEFAULT_TIME_RANGE_MINUTES;
                     timeRangeComboBox.setSelectedIndex(2); // 30 min
@@ -781,7 +777,7 @@ public class MemoryVisualizationPanel extends JBPanel<MemoryVisualizationPanel> 
                     showPredictionCheckBox.setSelected(true);
                     showPrediction = true;
                     selectedMetric = "Used Memory (%)";
-                    
+
                     // Try to reset snapshot manager if available
                     MemorySnapshotManager snapshotManager = MemorySnapshotManager.getInstance();
                     if (snapshotManager != null) {
@@ -795,7 +791,7 @@ public class MemoryVisualizationPanel extends JBPanel<MemoryVisualizationPanel> 
                         // If snapshot manager is not available, just update normally
                         updateVisualization();
                     }
-                    
+
                     LOG.info("Memory visualization panel reset completed");
                 } catch (Exception e) {
                     LOG.error("Error during memory visualization panel reset", e);
@@ -806,7 +802,7 @@ public class MemoryVisualizationPanel extends JBPanel<MemoryVisualizationPanel> 
             LOG.error("Error scheduling memory visualization panel reset", e);
         }
     }
-    
+
     /**
      * Memory chart panel that draws the chart
      */
@@ -814,21 +810,23 @@ public class MemoryVisualizationPanel extends JBPanel<MemoryVisualizationPanel> 
         private static final int PADDING = 40;
         private static final int X_AXIS_TICK_COUNT = 6;
         private static final int Y_AXIS_TICK_COUNT = 5;
-        
+
         private List<MemorySnapshot> data = Collections.emptyList();
         private boolean showPrediction = true;
         private String metricType = "Used Memory (%)";
         private final Stroke lineStroke = new BasicStroke(2.0f);
-        private final Stroke predictionStroke = new BasicStroke(2.0f, BasicStroke.CAP_BUTT, BasicStroke.JOIN_MITER, 10.0f, new float[]{5.0f}, 0.0f);
-        private final Stroke gridStroke = new BasicStroke(0.5f, BasicStroke.CAP_BUTT, BasicStroke.JOIN_MITER, 10.0f, new float[]{1.0f}, 0.0f);
-        
+        private final Stroke predictionStroke = new BasicStroke(2.0f, BasicStroke.CAP_BUTT, BasicStroke.JOIN_MITER,
+                10.0f, new float[] { 5.0f }, 0.0f);
+        private final Stroke gridStroke = new BasicStroke(0.5f, BasicStroke.CAP_BUTT, BasicStroke.JOIN_MITER, 10.0f,
+                new float[] { 1.0f }, 0.0f);
+
         private final Color chartLineColor = new JBColor(new Color(44, 102, 230), new Color(72, 125, 255));
         private final Color predictionLineColor = new JBColor(new Color(255, 100, 100), new Color(255, 120, 120));
         private final Color gridColor = new JBColor(new Color(200, 200, 200), new Color(100, 100, 100));
         private final Color textColor = UIUtil.getLabelForeground();
         private final Color gradientStartColor = new JBColor(new Color(44, 102, 230, 40), new Color(72, 125, 255, 40));
         private final Color gradientEndColor = new JBColor(new Color(44, 102, 230, 5), new Color(72, 125, 255, 5));
-        
+
         /**
          * Create a memory chart panel
          */
@@ -836,7 +834,7 @@ public class MemoryVisualizationPanel extends JBPanel<MemoryVisualizationPanel> 
             setBorder(JBUI.Borders.empty(10));
             setMinimumSize(new Dimension(300, 200));
             setPreferredSize(new Dimension(800, 400));
-            
+
             addComponentListener(new ComponentAdapter() {
                 @Override
                 public void componentResized(ComponentEvent e) {
@@ -844,19 +842,19 @@ public class MemoryVisualizationPanel extends JBPanel<MemoryVisualizationPanel> 
                 }
             });
         }
-        
+
         /**
          * Update the chart data
          * 
-         * @param newData The new data
+         * @param newData        The new data
          * @param showPrediction Whether to show prediction
-         * @param metricType The metric type to display
+         * @param metricType     The metric type to display
          */
         public void updateData(List<MemorySnapshot> newData, boolean showPrediction, String metricType) {
             // Thread-safe update by using a local copy
             if (newData != null) {
                 final List<MemorySnapshot> dataCopy = new ArrayList<>(newData);
-                
+
                 // Use SwingUtilities.invokeLater for thread safety when updating the UI
                 SwingUtilities.invokeLater(() -> {
                     this.data = dataCopy;
@@ -868,59 +866,59 @@ public class MemoryVisualizationPanel extends JBPanel<MemoryVisualizationPanel> 
                 LOG.warn("Attempted to update chart with null data");
             }
         }
-        
+
         /**
          * Clear all data from the chart
          * Used for reset operations
          */
         public void clearData() {
             LOG.info("Clearing memory chart data");
-            
+
             // Update on the EDT to ensure thread safety
             SwingUtilities.invokeLater(() -> {
                 this.data = Collections.emptyList();
                 repaint();
             });
         }
-        
+
         @Override
         protected void paintComponent(Graphics g) {
             super.paintComponent(g);
-            
+
             if (data.isEmpty()) {
                 drawEmptyState(g);
                 return;
             }
-            
+
             Graphics2D g2d = (Graphics2D) g.create();
             g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
             g2d.setRenderingHint(RenderingHints.KEY_STROKE_CONTROL, RenderingHints.VALUE_STROKE_PURE);
             g2d.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
-            
+
             int width = getWidth();
             int height = getHeight();
             int chartWidth = width - 2 * PADDING;
             int chartHeight = height - 2 * PADDING;
-            
+
             // Get min/max values based on metric type
             double[] valueRange = getValueRange();
             double minValue = valueRange[0];
             double maxValue = valueRange[1];
-            
+
             // Draw axes and grid
             drawAxes(g2d, width, height, chartWidth, chartHeight, minValue, maxValue);
-            
+
             // Draw data line
             drawDataLine(g2d, chartWidth, chartHeight, minValue, maxValue);
-            
+
             // Draw prediction line if needed
             if (showPrediction && data.size() >= 2) {
                 drawPredictionLine(g2d, chartWidth, chartHeight, minValue, maxValue);
             }
-            
+
             g2d.dispose();
         }
-        
+
         /**
          * Draw the empty state
          * 
@@ -930,89 +928,90 @@ public class MemoryVisualizationPanel extends JBPanel<MemoryVisualizationPanel> 
             Graphics2D g2d = (Graphics2D) g.create();
             g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
             g2d.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
-            
+
             String message = "No memory data available yet";
             FontMetrics metrics = g2d.getFontMetrics();
             int x = (getWidth() - metrics.stringWidth(message)) / 2;
             int y = ((getHeight() - metrics.getHeight()) / 2) + metrics.getAscent();
-            
+
             g2d.setColor(textColor);
             g2d.drawString(message, x, y);
-            
+
             g2d.dispose();
         }
-        
+
         /**
          * Draw the axes and grid
          * 
-         * @param g2d The graphics context
-         * @param width The total width
-         * @param height The total height
-         * @param chartWidth The chart width
+         * @param g2d         The graphics context
+         * @param width       The total width
+         * @param height      The total height
+         * @param chartWidth  The chart width
          * @param chartHeight The chart height
-         * @param minValue The minimum value
-         * @param maxValue The maximum value
+         * @param minValue    The minimum value
+         * @param maxValue    The maximum value
          */
-        private void drawAxes(Graphics2D g2d, int width, int height, int chartWidth, int chartHeight, double minValue, double maxValue) {
+        private void drawAxes(Graphics2D g2d, int width, int height, int chartWidth, int chartHeight, double minValue,
+                double maxValue) {
             g2d.setColor(textColor);
-            
+
             // Draw X axis
             g2d.drawLine(PADDING, height - PADDING, width - PADDING, height - PADDING);
-            
+
             // Draw Y axis
             g2d.drawLine(PADDING, PADDING, PADDING, height - PADDING);
-            
+
             // Draw X axis ticks and labels
             double xTickStep = (double) chartWidth / (X_AXIS_TICK_COUNT - 1);
             for (int i = 0; i < X_AXIS_TICK_COUNT; i++) {
                 int x = PADDING + (int) (i * xTickStep);
-                
+
                 // Draw tick
                 g2d.drawLine(x, height - PADDING, x, height - PADDING + 5);
-                
+
                 // Draw grid line
                 g2d.setColor(gridColor);
                 g2d.setStroke(gridStroke);
                 g2d.drawLine(x, PADDING, x, height - PADDING);
                 g2d.setStroke(new BasicStroke());
                 g2d.setColor(textColor);
-                
+
                 // Draw label
                 if (data.size() > 0) {
                     LocalDateTime time;
                     if (i == 0) {
-                        time = data.get(0).getTimestamp();
+                        time = data.get(0).getTimestampDateTime();
                     } else if (i == X_AXIS_TICK_COUNT - 1) {
-                        time = data.get(data.size() - 1).getTimestamp();
+                        time = data.get(data.size() - 1).getTimestampDateTime();
                     } else {
                         int index = (int) (i * (data.size() - 1) / (X_AXIS_TICK_COUNT - 1.0));
-                        time = data.get(index).getTimestamp();
+                        time = data.get(index).getTimestampDateTime();
                     }
-                    
+
                     String label = time.format(TIME_FORMATTER);
                     FontMetrics metrics = g2d.getFontMetrics();
                     int labelWidth = metrics.stringWidth(label);
                     g2d.drawString(label, x - labelWidth / 2, height - PADDING + 20);
                 }
             }
-            
+
             // Draw Y axis ticks and labels
             double valueRange = maxValue - minValue;
             double yTickStep = (double) chartHeight / (Y_AXIS_TICK_COUNT - 1);
-            
+
             for (int i = 0; i < Y_AXIS_TICK_COUNT; i++) {
                 int y = height - PADDING - (int) (i * yTickStep);
-                
+
                 // Draw tick
                 g2d.drawLine(PADDING, y, PADDING - 5, y);
-                
+
                 // Draw grid line
                 g2d.setColor(gridColor);
                 g2d.setStroke(gridStroke);
                 g2d.drawLine(PADDING, y, width - PADDING, y);
                 g2d.setStroke(new BasicStroke());
                 g2d.setColor(textColor);
-                
+
                 // Draw label
                 double value = minValue + (i * valueRange / (Y_AXIS_TICK_COUNT - 1));
                 String label = formatValue(value);
@@ -1020,7 +1019,7 @@ public class MemoryVisualizationPanel extends JBPanel<MemoryVisualizationPanel> 
                 int labelWidth = metrics.stringWidth(label);
                 g2d.drawString(label, PADDING - 10 - labelWidth, y + metrics.getAscent() / 2);
             }
-            
+
             // Draw Y axis title
             String yAxisTitle = metricType;
             g2d.translate(15, height / 2);
@@ -1029,40 +1028,40 @@ public class MemoryVisualizationPanel extends JBPanel<MemoryVisualizationPanel> 
             g2d.rotate(Math.PI / 2);
             g2d.translate(-15, -height / 2);
         }
-        
+
         /**
          * Draw the data line
          * 
-         * @param g2d The graphics context
-         * @param chartWidth The chart width
+         * @param g2d         The graphics context
+         * @param chartWidth  The chart width
          * @param chartHeight The chart height
-         * @param minValue The minimum value
-         * @param maxValue The maximum value
+         * @param minValue    The minimum value
+         * @param maxValue    The maximum value
          */
         private void drawDataLine(Graphics2D g2d, int chartWidth, int chartHeight, double minValue, double maxValue) {
             if (data.isEmpty()) {
                 return;
             }
-            
+
             // Create path for the line
             Path2D path = new Path2D.Double();
             Path2D fillPath = new Path2D.Double();
-            
+
             // Draw line
             boolean firstPoint = true;
             double valueRange = maxValue - minValue;
-            
+
             for (int i = 0; i < data.size(); i++) {
                 MemorySnapshot snapshot = data.get(i);
                 double value = getValueFromSnapshot(snapshot);
-                
+
                 // Calculate point coordinates
                 double xRatio = (double) i / (data.size() - 1);
                 double yRatio = (value - minValue) / valueRange;
-                
+
                 int x = PADDING + (int) (xRatio * chartWidth);
                 int y = getHeight() - PADDING - (int) (yRatio * chartHeight);
-                
+
                 if (firstPoint) {
                     path.moveTo(x, y);
                     fillPath.moveTo(x, getHeight() - PADDING);
@@ -1073,122 +1072,125 @@ public class MemoryVisualizationPanel extends JBPanel<MemoryVisualizationPanel> 
                     fillPath.lineTo(x, y);
                 }
             }
-            
+
             // Complete the fill path
             fillPath.lineTo(PADDING + chartWidth, getHeight() - PADDING);
             fillPath.lineTo(PADDING, getHeight() - PADDING);
             fillPath.closePath();
-            
+
             // Draw gradient fill
             GradientPaint gradient = new GradientPaint(
                     0, PADDING, gradientStartColor,
                     0, getHeight() - PADDING, gradientEndColor);
             g2d.setPaint(gradient);
             g2d.fill(fillPath);
-            
+
             // Draw line
             g2d.setColor(chartLineColor);
             g2d.setStroke(lineStroke);
             g2d.draw(path);
-            
+
             // Draw data points
             for (int i = 0; i < data.size(); i++) {
                 MemorySnapshot snapshot = data.get(i);
                 double value = getValueFromSnapshot(snapshot);
-                
+
                 // Calculate point coordinates
                 double xRatio = (double) i / (data.size() - 1);
                 double yRatio = (value - minValue) / valueRange;
-                
+
                 int x = PADDING + (int) (xRatio * chartWidth);
                 int y = getHeight() - PADDING - (int) (yRatio * chartHeight);
-                
+
                 g2d.setColor(chartLineColor);
                 g2d.fillOval(x - POINT_RADIUS, y - POINT_RADIUS, 2 * POINT_RADIUS, 2 * POINT_RADIUS);
                 g2d.setColor(UIUtil.getPanelBackground());
                 g2d.drawOval(x - POINT_RADIUS, y - POINT_RADIUS, 2 * POINT_RADIUS, 2 * POINT_RADIUS);
             }
         }
-        
+
         /**
          * Draw the prediction line
          * 
-         * @param g2d The graphics context
-         * @param chartWidth The chart width
+         * @param g2d         The graphics context
+         * @param chartWidth  The chart width
          * @param chartHeight The chart height
-         * @param minValue The minimum value
-         * @param maxValue The maximum value
+         * @param minValue    The minimum value
+         * @param maxValue    The maximum value
          */
-        private void drawPredictionLine(Graphics2D g2d, int chartWidth, int chartHeight, double minValue, double maxValue) {
+        private void drawPredictionLine(Graphics2D g2d, int chartWidth, int chartHeight, double minValue,
+                double maxValue) {
             if (data.size() < 2) {
                 return;
             }
-            
+
             try {
                 // Calculate linear regression
                 double[] coefficients = calculateLinearRegression();
                 double slope = coefficients[0];
                 double intercept = coefficients[1];
-                
+
                 // Create prediction path
                 Path2D path = new Path2D.Double();
-                
+
                 // Start from the last data point
                 MemorySnapshot lastSnapshot = data.get(data.size() - 1);
                 double lastValue = getValueFromSnapshot(lastSnapshot);
                 double valueRange = maxValue - minValue;
-                
+
                 // Calculate point coordinates for last data point
                 double xRatio = 1.0;
                 double yRatio = (lastValue - minValue) / valueRange;
-                
+
                 int x = PADDING + (int) (xRatio * chartWidth);
                 int y = getHeight() - PADDING - (int) (yRatio * chartHeight);
-                
+
                 path.moveTo(x, y);
-                
+
                 // Add prediction points (for next 30% of the time range)
                 int predictionPoints = 10;
                 double timeDiff = 0;
-                
+
                 // Calculate average time difference between snapshots
                 if (data.size() >= 2) {
-                    LocalDateTime firstTime = data.get(0).getTimestamp();
-                    LocalDateTime lastTime = data.get(data.size() - 1).getTimestamp();
-                    timeDiff = java.time.Duration.between(firstTime, lastTime).getSeconds() / (double) (data.size() - 1);
+                    LocalDateTime firstTime = data.get(0).getTimestampDateTime();
+                    LocalDateTime lastTime = data.get(data.size() - 1).getTimestampDateTime();
+                    timeDiff = java.time.Duration.between(firstTime, lastTime).getSeconds()
+                            / (double) (data.size() - 1);
                 }
-                
+
                 // Draw prediction line
                 for (int i = 1; i <= predictionPoints; i++) {
                     // Prediction value based on linear regression
-                    double timeOffset = data.size() - 1 + i * (chartWidth * 0.3 / predictionPoints) / (chartWidth / (data.size() - 1));
+                    double timeOffset = data.size() - 1
+                            + i * (chartWidth * 0.3 / predictionPoints) / (chartWidth / (data.size() - 1));
                     double predictedValue = slope * timeOffset + intercept;
-                    
+
                     // Ensure prediction stays within reasonable bounds
                     predictedValue = Math.max(minValue, Math.min(maxValue, predictedValue));
-                    
+
                     // Calculate point coordinates
                     xRatio = 1.0 + (i * 0.3 / predictionPoints);
                     xRatio = Math.min(xRatio, 1.3); // Limit to 30% extra
-                    
+
                     yRatio = (predictedValue - minValue) / valueRange;
-                    
+
                     x = PADDING + (int) (xRatio * chartWidth);
                     y = getHeight() - PADDING - (int) (yRatio * chartHeight);
-                    
+
                     path.lineTo(x, y);
                 }
-                
+
                 // Draw prediction line
                 g2d.setColor(predictionLineColor);
                 g2d.setStroke(predictionStroke);
                 g2d.draw(path);
-                
+
             } catch (Exception ex) {
                 LOG.warn("Failed to draw prediction line", ex);
             }
         }
-        
+
         /**
          * Calculate linear regression coefficients
          * 
@@ -1199,9 +1201,9 @@ public class MemoryVisualizationPanel extends JBPanel<MemoryVisualizationPanel> 
                 // Validate we have enough data points
                 if (data == null || data.size() < 2) {
                     LOG.debug("Not enough data points for linear regression");
-                    return new double[]{0, 0}; // Default no-change prediction
+                    return new double[] { 0, 0 }; // Default no-change prediction
                 }
-                
+
                 // Simple linear regression: y = mx + b
                 int n = data.size();
                 double sumX = 0;
@@ -1209,22 +1211,22 @@ public class MemoryVisualizationPanel extends JBPanel<MemoryVisualizationPanel> 
                 double sumXY = 0;
                 double sumXX = 0;
                 int validPoints = 0;
-                
+
                 for (int i = 0; i < n; i++) {
                     try {
                         MemorySnapshot snapshot = data.get(i);
                         if (snapshot == null) {
                             continue;
                         }
-                        
+
                         double x = i;
                         double y = getValueFromSnapshot(snapshot);
-                        
+
                         // Skip extreme outliers that would skew the regression
                         if (Double.isNaN(y) || Double.isInfinite(y)) {
                             continue;
                         }
-                        
+
                         sumX += x;
                         sumY += y;
                         sumXY += x * y;
@@ -1235,23 +1237,21 @@ public class MemoryVisualizationPanel extends JBPanel<MemoryVisualizationPanel> 
                         // Skip this data point
                     }
                 }
-                
+
                 // Need at least 2 valid points for regression
                 if (validPoints < 2) {
                     LOG.debug("Not enough valid data points for linear regression");
-                    return new double[]{0, 0}; // Default no-change prediction
+                    return new double[] { 0, 0 }; // Default no-change prediction
                 }
-                
+
                 // Calculate regression coefficients with division by zero protection
                 double denominator = (validPoints * sumXX - sumX * sumX);
-                double slope = (Math.abs(denominator) < 0.0001) ? 
-                               0 : // Avoid division by zero
-                               (validPoints * sumXY - sumX * sumY) / denominator;
-                               
-                double intercept = (validPoints == 0) ? 
-                                   0 : // Avoid division by zero 
-                                   (sumY - slope * sumX) / validPoints;
-                
+                double slope = (Math.abs(denominator) < 0.0001) ? 0 : // Avoid division by zero
+                        (validPoints * sumXY - sumX * sumY) / denominator;
+
+                double intercept = (validPoints == 0) ? 0 : // Avoid division by zero
+                        (sumY - slope * sumX) / validPoints;
+
                 // Apply reasonable limits to avoid extreme projections
                 // Limit maximum change rate to 5% per data point
                 double maxSlope = 5.0;
@@ -1259,15 +1259,15 @@ public class MemoryVisualizationPanel extends JBPanel<MemoryVisualizationPanel> 
                     slope = Math.signum(slope) * maxSlope;
                     LOG.debug("Limiting excessive slope in regression");
                 }
-                
-                return new double[]{slope, intercept};
-                
+
+                return new double[] { slope, intercept };
+
             } catch (Exception ex) {
                 LOG.error("Error calculating linear regression", ex);
-                return new double[]{0, 0}; // Default no-change prediction in case of error
+                return new double[] { 0, 0 }; // Default no-change prediction in case of error
             }
         }
-        
+
         /**
          * Get the value range based on the selected metric
          * 
@@ -1275,44 +1275,44 @@ public class MemoryVisualizationPanel extends JBPanel<MemoryVisualizationPanel> 
          */
         private double[] getValueRange() {
             if (data.isEmpty()) {
-                return new double[]{0, 100};
+                return new double[] { 0, 100 };
             }
-            
+
             double min = Double.MAX_VALUE;
             double max = Double.MIN_VALUE;
-            
+
             for (MemorySnapshot snapshot : data) {
                 double value = getValueFromSnapshot(snapshot);
                 min = Math.min(min, value);
                 max = Math.max(max, value);
             }
-            
+
             // Add some padding to the range
             double padding = (max - min) * 0.1;
             min = Math.max(0, min - padding);
             max = max + padding;
-            
+
             // Special case for percentages
             if (metricType.contains("%")) {
                 min = Math.max(0, min);
                 max = Math.min(100, max);
-                
+
                 // If the range is too small, expand it a bit
                 if (max - min < 10) {
                     min = Math.max(0, min - 5);
                     max = Math.min(100, max + 5);
                 }
             }
-            
+
             // If min and max are the same, add some padding
             if (Math.abs(max - min) < 0.001) {
                 min = Math.max(0, min - 1);
                 max = max + 1;
             }
-            
-            return new double[]{min, max};
+
+            return new double[] { min, max };
         }
-        
+
         /**
          * Get the value from a snapshot based on the selected metric
          * 
@@ -1324,7 +1324,7 @@ public class MemoryVisualizationPanel extends JBPanel<MemoryVisualizationPanel> 
                 LOG.warn("Attempted to get value from null snapshot");
                 return 0.0; // Default value
             }
-            
+
             try {
                 return switch (metricType) {
                     case "Used Memory (%)" -> {
@@ -1360,7 +1360,7 @@ public class MemoryVisualizationPanel extends JBPanel<MemoryVisualizationPanel> 
                 return 0.0; // Default value in case of error
             }
         }
-        
+
         /**
          * Format a value based on the selected metric
          * 

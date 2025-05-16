@@ -540,54 +540,22 @@ public final class PatternRecognitionService {
     }
 
     /**
-     * Gets detailed metrics about pattern recognition system.
-     * This provides a comprehensive view of how the system is performing.
-     *
-     * @return Map of detailed metrics with various types of values
+     * Returns usage metrics for pattern recognition.
+     */
+    @NotNull
+    public Map<String, Object> getUsageMetrics() {
+        Map<String, Object> metrics = new HashMap<>();
+        metrics.put("patternMatches", patternMatchCount.get());
+        metrics.put("patternMisses", patternMissCount.get());
+        return metrics;
+    }
+
+    /**
+     * Detailed alias for getUsageMetrics().
      */
     @NotNull
     public Map<String, Object> getDetailedMetrics() {
-        Map<String, Object> metrics = new HashMap<>();
-
-        // Basic counts
-        metrics.put("patternCount", patterns.size());
-        metrics.put("patternMatchCount", patternMatchCount.get());
-        metrics.put("patternMissCount", patternMissCount.get());
-
-        // Status
-        metrics.put("enabled",
-                com.modforge.intellij.plugin.settings.ModForgeSettings.getInstance().isPatternRecognition());
-
-        // Derived metrics
-        int totalRequests = patternMatchCount.get() + patternMissCount.get();
-        metrics.put("totalRequests", totalRequests);
-        metrics.put("patternMatches", patternMatchCount.get());
-        metrics.put("apiCalls", patternMissCount.get());
-
-        // Calculate tokens saved (estimated)
-        int estimatedTokensSaved = getEstimatedTokensSaved();
-        metrics.put("estimatedTokensSaved", (double) estimatedTokensSaved);
-
-        // Calculate cost saved (estimated at $0.002 per 1K tokens)
-        double estimatedCostSaved = estimatedTokensSaved * 0.002 / 1000.0;
-        metrics.put("estimatedCostSaved", estimatedCostSaved);
-
-        // Get pattern counts by category
-        Map<String, Integer> patternCountsByType = getPatternCountsByCategory();
-        metrics.put("patternCountsByType", patternCountsByType);
-
-        // Count patterns by category
-        Map<PatternCategory, Integer> categoryCounts = new EnumMap<>(PatternCategory.class);
-        for (PatternEntry entry : patterns.values()) {
-            categoryCounts.merge(entry.category, 1, Integer::sum);
-        }
-
-        // Add category counts to metrics
-        for (Map.Entry<PatternCategory, Integer> entry : categoryCounts.entrySet()) {
-            metrics.put("category_" + entry.getKey().name(), entry.getValue());
-        }
-
-        return metrics;
+        return getUsageMetrics();
     }
 
     /**
@@ -595,22 +563,22 @@ public final class PatternRecognitionService {
      *
      * @return A map containing usage metrics.
      */
-    public Map<String, Object> getUsageMetrics() {
-        Map<String, Object> usageMetrics = new HashMap<>();
+    public Map<String, Object> getUnifiedMetrics() {
+        Map<String, Object> unifiedMetrics = new HashMap<>();
 
         // Fetch detailed metrics
         Map<String, Object> detailedMetrics = getDetailedMetrics();
         if (detailedMetrics != null) {
-            usageMetrics.putAll(detailedMetrics);
+            unifiedMetrics.putAll(detailedMetrics);
         }
 
         // Fetch statistics from PatternLearningSystem
         Map<String, Object> statistics = patternLearningSystem.getStatistics();
         if (statistics != null) {
-            usageMetrics.putAll(statistics);
+            unifiedMetrics.putAll(statistics);
         }
 
-        return usageMetrics;
+        return unifiedMetrics;
     }
 
     /**

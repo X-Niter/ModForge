@@ -27,7 +27,7 @@ public final class SettingsPanel extends SimpleToolWindowPanel {
     private final Project project;
     private final ModForgeSettings settings;
     private final ContinuousDevelopmentService continuousDevelopmentService;
-    
+
     private JPanel mainPanel;
     private JCheckBox continuousDevelopmentCheckbox;
     private JCheckBox patternRecognitionCheckbox;
@@ -38,9 +38,10 @@ public final class SettingsPanel extends SimpleToolWindowPanel {
     private JCheckBox forgeSupportCheckbox;
     private JCheckBox fabricSupportCheckbox;
     private JCheckBox quiltSupportCheckbox;
-    
+
     /**
      * Creates a new SettingsPanel.
+     * 
      * @param project The project
      */
     public SettingsPanel(@NotNull Project project) {
@@ -48,54 +49,55 @@ public final class SettingsPanel extends SimpleToolWindowPanel {
         this.project = project;
         this.settings = ModForgeSettings.getInstance();
         this.continuousDevelopmentService = ContinuousDevelopmentService.getInstance(project);
-        
+
         initializeUI();
-        
+
         setContent(mainPanel);
     }
-    
+
     /**
      * Initializes the UI.
      */
     private void initializeUI() {
         mainPanel = new JPanel(new BorderLayout());
         mainPanel.setBorder(JBUI.Borders.empty(5));
-        
+
         JPanel contentPanel = new JPanel(new BorderLayout(0, 10));
         contentPanel.setBorder(JBUI.Borders.empty(5));
-        
+
         JPanel featureTogglesPanel = createFeatureTogglesPanel();
         JPanel developmentSettingsPanel = createDevelopmentSettingsPanel();
         JPanel modLoaderSettingsPanel = createModLoaderSettingsPanel();
-        
+
         JPanel settingsPanel = new JPanel(new GridLayout(3, 1, 0, 10));
         settingsPanel.add(featureTogglesPanel);
         settingsPanel.add(developmentSettingsPanel);
         settingsPanel.add(modLoaderSettingsPanel);
-        
+
         contentPanel.add(settingsPanel, BorderLayout.NORTH);
-        
+
         mainPanel.add(new JBScrollPane(contentPanel), BorderLayout.CENTER);
-        
+
         JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
-        
+
         JButton applyButton = new JButton("Apply", AllIcons.Actions.Compile);
         applyButton.addActionListener(e -> applySettings());
-        
+
         JButton advancedButton = new JButton("Advanced Settings...", AllIcons.General.Settings);
         advancedButton.addActionListener(e -> openAdvancedSettings());
-        
+
         buttonPanel.add(applyButton);
         buttonPanel.add(advancedButton);
-        
+
         mainPanel.add(buttonPanel, BorderLayout.SOUTH);
-        
+
         // Load current settings
         loadSettings();
     }
-    
+
     /**
      * Creates the feature toggles panel.
+     * 
      * @return The panel
      */
     private JPanel createFeatureTogglesPanel() {
@@ -104,15 +106,16 @@ public final class SettingsPanel extends SimpleToolWindowPanel {
                 BorderFactory.createLineBorder(UIManager.getColor("BorderColor")),
                 "Feature Toggles",
                 TitledBorder.LEFT,
-                TitledBorder.TOP
-        ));
-        
-        continuousDevelopmentCheckbox = new JBCheckBox("Enable Continuous Development", settings.isContinuousDevelopmentEnabled());
-        patternRecognitionCheckbox = new JBCheckBox("Enable Pattern Recognition", settings.isPatternRecognitionEnabled());
-        
+                TitledBorder.TOP));
+
+        continuousDevelopmentCheckbox = new JBCheckBox("Enable Continuous Development",
+                settings.isContinuousDevelopmentEnabled());
+        patternRecognitionCheckbox = new JBCheckBox("Enable Pattern Recognition",
+                settings.isPatternRecognitionEnabled());
+
         panel.add(continuousDevelopmentCheckbox);
         panel.add(patternRecognitionCheckbox);
-        
+
         // Add listener to update continuous development service
         continuousDevelopmentCheckbox.addItemListener(e -> {
             if (e.getStateChange() == ItemEvent.SELECTED) {
@@ -121,12 +124,13 @@ public final class SettingsPanel extends SimpleToolWindowPanel {
                 continuousDevelopmentService.stop();
             }
         });
-        
+
         return panel;
     }
-    
+
     /**
      * Creates the development settings panel.
+     * 
      * @return The panel
      */
     private JPanel createDevelopmentSettingsPanel() {
@@ -135,12 +139,11 @@ public final class SettingsPanel extends SimpleToolWindowPanel {
                 BorderFactory.createLineBorder(UIManager.getColor("BorderColor")),
                 "Development Settings",
                 TitledBorder.LEFT,
-                TitledBorder.TOP
-        ));
-        
+                TitledBorder.TOP));
+
         JPanel checkIntervalPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
         checkIntervalPanel.add(new JBLabel("Check Interval:"));
-        
+
         checkIntervalComboBox = new ComboBox<>(new String[] {
                 "1 second",
                 "5 seconds",
@@ -151,21 +154,22 @@ public final class SettingsPanel extends SimpleToolWindowPanel {
                 "10 minutes"
         });
         checkIntervalPanel.add(checkIntervalComboBox);
-        
-        autoCompileCheckbox = new JBCheckBox("Auto-Compile", settings.isAutoCompileEnabled());
-        autoFixCheckbox = new JBCheckBox("Auto-Fix Errors", settings.isAutoFixEnabled());
-        autoDocumentCheckbox = new JBCheckBox("Auto-Document Code", settings.isAutoDocumentEnabled());
-        
+
+        autoCompileCheckbox = new JBCheckBox("Auto-Compile", settings.isPatternRecognition());
+        autoFixCheckbox = new JBCheckBox("Auto-Fix Errors", settings.isEnableContinuousDevelopment());
+        autoDocumentCheckbox = new JBCheckBox("Auto-Document Code", settings.isEnableNotifications());
+
         panel.add(checkIntervalPanel);
         panel.add(autoCompileCheckbox);
         panel.add(autoFixCheckbox);
         panel.add(autoDocumentCheckbox);
-        
+
         return panel;
     }
-    
+
     /**
      * Creates the mod loader settings panel.
+     * 
      * @return The panel
      */
     private JPanel createModLoaderSettingsPanel() {
@@ -174,20 +178,19 @@ public final class SettingsPanel extends SimpleToolWindowPanel {
                 BorderFactory.createLineBorder(UIManager.getColor("BorderColor")),
                 "Mod Loader Support",
                 TitledBorder.LEFT,
-                TitledBorder.TOP
-        ));
-        
+                TitledBorder.TOP));
+
         forgeSupportCheckbox = new JBCheckBox("Forge", settings.isForgeSupported());
         fabricSupportCheckbox = new JBCheckBox("Fabric", settings.isFabricSupported());
         quiltSupportCheckbox = new JBCheckBox("Quilt", settings.isQuiltSupported());
-        
+
         panel.add(forgeSupportCheckbox);
         panel.add(fabricSupportCheckbox);
         panel.add(quiltSupportCheckbox);
-        
+
         return panel;
     }
-    
+
     /**
      * Loads the current settings.
      */
@@ -195,10 +198,10 @@ public final class SettingsPanel extends SimpleToolWindowPanel {
         // Feature toggles
         continuousDevelopmentCheckbox.setSelected(settings.isContinuousDevelopmentEnabled());
         patternRecognitionCheckbox.setSelected(settings.isPatternRecognitionEnabled());
-        
+
         // Development settings
         long checkIntervalMs = settings.getCheckIntervalMs();
-        
+
         if (checkIntervalMs <= 1000) {
             checkIntervalComboBox.setSelectedItem("1 second");
         } else if (checkIntervalMs <= 5000) {
@@ -214,17 +217,17 @@ public final class SettingsPanel extends SimpleToolWindowPanel {
         } else {
             checkIntervalComboBox.setSelectedItem("10 minutes");
         }
-        
-        autoCompileCheckbox.setSelected(settings.isAutoCompileEnabled());
-        autoFixCheckbox.setSelected(settings.isAutoFixEnabled());
-        autoDocumentCheckbox.setSelected(settings.isAutoDocumentEnabled());
-        
+
+        autoCompileCheckbox.setSelected(settings.isPatternRecognition());
+        autoFixCheckbox.setSelected(settings.isEnableContinuousDevelopment());
+        autoDocumentCheckbox.setSelected(settings.isEnableNotifications());
+
         // Mod loader settings
         forgeSupportCheckbox.setSelected(settings.isForgeSupported());
         fabricSupportCheckbox.setSelected(settings.isFabricSupported());
         quiltSupportCheckbox.setSelected(settings.isQuiltSupported());
     }
-    
+
     /**
      * Applies the settings.
      */
@@ -232,11 +235,11 @@ public final class SettingsPanel extends SimpleToolWindowPanel {
         // Feature toggles
         settings.setContinuousDevelopmentEnabled(continuousDevelopmentCheckbox.isSelected());
         settings.setPatternRecognitionEnabled(patternRecognitionCheckbox.isSelected());
-        
+
         // Development settings
         String checkIntervalStr = (String) checkIntervalComboBox.getSelectedItem();
         long checkIntervalMs = 60000L; // Default to 1 minute
-        
+
         if (checkIntervalStr != null) {
             if (checkIntervalStr.equals("1 second")) {
                 checkIntervalMs = 1000L;
@@ -254,19 +257,20 @@ public final class SettingsPanel extends SimpleToolWindowPanel {
                 checkIntervalMs = 600000L;
             }
         }
-        
+
         settings.setCheckIntervalMs(checkIntervalMs);
-        continuousDevelopmentService.setCheckInterval(checkIntervalMs);
-        
-        settings.setAutoCompileEnabled(autoCompileCheckbox.isSelected());
-        settings.setAutoFixEnabled(autoFixCheckbox.isSelected());
-        settings.setAutoDocumentEnabled(autoDocumentCheckbox.isSelected());
-        
+        continuousDevelopmentService.setScanInterval(checkIntervalMs);
+
+        // No direct settings for auto compile/fix/document, so update related settings
+        settings.setPatternRecognition(autoCompileCheckbox.isSelected());
+        settings.setEnableContinuousDevelopment(autoFixCheckbox.isSelected());
+        settings.setEnableNotifications(autoDocumentCheckbox.isSelected());
+
         // Mod loader settings
         settings.setForgeSupported(forgeSupportCheckbox.isSelected());
         settings.setFabricSupported(fabricSupportCheckbox.isSelected());
         settings.setQuiltSupported(quiltSupportCheckbox.isSelected());
-        
+
         // Update continuous development service
         if (settings.isContinuousDevelopmentEnabled()) {
             continuousDevelopmentService.start();
@@ -274,13 +278,13 @@ public final class SettingsPanel extends SimpleToolWindowPanel {
             continuousDevelopmentService.stop();
         }
     }
-    
+
     /**
      * Opens the advanced settings dialog.
      */
     private void openAdvancedSettings() {
         ShowSettingsUtil.getInstance().showSettingsDialog(project, ModForgeSettingsConfigurable.class);
-        
+
         // Reload settings
         ApplicationManager.getApplication().invokeLater(this::loadSettings);
     }

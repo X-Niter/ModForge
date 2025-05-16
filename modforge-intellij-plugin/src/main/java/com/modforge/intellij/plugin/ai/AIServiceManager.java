@@ -27,6 +27,14 @@ public final class AIServiceManager {
     private static final Logger LOG = Logger.getInstance(AIServiceManager.class);
     private static final String OPENAI_API_URL = "https://api.openai.com/v1/chat/completions";
 
+    // Metrics tracking
+    private final java.util.concurrent.atomic.AtomicLong requestCount = new java.util.concurrent.atomic.AtomicLong();
+    private final java.util.concurrent.atomic.AtomicLong failureCount = new java.util.concurrent.atomic.AtomicLong();
+    private final java.util.concurrent.atomic.AtomicLong totalTokensUsed = new java.util.concurrent.atomic.AtomicLong();
+    private final java.util.concurrent.atomic.AtomicLong cacheHitCount = new java.util.concurrent.atomic.AtomicLong();
+    private final java.util.concurrent.atomic.AtomicReference<Double> estimatedCost = new java.util.concurrent.atomic.AtomicReference<>(
+            0.0);
+
     /**
      * Gets the instance of AIServiceManager from the AI package.
      * This method avoids conflict with the similarly named method in
@@ -45,6 +53,64 @@ public final class AIServiceManager {
      */
     public static AIServiceManager getInstance() {
         return getAIInstance();
+    }
+
+    /**
+     * Accessor for project-specific instance (stub for UI code expecting
+     * getInstance(Project)).
+     */
+    public static AIServiceManager getInstance(@NotNull com.intellij.openapi.project.Project project) {
+        return getInstance();
+    }
+
+    // --- Usage metrics stubs for UI panels ---
+    /**
+     * Gets total number of AI requests made.
+     */
+    public long getRequestCount() {
+        return requestCount.get();
+    }
+
+    /**
+     * Gets number of cache hits.
+     */
+    public long getCacheHitCount() {
+        return cacheHitCount.get();
+    }
+
+    /**
+     * Gets number of failed AI calls.
+     */
+    public long getFailureCount() {
+        return failureCount.get();
+    }
+
+    /**
+     * Gets total tokens used.
+     */
+    public long getTotalTokensUsed() {
+        return totalTokensUsed.get();
+    }
+
+    /**
+     * Gets estimated cost of AI usage.
+     */
+    public double getEstimatedCost() {
+        return estimatedCost.get();
+    }
+
+    /**
+     * Returns basic usage metrics map.
+     */
+    @NotNull
+    public Map<String, Object> getUsageMetrics() {
+        Map<String, Object> metrics = new HashMap<>();
+        metrics.put("requestCount", getRequestCount());
+        metrics.put("cacheHitCount", getCacheHitCount());
+        metrics.put("failureCount", getFailureCount());
+        metrics.put("totalTokensUsed", getTotalTokensUsed());
+        metrics.put("estimatedCost", getEstimatedCost());
+        return metrics;
     }
 
     /**
@@ -216,90 +282,109 @@ public final class AIServiceManager {
      */
     @NotNull
     private String makeAiRequest(@NotNull String systemPrompt, @NotNull String userPrompt) throws IOException {
-        // Get settings
-        ModForgeSettings settings = ModForgeSettings.getInstance();
-        String apiKey = settings.getOpenAiApiKey();
-        String model = settings.getOpenAiModel();
-        int maxTokens = settings.getMaxTokens();
-        double temperature = settings.getTemperature();
+        requestCount.incrementAndGet();
+        try {
+            // Get settings
+            ModForgeSettings settings = ModForgeSettings.getInstance();
+            String apiKey = settings.getOpenAiApiKey();
+            String model = settings.getOpenAiModel();
+            int maxTokens = settings.getMaxTokens();
+            double temperature = settings.getTemperature();
 
-        // Validate API key
-        if (apiKey == null || apiKey.trim().isEmpty()) {
-            LOG.error("OpenAI API key is missing or invalid. Please configure it in the settings.");
-            throw new IOException("OpenAI API key is not configured or invalid.");
+            // Validate API key
+            if (apiKey == null || apiKey.trim().isEmpty()) {
+                LOG.error("OpenAI API key is missing or invalid. Please configure it in the settings.");
+                throw new IOException("OpenAI API key is not configured or invalid.");
+            }
+
+            // Create request body
+            Map<String, Object> requestBody = new HashMap<>();
+            requestBody.put("model", model);
+            requestBody.put("temperature", temperature);
+            requestBody.put("max_tokens", maxTokens);
+
+            List<Map<String, String>> messages = new ArrayList<>();
+
+            // Add system message
+            Map<String, String> systemMessage = new HashMap<>();
+            systemMessage.put("role", "system");
+            systemMessage.put("content", systemPrompt);
+            messages.add(systemMessage);
+
+            // Add user message
+            Map<String, String> userMessage = new HashMap<>();
+            userMessage.put("role", "user");
+            userMessage.put("content", userPrompt);
+            messages.add(userMessage);
+
+            requestBody.put("messages", messages);
+
+            // Create request
+            RequestBuilder request = HttpRequests.post(OPENAI_API_URL, "application/json")
+                    .accept("application/json")
+                    .productNameAsUserAgent()
+                    .tuner(connection -> connection.setRequestProperty("Authorization", "Bearer " + apiKey));
+
+            // Send request
+            LOG.info("Sending request to OpenAI API");
+
+            String response = request.connect(connection -> {
+                // Write request body
+                connection.write(JsonUtil.writeToString(requestBody));
+
+                // Read response using JsonUtil instead of JsonReader directly
+                Map<String, Object> responseMap = JsonUtil.readMapFromStream(connection.getInputStream());
+                if (responseMap == null) {
+                    throw new IOException("Failed to parse response from OpenAI API");
+                }
+
+                // Parse response
+                // Added type safety checks for response parsing
+                Object choicesObj = responseMap.get("choices");
+                if (!(choicesObj instanceof List)) {
+                    throw new IOException("Unexpected response format: 'choices' is not a list.");
+                }
+
+                List<?> choices = (List<?>) choicesObj;
+                if (choices.isEmpty() || !(choices.get(0) instanceof Map)) {
+                    throw new IOException("Unexpected response format: 'choices' is empty or invalid.");
+                }
+
+                Map<?, ?> choice = (Map<?, ?>) choices.get(0);
+                Object messageObj = choice.get("message");
+                if (!(messageObj instanceof Map)) {
+                    throw new IOException("Unexpected response format: 'message' is not a map.");
+                }
+
+                Map<?, ?> message = (Map<?, ?>) messageObj;
+                Object contentObj = message.get("content");
+                if (!(contentObj instanceof String)) {
+                    throw new IOException("Unexpected response format: 'content' is not a string.");
+                }
+
+                // parse usage if present
+                Object usageObj = responseMap.get("usage");
+                if (usageObj instanceof Map) {
+                    Object totalObj = ((Map<?, ?>) usageObj).get("total_tokens");
+                    if (totalObj instanceof Number) {
+                        long tokens = ((Number) totalObj).longValue();
+                        totalTokensUsed.addAndGet(tokens);
+                        // simple cost estimate: $0.00002 per token
+                        double cost = tokens * 0.00002;
+                        estimatedCost.updateAndGet(prev -> prev + cost);
+                    }
+                }
+
+                return ((String) contentObj).trim();
+            });
+
+            LOG.info("Received response from OpenAI API");
+
+            return response != null ? response.trim() : "";
+        } catch (IOException e) {
+            failureCount.incrementAndGet();
+            throw e;
         }
-
-        // Create request body
-        Map<String, Object> requestBody = new HashMap<>();
-        requestBody.put("model", model);
-        requestBody.put("temperature", temperature);
-        requestBody.put("max_tokens", maxTokens);
-
-        List<Map<String, String>> messages = new ArrayList<>();
-
-        // Add system message
-        Map<String, String> systemMessage = new HashMap<>();
-        systemMessage.put("role", "system");
-        systemMessage.put("content", systemPrompt);
-        messages.add(systemMessage);
-
-        // Add user message
-        Map<String, String> userMessage = new HashMap<>();
-        userMessage.put("role", "user");
-        userMessage.put("content", userPrompt);
-        messages.add(userMessage);
-
-        requestBody.put("messages", messages);
-
-        // Create request
-        RequestBuilder request = HttpRequests.post(OPENAI_API_URL, "application/json")
-                .accept("application/json")
-                .productNameAsUserAgent()
-                .tuner(connection -> connection.setRequestProperty("Authorization", "Bearer " + apiKey));
-
-        // Send request
-        LOG.info("Sending request to OpenAI API");
-
-        String response = request.connect(connection -> {
-            // Write request body
-            connection.write(JsonUtil.writeToString(requestBody));
-
-            // Read response using JsonUtil instead of JsonReader directly
-            Map<String, Object> responseMap = JsonUtil.readMapFromStream(connection.getInputStream());
-            if (responseMap == null) {
-                throw new IOException("Failed to parse response from OpenAI API");
-            }
-
-            // Parse response
-            // Added type safety checks for response parsing
-            Object choicesObj = responseMap.get("choices");
-            if (!(choicesObj instanceof List)) {
-                throw new IOException("Unexpected response format: 'choices' is not a list.");
-            }
-
-            List<?> choices = (List<?>) choicesObj;
-            if (choices.isEmpty() || !(choices.get(0) instanceof Map)) {
-                throw new IOException("Unexpected response format: 'choices' is empty or invalid.");
-            }
-
-            Map<?, ?> choice = (Map<?, ?>) choices.get(0);
-            Object messageObj = choice.get("message");
-            if (!(messageObj instanceof Map)) {
-                throw new IOException("Unexpected response format: 'message' is not a map.");
-            }
-
-            Map<?, ?> message = (Map<?, ?>) messageObj;
-            Object contentObj = message.get("content");
-            if (!(contentObj instanceof String)) {
-                throw new IOException("Unexpected response format: 'content' is not a string.");
-            }
-
-            return ((String) contentObj).trim();
-        });
-
-        LOG.info("Received response from OpenAI API");
-
-        return response != null ? response.trim() : "";
     }
 
     /**

@@ -156,6 +156,26 @@ public final class ArchitecturyService {
     }
 
     /**
+     * Checks if Architectury is available in the project (alias for
+     * isArchitecturyProject).
+     * 
+     * @return true if this is an Architectury project.
+     */
+    public boolean isArchitecturyAvailable() {
+        return isArchitecturyProject();
+    }
+
+    /**
+     * Checks if this is a multi-module Architectury setup (alias for
+     * isMultiModuleSetup).
+     * 
+     * @return true if multi-module.
+     */
+    public boolean isArchitecturyMultiModule() {
+        return isMultiModuleSetup();
+    }
+
+    /**
      * Scans the project for mod loaders and Architectury.
      */
     private void scanProjectForModLoaders() {

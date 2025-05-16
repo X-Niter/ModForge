@@ -388,7 +388,7 @@ jobs:
                   print(f"Error creating branch with fixes: {str(e)}")
                   return None, []
 
-          def create_issue_with_analysis(analysis, branch_name=None, files_changed=None):
+echo "None, files_changed=None):=" >> $GITHUB_OUTPUT
               """Create a GitHub issue with error analysis"""
               if not analysis:
                   print("No analysis data available")

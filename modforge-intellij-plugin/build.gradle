@@ -45,35 +45,20 @@ dependencies {
 
 // Configure Gradle IntelliJ Plugin
 intellij {
-    // IMPORTANT: Best practice for targeting IntelliJ IDEA 2025.1.1.1
-    // - Use stable 2023.3.6 for build compatibility
-    // - Set XML compatibility for 251.25410.129
-    // - Use localPath for direct 2025.1.1.1 testing
-    
-    // Target version approach depends on your needs:
-    // Option 1: Repository build (easier, more compatible, recommended for CI)
-    version = '2023.1' // Update to the latest IntelliJ SDK version
-    type = 'IC' // Community Edition
-    
-    // Alternative Option: Local build for exact version testing
-    // - Comment out the version line above
-    // - Uncomment the localPath line below with your IntelliJ path
-    // localPath = 'C:/Program Files/JetBrains/IntelliJ IDEA Community Edition 2025.1.1.1'
-    
-    // Essential configuration
+    // Fetch and build against IntelliJ IDEA 2025.1 EAP SDK remotely
+    version = '2023.3.6'
+    type = 'IC'
+
+    // Download sources and allow custom builds
     downloadSources = true
     updateSinceUntilBuild = false
-    
-    // Important: Use only the Java plugin dependency, platform dependencies are implicit
-    // Making platform modules as dependencies causes problems - platform is always included
+
+    // Only require the Java language plugin
     plugins = ['com.intellij.java']
-    
-    // Ensure these are properly resolved for your plugin
+
+    // Instrument code and define sandbox directory
     instrumentCode = true
-    sandboxDir = project.rootDir.canonicalPath + "/.sandbox"
-    
-    // Access multiple repositories for better dependency resolution
-    intellijRepository = 'https://www.jetbrains.com/intellij-repository/releases'
+    sandboxDir = "$rootDir/.sandbox"
 }
 
 // Configure Java sourceSets - using standard Gradle setup

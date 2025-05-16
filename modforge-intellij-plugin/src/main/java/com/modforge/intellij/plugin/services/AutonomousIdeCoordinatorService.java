@@ -9,7 +9,6 @@ import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.openapi.vfs.LocalFileSystem;
 import com.intellij.psi.PsiClass;
 import com.intellij.psi.JavaPsiFacade;
-import com.intellij.psi.PsiManager;
 import com.intellij.psi.search.GlobalSearchScope;
 import org.jetbrains.annotations.NotNull;
 
@@ -283,17 +282,17 @@ public final class AutonomousIdeCoordinatorService {
 
         methods.add(new AutonomousCodeGenerationService.MethodDefinition(
                 className, "void", constructorParams, false, false, false,
-                "This constructor initializes the entity with a name and sets the creation date.",
-                "Creates a new " + className));
+                "This constructor initializes the entity with a name and sets the creation date."));
 
-        // Generate class
+        // Generate class and return true on success
         return codeGenerationService.generateClass(
                 packageName,
                 className,
                 AutonomousCodeGenerationService.ClassType.CLASS,
                 fields,
                 methods,
-                "Entity representing a " + className);
+                "Entity representing a " + className)
+                .thenApply(v -> true);
     }
 
     /**
@@ -324,7 +323,7 @@ public final class AutonomousIdeCoordinatorService {
 
         methods.add(new AutonomousCodeGenerationService.MethodDefinition(
                 "findById", "com.example.domain." + entityName, findByIdParams,
-                false, false, false, null,
+                false, false, false,
                 "Finds an entity by ID", "The entity, or null if not found"));
 
         // save method
@@ -334,7 +333,7 @@ public final class AutonomousIdeCoordinatorService {
 
         methods.add(new AutonomousCodeGenerationService.MethodDefinition(
                 "save", "com.example.domain." + entityName, saveParams,
-                false, false, false, null,
+                false, false, false,
                 "Saves an entity", "The saved entity"));
 
         // delete method
@@ -346,14 +345,15 @@ public final class AutonomousIdeCoordinatorService {
                 "delete", "void", deleteParams, false, false, false,
                 "Deletes an entity"));
 
-        // Generate interface
+        // Generate interface and return true on success
         return codeGenerationService.generateClass(
                 packageName,
                 interfaceName,
                 AutonomousCodeGenerationService.ClassType.INTERFACE,
                 Collections.emptyList(),
                 methods,
-                "Service for " + entityName + " entities");
+                "Service for " + entityName + " entities")
+                .thenApply(v -> true);
     }
 
     /**

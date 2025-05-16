@@ -27,43 +27,43 @@ import java.util.concurrent.TimeUnit;
  */
 public class MemorySnapshotManager {
     private static final Logger LOG = Logger.getInstance(MemorySnapshotManager.class);
-    
+
     // Singleton instance
     private static MemorySnapshotManager instance;
-    
+
     // Maximum number of snapshots to keep in memory
     private static final int MAX_SNAPSHOTS = 1000;
-    
+
     // Snapshot collection interval in seconds
     private static final int DEFAULT_SNAPSHOT_INTERVAL_SECONDS = 10;
-    
+
     // Collection of memory snapshots
     private final List<MemorySnapshot> snapshots = new CopyOnWriteArrayList<>();
-    
+
     // Scheduled executor for collecting snapshots
     private final ScheduledExecutorService executor;
     private ScheduledFuture<?> scheduledTask;
-    
+
     // Current snapshot interval in seconds
     private int snapshotIntervalSeconds = DEFAULT_SNAPSHOT_INTERVAL_SECONDS;
-    
+
     /**
      * Private constructor for singleton pattern
      */
     private MemorySnapshotManager() {
         executor = AppExecutorUtil.createBoundedScheduledExecutorService(
                 "MemorySnapshotManager", 1);
-        
+
         // Start collecting snapshots
         startCollecting();
-        
+
         // Register for disposal when application is shutting down
         Disposer.register(ApplicationManager.getApplication(), () -> {
             stopCollecting();
             executor.shutdown();
         });
     }
-    
+
     /**
      * Get the singleton instance
      *
@@ -75,7 +75,7 @@ public class MemorySnapshotManager {
         }
         return instance;
     }
-    
+
     /**
      * Start collecting memory snapshots at regular intervals
      */
@@ -84,18 +84,17 @@ public class MemorySnapshotManager {
             // Already collecting
             return;
         }
-        
+
         // Schedule snapshot collection
         scheduledTask = executor.scheduleAtFixedRate(
                 this::collectSnapshot,
                 0,
                 snapshotIntervalSeconds,
-                TimeUnit.SECONDS
-        );
-        
+                TimeUnit.SECONDS);
+
         LOG.info("Started collecting memory snapshots every " + snapshotIntervalSeconds + " seconds");
     }
-    
+
     /**
      * Stop collecting memory snapshots
      */
@@ -105,7 +104,7 @@ public class MemorySnapshotManager {
             LOG.info("Stopped collecting memory snapshots");
         }
     }
-    
+
     /**
      * Set the interval for collecting snapshots
      *
@@ -115,16 +114,16 @@ public class MemorySnapshotManager {
         if (seconds < 1) {
             throw new IllegalArgumentException("Interval must be at least 1 second");
         }
-        
+
         // Update interval and restart collection
         this.snapshotIntervalSeconds = seconds;
-        
+
         if (scheduledTask != null && !scheduledTask.isDone()) {
             stopCollecting();
             startCollecting();
         }
     }
-    
+
     /**
      * Collect a memory snapshot and add it to the list
      */
@@ -135,14 +134,14 @@ public class MemorySnapshotManager {
             String pressureLevel = memoryManager != null
                     ? memoryManager.getPressureLevel().toString()
                     : "UNKNOWN";
-            
+
             // Create snapshot
             MemorySnapshot snapshot = MemorySnapshot.createCurrentSnapshot(pressureLevel);
-            
+
             // Add to list and trim if necessary
             synchronized (snapshots) {
                 snapshots.add(snapshot);
-                
+
                 // Trim list if it exceeds maximum size
                 if (snapshots.size() > MAX_SNAPSHOTS) {
                     snapshots.remove(0);
@@ -152,7 +151,7 @@ public class MemorySnapshotManager {
             LOG.error("Error collecting memory snapshot", e);
         }
     }
-    
+
     /**
      * Get a copy of the current snapshots list
      *
@@ -164,7 +163,7 @@ public class MemorySnapshotManager {
             return new ArrayList<>(snapshots);
         }
     }
-    
+
     /**
      * Clear all snapshots
      */
@@ -173,7 +172,7 @@ public class MemorySnapshotManager {
             snapshots.clear();
         }
     }
-    
+
     /**
      * Get the latest memory snapshot
      *
@@ -188,7 +187,7 @@ public class MemorySnapshotManager {
             return snapshots.get(snapshots.size() - 1);
         }
     }
-    
+
     /**
      * Export the memory snapshots to a CSV file
      *
@@ -201,21 +200,22 @@ public class MemorySnapshotManager {
                 LOG.warn("No snapshots to export");
                 return false;
             }
-            
+
             try (FileOutputStream fos = new FileOutputStream(file);
-                 OutputStreamWriter osw = new OutputStreamWriter(fos, StandardCharsets.UTF_8);
-                 BufferedWriter writer = new BufferedWriter(osw)) {
-                
+                    OutputStreamWriter osw = new OutputStreamWriter(fos, StandardCharsets.UTF_8);
+                    BufferedWriter writer = new BufferedWriter(osw)) {
+
                 // Write header
-                writer.write("Timestamp,UsedMemory,FreeMemory,TotalMemory,MaxMemory,PressureLevel,UsagePercentage,AllocationPercentage");
+                writer.write(
+                        "Timestamp,UsedMemory,FreeMemory,TotalMemory,MaxMemory,PressureLevel,UsagePercentage,AllocationPercentage");
                 writer.newLine();
-                
+
                 // Write each snapshot
                 for (MemorySnapshot snapshot : snapshots) {
                     writer.write(snapshot.toCsvLine());
                     writer.newLine();
                 }
-                
+
                 LOG.info("Exported " + snapshots.size() + " memory snapshots to: " + file.getAbsolutePath());
                 return true;
             } catch (IOException e) {
@@ -224,7 +224,7 @@ public class MemorySnapshotManager {
             }
         }
     }
-    
+
     /**
      * Import memory snapshots from a CSV file
      *
@@ -236,21 +236,21 @@ public class MemorySnapshotManager {
             LOG.warn("Import file does not exist: " + file.getAbsolutePath());
             return false;
         }
-        
+
         List<MemorySnapshot> importedSnapshots = new ArrayList<>();
         DateTimeFormatter formatter = DateTimeFormatter.ISO_LOCAL_DATE_TIME;
-        
+
         try (FileInputStream fis = new FileInputStream(file);
-             InputStreamReader isr = new InputStreamReader(fis, StandardCharsets.UTF_8);
-             BufferedReader reader = new BufferedReader(isr)) {
-            
+                InputStreamReader isr = new InputStreamReader(fis, StandardCharsets.UTF_8);
+                BufferedReader reader = new BufferedReader(isr)) {
+
             // Skip header
             String line = reader.readLine();
-            
+
             // Read each line
             while ((line = reader.readLine()) != null) {
                 String[] parts = line.split(",");
-                
+
                 if (parts.length >= 6) {
                     try {
                         LocalDateTime timestamp = LocalDateTime.parse(parts[0], formatter);
@@ -259,34 +259,34 @@ public class MemorySnapshotManager {
                         long totalMemory = Long.parseLong(parts[3]);
                         long maxMemory = Long.parseLong(parts[4]);
                         String pressureLevel = parts[5];
-                        
+
                         MemorySnapshot snapshot = new MemorySnapshot(
                                 timestamp, usedMemory, freeMemory, totalMemory, maxMemory, pressureLevel);
-                        
+
                         importedSnapshots.add(snapshot);
                     } catch (Exception e) {
                         LOG.warn("Error parsing CSV line: " + line, e);
                     }
                 }
             }
-            
+
             if (!importedSnapshots.isEmpty()) {
                 // Sort by timestamp
-                Collections.sort(importedSnapshots, 
-                        (s1, s2) -> s1.getTimestamp().compareTo(s2.getTimestamp()));
-                
+                Collections.sort(importedSnapshots,
+                        (s1, s2) -> s1.getTimestampDateTime().compareTo(s2.getTimestampDateTime()));
+
                 // Replace current snapshots with imported ones
                 synchronized (snapshots) {
                     snapshots.clear();
                     snapshots.addAll(importedSnapshots);
-                    
+
                     // Trim if necessary
                     if (snapshots.size() > MAX_SNAPSHOTS) {
                         int toRemove = snapshots.size() - MAX_SNAPSHOTS;
                         snapshots.subList(0, toRemove).clear();
                     }
                 }
-                
+
                 LOG.info("Imported " + importedSnapshots.size() + " memory snapshots from: " + file.getAbsolutePath());
                 return true;
             } else {
@@ -298,7 +298,7 @@ public class MemorySnapshotManager {
             return false;
         }
     }
-    
+
     /**
      * Save the memory snapshots to a persistence file
      *
@@ -308,7 +308,7 @@ public class MemorySnapshotManager {
     public boolean saveSnapshots(@NotNull File file) {
         return exportSnapshotsToCSV(file);
     }
-    
+
     /**
      * Load memory snapshots from a persistence file
      *
@@ -318,7 +318,7 @@ public class MemorySnapshotManager {
     public boolean loadSnapshots(@NotNull File file) {
         return importSnapshotsFromCSV(file);
     }
-    
+
     /**
      * Get the maximum number of snapshots to keep in memory
      *
@@ -327,7 +327,7 @@ public class MemorySnapshotManager {
     public int getMaxSnapshots() {
         return MAX_SNAPSHOTS;
     }
-    
+
     /**
      * Get the current snapshot interval in seconds
      *
@@ -336,7 +336,7 @@ public class MemorySnapshotManager {
     public int getSnapshotIntervalSeconds() {
         return snapshotIntervalSeconds;
     }
-    
+
     /**
      * Force a snapshot to be taken immediately
      *
@@ -347,7 +347,7 @@ public class MemorySnapshotManager {
         collectSnapshot();
         return getLatestSnapshot();
     }
-    
+
     /**
      * Save memory snapshots to the default persistence file
      *
@@ -359,7 +359,7 @@ public class MemorySnapshotManager {
             String tmpDir = System.getProperty("java.io.tmpdir");
             File persistenceDir = new File(tmpDir, "modforge/memory");
             FileUtil.createDirectory(persistenceDir);
-            
+
             File persistenceFile = new File(persistenceDir, "memory_snapshots.csv");
             return saveSnapshots(persistenceFile);
         } catch (Exception e) {
@@ -367,7 +367,7 @@ public class MemorySnapshotManager {
             return false;
         }
     }
-    
+
     /**
      * Load memory snapshots from the default persistence file
      *
@@ -379,18 +379,18 @@ public class MemorySnapshotManager {
             String tmpDir = System.getProperty("java.io.tmpdir");
             File persistenceDir = new File(tmpDir, "modforge/memory");
             File persistenceFile = new File(persistenceDir, "memory_snapshots.csv");
-            
+
             if (persistenceFile.exists() && persistenceFile.isFile()) {
                 return loadSnapshots(persistenceFile);
             }
-            
+
             return false;
         } catch (Exception e) {
             LOG.error("Error loading memory snapshots from persistence", e);
             return false;
         }
     }
-    
+
     /**
      * Reset the snapshot manager, clearing all snapshots and resetting the interval
      */

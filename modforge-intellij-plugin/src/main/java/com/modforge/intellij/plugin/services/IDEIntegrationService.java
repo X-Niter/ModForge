@@ -145,21 +145,24 @@ public final class IDEIntegrationService {
             @NotNull String content) {
         try {
             VirtualFile file = directory.findChild(fileName);
+            final VirtualFile targetFile;
             if (file == null) {
-                file = directory.createChildData(this, fileName);
+                targetFile = directory.createChildData(this, fileName);
+            } else {
+                targetFile = file;
             }
 
             // Using CompatibilityUtil for better compatibility with IntelliJ IDEA
             // 2025.1.1.1
             CompatibilityUtil.runWriteAction(() -> {
                 try {
-                    file.setBinaryContent(content.getBytes(StandardCharsets.UTF_8));
+                    targetFile.setBinaryContent(content.getBytes(StandardCharsets.UTF_8));
                 } catch (IOException e) {
-                    LOG.error("Error writing to file: " + file.getPath(), e);
+                    LOG.error("Error writing to file: " + targetFile.getPath(), e);
                 }
             });
 
-            return file;
+            return targetFile;
         } catch (IOException e) {
             LOG.error("Error creating file: " + fileName, e);
             return null;
@@ -174,7 +177,8 @@ public final class IDEIntegrationService {
      */
     public boolean openFile(@NotNull VirtualFile file) {
         OpenFileDescriptor descriptor = new OpenFileDescriptor(project, file);
-        return !descriptor.canNavigate() || descriptor.navigate(true);
+        descriptor.navigate(true);
+        return descriptor.canNavigate();
     }
 
     /**
@@ -487,10 +491,9 @@ public final class IDEIntegrationService {
         }
 
         // Check for mod base classes
-        PsiClassType extendsType = psiClass.getExtendsListType();
-        if (extendsType != null) {
+        PsiClassType[] extendsTypes = psiClass.getExtendsListTypes();
+        for (PsiClassType extendsType : extendsTypes) {
             String extendsName = extendsType.getClassName();
-
             if (extendsName != null) {
                 if (extendsName.contains("Mod") || extendsName.contains("Plugin")) {
                     return true;

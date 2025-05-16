@@ -275,9 +275,7 @@ public final class CompatibilityUtil {
     }
 
     /**
-     * Provides a scheduled executor service compatible with the IntelliJ platform.
-     *
-     * @return A ScheduledExecutorService instance.
+     * Provides a ScheduledExecutorService from the IntelliJ platform.
      */
     public static ScheduledExecutorService getCompatibleAppScheduledExecutorService() {
         return AppExecutorUtil.getAppScheduledExecutorService();
@@ -285,11 +283,23 @@ public final class CompatibilityUtil {
 
     /**
      * Provides an executor service compatible with the IntelliJ platform.
-     *
-     * @return An ExecutorService instance.
      */
     public static ExecutorService getCompatibleAppExecutorService() {
         return AppExecutorUtil.getAppExecutorService();
+    }
+
+    /**
+     * Provides access to the NodeManager from DebugProcessImpl via reflection.
+     * Returns null if the method is unavailable.
+     */
+    @Nullable
+    public static Object getNodeManager(@NotNull com.intellij.debugger.engine.DebugProcessImpl process) {
+        try {
+            java.lang.reflect.Method m = process.getClass().getMethod("getNodeManager");
+            return m.invoke(process);
+        } catch (Exception e) {
+            return null;
+        }
     }
 
     /**
@@ -335,6 +345,26 @@ public final class CompatibilityUtil {
      */
     public static <T> T runWriteAction(Computable<T> action) {
         return ApplicationManager.getApplication().runWriteAction(action);
+    }
+
+    /**
+     * Stream compatibility for arrays
+     */
+    public static <T> java.util.stream.Stream<T> toStream(T[] array) {
+        return java.util.Arrays.stream(array);
+    }
+
+    /**
+     * Add breakpoint listener to XDebugSession for compatibility
+     */
+    public static <L extends com.intellij.xdebugger.breakpoints.XBreakpoint<?>> void addBreakpointListener(
+            com.intellij.xdebugger.XDebugSession session,
+            com.intellij.xdebugger.XBreakpointListener<L> listener) {
+        try {
+            session.addBreakpointListener(listener);
+        } catch (NoSuchMethodError e) {
+            // ignore on older/newer APIs
+        }
     }
 
     private CompatibilityUtil() {

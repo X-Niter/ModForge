@@ -123,6 +123,7 @@ public final class AutonomousCodeGenerationService {
         private final boolean isAbstract;
         private final boolean isPrivate;
         private final String description;
+        private final String returnDescription;
 
         /**
          * Creates a new method definition.
@@ -137,6 +138,23 @@ public final class AutonomousCodeGenerationService {
          */
         public MethodDefinition(String name, String returnType, List<ParameterDefinition> parameters,
                 boolean isStatic, boolean isAbstract, boolean isPrivate, String description) {
+            this(name, returnType, parameters, isStatic, isAbstract, isPrivate, description, null);
+        }
+
+        /**
+         * Creates a new method definition with a return description.
+         *
+         * @param name              The method name
+         * @param returnType        The return type
+         * @param parameters        The method parameters
+         * @param isStatic          Whether the method is static
+         * @param isAbstract        Whether the method is abstract
+         * @param isPrivate         Whether the method is private
+         * @param description       The method description
+         * @param returnDescription The return value description
+         */
+        public MethodDefinition(String name, String returnType, List<ParameterDefinition> parameters,
+                boolean isStatic, boolean isAbstract, boolean isPrivate, String description, String returnDescription) {
             this.name = name;
             this.returnType = returnType;
             this.parameters = parameters;
@@ -144,6 +162,7 @@ public final class AutonomousCodeGenerationService {
             this.isAbstract = isAbstract;
             this.isPrivate = isPrivate;
             this.description = description;
+            this.returnDescription = returnDescription;
         }
 
         /**
@@ -207,6 +226,15 @@ public final class AutonomousCodeGenerationService {
          */
         public String getDescription() {
             return description;
+        }
+
+        /**
+         * Gets the return value description.
+         *
+         * @return The return value description
+         */
+        public String getReturnDescription() {
+            return returnDescription;
         }
     }
 
