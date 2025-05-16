@@ -122,8 +122,10 @@ jobs:
           CONVERSATION_ID: ${{ steps.context.outputs.conversation_id }}
           IS_STALE: ${{ steps.context.outputs.is_stale }}
         run: |
-          # Create a Python script to process the conversation
           cat > process_conversation.py << 'EOF'
+          # [Insert your Python script here, fully indented by two spaces for each level under run: |]
+          EOF
+          python process_conversation.py
           import os
           import sys
           import json
